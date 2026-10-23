@@ -23,6 +23,17 @@ class AssetClassificationTests(unittest.TestCase):
         kind, _ = MODULE._asset_type({"symbol": "ABC", "name": "Example Protocol", "id": "example-protocol"})
         self.assertEqual(kind, "other_crypto")
 
+    def test_gold_backed_tokens_get_commodity_category(self):
+        for coin in (
+            {"symbol": "XAUT", "name": "Tether Gold", "id": "tether-gold"},
+            {"symbol": "PAXG", "name": "PAX Gold", "id": "pax-gold"},
+            {"symbol": "GLD", "name": "Example Tokenized Gold", "id": "example-tokenized-gold"},
+        ):
+            with self.subTest(coin=coin):
+                kind, note = MODULE._asset_type(coin)
+                self.assertEqual(kind, "commodity_backed")
+                self.assertTrue(note)
+
 
 class ScoreTests(unittest.TestCase):
     def test_score_is_bounded_and_includes_caveats(self):
@@ -38,6 +49,34 @@ class ScoreTests(unittest.TestCase):
         self.assertEqual(result["asset_type"], "other_crypto")
         self.assertIn("warnings", result)
         self.assertIn("reasons", result)
+        self.assertTrue(result["growth_candidate_eligible"])
+        self.assertEqual(result["screen_profile"], "growth_research")
+
+    def test_stablecoin_high_metric_score_is_not_a_growth_candidate(self):
+        result = MODULE._score({
+            "id": "tether", "symbol": "USDT", "name": "Tether",
+            "current_price": 1.0, "market_cap": 500_000_000,
+            "total_volume": 20_000_000, "fully_diluted_valuation": 500_000_000,
+            "circulating_supply": 500_000_000, "total_supply": 500_000_000,
+            "price_change_percentage_24h": 0.1,
+        })
+        self.assertEqual(result["asset_type"], "stablecoin")
+        self.assertFalse(result["growth_candidate_eligible"])
+        self.assertEqual(result["screen_profile"], "stablecoin_monitoring")
+        self.assertEqual(result["screen_band"], "excluded_non_growth_asset")
+        self.assertEqual(result["screen_score"], 100)
+
+    def test_commodity_backed_asset_is_not_a_growth_candidate(self):
+        result = MODULE._score({
+            "id": "tether-gold", "symbol": "XAUT", "name": "Tether Gold",
+            "current_price": 2000.0, "market_cap": 500_000_000,
+            "total_volume": 20_000_000, "fully_diluted_valuation": 500_000_000,
+            "circulating_supply": 250_000, "total_supply": 250_000,
+            "price_change_percentage_24h": 0.1,
+        })
+        self.assertEqual(result["asset_type"], "commodity_backed")
+        self.assertFalse(result["growth_candidate_eligible"])
+        self.assertEqual(result["screen_band"], "excluded_non_growth_asset")
 
 
 if __name__ == "__main__":
