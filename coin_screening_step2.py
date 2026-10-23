@@ -152,6 +152,60 @@ def _fetch_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]
             return cached[1], "stale_cache", 0
         raise
 
+
+def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]], str, int, int, int]:
+    """Scan the full public CoinPaprika ticker list before applying the commodity filter."""
+    key = (f"commodity:{vs_currency}", per_page)
+    now = time.time()
+    with _CACHE_LOCK:
+        cached = _CACHE.get(key)
+    if cached and now - cached[0] <= _CACHE_TTL_SECONDS:
+        rows = cached[1]
+        scanned = int(rows[0].get("_cin_scanned_universe", 0)) if rows else 0
+        return rows, "cache", 0, scanned, len(rows)
+    url = "https://api.coinpaprika.com/v1/tickers?quotes=" + urllib.parse.quote(vs_currency.upper())
+    req = urllib.request.Request(url, headers={"accept": "application/json", "user-agent": "CIN-Research-API/0.4.0"}, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=20) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        if not isinstance(payload, list):
+            raise ValueError("Unexpected CoinPaprika ticker response")
+        mapped: list[dict[str, Any]] = []
+        for row in payload:
+            if not isinstance(row, dict):
+                continue
+            quotes = row.get("quotes") or {}
+            quote = quotes.get(vs_currency.upper()) or {}
+            price = quote.get("price")
+            market_cap = quote.get("market_cap")
+            total_supply = row.get("total_supply")
+            max_supply = row.get("max_supply")
+            fdv_supply = max_supply if isinstance(max_supply, (int, float)) and max_supply > 0 else total_supply
+            fdv = price * fdv_supply if isinstance(price, (int, float)) and isinstance(fdv_supply, (int, float)) else None
+            mapped.append({
+                "id": row.get("id"), "symbol": row.get("symbol"), "name": row.get("name"),
+                "current_price": price, "market_cap": market_cap,
+                "total_volume": quote.get("volume_24h"), "fully_diluted_valuation": fdv,
+                "circulating_supply": row.get("circulating_supply"), "total_supply": total_supply,
+                "price_change_percentage_24h": quote.get("percent_change_24h"),
+                "last_updated": row.get("last_updated"), "_cin_provider": "CoinPaprika",
+            })
+        scanned = len(mapped)
+        matches = [row for row in mapped if _asset_type(row)[0] == "commodity_backed"]
+        matches.sort(key=lambda item: item.get("market_cap") or 0, reverse=True)
+        selected = matches[:per_page]
+        for row in selected:
+            row["_cin_scanned_universe"] = scanned
+        with _CACHE_LOCK:
+            _CACHE[key] = (time.time(), selected)
+        return selected, "live", 0, scanned, len(matches)
+    except urllib.error.HTTPError as exc:
+        if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
+            rows = cached[1]
+            scanned = int(rows[0].get("_cin_scanned_universe", 0)) if rows else 0
+            return rows, "stale_cache", exc.code, scanned, len(rows)
+        raise
+
 def _score(coin: dict[str, Any]) -> dict[str, Any]:
     market_cap = _number(coin.get("market_cap"))
     volume = _number(coin.get("total_volume"))
@@ -277,8 +331,20 @@ async def coin_screening(
 ):
     """Screen top market-cap assets. Asset-type labels are heuristic. Read-only."""
     currency = vs_currency.lower()
+    commodity_scan: dict[str, Any] | None = None
     try:
-        raw, data_mode, provider_error_code = await asyncio.to_thread(_fetch_markets, currency, per_page)
+        if asset_type == "commodity_backed":
+            raw, data_mode, provider_error_code, scanned_count, matched_count = await asyncio.to_thread(_fetch_commodity_markets, currency, per_page)
+            commodity_scan = {
+                "provider": "CoinPaprika",
+                "scanned_universe_count": scanned_count,
+                "classified_match_count": matched_count,
+                "returned_count": len(raw),
+                "scope": "All ticker rows returned by the public CoinPaprika tickers endpoint; not every token in existence",
+                "status": "matches_found" if matched_count else "no_matches_in_scanned_universe",
+            }
+        else:
+            raw, data_mode, provider_error_code = await asyncio.to_thread(_fetch_markets, currency, per_page)
     except urllib.error.HTTPError as exc:
         if exc.code == 429:
             raise HTTPException(status_code=503, detail="CoinGecko rate-limited and fallback provider unavailable; retry later") from exc
@@ -317,6 +383,7 @@ async def coin_screening(
             "24h_change_band": 10,
         },
         "asset_classification": "Heuristic symbol/name/ID classification; validate independently before research decisions",
+        "universe_scan": commodity_scan,
         "limitations": [
             "Initial screen covers the top market-cap assets returned by CoinGecko, not every token.",
             "A missing value receives no points and generates a warning.",
