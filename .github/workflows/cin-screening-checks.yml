@@ -18,8 +18,10 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install minimal test dependency
-        run: python -m pip install "fastapi>=0.110,<1"
+        run: python -m pip install "fastapi>=0.110,<1" pytest
       - name: Compile screening module
         run: python -m py_compile coin_screening_step2.py
       - name: Run offline screening tests
         run: python -m unittest discover -s tests -v
+      - name: Run evidence assessment tests
+        run: python -m pytest -q tests/test_commodity_backing_assessment.py tests/test_commodity_backing_api.py
