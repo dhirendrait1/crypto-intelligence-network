@@ -3,6 +3,6 @@ services:
     name: cin-api
     runtime: python
     plan: free
-    buildCommand: python -m zipfile -e cin_step203_bootable_scaffold.zip . && python patch_cin_metadata.py && pip install -r cin/requirements.txt
+    buildCommand: python -m zipfile -e cin_step203_scaffold_fixed.zip . && python patch_cin_metadata_fixed.py && pip install -r cin/requirements.txt
     startCommand: uvicorn app.main:app --app-dir cin --host 0.0.0.0 --port $PORT
     autoDeploy: true
