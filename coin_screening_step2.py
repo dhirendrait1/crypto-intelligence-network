@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -13,6 +15,10 @@ from fastapi import APIRouter, HTTPException, Query
 
 router = APIRouter(tags=["coin-screening"])
 URL = "https://api.coingecko.com/api/v3/coins/markets"
+_CACHE_TTL_SECONDS = 90
+_STALE_CACHE_MAX_SECONDS = 900
+_CACHE: dict[tuple[str, int], tuple[float, list[dict[str, Any]]]] = {}
+_CACHE_LOCK = threading.Lock()
 
 # Conservative symbol/name heuristics only; this is not a canonical token taxonomy.
 STABLE_SYMBOLS = {
@@ -42,7 +48,7 @@ def _asset_type(coin: dict[str, Any]) -> tuple[str, str]:
     return "other_crypto", "Default classification; not a verified asset taxonomy"
 
 
-def _fetch_markets(vs_currency: str, per_page: int) -> list[dict[str, Any]]:
+def _request_markets(vs_currency: str, per_page: int) -> list[dict[str, Any]]:
     params = urllib.parse.urlencode({
         "vs_currency": vs_currency,
         "order": "market_cap_desc",
@@ -62,6 +68,28 @@ def _fetch_markets(vs_currency: str, per_page: int) -> list[dict[str, Any]]:
         raise ValueError("Unexpected market-data response")
     return [row for row in payload if isinstance(row, dict)]
 
+
+
+def _fetch_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]], str, int]:
+    key = (vs_currency, per_page)
+    now = time.time()
+    with _CACHE_LOCK:
+        cached = _CACHE.get(key)
+    if cached and now - cached[0] <= _CACHE_TTL_SECONDS:
+        return cached[1], "cache", 0
+    try:
+        rows = _request_markets(vs_currency, per_page)
+        with _CACHE_LOCK:
+            _CACHE[key] = (time.time(), rows)
+        return rows, "live", 0
+    except urllib.error.HTTPError as exc:
+        if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
+            return cached[1], "stale_cache", exc.code
+        raise
+    except (urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError):
+        if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
+            return cached[1], "stale_cache", 0
+        raise
 
 def _score(coin: dict[str, Any]) -> dict[str, Any]:
     market_cap = _number(coin.get("market_cap"))
@@ -171,10 +199,10 @@ async def coin_screening(
     """Screen top market-cap assets. Asset-type labels are heuristic. Read-only."""
     currency = vs_currency.lower()
     try:
-        raw = await asyncio.to_thread(_fetch_markets, currency, per_page)
+        raw, data_mode, provider_error_code = await asyncio.to_thread(_fetch_markets, currency, per_page)
     except urllib.error.HTTPError as exc:
         if exc.code == 429:
-            raise HTTPException(status_code=503, detail="CoinGecko rate limit; retry later") from exc
+            raise HTTPException(status_code=503, detail="CoinGecko rate limit and no recent cached response; retry later") from exc
         raise HTTPException(status_code=502, detail=f"CoinGecko HTTP error: {exc.code}") from exc
     except (urllib.error.URLError, TimeoutError) as exc:
         raise HTTPException(status_code=503, detail="CoinGecko temporarily unavailable") from exc
@@ -193,6 +221,9 @@ async def coin_screening(
         "endpoint": "/coin-screening",
         "source": "CoinGecko public API",
         "mode": "read_only",
+        "data_mode": data_mode,
+        "stale_data_warning": ("CoinGecko is unavailable or rate-limiting; results use cached market data and may be up to 15 minutes old." if data_mode == "stale_cache" else None),
+        "provider_error_code": provider_error_code or None,
         "methodology": "Preliminary transparent heuristic; not financial advice or a safety rating",
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
         "currency": currency.upper(),
