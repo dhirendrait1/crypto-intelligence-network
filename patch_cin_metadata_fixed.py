@@ -32,6 +32,8 @@ MODULES = (
     "commodity_backing_api.py",
     "growth_fundamentals_assessment.py",
     "growth_fundamentals_api.py",
+    "cin_evidence_ingestion.py",
+    "cin_evidence_ingestion_api.py",
 )
 for module_name in MODULES:
     source_module = ROOT / module_name
@@ -70,6 +72,12 @@ registrations = [
         "from app.growth_fundamentals_api import router as cin_growth_fundamentals_router\n"
         "app.include_router(cin_growth_fundamentals_router)\n",
     ),
+    (
+        "cin_public_evidence_router",
+        "\n# CIN Milestone 2: allowlisted public evidence ingestion (read-only)\n"
+        "from app.cin_evidence_ingestion_api import router as cin_public_evidence_router\n"
+        "app.include_router(cin_public_evidence_router)\n",
+    ),
 ]
 for marker, registration in registrations:
     if marker not in main_text:
@@ -77,4 +85,4 @@ for marker, registration in registrations:
         changed += 1
 main_path.write_text(main_text, encoding="utf-8")
 
-print(f"CIN metadata verified; Step 1, Step 2, commodity backing, and growth fundamentals routers installed; files updated: {changed}")
+print(f"CIN metadata verified; market data, screening, commodity backing, growth fundamentals, and public evidence routers installed; files updated: {changed}")
