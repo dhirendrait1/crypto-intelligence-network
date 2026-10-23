@@ -49,6 +49,7 @@ def _asset_type(coin: dict[str, Any]) -> tuple[str, str]:
 
 
 def _request_markets(vs_currency: str, per_page: int) -> list[dict[str, Any]]:
+    """Try CoinGecko first, then map CoinPaprika tickers into the same screening schema."""
     params = urllib.parse.urlencode({
         "vs_currency": vs_currency,
         "order": "market_cap_desc",
@@ -59,15 +60,71 @@ def _request_markets(vs_currency: str, per_page: int) -> list[dict[str, Any]]:
     })
     req = urllib.request.Request(
         f"{URL}?{params}",
-        headers={"accept": "application/json", "user-agent": "CIN-Research-API/0.3.0"},
+        headers={"accept": "application/json", "user-agent": "CIN-Research-API/0.4.0"},
         method="GET",
     )
-    with urllib.request.urlopen(req, timeout=15) as response:
-        payload = json.loads(response.read().decode("utf-8"))
-    if not isinstance(payload, list):
-        raise ValueError("Unexpected market-data response")
-    return [row for row in payload if isinstance(row, dict)]
-
+    try:
+        with urllib.request.urlopen(req, timeout=12) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        if not isinstance(payload, list):
+            raise ValueError("Unexpected CoinGecko market-data response")
+        rows = [row for row in payload if isinstance(row, dict)]
+        for row in rows:
+            row["_cin_provider"] = "CoinGecko"
+        if rows:
+            return rows
+        raise ValueError("CoinGecko returned no market rows")
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError) as primary_error:
+        # CoinPaprika's public tickers endpoint is an independent fallback.
+        fallback_url = "https://api.coinpaprika.com/v1/tickers?quotes=" + urllib.parse.quote(vs_currency.upper())
+        fallback_req = urllib.request.Request(
+            fallback_url,
+            headers={"accept": "application/json", "user-agent": "CIN-Research-API/0.4.0"},
+            method="GET",
+        )
+        try:
+            with urllib.request.urlopen(fallback_req, timeout=12) as response:
+                fallback_payload = json.loads(response.read().decode("utf-8"))
+            if not isinstance(fallback_payload, list):
+                raise ValueError("Unexpected CoinPaprika ticker response")
+            quote_key = vs_currency.upper()
+            mapped: list[dict[str, Any]] = []
+            for row in fallback_payload:
+                if not isinstance(row, dict):
+                    continue
+                quotes = row.get("quotes") or {}
+                quote = quotes.get(quote_key) or {}
+                price = quote.get("price")
+                market_cap = quote.get("market_cap")
+                volume = quote.get("volume_24h")
+                circulating = row.get("circulating_supply")
+                total_supply = row.get("total_supply")
+                max_supply = row.get("max_supply")
+                fdv_supply = max_supply if isinstance(max_supply, (int, float)) and max_supply > 0 else total_supply
+                fdv = price * fdv_supply if isinstance(price, (int, float)) and isinstance(fdv_supply, (int, float)) else None
+                mapped.append({
+                    "id": row.get("id"),
+                    "symbol": row.get("symbol"),
+                    "name": row.get("name"),
+                    "current_price": price,
+                    "market_cap": market_cap,
+                    "total_volume": volume,
+                    "fully_diluted_valuation": fdv,
+                    "circulating_supply": circulating,
+                    "total_supply": total_supply,
+                    "price_change_percentage_24h": quote.get("percent_change_24h"),
+                    "last_updated": row.get("last_updated"),
+                    "_cin_provider": "CoinPaprika",
+                })
+            mapped.sort(key=lambda item: item.get("market_cap") or 0, reverse=True)
+            if not mapped:
+                raise ValueError("CoinPaprika returned no usable ticker rows")
+            return mapped[:per_page]
+        except Exception as fallback_error:
+            # Preserve the original CoinGecko 429 so the API can report rate limiting clearly.
+            if isinstance(primary_error, urllib.error.HTTPError) and primary_error.code == 429:
+                raise primary_error
+            raise fallback_error
 
 
 def _fetch_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]], str, int]:
@@ -202,10 +259,10 @@ async def coin_screening(
         raw, data_mode, provider_error_code = await asyncio.to_thread(_fetch_markets, currency, per_page)
     except urllib.error.HTTPError as exc:
         if exc.code == 429:
-            raise HTTPException(status_code=503, detail="CoinGecko rate limit and no recent cached response; retry later") from exc
+            raise HTTPException(status_code=503, detail="CoinGecko rate-limited and fallback provider unavailable; retry later") from exc
         raise HTTPException(status_code=502, detail=f"CoinGecko HTTP error: {exc.code}") from exc
     except (urllib.error.URLError, TimeoutError) as exc:
-        raise HTTPException(status_code=503, detail="CoinGecko temporarily unavailable") from exc
+        raise HTTPException(status_code=503, detail="Primary and fallback market-data providers are temporarily unavailable") from exc
     except (ValueError, json.JSONDecodeError) as exc:
         raise HTTPException(status_code=502, detail="Invalid CoinGecko response") from exc
 
@@ -219,10 +276,10 @@ async def coin_screening(
     return {
         "service": "cin",
         "endpoint": "/coin-screening",
-        "source": "CoinGecko public API",
+        "source": (raw[0].get("_cin_provider", "Unknown provider") + " public API") if raw else "No provider data",
         "mode": "read_only",
         "data_mode": data_mode,
-        "stale_data_warning": ("CoinGecko is unavailable or rate-limiting; results use cached market data and may be up to 15 minutes old." if data_mode == "stale_cache" else None),
+        "stale_data_warning": ("Primary provider was unavailable; results use cached market data and may be up to 15 minutes old." if data_mode == "stale_cache" else None),
         "provider_error_code": provider_error_code or None,
         "methodology": "Preliminary transparent heuristic; not financial advice or a safety rating",
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
