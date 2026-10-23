@@ -25,7 +25,15 @@ for path in APP_DIR.rglob("*.py"):
 if not found:
     raise SystemExit("Could not find a CIN application title to validate")
 
-for module_name in ("market_data_step1.py", "coin_screening_step2.py", "commodity_backing_assessment.py", "commodity_backing_api.py"):
+MODULES = (
+    "market_data_step1.py",
+    "coin_screening_step2.py",
+    "commodity_backing_assessment.py",
+    "commodity_backing_api.py",
+    "growth_fundamentals_assessment.py",
+    "growth_fundamentals_api.py",
+)
+for module_name in MODULES:
     source_module = ROOT / module_name
     target_module = APP_DIR / module_name
     if not source_module.is_file():
