@@ -2,6 +2,8 @@
 import importlib.util
 import pathlib
 import unittest
+from unittest.mock import patch, MagicMock
+import json
 
 MODULE_PATH = pathlib.Path(__file__).resolve().parents[1] / "coin_screening_step2.py"
 SPEC = importlib.util.spec_from_file_location("coin_screening_step2", MODULE_PATH)
@@ -33,6 +35,25 @@ class AssetClassificationTests(unittest.TestCase):
                 kind, note = MODULE._asset_type(coin)
                 self.assertEqual(kind, "commodity_backed")
                 self.assertTrue(note)
+
+
+    def test_commodity_scan_filters_full_provider_list_before_limit(self):
+        payload = [
+            {"id": "btc-bitcoin", "symbol": "BTC", "name": "Bitcoin", "quotes": {"USD": {"price": 100, "market_cap": 1000, "volume_24h": 10}}},
+            {"id": "tether-gold", "symbol": "XAUT", "name": "Tether Gold", "circulating_supply": 10, "total_supply": 10, "quotes": {"USD": {"price": 2000, "market_cap": 900, "volume_24h": 20}}},
+            {"id": "pax-gold", "symbol": "PAXG", "name": "PAX Gold", "circulating_supply": 8, "total_supply": 8, "quotes": {"USD": {"price": 2000, "market_cap": 800, "volume_24h": 15}}},
+        ]
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = json.dumps(payload).encode("utf-8")
+        with patch.object(MODULE.urllib.request, "urlopen", return_value=response):
+            rows, mode, error_code, scanned, matches = MODULE._fetch_commodity_markets("usd", 1)
+        self.assertEqual(mode, "live")
+        self.assertEqual(error_code, 0)
+        self.assertEqual(scanned, 3)
+        self.assertEqual(matches, 2)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["symbol"], "XAUT")
+        self.assertEqual(rows[0]["_cin_scanned_universe"], 3)
 
 
 class ScoreTests(unittest.TestCase):
