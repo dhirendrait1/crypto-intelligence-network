@@ -28,4 +28,4 @@ from commodity_backing_assessment import assess_commodity_asset
 assessment = assess_commodity_asset("PAXG", evidence_records)
 ```
 
-The module is not yet connected to the live `/coin-screening` response. That integration should be a separate step with its own endpoint and tests.
+## API endpoint\n\nThe read-only API router exposes `POST /commodity-backing-assessment`. Submit a JSON body containing `symbol`, an optional `evidence` array, and optional `max_age_days` (default 90; allowed range 1–3650). Each evidence record may include `evidence_type`, `source_name`, `source_url`, `published_at`, `checked_at`, `status`, and `notes`. The endpoint assesses caller-supplied metadata only: it does not fetch source documents, does not modify stored state, and does not certify reserves. Empty evidence returns an explicit unverified/incomplete assessment. The Render build script copies the router and assessment module into the FastAPI application and registers the router.
