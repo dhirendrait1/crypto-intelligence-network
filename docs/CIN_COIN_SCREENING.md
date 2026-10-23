@@ -15,7 +15,17 @@ Query parameters:
 Examples:
 - `/coin-screening?per_page=20`
 - `/coin-screening?asset_type=growth&per_page=50`
-- `/coin-screening?asset_type=commodity_backed`
+- `/coin-screening?asset_type=commodity_backed&per_page=10`
+
+### Commodity-backed discovery
+
+The `commodity_backed` filter uses the public CoinPaprika ticker endpoint and classifies the returned ticker universe **before** applying `per_page`. This avoids the previous behavior where commodity assets could be missed because they were outside the top market-cap page. The response includes `universe_scan` metadata:
+- `scanned_universe_count`: ticker rows inspected from the provider response.
+- `classified_match_count`: rows classified by CIN's heuristic as commodity-backed.
+- `returned_count`: matching rows returned after `per_page`.
+- `status`: `matches_found` or `no_matches_in_scanned_universe`.
+
+This is still only the provider's returned ticker universe, not every token in existence. Classification is heuristic and can miss assets. A zero-match response means no matches were identified in the scanned provider response; it does not prove no commodity-backed tokens exist. This category-specific path uses CoinPaprika data and has a 20-second provider timeout.
 
 ## Score and interpretation
 
