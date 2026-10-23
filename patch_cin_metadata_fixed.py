@@ -56,6 +56,12 @@ registrations = [
         "from app.commodity_backing_api import router as cin_commodity_backing_router\n"
         "app.include_router(cin_commodity_backing_router)\n",
     ),
+    (
+        "cin_growth_fundamentals_router",
+        "\n# CIN: read-only growth fundamentals evidence endpoint\n"
+        "from app.growth_fundamentals_api import router as cin_growth_fundamentals_router\n"
+        "app.include_router(cin_growth_fundamentals_router)\n",
+    ),
 ]
 for marker, registration in registrations:
     if marker not in main_text:
@@ -63,4 +69,4 @@ for marker, registration in registrations:
         changed += 1
 main_path.write_text(main_text, encoding="utf-8")
 
-print(f"CIN metadata verified; Step 1, Step 2, and commodity backing routers installed; files updated: {changed}")
+print(f"CIN metadata verified; Step 1, Step 2, commodity backing, and growth fundamentals routers installed; files updated: {changed}")
