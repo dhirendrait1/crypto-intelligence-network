@@ -25,7 +25,7 @@ for path in APP_DIR.rglob("*.py"):
 if not found:
     raise SystemExit("Could not find a CIN application title to validate")
 
-for module_name in ("market_data_step1.py", "coin_screening_step2.py"):
+for module_name in ("market_data_step1.py", "coin_screening_step2.py", "commodity_backing_assessment.py", "commodity_backing_api.py"):
     source_module = ROOT / module_name
     target_module = APP_DIR / module_name
     if not source_module.is_file():
@@ -50,6 +50,12 @@ registrations = [
         "from app.coin_screening_step2 import router as cin_coin_screening_router\n"
         "app.include_router(cin_coin_screening_router)\n",
     ),
+    (
+        "cin_commodity_backing_router",
+        "\n# CIN: read-only commodity backing evidence assessment endpoint\n"
+        "from app.commodity_backing_api import router as cin_commodity_backing_router\n"
+        "app.include_router(cin_commodity_backing_router)\n",
+    ),
 ]
 for marker, registration in registrations:
     if marker not in main_text:
@@ -57,4 +63,4 @@ for marker, registration in registrations:
         changed += 1
 main_path.write_text(main_text, encoding="utf-8")
 
-print(f"CIN metadata verified; Step 1 and Step 2 routers installed; files updated: {changed}")
+print(f"CIN metadata verified; Step 1, Step 2, and commodity backing routers installed; files updated: {changed}")
