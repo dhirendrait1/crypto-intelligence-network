@@ -162,7 +162,7 @@ def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict
     if cached and now - cached[0] <= _CACHE_TTL_SECONDS:
         rows = cached[1]
         scanned = int(rows[0].get("_cin_scanned_universe", 0)) if rows else 0
-        return rows, "cache", 0, scanned, len(rows)
+        return rows, "cache", 0, scanned, (int(rows[0].get("_cin_match_count", len(rows))) if rows else 0)
     url = "https://api.coinpaprika.com/v1/tickers?quotes=" + urllib.parse.quote(vs_currency.upper())
     req = urllib.request.Request(url, headers={"accept": "application/json", "user-agent": "CIN-Research-API/0.4.0"}, method="GET")
     try:
@@ -196,6 +196,7 @@ def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict
         selected = matches[:per_page]
         for row in selected:
             row["_cin_scanned_universe"] = scanned
+            row["_cin_match_count"] = len(matches)
         # Do not cache empty matches: without a row there is no place to retain
         # scanned-universe metadata, and an empty cache hit would report scanned=0.
         if selected:
@@ -206,7 +207,7 @@ def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict
         if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
             rows = cached[1]
             scanned = int(rows[0].get("_cin_scanned_universe", 0)) if rows else 0
-            return rows, "stale_cache", exc.code, scanned, len(rows)
+            return rows, "stale_cache", exc.code, scanned, (int(rows[0].get("_cin_match_count", len(rows))) if rows else 0)
         raise
 
 def _score(coin: dict[str, Any]) -> dict[str, Any]:
