@@ -1,4 +1,4 @@
-"""CIN Step 2: explainable, read-only crypto coin screening."""
+"""CIN Step 2/3: explainable screening with explicit asset-type classification."""
 from __future__ import annotations
 
 import asyncio
@@ -14,9 +14,32 @@ from fastapi import APIRouter, HTTPException, Query
 router = APIRouter(tags=["coin-screening"])
 URL = "https://api.coingecko.com/api/v3/coins/markets"
 
+# Conservative symbol/name heuristics only; this is not a canonical token taxonomy.
+STABLE_SYMBOLS = {
+    "USDT", "USDC", "DAI", "FDUSD", "USDE", "USDS", "TUSD", "USDD",
+    "PYUSD", "USDP", "FRAX", "LUSD", "GUSD", "EURC", "EURT", "USTC",
+}
+WRAPPED_SYMBOLS = {
+    "WBTC", "WETH", "WBNB", "WMATIC", "WAVAX", "WFTM", "WSOL",
+    "STETH", "WSTETH", "CBETH", "RETH", "WEETH", "EZETH",
+}
+
 
 def _number(value: Any) -> float | None:
     return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
+def _asset_type(coin: dict[str, Any]) -> tuple[str, str]:
+    symbol = str(coin.get("symbol", "")).upper()
+    name = str(coin.get("name", "")).lower()
+    coin_id = str(coin.get("id", "")).lower()
+    if symbol in STABLE_SYMBOLS or any(word in name for word in ("usd coin", "tether", "stablecoin")):
+        return "stablecoin", "Symbol/name heuristic; verify peg and issuer independently"
+    if symbol in WRAPPED_SYMBOLS or any(word in name for word in ("wrapped ", " liquid staked", "staked ether")):
+        return "wrapped_or_staked", "Symbol/name heuristic; wrapper or staking status may require verification"
+    if "wrapped" in coin_id or coin_id.startswith("wrapped-"):
+        return "wrapped_or_staked", "Coin ID heuristic; verify asset structure independently"
+    return "other_crypto", "Default classification; not a verified asset taxonomy"
 
 
 def _fetch_markets(vs_currency: str, per_page: int) -> list[dict[str, Any]]:
@@ -30,7 +53,7 @@ def _fetch_markets(vs_currency: str, per_page: int) -> list[dict[str, Any]]:
     })
     req = urllib.request.Request(
         f"{URL}?{params}",
-        headers={"accept": "application/json", "user-agent": "CIN-Research-API/0.2.0"},
+        headers={"accept": "application/json", "user-agent": "CIN-Research-API/0.3.0"},
         method="GET",
     )
     with urllib.request.urlopen(req, timeout=15) as response:
@@ -47,14 +70,14 @@ def _score(coin: dict[str, Any]) -> dict[str, Any]:
     circulating = _number(coin.get("circulating_supply"))
     total_supply = _number(coin.get("total_supply"))
     change = _number(coin.get("price_change_percentage_24h"))
+    asset_type, classification_note = _asset_type(coin)
     score = 0
     reasons: list[str] = []
     warnings: list[str] = []
 
-    # A transparent preliminary screen, not an investment recommendation.
     if market_cap is not None and market_cap >= 100_000_000:
         score += 20
-        reasons.append("Market cap at least USD-equivalent 100M")
+        reasons.append("Market cap at least 100M in selected currency")
     elif market_cap is None:
         warnings.append("Market-cap data missing")
     else:
@@ -79,7 +102,7 @@ def _score(coin: dict[str, Any]) -> dict[str, Any]:
         ratio = None
         warnings.append("Volume-to-market-cap ratio unavailable")
 
-    if fdv and market_cap and fdv > 0:
+    if fdv is not None and market_cap is not None and fdv > 0:
         fdv_gap = max(0.0, (fdv - market_cap) / fdv)
         if fdv_gap <= 0.25:
             score += 15
@@ -90,7 +113,7 @@ def _score(coin: dict[str, Any]) -> dict[str, Any]:
         fdv_gap = None
         warnings.append("FDV or market-cap data missing; dilution risk not scored")
 
-    if circulating and total_supply and total_supply > 0:
+    if circulating is not None and total_supply is not None and total_supply > 0:
         circulating_ratio = min(1.0, circulating / total_supply)
         if circulating_ratio >= 0.7:
             score += 15
@@ -109,10 +132,18 @@ def _score(coin: dict[str, Any]) -> dict[str, Any]:
     else:
         warnings.append("Extreme 24h move; review volatility and possible event risk")
 
+    if asset_type == "stablecoin":
+        warnings.append("Stablecoin classification is heuristic; peg stability and issuer risk are not assessed")
+    elif asset_type == "wrapped_or_staked":
+        warnings.append("Wrapped/staked classification is heuristic; depeg, bridge, custody, and staking risks are not assessed")
+
     return {
         "id": coin.get("id"),
         "symbol": str(coin.get("symbol", "")).upper(),
         "name": coin.get("name"),
+        "asset_type": asset_type,
+        "asset_type_confidence": "heuristic",
+        "asset_type_note": classification_note,
         "price": coin.get("current_price"),
         "market_cap": market_cap,
         "total_volume_24h": volume,
@@ -135,8 +166,9 @@ async def coin_screening(
     vs_currency: str = Query(default="usd", min_length=2, max_length=10, pattern="^[a-zA-Z]+$"),
     per_page: int = Query(default=50, ge=1, le=100),
     min_score: int = Query(default=0, ge=0, le=100),
+    asset_type: str = Query(default="all", pattern="^(all|growth|stablecoin|wrapped_or_staked|other_crypto)$"),
 ):
-    """Screen top market-cap assets with explicit, preliminary metrics. Read-only."""
+    """Screen top market-cap assets. Asset-type labels are heuristic. Read-only."""
     currency = vs_currency.lower()
     try:
         raw = await asyncio.to_thread(_fetch_markets, currency, per_page)
@@ -150,6 +182,10 @@ async def coin_screening(
         raise HTTPException(status_code=502, detail="Invalid CoinGecko response") from exc
 
     results = [_score(coin) for coin in raw]
+    if asset_type == "growth":
+        results = [coin for coin in results if coin["asset_type"] == "other_crypto"]
+    elif asset_type != "all":
+        results = [coin for coin in results if coin["asset_type"] == asset_type]
     results = [coin for coin in results if coin["screen_score"] >= min_score]
     results.sort(key=lambda item: (item["screen_score"], item["market_cap"] or 0), reverse=True)
     return {
@@ -161,7 +197,7 @@ async def coin_screening(
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
         "currency": currency.upper(),
         "count": len(results),
-        "parameters": {"per_page": per_page, "min_score": min_score},
+        "parameters": {"per_page": per_page, "min_score": min_score, "asset_type": asset_type},
         "score_weights": {
             "market_cap": 20,
             "volume_24h": 20,
@@ -170,10 +206,12 @@ async def coin_screening(
             "circulating_supply_ratio": 15,
             "24h_change_band": 10,
         },
+        "asset_classification": "Heuristic symbol/name/ID classification; validate independently before research decisions",
         "limitations": [
             "Initial screen covers the top market-cap assets returned by CoinGecko, not every token.",
             "A missing value receives no points and generates a warning.",
-            "Token unlock schedules, project utility, developer activity, audits, exploits, holder concentration, and exchange-specific liquidity are not yet verified by this endpoint.",
+            "Stablecoin and wrapped/staked labels are heuristics and may misclassify assets.",
+            "Token unlock schedules, project utility, developer activity, audits, exploits, holder concentration, and exchange-specific liquidity are not yet verified.",
             "Score is a research prioritization aid, not a prediction, endorsement, or guarantee of safety.",
         ],
         "data": results,
