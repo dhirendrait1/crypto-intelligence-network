@@ -29,6 +29,8 @@ WRAPPED_SYMBOLS = {
     "WBTC", "WETH", "WBNB", "WMATIC", "WAVAX", "WFTM", "WSOL",
     "STETH", "WSTETH", "CBETH", "RETH", "WEETH", "EZETH",
 }
+# Known examples only; this list is not a complete or independently verified taxonomy.
+COMMODITY_BACKED_SYMBOLS = {"XAUT", "PAXG"}
 
 
 def _number(value: Any) -> float | None:
@@ -39,6 +41,8 @@ def _asset_type(coin: dict[str, Any]) -> tuple[str, str]:
     symbol = str(coin.get("symbol", "")).upper()
     name = str(coin.get("name", "")).lower()
     coin_id = str(coin.get("id", "")).lower()
+    if symbol in COMMODITY_BACKED_SYMBOLS or any(word in name for word in ("gold-backed", "gold backed", "tokenized gold", "commodity-backed", "commodity backed")):
+        return "commodity_backed", "Symbol/name heuristic; verify reserves, redemption, custody, and issuer independently"
     if symbol in STABLE_SYMBOLS or any(word in name for word in ("usd coin", "tether", "stablecoin")):
         return "stablecoin", "Symbol/name heuristic; verify peg and issuer independently"
     if symbol in WRAPPED_SYMBOLS or any(word in name for word in ("wrapped ", " liquid staked", "staked ether")):
@@ -221,6 +225,22 @@ def _score(coin: dict[str, Any]) -> dict[str, Any]:
         warnings.append("Stablecoin classification is heuristic; peg stability and issuer risk are not assessed")
     elif asset_type == "wrapped_or_staked":
         warnings.append("Wrapped/staked classification is heuristic; depeg, bridge, custody, and staking risks are not assessed")
+    elif asset_type == "commodity_backed":
+        warnings.append("Commodity-backed classification is heuristic; reserves, redemption, custody, and issuer risk are not assessed")
+
+    # Keep the raw metric score comparable, but explicitly prevent non-growth
+    # asset classes from being presented as growth-screen candidates.
+    profile_by_type = {
+        "other_crypto": ("growth_research", True),
+        "stablecoin": ("stablecoin_monitoring", False),
+        "wrapped_or_staked": ("wrapped_staked_monitoring", False),
+        "commodity_backed": ("commodity_backed_monitoring", False),
+    }
+    screen_profile, growth_candidate_eligible = profile_by_type[asset_type]
+    if not growth_candidate_eligible:
+        screen_band = "excluded_non_growth_asset"
+    else:
+        screen_band = "research_candidate" if score >= 70 else ("watchlist" if score >= 45 else "insufficient_fundamental_metrics")
 
     return {
         "id": coin.get("id"),
@@ -229,6 +249,8 @@ def _score(coin: dict[str, Any]) -> dict[str, Any]:
         "asset_type": asset_type,
         "asset_type_confidence": "heuristic",
         "asset_type_note": classification_note,
+        "screen_profile": screen_profile,
+        "growth_candidate_eligible": growth_candidate_eligible,
         "price": coin.get("current_price"),
         "market_cap": market_cap,
         "total_volume_24h": volume,
@@ -239,7 +261,7 @@ def _score(coin: dict[str, Any]) -> dict[str, Any]:
         "price_change_percentage_24h": change,
         "screen_score": score,
         "max_score": 100,
-        "screen_band": "research_candidate" if score >= 70 else ("watchlist" if score >= 45 else "insufficient_fundamental_metrics"),
+        "screen_band": screen_band,
         "reasons": reasons,
         "warnings": warnings,
         "last_updated": coin.get("last_updated"),
@@ -268,7 +290,7 @@ async def coin_screening(
 
     results = [_score(coin) for coin in raw]
     if asset_type == "growth":
-        results = [coin for coin in results if coin["asset_type"] == "other_crypto"]
+        results = [coin for coin in results if coin["growth_candidate_eligible"]]
     elif asset_type != "all":
         results = [coin for coin in results if coin["asset_type"] == asset_type]
     results = [coin for coin in results if coin["screen_score"] >= min_score]
@@ -298,7 +320,9 @@ async def coin_screening(
         "limitations": [
             "Initial screen covers the top market-cap assets returned by CoinGecko, not every token.",
             "A missing value receives no points and generates a warning.",
-            "Stablecoin and wrapped/staked labels are heuristics and may misclassify assets.",
+            "Stablecoin, wrapped/staked, and commodity-backed labels are heuristics and may misclassify assets.",
+            "The growth filter excludes assets heuristically classified as stablecoins, wrapped/staked tokens, or commodity-backed tokens; remaining assets are not verified growth investments.",
+            "Raw screening scores remain metric-based; non-growth asset classes receive an explicit excluded_non_growth_asset band and are not growth candidates.",
             "Token unlock schedules, project utility, developer activity, audits, exploits, holder concentration, and exchange-specific liquidity are not yet verified.",
             "Score is a research prioritization aid, not a prediction, endorsement, or guarantee of safety.",
         ],
