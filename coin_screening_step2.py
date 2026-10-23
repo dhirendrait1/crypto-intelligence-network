@@ -196,8 +196,11 @@ def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict
         selected = matches[:per_page]
         for row in selected:
             row["_cin_scanned_universe"] = scanned
-        with _CACHE_LOCK:
-            _CACHE[key] = (time.time(), selected)
+        # Do not cache empty matches: without a row there is no place to retain
+        # scanned-universe metadata, and an empty cache hit would report scanned=0.
+        if selected:
+            with _CACHE_LOCK:
+                _CACHE[key] = (time.time(), selected)
         return selected, "live", 0, scanned, len(matches)
     except urllib.error.HTTPError as exc:
         if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
