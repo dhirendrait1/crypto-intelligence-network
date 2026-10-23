@@ -273,7 +273,7 @@ async def coin_screening(
     vs_currency: str = Query(default="usd", min_length=2, max_length=10, pattern="^[a-zA-Z]+$"),
     per_page: int = Query(default=50, ge=1, le=100),
     min_score: int = Query(default=0, ge=0, le=100),
-    asset_type: str = Query(default="all", pattern="^(all|growth|stablecoin|wrapped_or_staked|other_crypto)$"),
+    asset_type: str = Query(default="all", pattern="^(all|growth|stablecoin|wrapped_or_staked|commodity_backed|other_crypto)$"),
 ):
     """Screen top market-cap assets. Asset-type labels are heuristic. Read-only."""
     currency = vs_currency.lower()
