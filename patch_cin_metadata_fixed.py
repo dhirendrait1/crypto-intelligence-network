@@ -25,7 +25,6 @@ for path in APP_DIR.rglob("*.py"):
 if not found:
     raise SystemExit("Could not find a CIN application title to validate")
 
-# Copy tracked endpoint modules into the extracted application package.
 for module_name in ("market_data_step1.py", "coin_screening_step2.py"):
     source_module = ROOT / module_name
     target_module = APP_DIR / module_name
@@ -41,15 +40,15 @@ main_text = main_path.read_text(encoding="utf-8")
 registrations = [
     (
         "cin_market_data_router",
-        "\\n# CIN Step 1: public, read-only market data endpoint\\n"
-        "from app.market_data_step1 import router as cin_market_data_router\\n"
-        "app.include_router(cin_market_data_router)\\n",
+        "\n# CIN Step 1: public, read-only market data endpoint\n"
+        "from app.market_data_step1 import router as cin_market_data_router\n"
+        "app.include_router(cin_market_data_router)\n",
     ),
     (
         "cin_coin_screening_router",
-        "\\n# CIN Step 2: explainable, read-only coin screening endpoint\\n"
-        "from app.coin_screening_step2 import router as cin_coin_screening_router\\n"
-        "app.include_router(cin_coin_screening_router)\\n",
+        "\n# CIN Step 2: explainable, read-only coin screening endpoint\n"
+        "from app.coin_screening_step2 import router as cin_coin_screening_router\n"
+        "app.include_router(cin_coin_screening_router)\n",
     ),
 ]
 for marker, registration in registrations:
