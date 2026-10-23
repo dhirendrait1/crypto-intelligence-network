@@ -36,6 +36,7 @@ MODULES = (
     "cin_evidence_ingestion_api.py",
     "cin_technical_analysis.py",
     "cin_technical_analysis_api.py",
+    "cin_public_market_candles_api.py",
 )
 for module_name in MODULES:
     source_module = ROOT / module_name
@@ -86,6 +87,12 @@ registrations = [
         "from app.cin_technical_analysis_api import router as cin_technical_analysis_router\n"
         "app.include_router(cin_technical_analysis_router)\n",
     ),
+    (
+        "cin_public_market_candles_router",
+        "\n# CIN: public timestamped OHLCV and market-backed analysis (read-only)\n"
+        "from app.cin_public_market_candles_api import router as cin_public_market_candles_router\n"
+        "app.include_router(cin_public_market_candles_router)\n",
+    ),
 ]
 for marker, registration in registrations:
     if marker not in main_text:
@@ -93,4 +100,4 @@ for marker, registration in registrations:
         changed += 1
 main_path.write_text(main_text, encoding="utf-8")
 
-print(f"CIN metadata verified; read-only market data, screening, assessment, evidence, and technical-analysis routers installed; files updated: {changed}")
+print(f"CIN metadata verified; read-only market data, screening, assessment, evidence, and technical-analysis and public market-candle routers installed; files updated: {changed}")
