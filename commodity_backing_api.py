@@ -4,7 +4,10 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from app.commodity_backing_assessment import assess_commodity_asset
+try:
+    from app.commodity_backing_assessment import assess_commodity_asset
+except ModuleNotFoundError:  # Allows offline tests from the repository root.
+    from commodity_backing_assessment import assess_commodity_asset
 
 router = APIRouter(tags=["commodity backing evidence"])
 
