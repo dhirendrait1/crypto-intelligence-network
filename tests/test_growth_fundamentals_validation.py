@@ -123,6 +123,7 @@ class GrowthFundamentalsValidationTests(unittest.TestCase):
     def test_valid_http_url_is_accepted_as_metadata(self):
         result = assess_growth_fundamentals("ETH", [self.record(source_url="http://example.com/report")], now=self.now)
         self.assertEqual(result["evidence"][0]["status"], "verified")
+        self.assertTrue(result["evidence"][0]["source_url_valid"])
         self.assertFalse(result["cin_independently_verified_claims"])
 
     def test_timezone_naive_assessment_clock_falls_back_and_is_reported(self):
