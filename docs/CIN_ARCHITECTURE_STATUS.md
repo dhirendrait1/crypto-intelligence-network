@@ -123,3 +123,15 @@ The next audit should create one row per numbered roadmap requirement with colum
 - Do not change Render configuration or trigger deployment without explicit approval.
 - Do not introduce trade/order execution, wallet control, private keys, seed phrases or fund movement.
 - Prefer free/public sources first; document rate limits and any paid dependency before adopting it.
+
+
+## Commodity evidence metadata audit — 2026-10-24
+
+The isolated feature branch hardens `commodity_backing_assessment.py`:
+
+- Evidence URLs must be absolute HTTP(S) URLs with a hostname; scheme-only values and URLs containing embedded credentials are rejected for supplied `verified` records.
+- Future publication/review timestamps and review timestamps earlier than publication cause supplied `verified` status to be downgraded to `unverified`.
+- Outputs include `source_url_valid` and `timestamp_validation_errors` to make the validation result inspectable.
+- Regression tests cover these edge cases and a valid HTTP URL.
+
+This is validation of caller-supplied metadata, not independent source retrieval or reserve certification. The updated code remains pending CI verification until workflows for the resulting commit complete. No production deployment is implied.
