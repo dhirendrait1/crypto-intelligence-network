@@ -373,6 +373,21 @@ class ScreeningResponseMetadataTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreaterEqual(response["cache_age_seconds"], 30)
         self.assertLess(response["cache_age_seconds"], 35)
 
+    async def test_commodity_endpoint_exposes_provenance_for_empty_scan(self):
+        retrieved_at = MODULE.time.time() - 5
+        async def fake_to_thread(func, *args, **kwargs):
+            return ([], "live", 0, 250, 0, None, retrieved_at)
+        with patch.object(MODULE.asyncio, "to_thread", side_effect=fake_to_thread):
+            response = await MODULE.coin_screening(
+                vs_currency="usd", per_page=5, min_score=0, asset_type="commodity_backed"
+            )
+        self.assertEqual(response["count"], 0)
+        self.assertEqual(response["data_mode"], "live")
+        self.assertEqual(response["universe_scan"]["scanned_universe_count"], 250)
+        self.assertEqual(response["universe_scan"]["classified_match_count"], 0)
+        self.assertIsNotNone(response["universe_scan"]["provider_retrieved_at"])
+        self.assertGreaterEqual(response["cache_age_seconds"], 5)
+
     async def test_commodity_endpoint_attributes_uncached_http_failure_to_coinpaprika(self):
         error = MODULE.urllib.error.HTTPError("coinpaprika", 429, "limited", {}, None)
         async def fake_to_thread(func, *args, **kwargs):
