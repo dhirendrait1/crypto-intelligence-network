@@ -265,5 +265,34 @@ class ProviderFailureClassificationTests(unittest.TestCase):
         MODULE._CACHE.clear()
 
 
+class ScreeningResponseMetadataTests(unittest.IsolatedAsyncioTestCase):
+    async def test_endpoint_exposes_structured_stale_cache_provider_errors(self):
+        row = {
+            "id": "cached-coin", "symbol": "CACH", "name": "Cached Coin",
+            "current_price": 2.0, "market_cap": 100.0, "total_volume": 10.0,
+            "fully_diluted_valuation": None, "circulating_supply": 40.0,
+            "total_supply": 50.0, "price_change_percentage_24h": 1.0,
+            "_cin_provider": "CoinGecko", "_cin_retrieved_at": 1_800_000_000.0,
+        }
+        details = {
+            "primary_provider": "CoinGecko", "primary_error": "http_error",
+            "primary_http_status": 429, "fallback_provider": "CoinPaprika",
+            "fallback_error": "http_error", "fallback_http_status": 503,
+        }
+
+        async def fake_to_thread(func, *args, **kwargs):
+            return ([row], "stale_cache", 503, details)
+
+        with patch.object(MODULE.asyncio, "to_thread", side_effect=fake_to_thread):
+            response = await MODULE.coin_screening(
+                vs_currency="usd", per_page=1, min_score=0, asset_type="all"
+            )
+
+        self.assertEqual(response["data_mode"], "stale_cache")
+        self.assertEqual(response["provider_error_code"], 503)
+        self.assertEqual(response["provider_error_details"], details)
+        self.assertIsNotNone(response["stale_data_warning"])
+
+
 if __name__ == "__main__":
     unittest.main()
