@@ -252,4 +252,5 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Expose `unrecognized_evidence_type_count` and retain `invalid_evidence_record_count`; invalid inputs now produce `evidence_invalid_or_incomplete` unless a status conflict takes precedence.
 - [x] Add offline regression tests for unknown evidence types and malformed extra rows alongside otherwise complete evidence.
 - [x] Updated the pre-existing non-list-input regression expectation to match the stricter `evidence_invalid_or_incomplete` result; fix commit `5773934e0d5937cd1b2fa8e78de41ce1e11db398`.
-- **Validation status:** CI for the corrected code/test revision is pending. The preceding run exposed only the stale assertion described above; other three workflows passed. No merge or production deployment was performed.
+- [x] All four workflows passed on corrected code/test commit `5773934e0d5937cd1b2fa8e78de41ce1e11db398`: Technical Analysis Tests (run `40110294522`), evidence-ingestion API checks (`40110294507`), screening checks (`40110294532`), and CIN Automated Tests (`40110294558`). The prior run exposed a stale assertion; that expectation was corrected before this passing run.
+- **Boundary:** all checks are offline/mocked; no merge or production deployment was performed.
