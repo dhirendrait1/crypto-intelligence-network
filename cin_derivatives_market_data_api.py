@@ -184,7 +184,16 @@ async def derivatives_market_snapshot(
             "provider": "Binance USDⓈ-M Futures",
             "error": "network_error",
         }) from exc
-    except (ValueError, json.JSONDecodeError) as exc:
+    except (
+        ValueError,
+        json.JSONDecodeError,
+        UnicodeDecodeError,
+        RuntimeError,
+        TypeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+    ) as exc:
         raise HTTPException(status_code=502, detail={
             "message": "Derivatives provider response was invalid or incomplete.",
             "provider": "Binance USDⓈ-M Futures",
