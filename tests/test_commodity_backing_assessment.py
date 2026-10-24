@@ -204,3 +204,13 @@ def test_raw_whitespace_and_control_characters_in_source_urls_are_rejected():
         result = normalize_evidence(valid_item(source_url=url), now=NOW)
         assert result["source_url_valid"] is False
         assert result["status"] == "unverified"
+
+
+def test_invalid_ports_in_source_urls_are_rejected():
+    for url in (
+        "https://example.com:notaport/report",
+        "https://example.com:99999/report",
+    ):
+        result = normalize_evidence(valid_item(source_url=url), now=NOW)
+        assert result["source_url_valid"] is False
+        assert result["status"] == "unverified"
