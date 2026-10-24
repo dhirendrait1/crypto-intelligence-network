@@ -19,6 +19,7 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
     async def test_provider_response_size_is_bounded(self):
         response = MagicMock()
         response.status = 200
+        response.__enter__.return_value = response
         response.read.return_value = b"x" * (api.MAX_PROVIDER_RESPONSE_BYTES + 1)
         with patch.object(api.urllib.request, "urlopen", return_value=response):
             with self.assertRaisesRegex(ValueError, "exceeded the configured size limit"):
