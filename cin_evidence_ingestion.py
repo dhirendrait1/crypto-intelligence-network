@@ -29,6 +29,39 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _validate_metadata(payload: dict[str, Any]) -> None:
+    """Reject malformed optional metadata rather than labeling it validated."""
+    branch = payload.get("default_branch")
+    if branch is not None and (not isinstance(branch, str) or not branch.strip()):
+        raise EvidenceSourceError("GitHub default_branch must be a non-empty string or null")
+
+    for field in ("pushed_at", "updated_at"):
+        value = payload.get(field)
+        if value is None:
+            continue
+        if not isinstance(value, str):
+            raise EvidenceSourceError(f"GitHub {field} must be an ISO-8601 timestamp or null")
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise EvidenceSourceError(f"GitHub {field} must be an ISO-8601 timestamp or null") from exc
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            raise EvidenceSourceError(f"GitHub {field} timestamp must include a timezone")
+
+    for field in ("stargazers_count", "forks_count", "open_issues_count"):
+        value = payload.get(field)
+        if value is not None and (
+            isinstance(value, bool) or not isinstance(value, int) or value < 0
+        ):
+            raise EvidenceSourceError(f"GitHub {field} must be a non-negative integer or null")
+
+    archived = payload.get("archived")
+    if archived is not None and not isinstance(archived, bool):
+        raise EvidenceSourceError("GitHub archived must be a boolean or null")
+
+
+
+
 def fetch_github_repository_evidence(
     repository: str = "ethereum/go-ethereum",
     *,
@@ -67,6 +100,7 @@ def fetch_github_repository_evidence(
     full_name = payload.get("full_name")
     if not isinstance(full_name, str) or full_name.lower() != repository:
         raise EvidenceSourceError("GitHub response did not match the requested repository")
+    _validate_metadata(payload)
 
     retrieved_at = _utc_now()
     return {
