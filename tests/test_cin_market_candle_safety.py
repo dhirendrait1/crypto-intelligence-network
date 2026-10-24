@@ -396,3 +396,15 @@ def test_monthly_candle_time_consistency_rejects_non_month_start_and_wrong_close
     assert not api._candle_time_consistent(_row(opened, opened + 29 * 86_400_000 - 1), "1M")
     opened = int(datetime(2024, 2, 1, tzinfo=timezone.utc).timestamp() * 1000)
     assert not api._candle_time_consistent(_row(opened, opened + 31 * 86_400_000 - 1), "1M")
+
+def test_candle_time_consistency_rejects_materially_future_open_time():
+    now_ms = 1_700_000_000_000
+    row = _row(now_ms + 60_001, now_ms + 60_001 + 3_600_000 - 1)
+    assert not api._candle_time_consistent(row, "1h", now_ms=now_ms)
+
+
+def test_candle_time_consistency_allows_small_clock_skew():
+    now_ms = 1_700_000_000_000
+    opened = now_ms + 60_000
+    row = _row(opened, opened + 3_600_000 - 1)
+    assert api._candle_time_consistent(row, "1h", now_ms=now_ms)
