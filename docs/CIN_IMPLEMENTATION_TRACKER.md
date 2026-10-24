@@ -47,8 +47,8 @@
 - [x] Preserve commodity scan timestamp and scanned-universe counts when zero assets match; cache empty scans with separate metadata.
 - [x] Test read-only derivatives snapshot parsing, provider timestamps, open-interest change, missing liquidation state, and network-failure classification.
 - [x] Register the derivatives router in the scaffold patch and run its regression tests in scaffold CI.
-- [x] Verify all four workflows on commit `f3e4c4e858a28463bb2b7ec66f5bf87213319ae7` (screening, automated tests, technical analysis, evidence ingestion). Results are mocked/offline tests.
-- [ ] Perform live read-only provider smoke tests and compare provider timestamps, CIN retrieval time, cache age, and stale warning. Attempted from this environment, but outbound DNS resolution failed; this is an environment limitation, not evidence that Render itself is down.
+- [x] Verify all four workflows on commit `d27ed261bfd7d82e0bfcded53d656403eda4ced2` (screening, automated tests, technical analysis, evidence ingestion). Results are mocked/offline tests; the derivatives snapshot tests are included in the automated scaffold workflow.
+- [ ] Perform live read-only provider smoke tests for screening, candles, and derivatives; compare provider timestamps, CIN retrieval time, cache age, and stale warning. Attempted from this environment, but outbound DNS resolution failed; this is an environment limitation, not evidence that Render or the providers are down.
 - [ ] Confirm the running Render service serves the tested code revision; do not deploy without explicit approval. This cannot be established from the current network-restricted environment.
 
 ## Completion accounting
