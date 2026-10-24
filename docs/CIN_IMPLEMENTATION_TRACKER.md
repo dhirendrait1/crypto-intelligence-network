@@ -446,3 +446,10 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - Added regression assertions for the documented 400 semantics and presence of the 422 response description on both candle endpoints.
 - Code commit: `4536d9616a7be95c155fa4c8ee51f707ab39ba36`; regression test commit: `f2aa7c40fa840dd7a1f303b31f9206d2210faa4e`.
 - CI status for this latest test commit has not yet been confirmed. No live-provider smoke test or deployment is claimed.
+
+
+### Public candle provider response-size hardening (2026-10-25)
+- The shared Binance/Kraken JSON request helper now reads at most 2,000,001 bytes and rejects bodies above the 2 MB cap before UTF-8 decoding or JSON parsing.
+- Added regression tests for a valid bounded JSON response and an oversized body, including an assertion that the read is capped at limit + 1 byte.
+- Runtime code commit: `4ced9fb2743ba51ee2449b37f7b4ae659d5a8b6e`; test commit: `320f19829bf4e105197769b83342e5c40d60ef26`.
+- CI on the latest head is pending; no live-provider behavior or deployment is claimed.
