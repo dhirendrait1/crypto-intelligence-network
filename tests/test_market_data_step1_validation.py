@@ -1,6 +1,7 @@
 import asyncio
 import json
 import unittest
+import urllib.error
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
@@ -205,6 +206,21 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         result = _fetch_market_data(["bitcoin"], "usd")
         self.assertEqual(len(result), 1)
 
+
+    def test_endpoint_rejects_malformed_currency_codes(self):
+        for currency in ("u", "usd!", "us d", "１２３", "abcdefghijk"):
+            with self.subTest(currency=currency):
+                with self.assertRaises(Exception) as raised:
+                    asyncio.run(get_public_market_data("bitcoin", currency))
+                self.assertEqual(getattr(raised.exception, "status_code", None), 400)
+
+    @patch("market_data_step1._fetch_market_data")
+    def test_provider_rejected_request_is_reported_as_client_error(self, mocked):
+        mocked.side_effect = urllib.error.HTTPError("https://api.coingecko.com", 400, "Bad Request", {}, None)
+        with self.assertRaises(Exception) as raised:
+            asyncio.run(get_public_market_data("bitcoin", "notacurrency"))
+        self.assertEqual(getattr(raised.exception, "status_code", None), 400)
+        self.assertIn("not supported", str(raised.exception.detail))
 
     @patch("market_data_step1._fetch_market_data")
     def test_endpoint_discloses_partial_market_coverage(self, mocked):
