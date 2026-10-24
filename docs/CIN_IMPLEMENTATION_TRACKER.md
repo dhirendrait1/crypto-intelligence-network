@@ -215,3 +215,10 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 
 - [x] Follow-up URL syntax audit: commodity backing, growth fundamentals, and GDELT article URLs now reject non-numeric and out-of-range explicit ports by forcing parser port validation; regression cases added to all three test suites. This prevents malformed ports from being accepted as valid source links.
 - **Boundary:** URL parsing still does not fetch articles or verify publisher identity/claim accuracy.
+
+## Assessment-clock regression follow-up (2026-10-24)
+
+- [x] Corrected commodity assessment clock propagation and ensured the summary exposes `assessment_clock_valid` once, with the validated UTC clock passed into each evidence row.
+- [x] Added regression coverage asserting valid clock metadata appears consistently in the commodity summary and normalized evidence rows.
+- [x] All four workflows passed on revision `1020ee7c9aeebdd3fc461215dbe474362faf8146`: CIN Automated Tests (run `40108896479`), screening checks (run `40108896505`), evidence-ingestion API checks (run `40108896477`), and Technical Analysis Tests (run `40108896530`).
+- **Boundary:** these are automated offline/mocked regression checks. They do not verify live providers or the deployed Render service; no merge or deployment was performed.
