@@ -52,6 +52,37 @@ def test_snapshot_preserves_source_times_and_never_invents_liquidations(monkeypa
     assert all("order" not in params and "side" not in params for _, params in calls)
 
 
+
+def test_order_book_retrieval_time_is_not_overwritten_by_snapshot_time(monkeypatch):
+    from datetime import datetime, timezone
+
+    times = [
+        datetime(2026, 10, 24, 17, 0, 0, tzinfo=timezone.utc),
+        datetime(2026, 10, 24, 17, 0, 5, tzinfo=timezone.utc),
+    ]
+
+    class ControlledDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return times.pop(0)
+
+    payloads = [
+        {"symbol": "BTCUSDT", "openInterest": "1000", "time": 1_800_000_000_000},
+        {"symbol": "BTCUSDT", "markPrice": "65000", "indexPrice": "64990", "lastFundingRate": "0.0001", "time": 1_800_000_000_000},
+        [
+            {"symbol": "BTCUSDT", "sumOpenInterestValue": "1000000", "timestamp": 1_799_985_600_000},
+            {"symbol": "BTCUSDT", "sumOpenInterestValue": "1020000", "timestamp": 1_800_000_000_000},
+        ],
+        {"bids": [["65000", "2"]], "asks": [["65010", "1"]]},
+    ]
+    monkeypatch.setattr(api, "datetime", ControlledDateTime)
+    monkeypatch.setattr(api, "_get_json", lambda _path, _params: payloads.pop(0))
+
+    result = api._snapshot("BTCUSDT")
+
+    assert result["order_book"]["retrieved_at"] == "2026-10-24T17:00:00+00:00"
+    assert result["retrieved_at"] == "2026-10-24T17:00:05+00:00"
+
 def test_snapshot_rejects_wrong_symbol_or_invalid_payload(monkeypatch):
     monkeypatch.setattr(api, "_get_json", lambda _path, _params: {"symbol": "ETHUSDT"})
     with pytest.raises(ValueError, match="Unexpected open-interest"):
