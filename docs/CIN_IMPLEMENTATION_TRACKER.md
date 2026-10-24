@@ -132,6 +132,7 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - Boundary: offline/mocked validation only; no live provider or deployment verification.
 
 ## News provider boundary tests
+- [x] Added catch-all sanitization for unforeseen GDELT provider/parser exceptions as HTTP 502, with `AttributeError` and generic `Exception` regression cases; all four workflows passed on commit `13ec8555ac6b6f744d14afbb9c22500f77ba99c4`. Offline/mocked validation only.
 - [x] Hardened GDELT article URL parsing to accept only absolute HTTP(S) URLs with a hostname, no embedded credentials, and no whitespace/control characters; added malformed URL regression cases. All four workflows passed on commit `349c21fbcc8e658c8e70f3fad2586846319dd914`; validation is offline/mocked and does not establish live GDELT behavior.
 - [x] Sanitized unexpected provider runtime/type/UTF-8 errors as HTTP 502; mocked regression tests added.
 - [x] Four workflows passed on commit 6826048f92e825a33e3503d33628d913df10507d.
