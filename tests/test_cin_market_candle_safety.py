@@ -88,6 +88,27 @@ def test_oversized_provider_body_maps_to_sanitized_api_error(monkeypatch):
     assert "configured size limit" not in caught.value.detail
 
 
+@pytest.mark.parametrize(
+    "transport_error",
+    [
+        api.urllib.error.URLError("sensitive-provider-network-detail"),
+        TimeoutError("sensitive-provider-timeout-detail"),
+    ],
+)
+def test_provider_transport_failures_return_sanitized_503(monkeypatch, transport_error):
+    def fail(*_args, **_kwargs):
+        raise transport_error
+
+    monkeypatch.setattr(api.urllib.request, "urlopen", fail)
+
+    with pytest.raises(api.HTTPException) as caught:
+        asyncio.run(api._load("BTCUSDT", "1h", 10))
+
+    assert caught.value.status_code == 503
+    assert caught.value.detail == "Binance public market-data provider is temporarily unavailable."
+    assert "sensitive-provider" not in caught.value.detail
+
+
 def test_clean_candles_rejects_invalid_rows_and_orders_unique_timestamps():
     valid_later = _row(2_000, 2_999)
     valid_earlier = _row(1_000, 1_999)
