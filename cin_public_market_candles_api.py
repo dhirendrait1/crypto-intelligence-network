@@ -217,7 +217,7 @@ async def analyze_public_market(
             detail="Fewer than 5 completed candles are available for analysis; retry after more candles close.",
         )
     try:
-        analysis = analyze_ohlc([{key: row[key] for key in ("open", "high", "low", "close")} for row in closed_rows])
+        analysis = analyze_ohlc([{key: row[key] for key in ("open", "high", "low", "close", "volume")} for row in closed_rows])
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=f"Fetched candles failed analysis validation: {exc}") from exc
     analysis["input"].update({
@@ -231,7 +231,7 @@ async def analyze_public_market(
         "forming_candles_excluded": forming_count,
         "first_candle_open_time_utc": datetime.fromtimestamp(closed_rows[0]["open_time"] / 1000, timezone.utc).isoformat(),
         "last_candle_close_time_utc": datetime.fromtimestamp(closed_rows[-1]["close_time"] / 1000, timezone.utc).isoformat(),
-        "volume_included_in_source_but_not_used_in_indicators": True,
+        "volume_included_in_source": all("volume" in row for row in closed_rows),
     })
     analysis["limitations"].extend([
         "Public exchange data is not independently audited by CIN.",
