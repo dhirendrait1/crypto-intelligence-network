@@ -1,4 +1,6 @@
 """Offline tests for the CIN commodity backing API endpoint."""
+import pytest
+from pydantic import ValidationError
 from commodity_backing_api import (
     CommodityBackingAssessmentRequest,
     commodity_backing_assessment_endpoint,
@@ -200,3 +202,11 @@ def test_request_rejects_symbol_with_trailing_newline():
     with pytest.raises(ValidationError):
         CommodityBackingAssessmentRequest(symbol="PAXG\n")
 
+
+
+def test_request_rejects_unsupported_evidence_status():
+    with pytest.raises(ValidationError):
+        CommodityBackingAssessmentRequest(
+            symbol="PAXG",
+            evidence=[{"evidence_type": "reserve_attestation", "status": "confirmed"}],
+        )
