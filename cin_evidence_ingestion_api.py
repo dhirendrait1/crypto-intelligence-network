@@ -23,7 +23,7 @@ router = APIRouter(tags=["public evidence ingestion"])
 class PublicEvidenceRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     symbol: str = Field(default="ETH", min_length=1, max_length=10, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*\z")
-    repository: str = Field(default="ethereum/go-ethereum", min_length=1, max_length=100, pattern=r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+    repository: str = Field(default="ethereum/go-ethereum", min_length=1, max_length=100, pattern=r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\z")
 
 
 @router.post("/public-evidence-ingestion")
