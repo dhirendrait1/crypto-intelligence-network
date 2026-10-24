@@ -10,7 +10,7 @@ This endpoint is read-only and uses public Binance USDⓈ-M Futures market-data 
 
 - [Open interest](https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Open-Interest): current contract open interest and provider timestamp.
 - [Mark price and funding rate](https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Mark-Price): mark/index prices, latest funding rate, and provider timestamp.
-- [Open-interest history](https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Open-Interest-Statistics): latest two available 4-hour aggregates used for an approximate 4-hour notional open-interest change.
+- [Open-interest history](https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Open-Interest-Statistics): latest two available 4-hour aggregates used for an approximate 4-hour notional open-interest change.\n- [Order book](https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Order-Book): public depth snapshot used to compute best bid/ask, spread, and approximate bid/ask notional imbalance.
 
 ## Data-quality behavior
 
@@ -19,7 +19,7 @@ This endpoint is read-only and uses public Binance USDⓈ-M Futures market-data 
 - The open-interest change is null when the provider does not return two usable aggregates or the previous notional value is non-positive.
 - HTTP, network, and malformed-response failures return structured API errors rather than fabricated numbers.
 - Liquidation totals are explicitly marked `not_available`. A reliable liquidation window requires continuous event ingestion and aggregation; this point-in-time snapshot does not infer liquidation totals.
-- This is one exchange's derivatives market, not a market-wide aggregate.
+- Order-book metrics are a rapidly changing snapshot; the public endpoint excludes retail price-improvement orders.\n- This is one exchange's derivatives market, not a market-wide aggregate.
 
 ## Validation boundary
 
