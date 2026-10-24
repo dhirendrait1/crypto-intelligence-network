@@ -27,7 +27,7 @@ class FakeResponse:
 
 class FakeInvalidUtf8Response(FakeResponse):
     def read(self, limit=-1):
-        return b"\\xff\\xfe"
+        return b"\xff\xfe"
 
 
 class EvidenceIngestionTests(unittest.TestCase):
