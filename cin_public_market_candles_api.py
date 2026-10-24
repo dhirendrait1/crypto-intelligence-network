@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import re
 import urllib.error
 import urllib.parse
@@ -40,6 +41,26 @@ def _request_json(url: str) -> Any:
         return json.loads(response.read().decode("utf-8"))
 
 
+def _is_valid_candle(candle: dict[str, Any]) -> bool:
+    """Reject non-finite values, impossible OHLC ranges, and invalid timestamps."""
+    try:
+        prices = [float(candle[key]) for key in ("open", "high", "low", "close")]
+        volume = float(candle["volume"])
+        open_time = int(candle["open_time"])
+        close_time = int(candle["close_time"])
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return False
+    open_price, high, low, close = prices
+    return (
+        all(math.isfinite(value) and value > 0 for value in prices)
+        and math.isfinite(volume) and volume >= 0
+        and high >= max(open_price, close)
+        and low <= min(open_price, close)
+        and high >= low
+        and open_time >= 0 and close_time >= open_time
+    )
+
+
 def _fetch_binance(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
     query = urllib.parse.urlencode({"symbol": symbol, "interval": interval, "limit": limit})
     payload = _request_json(f"{BINANCE_KLINES_URL}?{query}")
@@ -50,11 +71,13 @@ def _fetch_binance(symbol: str, interval: str, limit: int) -> list[dict[str, Any
         if not isinstance(row, list) or len(row) < 7:
             continue
         try:
-            candles.append({
+            candle = {
                 "open_time": int(row[0]), "open": float(row[1]), "high": float(row[2]),
                 "low": float(row[3]), "close": float(row[4]), "volume": float(row[5]),
                 "close_time": int(row[6]),
-            })
+            }
+            if _is_valid_candle(candle):
+                candles.append(candle)
         except (TypeError, ValueError, OverflowError):
             continue
     if not candles:
@@ -95,11 +118,13 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
             # Kraken returns OHLC, VWAP, volume, trade count; derive candle end
             # from the selected timeframe so the output schema matches Binance.
             duration_ms = KRAKEN_INTERVALS[interval] * 60_000
-            candles.append({
+            candle = {
                 "open_time": start, "open": float(row[1]), "high": float(row[2]),
                 "low": float(row[3]), "close": float(row[4]), "volume": float(row[6]),
                 "close_time": start + duration_ms - 1,
-            })
+            }
+            if _is_valid_candle(candle):
+                candles.append(candle)
         except (TypeError, ValueError, OverflowError):
             continue
     if not candles:
