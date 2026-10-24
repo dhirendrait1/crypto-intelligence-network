@@ -335,6 +335,15 @@ def _score(coin: dict[str, Any]) -> dict[str, Any]:
     score = 0
     reasons: list[str] = []
     warnings: list[str] = []
+    freshness_status, freshness_age_seconds = _market_freshness(coin.get("last_updated"))
+    price = _number(coin.get("current_price"))
+    analysis_eligible = freshness_status == "fresh" and price is not None and price > 0
+    if freshness_status == "stale":
+        warnings.append("Provider price timestamp is older than 15 minutes; candidate signal held")
+    elif freshness_status == "unknown":
+        warnings.append("Provider price timestamp is missing or invalid; candidate signal held")
+    if price is None or price <= 0:
+        warnings.append("Positive finite price unavailable; candidate signal held")
 
     if market_cap is not None and market_cap >= 100_000_000:
         score += 20
@@ -411,6 +420,8 @@ def _score(coin: dict[str, Any]) -> dict[str, Any]:
     screen_profile, growth_candidate_eligible = profile_by_type[asset_type]
     if not growth_candidate_eligible:
         screen_band = "excluded_non_growth_asset"
+    elif not analysis_eligible:
+        screen_band = "data_quality_hold"
     else:
         screen_band = "research_candidate" if score >= 70 else ("watchlist" if score >= 45 else "insufficient_fundamental_metrics")
 
@@ -423,7 +434,10 @@ def _score(coin: dict[str, Any]) -> dict[str, Any]:
         "asset_type_note": classification_note,
         "screen_profile": screen_profile,
         "growth_candidate_eligible": growth_candidate_eligible,
-        "price": _number(coin.get("current_price")),
+        "price": price,
+        "freshness_status": freshness_status,
+        "freshness_age_seconds": freshness_age_seconds,
+        "analysis_eligible": analysis_eligible,
         "market_cap": market_cap,
         "total_volume_24h": volume,
         "volume_to_market_cap": round(ratio, 6) if ratio is not None else None,
