@@ -24,6 +24,10 @@ class PublicEvidenceHttpTests(unittest.TestCase):
             "retrieval_status": "success",
             "claim_verification_status": "unverified",
             "independently_verified": False,
+            "source_timestamp": "2026-10-20T10:00:00Z",
+            "source_timestamp_field": "pushed_at",
+            "timestamp_semantics": "repository_metadata_timestamp_not_publication",
+            "published_at": "2026-10-20T10:00:00Z",
         }
         with patch.object(api, "fetch_github_repository_evidence", return_value=evidence):
             response = client.post("/public-evidence-ingestion", json={})
@@ -32,6 +36,13 @@ class PublicEvidenceHttpTests(unittest.TestCase):
         self.assertEqual(response.json(), evidence)
         self.assertEqual(response.json()["claim_verification_status"], "unverified")
         self.assertFalse(response.json()["independently_verified"])
+        self.assertEqual(response.json()["source_timestamp"], "2026-10-20T10:00:00Z")
+        self.assertEqual(response.json()["source_timestamp_field"], "pushed_at")
+        self.assertEqual(
+            response.json()["timestamp_semantics"],
+            "repository_metadata_timestamp_not_publication",
+        )
+        self.assertEqual(response.json()["published_at"], response.json()["source_timestamp"])
 
     def test_unsupported_symbol_returns_http_400_without_source_call(self):
         with patch.object(api, "fetch_github_repository_evidence") as fetch:
