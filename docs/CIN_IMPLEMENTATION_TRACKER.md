@@ -295,3 +295,14 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Added offline regression tests for unsupported status values in both request models.
 - **Boundary:** accepted `verified` remains caller-supplied metadata, not CIN's independent verification of evidence claims. This change only makes the public request contract stricter.
 - [ ] CI status for the newest request-contract tests must be checked before this batch is marked validated.
+
+
+## API reliability and release-readiness audit (2026-10-25)
+
+- [x] Re-checked PR #8's current head `dac8f646b20f580be7257a60db03d272253c29f6` and confirmed all four GitHub Actions workflows completed successfully on that exact commit: CIN Automated Tests (run `40123474267`), CIN screening checks (run `40123474281`), CIN Technical Analysis Tests (run `40123474309`), and CIN evidence ingestion API checks (run `40123474227`).
+- [x] Audited the current branch's public evidence ingestion and market-candle API boundaries for strict request schemas, allowlist enforcement, provider error sanitization, malformed candle rejection, timestamp representability, and closed-candle-only technical analysis. Existing regression tests cover these offline/mocked cases; passing CI is not a live-provider certification.
+- [x] Confirmed the pull request remains Draft and unmerged. The production Render service and its configuration were not changed as part of this audit.
+- [ ] Before release: run read-only live smoke checks for production health/readiness and route registration; compare the existing Render deployment with the PR branch; validate Kraken pair-key/quote-currency mappings against actual provider responses; review generated OpenAPI schemas for all public endpoints and confirm documented error responses match runtime behavior.
+- [ ] Record the production-only checks and results separately from offline CI. Do not claim live verification until those checks have actually run and their outputs have been inspected.
+- **Release decision:** not cleared. Keep PR #8 in Draft until the release gates above are completed. Merging is not authorized by this audit because the `main` Render configuration may automatically deploy.
+- **Safety boundary:** CIN remains read-only research, analysis, monitoring and alerting. No trade/order execution, wallet control, private keys, seed phrases, or fund movement. Preserve the ₹0-first approach.
