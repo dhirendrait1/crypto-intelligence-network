@@ -1,7 +1,7 @@
 """Offline safety and contract tests for public market candle endpoints."""
 import unittest
 import urllib.error
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
 
@@ -16,6 +16,15 @@ SAMPLE = [
 
 
 class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_provider_response_size_is_bounded(self):
+        response = MagicMock()
+        response.status = 200
+        response.read.return_value = b"x" * (api.MAX_PROVIDER_RESPONSE_BYTES + 1)
+        with patch.object(api.urllib.request, "urlopen", return_value=response):
+            with self.assertRaisesRegex(ValueError, "exceeded the configured size limit"):
+                api._request_json("https://example.test/data")
+        response.read.assert_called_once_with(api.MAX_PROVIDER_RESPONSE_BYTES + 1)
+
     async def test_binance_skips_nonfinite_and_impossible_candles(self):
         payload = [
             [1700000000000, "100", "102", "99", "101", "10", 1700003599999],
