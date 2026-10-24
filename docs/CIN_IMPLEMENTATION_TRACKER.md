@@ -473,3 +473,8 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - Binance candle parsing now skips rows whose open or close timestamp is a JSON boolean; Kraken parsing likewise skips boolean open timestamps. Python treats booleans as integers, so coercion could otherwise turn malformed provider data into plausible timestamps.
 - Added offline regression tests for both providers.
 - Code commit: `707f1071f533082db98316e70810409a0a1a34e4`; test commit: `54389c9e979b723298ca9caa4c58bc9cb12fead4`. CI validation for the latest tracker commit is pending.
+
+### Strict provider timestamp parsing (2026-10-25)
+- Tightened timestamp parsing beyond boolean rejection: Binance open/close timestamps must be integer JSON values; Kraken open timestamps must be numeric, finite, and whole epoch seconds. String-coercible and fractional timestamp values are skipped instead of silently coerced or truncated.
+- Added offline regression coverage for string timestamps from Binance and string/fractional timestamps from Kraken.
+- Code commit: `7a7e10ba8fd65abdb2d04a5dcd77d53370b03c42`; test commit: `5a39471cb6abec9ba6fd84423f5cf20a45b2ba9e`. CI validation for latest tracker commit is pending.
