@@ -602,3 +602,13 @@ This checkpoint validates configured offline automation only. It does not establ
 - Expected outcome remains a sanitized HTTP 503; raw provider payloads and parser details must not appear in the API response.
 - Test commit: `f52a2ed1a7b4e6062e2561d04079894b0f3dd26d`.
 - CI verification pending on the latest tracker commit.
+
+
+## Kraken error-field schema validation (2026-10-25)
+
+- Kraken OHLC responses must now contain an `error` field represented as a list of strings, matching the documented response shape.
+- Missing, null, string, object, integer, or non-string list entries are rejected as malformed rather than being accidentally accepted when falsy or raising incidental type errors.
+- Added fallback API regression cases to assert malformed payloads remain controlled and sanitized.
+- Code commit: `5cea6dc6d143b265439f36c1edc01ecec61e7cdf`.
+- Test commit: `697501bc2e257ea8489bb9230b8aafbd68e4391f`.
+- CI verification pending on the latest tracker commit.
