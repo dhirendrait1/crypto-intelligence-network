@@ -59,9 +59,15 @@ def assess_growth_fundamentals(
     """Assess evidence coverage across growth fundamentals; never infer missing facts."""
     threshold_valid = isinstance(max_age_days, int) and not isinstance(max_age_days, bool) and max_age_days >= 0
     max_age_days = max_age_days if threshold_valid else 90
-    current = now or datetime.now(timezone.utc)
-    if current.tzinfo is None:
-        current = current.replace(tzinfo=timezone.utc)
+    assessment_clock_valid = (
+        now is None
+        or (
+            isinstance(now, datetime)
+            and now.tzinfo is not None
+            and now.utcoffset() is not None
+        )
+    )
+    current = now if assessment_clock_valid and now is not None else datetime.now(timezone.utc)
     current = current.astimezone(timezone.utc)
 
     normalized: list[dict[str, Any]] = []
@@ -98,8 +104,10 @@ def assess_growth_fundamentals(
             missing.append("source_url")
         if published is None:
             missing.append("published_at")
-        age = max(0, (current - published).days) if published else None
-        if published is not None and published > current and status == "verified":
+        future_publication = published is not None and published > current
+        age = (current - published).days if published is not None and not future_publication else None
+        timestamp_validation_errors = ["published_at_is_in_the_future"] if future_publication else []
+        if future_publication and status == "verified":
             status = "unverified"
         if status == "verified" and missing:
             status = "unverified"
@@ -112,6 +120,7 @@ def assess_growth_fundamentals(
             "source_url": source_url,
             "published_at": item.get("published_at"),
             "publication_age_days": age,
+            "timestamp_validation_errors": timestamp_validation_errors,
             "status": status,
             "missing_fields": missing,
             "notes": str(item.get("notes", "")).strip() or None,
@@ -183,6 +192,7 @@ def assess_growth_fundamentals(
         "input_evidence_list_valid": isinstance(evidence, (list, type(None))),
         "freshness_threshold_valid": threshold_valid,
         "freshness_threshold_days": max_age_days,
+        "assessment_clock_valid": assessment_clock_valid,
         "not_an_investment_recommendation": True,
         "cin_independently_verified_claims": False,
         "limitations": [
