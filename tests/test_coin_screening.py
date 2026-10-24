@@ -316,6 +316,18 @@ class ProviderFallbackMappingTests(unittest.TestCase):
         self.assertIsNone(rows[0]["fully_diluted_valuation"])
 
 
+class RetrievalTimestampFormattingTests(unittest.TestCase):
+    def test_invalid_and_oversized_retrieval_timestamps_are_missing(self):
+        for value in (None, True, float('inf'), 10**10000, '123'):
+            with self.subTest(value_type=type(value).__name__):
+                self.assertIsNone(MODULE._safe_retrieved_at(value))
+
+    def test_epoch_retrieval_timestamp_is_formatted_in_utc(self):
+        self.assertEqual(
+            MODULE._safe_retrieved_at(0),
+            '1970-01-01T00:00:00+00:00',
+        )
+
 class ScreeningFreshnessTests(unittest.TestCase):
     def setUp(self):
         MODULE._CACHE.clear()
