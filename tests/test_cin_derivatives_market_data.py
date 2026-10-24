@@ -9,6 +9,25 @@ from fastapi import FastAPI, HTTPException
 import cin_derivatives_market_data_api as api
 
 
+@pytest.mark.parametrize(
+    "bids, asks",
+    [
+        ([["1e308", "1e308"]], [["1e308", "1"]]),
+        ([["1e308", "1"]], [["1e308", "1"]]),
+    ],
+)
+def test_snapshot_rejects_non_finite_order_book_arithmetic(monkeypatch, bids, asks):
+    payloads = [
+        {"symbol": "BTCUSDT", "openInterest": "1000", "time": 1_800_000_000_000},
+        {"symbol": "BTCUSDT", "markPrice": "65000", "indexPrice": "65000", "lastFundingRate": "0.0001", "time": 1_800_000_000_000},
+        [],
+        {"bids": bids, "asks": asks},
+    ]
+    monkeypatch.setattr(api, "_get_json", lambda _path, _params: payloads.pop(0))
+    with pytest.raises(ValueError, match="Order-book arithmetic"):
+        api._snapshot("BTCUSDT")
+
+
 def test_snapshot_preserves_source_times_and_never_invents_liquidations(monkeypatch):
     payloads = [
         {"symbol": "BTCUSDT", "openInterest": "1000.0", "time": 1_800_000_000_000},
