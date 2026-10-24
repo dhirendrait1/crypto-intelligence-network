@@ -73,6 +73,43 @@ class EvidenceIngestionTests(unittest.TestCase):
                 with self.assertRaises(EvidenceSourceError):
                     fetch_github_repository_evidence()
 
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_malformed_metadata_fields_raise_source_error(self, mocked):
+        valid = {
+            "full_name": "ethereum/go-ethereum",
+            "default_branch": "master",
+            "pushed_at": "2026-10-20T10:00:00Z",
+            "updated_at": "2026-10-21T10:00:00Z",
+            "stargazers_count": 10,
+            "forks_count": 2,
+            "open_issues_count": 3,
+            "archived": False,
+        }
+        invalid_fields = {
+            "default_branch": 12,
+            "pushed_at": "not-a-timestamp",
+            "updated_at": 123,
+            "stargazers_count": -1,
+            "forks_count": True,
+            "open_issues_count": "3",
+            "archived": "false",
+        }
+        for field, invalid_value in invalid_fields.items():
+            with self.subTest(field=field, invalid_value=invalid_value):
+                payload = {**valid, field: invalid_value}
+                mocked.return_value = FakeResponse(payload)
+                with self.assertRaises(EvidenceSourceError):
+                    fetch_github_repository_evidence()
+
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_timestamp_without_timezone_is_rejected(self, mocked):
+        mocked.return_value = FakeResponse({
+            "full_name": "ethereum/go-ethereum",
+            "pushed_at": "2026-10-20T10:00:00",
+        })
+        with self.assertRaises(EvidenceSourceError):
+            fetch_github_repository_evidence()
+
 
 if __name__ == "__main__":
     unittest.main()
