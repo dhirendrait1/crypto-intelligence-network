@@ -174,7 +174,8 @@ class ScreeningFreshnessTests(unittest.TestCase):
         rows_cached, cached_mode, cached_error, cached_details = MODULE._fetch_markets("usd", 1)
         self.assertEqual(cached_mode, "cache")
         self.assertEqual(cached_error, 0)
-        self.assertEqual(rows_cached[0]["_cin_retrieved_at"], rows[0]["_cin_retrieved_at"])\n        self.assertIsNone(cached_details)
+        self.assertEqual(rows_cached[0]["_cin_retrieved_at"], rows[0]["_cin_retrieved_at"])
+        self.assertIsNone(cached_details)
 
 
 
@@ -242,7 +243,11 @@ class ProviderFailureClassificationTests(unittest.TestCase):
         ):
             rows, mode, error_code, error_details = MODULE._fetch_markets("usd", 5)
         self.assertEqual(mode, "stale_cache")
-        self.assertEqual(error_code, 503)\n        self.assertEqual(error_details["primary_http_status"], 429)\n        self.assertEqual(error_details["fallback_http_status"], 503)\n        self.assertEqual(error_details["primary_error"], "http_error")\n        self.assertEqual(error_details["fallback_error"], "http_error")
+        self.assertEqual(error_code, 503)
+        self.assertEqual(error_details["primary_http_status"], 429)
+        self.assertEqual(error_details["fallback_http_status"], 503)
+        self.assertEqual(error_details["primary_error"], "http_error")
+        self.assertEqual(error_details["fallback_error"], "http_error")
         self.assertEqual(rows[0]["_cin_retrieved_at"], now - 120)
         MODULE._CACHE.clear()
 
