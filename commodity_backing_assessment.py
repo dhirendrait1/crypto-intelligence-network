@@ -60,8 +60,6 @@ def normalize_evidence(item: Any, *, now: datetime | None = None,
     """
     threshold_valid = isinstance(max_age_days, int) and not isinstance(max_age_days, bool) and max_age_days >= 0
     max_age_days = max_age_days if threshold_valid else 90
-    threshold_valid = isinstance(max_age_days, int) and not isinstance(max_age_days, bool) and max_age_days >= 0
-    max_age_days = max_age_days if threshold_valid else 90
     current = now or datetime.now(timezone.utc)
     if current.tzinfo is None:
         current = current.replace(tzinfo=timezone.utc)
@@ -145,6 +143,8 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
                            now: datetime | None = None,
                            max_age_days: int = 90) -> dict[str, Any]:
     """Summarize reserve/redemption/custody evidence without treating gaps as proof."""
+    threshold_valid = isinstance(max_age_days, int) and not isinstance(max_age_days, bool) and max_age_days >= 0
+    max_age_days = max_age_days if threshold_valid else 90
     required_types = {
         "reserve_attestation",
         "redemption_terms",
