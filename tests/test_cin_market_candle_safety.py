@@ -31,7 +31,8 @@ def test_clean_candles_rejects_invalid_rows_and_orders_unique_timestamps():
     invalid_price["close"] = float("nan")
     invalid_volume = _row(4_000, 4_999)
     invalid_volume["volume"] = -1
-    duplicate = _row(1_000, 1_999, close=101.0)
+    # Exact duplicates are safe to collapse; conflicting rows are rejected separately. 
+    duplicate = _row(1_000, 1_999, close=100.0)
 
     cleaned = api._clean_candles(
         [valid_later, invalid_price, valid_earlier, invalid_volume, duplicate],
@@ -39,7 +40,7 @@ def test_clean_candles_rejects_invalid_rows_and_orders_unique_timestamps():
     )
 
     assert [row["open_time"] for row in cleaned] == [1_000, 2_000]
-    assert cleaned[0]["close"] == 101.0
+    assert cleaned[0]["close"] == 100.0
 
 
 def test_clean_candles_fails_when_provider_returns_only_invalid_rows():
