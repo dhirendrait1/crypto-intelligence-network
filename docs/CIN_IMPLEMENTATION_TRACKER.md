@@ -136,5 +136,5 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 
 - [x] Added maximum lengths for caller-supplied commodity and growth evidence fields (type/category, source name, URL, timestamps, status, notes) to prevent oversized individual metadata strings reaching assessment logic.
 - [x] Added offline regression tests for over-limit fields in both assessment request models; existing symbol, evidence-batch, and strict freshness-threshold bounds remain in place.
-- [ ] Confirm all four CI workflows on the resulting feature-branch revision; failures must be diagnosed and fixed before treating this batch as validated.
+- [x] All four CI workflows passed on code/test commit `1f42a825530d60752c2294fd8c6d298faa68932d` (CIN Automated Tests, screening checks, technical-analysis tests, and evidence-ingestion API checks). Validation is offline/mocked, not live-provider or production verification.
 - **Boundary:** validation constrains request size/shape only. It does not authenticate source URLs, prove source content, or independently verify the underlying evidence claims.
