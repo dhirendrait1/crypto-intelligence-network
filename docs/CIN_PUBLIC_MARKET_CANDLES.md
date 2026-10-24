@@ -29,3 +29,7 @@ This fetches public OHLCV candles and passes **completed candles only** to CIN's
 - Volume is included in analysis input and may contribute volume metrics when valid; it is not a guarantee of market liquidity or executable depth.
 - RSI/MACD/ATR and structure labels are descriptive research outputs, not guaranteed predictions, investment advice, or trade instructions.
 - No credentials, user accounts, order placement, wallet control, or trade execution are involved.
+
+## Duplicate timestamp consistency
+
+Valid candles are sorted chronologically. Identical duplicate rows with the same open timestamp are collapsed into one row. If the same provider response contains different OHLCV or close-time values for the same open timestamp, the provider response is rejected as conflicting evidence rather than silently selecting whichever row appeared last. This is an offline-tested data-integrity guard; it does not compare Binance and Kraken prices simultaneously or establish cross-exchange equivalence.
