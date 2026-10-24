@@ -116,3 +116,31 @@ def test_endpoint_rejects_symbol_longer_than_documented_limit():
 
     with pytest.raises(ValidationError):
         CommodityBackingAssessmentRequest(symbol="P" * 21)
+
+
+def test_endpoint_rejects_oversized_evidence_metadata_fields():
+    import pytest
+    from pydantic import ValidationError
+
+    valid = {
+        "evidence_type": "reserve_attestation",
+        "source_name": "Example",
+        "source_url": "https://example.com/report",
+        "published_at": "2026-10-01T00:00:00Z",
+        "checked_at": "2026-10-24T00:00:00Z",
+        "status": "unverified",
+        "notes": "ok",
+    }
+    limits = {
+        "evidence_type": "e" * 81,
+        "source_name": "s" * 201,
+        "source_url": "https://" + "a" * 2042,
+        "published_at": "t" * 65,
+        "checked_at": "t" * 65,
+        "status": "s" * 33,
+        "notes": "n" * 2001,
+    }
+    for field, oversized in limits.items():
+        record = {**valid, field: oversized}
+        with pytest.raises(ValidationError):
+            CommodityBackingAssessmentRequest(symbol="PAXG", evidence=[record])
