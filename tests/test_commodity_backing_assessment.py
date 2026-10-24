@@ -140,6 +140,21 @@ def test_non_list_evidence_input_does_not_raise_or_claim_complete_coverage():
     assert result["evidence"] == []
 
 
+def test_duplicate_evidence_is_counted_once_in_coverage():
+    item = valid_item()
+    duplicate = valid_item(source_url="https://example.com/report/")
+    result = assess_commodity_asset("PAXG", [item, duplicate], now=NOW)
+    coverage = result["evidence_coverage"]["reserve_attestation"]
+    assert coverage["evidence_count"] == 1
+    assert coverage["duplicate_record_count"] == 1
+
+
+def test_invalid_freshness_threshold_falls_back_safely():
+    result = assess_commodity_asset("PAXG", [valid_item()], now=NOW, max_age_days=-1)
+    assert result["freshness_threshold_valid"] is False
+    assert result["freshness_threshold_days"] == 90
+
+
 def test_valid_http_url_and_timestamp_metadata_remain_accepted():
     result = normalize_evidence(valid_item(source_url="http://example.com/report"), now=NOW)
     assert result["status"] == "verified"
