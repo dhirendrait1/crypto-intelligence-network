@@ -144,3 +144,23 @@ def test_endpoint_rejects_oversized_evidence_metadata_fields():
         record = {**valid, field: oversized}
         with pytest.raises(ValidationError):
             CommodityBackingAssessmentRequest(symbol="PAXG", evidence=[record])
+
+
+def test_request_rejects_unknown_top_level_fields():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        CommodityBackingAssessmentRequest(symbol="PAXG", max_age_day=30)
+
+
+def test_request_rejects_unknown_evidence_record_fields():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        CommodityBackingAssessmentRequest(
+            symbol="PAXG",
+            evidence=[{"evidence_type": "reserve_attestation", "published": "2026-10-01"}],
+        )
+
