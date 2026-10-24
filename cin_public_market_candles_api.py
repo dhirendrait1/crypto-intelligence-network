@@ -154,7 +154,7 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
         try:
             rows = await asyncio.to_thread(_fetch_kraken, symbol, interval, limit)
             source, endpoint = "Kraken public OHLC API (fallback after Binance HTTP 451)", KRAKEN_OHLC_URL
-        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError, RuntimeError, UnicodeDecodeError, TypeError, KeyError, OverflowError, IndexError) as fallback_exc:
+        except Exception as fallback_exc:
             # Do not disguise fallback failure or return stale/empty data as live.
             reason = "Kraken fallback unavailable or pair/timeframe unsupported"
             if isinstance(fallback_exc, urllib.error.HTTPError):
@@ -163,6 +163,9 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
     except (urllib.error.URLError, TimeoutError, OSError):
         raise HTTPException(status_code=503, detail="Binance public market-data provider is temporarily unavailable.") from None
     except (ValueError, json.JSONDecodeError, RuntimeError, UnicodeDecodeError, TypeError, KeyError, OverflowError, IndexError):
+        raise HTTPException(status_code=502, detail="Public market-data provider returned an invalid response.") from None
+    except Exception:
+        # Prevent unforeseen provider/parser failures from escaping as HTTP 500.
         raise HTTPException(status_code=502, detail="Public market-data provider returned an invalid response.") from None
     requested_pair = re.fullmatch(r"([A-Z0-9]+)(USDT|USD)", symbol)
     for row in rows:
