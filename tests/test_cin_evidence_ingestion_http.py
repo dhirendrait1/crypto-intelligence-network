@@ -61,6 +61,21 @@ class PublicEvidenceHttpTests(unittest.TestCase):
         self.assertEqual(response.status_code, 502)
         self.assertIn("Public GitHub metadata retrieval failed", response.json()["detail"])
 
+    def test_unexpected_value_error_returns_sanitized_http_502(self):
+        with patch.object(
+            api,
+            "fetch_github_repository_evidence",
+            side_effect=ValueError("internal validation details"),
+        ):
+            response = client.post("/public-evidence-ingestion", json={})
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(
+            response.json()["detail"],
+            "Public evidence provider returned an unexpected response",
+        )
+        self.assertNotIn("internal validation details", response.text)
+
     def test_invalid_request_shape_returns_http_422(self):
         response = client.post("/public-evidence-ingestion", json={"symbol": ""})
         self.assertEqual(response.status_code, 422)
