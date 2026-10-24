@@ -151,7 +151,7 @@ async def news_sentiment(
             "provider": "GDELT DOC 2.0",
             "error": "network_error",
         }) from exc
-    except (ValueError, json.JSONDecodeError) as exc:
+    except (ValueError, json.JSONDecodeError, RuntimeError, TypeError, UnicodeDecodeError) as exc:
         raise HTTPException(status_code=502, detail={
             "message": "Public news provider response was invalid.",
             "provider": "GDELT DOC 2.0",
