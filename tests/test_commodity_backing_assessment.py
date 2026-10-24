@@ -76,6 +76,7 @@ def test_future_publication_timestamp_downgrades_supplied_verified_status():
         valid_item(published_at="2026-10-25T00:00:00Z"), now=NOW
     )
     assert result["status"] == "unverified"
+    assert result["publication_age_days"] is None
     assert "published_at_is_in_the_future" in result["timestamp_validation_errors"]
 
 
