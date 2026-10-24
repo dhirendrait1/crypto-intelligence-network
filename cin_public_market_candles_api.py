@@ -116,7 +116,7 @@ def _valid_candle(row: dict[str, Any]) -> bool:
         return False
 
 
-def _candle_time_consistent(row: dict[str, Any], interval: str) -> bool:
+def _candle_time_consistent(row: dict[str, Any], interval: str, now_ms: int | None = None) -> bool:
     """Check candle boundaries where exchange interval semantics are explicit."""
     try:
         opened = row["open_time"]
@@ -124,6 +124,12 @@ def _candle_time_consistent(row: dict[str, Any], interval: str) -> bool:
         if isinstance(opened, bool) or not isinstance(opened, int):
             return False
         if isinstance(closed, bool) or not isinstance(closed, int):
+            return False
+        if now_ms is None:
+            now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        # Allow one minute of clock skew, but never accept a candle opening
+        # materially in the future.
+        if opened > now_ms + 60_000:
             return False
         if interval == "1M":
             start = datetime.fromtimestamp(opened / 1000, timezone.utc)
