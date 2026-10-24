@@ -82,6 +82,7 @@ def normalize_evidence(item: Any, *, now: datetime | None = None,
             "timestamp_validation_errors": [],
             "source_url_valid": False,
             "freshness_threshold_days": max_age_days,
+            "assessment_clock_valid": assessment_clock_valid,
             "invalid_record": True,
         }
 
@@ -142,6 +143,7 @@ def normalize_evidence(item: Any, *, now: datetime | None = None,
     record["timestamp_validation_errors"] = timestamp_errors
     record["source_url_valid"] = url_valid
     record["freshness_threshold_days"] = max_age_days
+    record["assessment_clock_valid"] = assessment_clock_valid
     return record
 
 
