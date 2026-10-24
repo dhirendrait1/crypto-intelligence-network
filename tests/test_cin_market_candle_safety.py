@@ -368,3 +368,31 @@ def test_monthly_freshness_threshold_uses_latest_candle_calendar_month():
     row = _row(open_ms, close_ms)
     result = api._freshness_metadata([row], "1M", close_ms + 1000)
     assert result["stale_threshold_seconds"] == 2 * 29 * 86_400
+
+def test_candle_time_consistency_rejects_fixed_interval_close_mismatch():
+    row = _row(1_700_000_000_000, 1_700_003_599_998)
+    assert not api._candle_time_consistent(row, "1h")
+
+
+def test_candle_time_consistency_accepts_fixed_interval_duration_without_epoch_anchor_assumption():
+    opened = 1_700_000_000_000
+    row = _row(opened, opened + 3_600_000 - 1)
+    assert api._candle_time_consistent(row, "1h")
+
+
+@pytest.mark.parametrize("month_start, month_end", [
+    ("2024-02-01T00:00:00+00:00", "2024-02-29T23:59:59.999000+00:00"),
+    ("2023-02-01T00:00:00+00:00", "2023-02-28T23:59:59.999000+00:00"),
+    ("2024-04-01T00:00:00+00:00", "2024-04-30T23:59:59.999000+00:00"),
+])
+def test_monthly_candle_time_consistency_accepts_calendar_boundaries(month_start, month_end):
+    opened = int(datetime.fromisoformat(month_start).timestamp() * 1000)
+    closed = int(datetime.fromisoformat(month_end).timestamp() * 1000)
+    assert api._candle_time_consistent(_row(opened, closed), "1M")
+
+
+def test_monthly_candle_time_consistency_rejects_non_month_start_and_wrong_close():
+    opened = int(datetime(2024, 2, 2, tzinfo=timezone.utc).timestamp() * 1000)
+    assert not api._candle_time_consistent(_row(opened, opened + 29 * 86_400_000 - 1), "1M")
+    opened = int(datetime(2024, 2, 1, tzinfo=timezone.utc).timestamp() * 1000)
+    assert not api._candle_time_consistent(_row(opened, opened + 31 * 86_400_000 - 1), "1M")
