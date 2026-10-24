@@ -121,3 +121,14 @@ class PublicEvidenceIngestionApiTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    def test_request_rejects_unknown_fields(self):
+        from pydantic import ValidationError
+
+        with self.assertRaises(ValidationError):
+            PublicEvidenceRequest(
+                symbol="ETH",
+                repository="ethereum/go-ethereum",
+                repo="ethereum/go-ethereum",
+            )
+
