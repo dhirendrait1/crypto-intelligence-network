@@ -629,3 +629,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - This locks down the public API contract: fallback failure is reported as a controlled 503 without leaking provider payload internals.
 - Test commit: `b5ac4b39b0ac52d4dd0836e090bee87344510887`.
 - CI verification pending on the latest tracker commit.
+
+
+## Unsupported Kraken pair-identifier regression cases (2026-10-25)
+
+- Added controlled-fallback cases for a result key using an unsupported quote suffix and for a syntactically shaped but mismatched USD pair identifier.
+- These cases ensure pair identity validation rejects unsupported or unexpected provider keys before candle data can be returned.
+- Test commit: `aa0834be6e6788277587429365c4f4ca8b8aadfb`.
+- CI verification pending on the latest tracker commit.
