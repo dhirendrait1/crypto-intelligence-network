@@ -13,6 +13,17 @@ SPEC.loader.exec_module(MODULE)
 
 
 class FiniteNumericValidationTests(unittest.TestCase):
+    def test_oversized_integer_is_treated_as_missing(self):
+        self.assertIsNone(MODULE._number(10**10000))
+
+    def test_oversized_price_is_not_exposed_and_scores_zero(self):
+        scored = MODULE._score({
+            "id": "huge-price", "symbol": "HUGE", "name": "Huge Price",
+            "current_price": 10**10000,
+        })
+        self.assertIsNone(scored["price"])
+        self.assertEqual(scored["screen_score"], 0)
+
     def test_non_finite_provider_values_are_treated_as_missing(self):
         for value in (float("nan"), float("inf"), float("-inf"), True, "12.5", None):
             with self.subTest(value=value):
