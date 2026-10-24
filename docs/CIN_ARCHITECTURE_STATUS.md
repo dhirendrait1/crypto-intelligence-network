@@ -30,7 +30,7 @@ Layers 4–6 require further source-level and end-to-end verification; the list 
 
 ## Verified source and router inventory
 
-The deployment patch `patch_cin_metadata_fixed.py` names the following source modules and registers seven router families in the FastAPI application.
+The deployment patch `patch_cin_metadata_fixed.py` names the following source modules and registers eight router families in the FastAPI application.
 
 | Component | Source module(s) | Evidence/status |
 |---|---|---|
@@ -40,7 +40,7 @@ The deployment patch `patch_cin_metadata_fixed.py` names the following source mo
 | Growth fundamentals | `growth_fundamentals_assessment.py`, `growth_fundamentals_api.py` | Named in deployment patch; full behavior audit pending |
 | Public evidence ingestion | `cin_evidence_ingestion.py`, `cin_evidence_ingestion_api.py` | Named in deployment patch; full source and allowlist audit pending |
 | Caller-supplied OHLC analysis | `cin_technical_analysis.py`, `cin_technical_analysis_api.py` | Named in deployment patch; prior offline technical-analysis checks passed; full feature audit pending |
-| Exchange-backed candle data and analysis | `cin_public_market_candles_api.py` | Market-data branch regression tests passed previously; wording fix added on this branch and requires CI re-run |
+| Exchange-backed candle data and analysis | `cin_public_market_candles_api.py` | Closed-candle and volume behavior covered by offline regression tests; no live-provider validation claimed |\n| Read-only derivatives snapshot | `cin_derivatives_market_data_api.py` | Public Binance USDⓈ-M futures endpoints for open interest, funding, mark/index price and latest two 4h OI aggregates; provider timestamps and explicit unavailable liquidation state; router registered by scaffold patch and offline tests pass |
 | API health/readiness | FastAPI app endpoints | Live `/health` and `/ready` returned healthy/ready in earlier checks; recheck after any future release |
 
 The patch copies the source modules into `cin/app` during the build. The source inventory therefore needs to be audited together with the generated scaffold and patch process.
@@ -65,7 +65,7 @@ Previously recorded CI on the market-data validation branch:
 - Technical-analysis offline checks: passed.
 - Screening and evidence-ingestion offline checks: passed.
 
-These results apply to the recorded branch commit and tests at that time. The subsequent closed-candle limitation wording/test update on `feat/cin-architecture-audit` needs its own CI run. Mocked tests do not certify all live exchange pairs, provider uptime, or production behavior.
+On commit `d27ed261bfd7d82e0bfcded53d656403eda4ced2`, all four GitHub Actions workflows completed successfully: CIN Automated Tests, CIN screening checks, CIN Technical Analysis Tests, and CIN evidence ingestion API checks. The scaffold CI extracts the same scaffold archive used by the deployment patch, installs the read-only derivatives router, and runs its offline regression tests. These are mocked/offline results and do not certify live exchange availability, provider freshness, or production behavior.
 
 ## Work still requiring verification or implementation
 
@@ -74,7 +74,7 @@ The following are not marked complete until code and evidence are inspected:
 - Full source review of screening and assessment algorithms, including inputs, scoring rationale and missing-data behavior.
 - Full audit of evidence ingestion source allowlists, timeouts, source attribution, parsing failures and freshness.
 - Technical-analysis coverage for structure, BOS/CHoCH, support/resistance, momentum and risk scenarios; volume must be either implemented correctly or clearly excluded.
-- Derivatives data (open interest, funding and liquidations), exchange flows and whale-related evidence, with provider coverage and caveats.
+- Derivatives: a read-only single-exchange snapshot now covers open interest, funding, mark/index prices and a limited 4-hour OI change. Liquidation totals are explicitly unavailable until continuous event ingestion exists. Multi-exchange derivatives, exchange flows and whale-related evidence remain incomplete.
 - News and social sentiment connectors, deduplication, timestamps, manipulation/noise caveats and source links.
 - BTC regime and cross-asset/context logic.
 - Alerts, scheduling, retry/backoff, notification delivery and user-configurable thresholds.
@@ -91,7 +91,7 @@ The following are not marked complete until code and evidence are inspected:
 - **Commodity backing assessment**: the API accepts caller-supplied evidence metadata. It does not fetch reserve reports or independently verify custody, solvency, or redemption rights.
 - **Growth fundamentals**: the API accepts caller-supplied evidence metadata. Coverage scores are not a substitute for source ingestion or independently verified fundamentals.
 - **Evidence ingestion**: the first public connector is limited to an allowlist of three Ethereum-related public GitHub repositories and supports ETH only through the API. This is not yet a general-purpose news, social, whale, exchange-flow, or derivatives ingestion system.
-- **Technical analysis**: the caller-supplied OHLC API is deterministic and does not fetch market data itself. Optional per-candle volume now has all-or-none validation and latest/previous-20 average/relative-volume metrics. The public market adapter now forwards volume from closed candles to the analysis engine, with a regression assertion. Latest changes still require a fresh CI result before being marked validated.
+- **Technical analysis**: the caller-supplied OHLC API is deterministic and does not fetch market data itself. Optional per-candle volume now has all-or-none validation and latest/previous-20 average/relative-volume metrics. The public market adapter now forwards volume from closed candles to the analysis engine, with a regression assertion. The latest recorded branch validation passed all four CI workflows on `d27ed261bfd7d82e0bfcded53d656403eda4ced2`; these tests are offline/mocked.
 - **Derivatives snapshot**: `cin_derivatives_market_data_api.py` adds a read-only Binance USDⓈ-M Futures endpoint for current open interest, latest funding rate, mark/index prices, and an approximate change from the latest two available 4-hour open-interest notional aggregates. It returns provider timestamps separately from CIN retrieval time, classifies provider failures, and explicitly marks liquidations as unavailable because reliable totals require continuous event ingestion. Mocked/offline regression tests are included in scaffold CI. This is a single-exchange snapshot, not a market-wide derivatives model; live-provider validation and deployed-revision verification remain outstanding. See `docs/CIN_DERIVATIVES_MARKET_DATA.md`.
 - **Order-book depth, exchange flows, whale attribution, news/social sentiment, alerts, and forecast outcome tracking**: no corresponding complete, independently verified end-to-end capability has been established by the source inventory inspected so far. Treat these as **not yet verified complete**, not as shipped features.
 
