@@ -90,6 +90,21 @@ class GrowthFundamentalsValidationTests(unittest.TestCase):
         self.assertEqual(result["evidence"][0]["status"], "unverified")
         self.assertIn("source_url", result["evidence"][0]["missing_fields"])
 
+    def test_duplicate_evidence_is_counted_once_in_category_coverage(self):
+        first = self.record()
+        second = self.record(source_url="https://example.com/report/")
+        result = assess_growth_fundamentals("ETH", [first, second], now=self.now)
+        coverage = result["coverage"]["usage_and_adoption"]
+        self.assertEqual(coverage["evidence_count"], 1)
+        self.assertEqual(coverage["duplicate_record_count"], 1)
+
+    def test_invalid_freshness_threshold_falls_back_safely(self):
+        result = assess_growth_fundamentals(
+            "ETH", [self.record()], now=self.now, max_age_days=-1
+        )
+        self.assertFalse(result["freshness_threshold_valid"])
+        self.assertEqual(result["freshness_threshold_days"], 90)
+
     def test_valid_http_url_is_accepted_as_metadata(self):
         result = assess_growth_fundamentals("ETH", [self.record(source_url="http://example.com/report")], now=self.now)
         self.assertEqual(result["evidence"][0]["status"], "verified")
