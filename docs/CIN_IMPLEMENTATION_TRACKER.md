@@ -193,8 +193,8 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 
 - [x] Cross-checked the public candle and derivatives snapshot request contracts.
 - [x] Reduced the derivatives symbol maximum length from 30 to 20 characters to match the public candle API's accepted alphanumeric pair length; kept the existing 5-character minimum and alphanumeric pattern.
-- [x] Updated the OpenAPI regression test to assert the 20-character bound.
-- [x] All four workflows passed on code/test commit `cb711fbc0f489f05a253933d1d200e5ee2185416`: CIN Automated Tests (run `40107114907`), screening checks (run `40107114890`), Technical Analysis Tests (run `40107114918`), and evidence-ingestion API checks (run `40107114916`).
+- [x] Updated the derivatives OpenAPI regression test to assert the 20-character bound and added the same documented alphanumeric pattern/minimum/maximum constraints to both public candle routes.
+- [x] Added OpenAPI regression coverage for `/market-candles` and `/technical-analysis/market`; all four workflows passed on test commit `5ee26c102a6dafe978024e3ad9c436ebe8f525d0`: CIN Automated Tests (run `40107312372`), screening checks (run `40107312395`), Technical Analysis Tests (run `40107312379`), and evidence-ingestion API checks (run `40107312427`).
 - **Boundary:** the shared format is a syntactic guard, not proof that a pair is listed by Binance or Kraken. Validation remains offline/mocked; no live-provider or production check is implied.
 
 ## Technical-analysis API error contract (2026-10-24)
