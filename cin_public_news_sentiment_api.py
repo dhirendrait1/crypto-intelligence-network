@@ -120,7 +120,7 @@ def _optional_provider_text(value: Any, max_length: int = 256) -> str | None:
     if not isinstance(value, str):
         return None
     normalized = value.strip()
-    if not normalized or len(normalized) > max_length or any(ord(char) < 32 for char in normalized):
+    if not normalized or len(normalized) > max_length or any(ord(char) < 32 or ord(char) == 127 for char in normalized):
         return None
     return normalized
 
