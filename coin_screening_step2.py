@@ -406,7 +406,8 @@ async def coin_screening(
     commodity_scan: dict[str, Any] | None = None
     try:
         if asset_type == "commodity_backed":
-            raw, data_mode, provider_error_code, scanned_count, matched_count = await asyncio.to_thread(_fetch_commodity_markets, currency, per_page)\n            provider_error_details = None
+            raw, data_mode, provider_error_code, scanned_count, matched_count = await asyncio.to_thread(_fetch_commodity_markets, currency, per_page)
+            provider_error_details = None
             commodity_scan = {
                 "provider": "CoinPaprika",
                 "scanned_universe_count": scanned_count,
@@ -476,7 +477,8 @@ async def coin_screening(
         "mode": "read_only",
         "data_mode": data_mode,
         "stale_data_warning": ("Primary provider was unavailable; results use cached market data and may be up to 15 minutes old." if data_mode == "stale_cache" else None),
-        "provider_error_code": provider_error_code or None,\n        "provider_error_details": provider_error_details,
+        "provider_error_code": provider_error_code or None,
+        "provider_error_details": provider_error_details,
         "methodology": "Preliminary transparent heuristic; not financial advice or a safety rating",
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
         "cache_age_seconds": (
