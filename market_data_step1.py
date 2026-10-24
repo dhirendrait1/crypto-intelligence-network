@@ -20,14 +20,19 @@ router = APIRouter(tags=["market-data"])
 COINGECKO_URL = "https://api.coingecko.com/api/v3/coins/markets"
 MARKET_DATA_MAX_AGE = timedelta(minutes=15)
 FUTURE_TIMESTAMP_TOLERANCE = timedelta(minutes=5)
+MAX_PROVIDER_RESPONSE_BYTES = 2_000_000
 
 
 def _finite_number(value: Any, *, minimum: float | None = None) -> bool:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return False
-    if not math.isfinite(value):
+    try:
+        numeric_value = float(value)
+    except (OverflowError, TypeError, ValueError):
         return False
-    return minimum is None or value >= minimum
+    if not math.isfinite(numeric_value):
+        return False
+    return minimum is None or numeric_value >= minimum
 
 
 def _timestamp_status(value: Any) -> tuple[str, int | None, str | None]:
@@ -64,7 +69,10 @@ def _fetch_market_data(ids: list[str], vs_currency: str) -> list[dict[str, Any]]
     with urllib.request.urlopen(request, timeout=12) as response:
         if response.status != 200:
             raise ValueError(f"Provider returned unexpected HTTP status {response.status}")
-        payload = json.loads(response.read().decode("utf-8"))
+        raw = response.read(MAX_PROVIDER_RESPONSE_BYTES + 1)
+    if len(raw) > MAX_PROVIDER_RESPONSE_BYTES:
+        raise ValueError("CoinGecko response exceeded the configured size limit")
+    payload = json.loads(raw.decode("utf-8"))
 
     if not isinstance(payload, list):
         raise ValueError("Provider response was not a list")
