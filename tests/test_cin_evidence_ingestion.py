@@ -67,6 +67,12 @@ class EvidenceIngestionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             fetch_github_repository_evidence(timeout=60)
 
+    def test_rejects_boolean_or_fractional_timeout(self):
+        for timeout in (True, False, 1.5, "8"):
+            with self.subTest(timeout=timeout):
+                with self.assertRaises(ValueError):
+                    fetch_github_repository_evidence(timeout=timeout)
+
     @patch("cin_evidence_ingestion.urlopen", side_effect=TimeoutError())
     def test_timeout_is_reported_as_source_error(self, mocked):
         with self.assertRaises(EvidenceSourceError):
