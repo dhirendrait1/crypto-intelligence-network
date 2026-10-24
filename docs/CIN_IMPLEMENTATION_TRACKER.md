@@ -130,3 +130,11 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Sanitized unexpected provider runtime/type/UTF-8 errors as HTTP 502; mocked regression tests added.
 - [x] Four workflows passed on commit 6826048f92e825a33e3503d33628d913df10507d.
 - Boundary: offline tests only; live GDELT and production behavior remain unverified.
+
+
+## Assessment API payload size bounds (2026-10-24)
+
+- [x] Added maximum lengths for caller-supplied commodity and growth evidence fields (type/category, source name, URL, timestamps, status, notes) to prevent oversized individual metadata strings reaching assessment logic.
+- [x] Added offline regression tests for over-limit fields in both assessment request models; existing symbol, evidence-batch, and strict freshness-threshold bounds remain in place.
+- [ ] Confirm all four CI workflows on the resulting feature-branch revision; failures must be diagnosed and fixed before treating this batch as validated.
+- **Boundary:** validation constrains request size/shape only. It does not authenticate source URLs, prove source content, or independently verify the underlying evidence claims.
