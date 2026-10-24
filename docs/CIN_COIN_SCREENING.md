@@ -47,3 +47,8 @@ The screen does not yet validate token unlock schedules, project utility, develo
 ## Operating boundary
 
 CIN is for public-data research, analysis, monitoring, and alerts only. No trade/order execution, wallet control, private-key handling, or fund movement is implemented or intended.
+
+
+## Cache state versus provider timestamp freshness
+
+Each result exposes `provider_timestamp_status` and `provider_timestamp_age_seconds` for the provider's `last_updated` timestamp. The effective `freshness_status` may instead be `stale_cache` when provider retrieval fails and CIN falls back to cached rows. In that case `analysis_eligible` and `screening_eligible` are forced to `false`, and the growth candidate band is held, even if the provider timestamp itself appears recent. These fields describe different evidence dimensions: provider-reported update age does not make a stale-cache fallback eligible for screening. Inspect both result-level metadata and response-level `data_mode`, `cache_age_seconds`, and provider error details.
