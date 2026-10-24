@@ -483,3 +483,8 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - Binance and Kraken parsing now rejects JSON booleans in price and volume fields before numeric conversion; Python would otherwise convert `true`/`false` into 1.0/0.0 and could let malformed provider evidence appear numeric.
 - Added offline regression tests for both providers.
 - Code commit: `0424acd46d43ecb4e6bb3028694d82e207c9f61f`; test commit: `e24a28f6bfb4b095e951a78c36809e6d8ee6530d`. CI validation for latest tracker commit is pending.
+
+### Kraken limit-after-validation handling (2026-10-25)
+- Kraken candle rows are now validated and cleaned before applying the requested result limit. Malformed trailing rows no longer displace earlier valid candles from the response window.
+- Added offline regression coverage with six valid rows followed by a malformed row and a requested limit of five.
+- Code commit: `93235086ed413a411ac7ce5627f5b0a1afdce703`; test commit: `ad8222b7e2b4b178b2d4c86e405402cf3ec11a38`. CI validation for the latest tracker commit is pending.
