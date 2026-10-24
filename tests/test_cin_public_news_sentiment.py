@@ -34,8 +34,12 @@ def test_parse_articles_deduplicates_and_skips_invalid_urls():
     rows = api._parse_articles(payload, 10)
     assert len(rows) == 2
     assert rows[0]["headline_sentiment"]["label"] == "positive"
-    assert rows[0]["published_at"] == "20261024T000000Z"
-    assert rows[0]["published_at_utc"] == "2026-10-24T00:00:00Z"
+    assert rows[0]["provider_seen_at"] == "20261024T000000Z"
+    assert rows[0]["provider_seen_at_utc"] == "2026-10-24T00:00:00Z"
+    assert rows[0]["provider_seen_at_validation_status"] == "valid"
+    # Legacy aliases remain available but mirror GDELT seen time, not verified publication time.
+    assert rows[0]["published_at"] == rows[0]["provider_seen_at"]
+    assert rows[0]["published_at_utc"] == rows[0]["provider_seen_at_utc"]
     assert rows[0]["published_at_validation_status"] == "valid"
     assert rows[1]["headline_sentiment"]["label"] == "negative"
 
@@ -175,6 +179,35 @@ def test_article_timestamp_validation_preserves_raw_provider_value():
     assert rows[2]["published_at"] is None
     assert rows[2]["published_at_validation_status"] == "missing"
 
+
+
+def test_gdelt_seen_timestamp_flags_future_time_and_preserves_normalized_value():
+    from datetime import datetime, timezone
+
+    now = datetime(2026, 10, 25, 12, 0, 0, tzinfo=timezone.utc)
+    normalized, status = api._normalize_provider_timestamp("20261025T120200Z", now=now)
+    assert normalized == "2026-10-25T12:02:00Z"
+    assert status == "future_dated"
+
+
+def test_article_future_seen_timestamp_is_exposed_with_explicit_status(monkeypatch):
+    from datetime import datetime, timezone
+
+    fixed_now = datetime(2026, 10, 25, 12, 0, 0, tzinfo=timezone.utc)
+
+    class ControlledDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return fixed_now
+
+    monkeypatch.setattr(api, "datetime", ControlledDateTime)
+    rows = api._parse_articles(
+        {"articles": [{"title": "Market update", "url": "https://news.example/a", "seendate": "20261025T120200Z"}]},
+        10,
+    )
+    assert rows[0]["provider_seen_at_validation_status"] == "future_dated"
+    assert rows[0]["provider_seen_at_utc"] == "2026-10-25T12:02:00Z"
+    assert rows[0]["published_at_validation_status"] == "future_dated"
 
 def test_parse_articles_sanitizes_malformed_optional_provider_metadata():
     rows = api._parse_articles(
