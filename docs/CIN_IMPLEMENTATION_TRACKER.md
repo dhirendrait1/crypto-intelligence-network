@@ -355,3 +355,12 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] All four workflows passed on code/test commit `1596de175210a952c3e6f74da9b8b6111f754e1e`: CIN Automated Tests (run `40125108093`), CIN screening checks (run `40125108087`), CIN Technical Analysis Tests (run `40125108135`), and CIN evidence ingestion API checks (run `40125108083`). The derivatives regression step passed in the automated workflow.
 - **Boundary:** tests use mocked provider payloads; they do not establish live Binance availability or production endpoint health. PR #8 remains Draft and unmerged.
 
+## Derivatives timestamp freshness classification (2026-10-25)
+
+- [x] Added timestamp-quality metadata for open interest, mark-price/funding, and latest open-interest history: provider timestamp, age in seconds, status, and freshness threshold.
+- [x] Mark current open-interest and premium-index timestamps stale after 15 minutes; mark 4-hour open-interest history stale after 8 hours; classify timestamps more than 60 seconds ahead as future-dated.
+- [x] Missing history is classified as unavailable rather than invalid, preserving the prior contract that empty history yields null history-derived values.
+- [x] Added regression tests for fresh, stale, future-dated, and unavailable timestamp states, plus an integration-style snapshot test that verifies warning fields.
+- [x] All four workflows passed on code/test commit `6fd11d8e90d1b0340574ebec97bed9ab3a6edc54`: CIN Automated Tests (run `40125347836`), CIN screening checks (`40125347837`), CIN Technical Analysis Tests (`40125347825`), and CIN evidence ingestion API checks (`40125347822`). The derivatives regression step passed in CIN Automated Tests.
+- **Boundary:** fixed-time and mocked-provider tests only; no live exchange or production endpoint was contacted. PR #8 remains Draft and unmerged.
+
