@@ -143,9 +143,9 @@ def test_snapshot_rejects_non_finite_derived_funding_percent(monkeypatch):
 @pytest.mark.parametrize(
     "field, value, message",
     [
-        ("open_interest_time", "invalid", "open-interest provider payload contained an invalid timestamp"),
-        ("premium_time", 10**400, "premium-index provider payload contained an invalid timestamp"),
-        ("history_time", 10**400, "open-interest history contained an invalid timestamp"),
+        ("open_interest_time", "invalid", "(?i)open-interest provider payload contained an invalid timestamp"),
+        ("premium_time", 10**400, "(?i)premium-index provider payload contained an invalid timestamp"),
+        ("history_time", 10**400, "(?i)open-interest history contained an invalid timestamp"),
     ],
 )
 def test_snapshot_rejects_unrepresentable_provider_timestamps(monkeypatch, field, value, message):
