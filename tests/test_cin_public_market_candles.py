@@ -152,5 +152,20 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Fewer than 5 completed candles", ctx.exception.detail)
 
 
+    async def test_candle_endpoint_marks_forming_rows_and_warns_when_no_closed_candle_exists(self):
+        import time
+        rows = [dict(row) for row in SAMPLE[:5]]
+        future_close = int(time.time() * 1000) + 60_000
+        for row in rows:
+            row["close_time"] = future_close
+        with patch.object(api, "_load", return_value=rows):
+            result = await api.get_market_candles("BTCUSDT", "1h", 5)
+        self.assertEqual(result["count"], 5)
+        self.assertTrue(all(row["is_closed"] is False for row in result["data"]))
+        self.assertTrue(all(row["candle_status"] == "forming" for row in result["data"]))
+        self.assertIsNone(result["freshness"]["latest_closed_candle_close_time_utc"])
+        self.assertIsNotNone(result["freshness"]["stale_data_warning"])
+
+
 if __name__ == "__main__":
     unittest.main()
