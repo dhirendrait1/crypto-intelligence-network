@@ -174,6 +174,31 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(ValueError):
                 api._fetch_kraken("BTCUSD", "1h", 5)
 
+    def test_kraken_fallback_rejects_unexpected_pair_identity(self):
+        payload = {
+            "error": [],
+            "result": {
+                "XETHZUSD": [[1700000000, "100", "105", "98", "102", "101", "12.5", 7]],
+                "last": 1700000000,
+            },
+        }
+        with patch.object(api, "_request_json", return_value=payload):
+            with self.assertRaisesRegex(ValueError, "different trading pair"):
+                api._fetch_kraken("BTCUSD", "1h", 5)
+
+    def test_kraken_fallback_rejects_ambiguous_multiple_pair_keys(self):
+        payload = {
+            "error": [],
+            "result": {
+                "XXBTZUSD": [[1700000000, "100", "105", "98", "102", "101", "12.5", 7]],
+                "XETHZUSD": [[1700000000, "100", "105", "98", "102", "101", "12.5", 7]],
+                "last": 1700000000,
+            },
+        }
+        with patch.object(api, "_request_json", return_value=payload):
+            with self.assertRaisesRegex(ValueError, "exactly one requested trading pair"):
+                api._fetch_kraken("BTCUSD", "1h", 5)
+
 
 
     async def test_market_analysis_excludes_forming_candle(self):
