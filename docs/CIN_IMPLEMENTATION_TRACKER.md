@@ -380,3 +380,10 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Added offline regression coverage for mixed valid, missing, and future-dated provider timestamps.
 - [ ] Verify all CI workflows on the latest head before treating the milestone as complete.
 - **Boundary:** counts describe provider seen/indexing time, not verified original publication time. Offline tests do not verify live GDELT or production behavior. PR #8 remains Draft and unmerged.
+
+## Cross-provider evidence consistency — candle duplicate conflicts (2026-10-25)
+
+- [x] Public candle normalization now collapses exact duplicate rows sharing an open timestamp but rejects conflicting OHLCV/close-time values for that timestamp rather than silently using the last row.
+- [x] Added offline regression tests for identical duplicates and conflicting duplicates; documented the rule and its limits.
+- [ ] Verify all four CI workflows on the latest head before marking this milestone verified.
+- **Boundary:** this validates duplicate consistency within one provider response. It does not compare Binance and Kraken simultaneously or verify live exchange data. PR #8 remains Draft and unmerged.
