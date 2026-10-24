@@ -16,7 +16,7 @@
 
 | Capability | Repository evidence | Current status | Remaining acceptance work |
 |---|---|---|---|
-| Public market overview | `market_data_step1.py` | Partial / offline tests only | Validate live provider freshness, rate limits, missing fields, and running endpoint behavior |
+| Public market overview | `market_data_step1.py`; `tests/test_market_data_step1_validation.py` | Partial / offline-tested | Reject non-finite/negative prices; omit invalid optional metrics with warnings; per-row provider timestamp freshness (`fresh` ≤15 minutes, `stale` >15 minutes, `unknown` for missing/invalid/future timestamps); controlled unexpected-status errors; CI regression coverage |
 | Coin screening | `coin_screening_step2.py`, screening API tests | Implemented, offline-tested | Live provider smoke test; confirm fresh/cache/stale metadata in running service |
 | Screening source provenance | Provider retrieval timestamps, cache age, structured primary/fallback failures, stale warning; fresh/live, fresh-cache, and stale-cache response regression tests | Implemented, offline-tested on feature branch | Live read-only smoke test remains unverified; outbound network access from this environment is unavailable |
 | Commodity-backed token scan | CoinPaprika public ticker scan, bounded stale cache, structured provider errors, separate retrieval metadata retained even when no assets match | Partial / offline-tested | Classification is heuristic; independently validate issuer, custody, reserves, redemption and audit evidence; live provider behavior remains unverified |
