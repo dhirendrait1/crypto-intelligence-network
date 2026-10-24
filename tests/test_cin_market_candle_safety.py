@@ -72,6 +72,36 @@ def test_market_candles_reports_pair_and_closed_status(monkeypatch):
     assert [c["is_closed"] for c in response["data"]] == [True, True, True, False]
 
 
+def test_freshness_metadata_warns_when_latest_closed_candle_is_old():
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    old = _row(now_ms - 5 * 3_600_000, now_ms - 4 * 3_600_000)
+
+    result = api._freshness_metadata([old], "1h", now_ms)
+
+    assert result["latest_closed_candle_age_seconds"] >= 4 * 3_600_000 / 1000
+    assert result["stale_threshold_seconds"] == 7200
+    assert "older than the 1h freshness threshold" in result["stale_data_warning"]
+
+
+def test_freshness_metadata_does_not_warn_for_recent_closed_candle():
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    recent = _row(now_ms - 3_600_000, now_ms - 1000)
+
+    result = api._freshness_metadata([recent], "1h", now_ms)
+
+    assert result["latest_closed_candle_age_seconds"] < 2
+    assert result["stale_data_warning"] is None
+
+
+def test_freshness_metadata_explicitly_handles_no_closed_candles():
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    forming = _row(now_ms, now_ms + 3_599_999)
+
+    result = api._freshness_metadata([forming], "1h", now_ms)
+
+    assert result["latest_closed_candle_age_seconds"] is None
+    assert "No completed candle" in result["stale_data_warning"]
+
 def test_market_analysis_excludes_forming_candle_by_default(monkeypatch):
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     rows = [
