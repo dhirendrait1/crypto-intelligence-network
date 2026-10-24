@@ -60,9 +60,15 @@ def normalize_evidence(item: Any, *, now: datetime | None = None,
     """
     threshold_valid = isinstance(max_age_days, int) and not isinstance(max_age_days, bool) and max_age_days >= 0
     max_age_days = max_age_days if threshold_valid else 90
-    current = now or datetime.now(timezone.utc)
-    if current.tzinfo is None:
-        current = current.replace(tzinfo=timezone.utc)
+    assessment_clock_valid = (
+        now is None
+        or (
+            isinstance(now, datetime)
+            and now.tzinfo is not None
+            and now.utcoffset() is not None
+        )
+    )
+    current = now if assessment_clock_valid and now is not None else datetime.now(timezone.utc)
     current = current.astimezone(timezone.utc)
 
     if not isinstance(item, dict):
@@ -124,8 +130,8 @@ def normalize_evidence(item: Any, *, now: datetime | None = None,
         record["status_reason"] = "Evidence is not verified."
 
     age_days = None
-    if published is not None:
-        age_days = max(0, (current - published).days)
+    if published is not None and published <= current:
+        age_days = (current - published).days
         if status == "verified" and age_days > max_age_days:
             status = "stale"
             record["status_reason"] = f"Publication is older than the {max_age_days}-day freshness threshold."
@@ -214,6 +220,7 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
         "input_evidence_list_valid": isinstance(evidence, list),
         "freshness_threshold_valid": threshold_valid,
         "freshness_threshold_days": max_age_days,
+        "assessment_clock_valid": assessment_clock_valid,
         "limitations": [
             "CIN records evidence metadata; it does not itself audit reserves or certify issuer claims.",
             "A source publication or attestation is not a guarantee of solvency, custody, redemption, or future backing.",
