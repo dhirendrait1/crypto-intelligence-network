@@ -144,7 +144,7 @@ async def get_public_market_data(
     vs_currency: str = Query(default="usd", min_length=2, max_length=10),
 ) -> dict[str, Any]:
     """Fetch normalized public market data. Read-only; never places trades."""
-    ids = [item.strip().lower() for item in coins.split(",") if item.strip()]
+    ids = list(dict.fromkeys(item.strip().lower() for item in coins.split(",") if item.strip()))
     if not ids or len(ids) > 10:
         raise HTTPException(status_code=400, detail="Provide between 1 and 10 coin IDs.")
     if any(not item.replace("-", "").isalnum() for item in ids):
@@ -167,6 +167,8 @@ async def get_public_market_data(
     if not rows:
         raise HTTPException(status_code=502, detail="No valid market data was returned for the requested coin IDs.")
 
+    returned_ids = {row["id"] for row in rows}
+    missing_ids = [coin_id for coin_id in ids if coin_id not in returned_ids]
     return {
         "service": "cin",
         "source": "CoinGecko public API",
@@ -174,6 +176,9 @@ async def get_public_market_data(
         "retrieved_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "freshness_policy": "row is fresh when provider last_updated is no more than 15 minutes old; stale beyond 15 minutes; unknown when timestamp is missing or invalid",
         "currency": currency.upper(),
+        "requested_count": len(ids),
         "count": len(rows),
+        "partial_result": bool(missing_ids),
+        "missing_coins": missing_ids,
         "data": rows,
     }
