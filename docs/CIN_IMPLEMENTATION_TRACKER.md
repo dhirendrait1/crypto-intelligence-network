@@ -670,3 +670,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - This protects the public market-data path against unexpectedly large responses and unbounded buffering.
 - Test commit: `6d9b0790f455fca840c890ecd7c9255699e6ed59`.
 - CI verification pending on the latest tracker commit.
+
+
+## Provider response-size boundary test (2026-10-25)
+
+- Added a boundary regression proving a valid JSON body exactly at the configured 2,000,000-byte limit is accepted, complementing the oversized-body rejection test.
+- Together, the tests cover both sides of the transport's size boundary without external network access.
+- Test commit: `a322c7770703919281d407487090652081be7846`.
+- CI verification pending on the latest tracker commit.
