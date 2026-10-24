@@ -541,6 +541,17 @@ async def coin_screening(
         }) from exc
 
     results = [_score(coin) for coin in raw]
+    if data_mode == "stale_cache":
+        for result in results:
+            result["analysis_eligible"] = False
+            result["freshness_status"] = "stale_cache"
+            result["screening_eligible"] = False
+            result["warnings"].append("Cached fallback data used after provider failure; candidate signal held")
+            if result["growth_candidate_eligible"]:
+                result["screen_band"] = "data_quality_hold"
+    else:
+        for result in results:
+            result["screening_eligible"] = bool(result["growth_candidate_eligible"] and result["analysis_eligible"])
     if asset_type == "growth":
         results = [coin for coin in results if coin["growth_candidate_eligible"]]
     elif asset_type != "all":
