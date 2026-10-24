@@ -85,3 +85,28 @@ def test_finite_number_rejects_nan_and_infinity():
     assert api._finite_number("NaN") is None
     assert api._finite_number("Infinity") is None
     assert api._finite_number("12.5") == 12.5
+
+
+
+def test_endpoint_classifies_provider_http_error(monkeypatch):
+    def fail(_symbol):
+        raise urllib.error.HTTPError("https://example.invalid", 429, "rate limited", {}, None)
+
+    monkeypatch.setattr(api, "_snapshot", fail)
+    with pytest.raises(HTTPException) as caught:
+        asyncio.run(api.derivatives_market_snapshot(symbol="BTCUSDT"))
+    assert caught.value.status_code == 503
+    assert caught.value.detail["error"] == "http_error"
+    assert caught.value.detail["http_status"] == 429
+
+
+def test_snapshot_rejects_malformed_order_book_payload(monkeypatch):
+    payloads = [
+        {"symbol": "BTCUSDT", "openInterest": "1000", "time": 1_800_000_000_000},
+        {"symbol": "BTCUSDT", "markPrice": "65000", "indexPrice": "65000", "lastFundingRate": "0.0001", "time": 1_800_000_000_000},
+        [],
+        {"bids": [], "asks": [["65010", "1"]]},
+    ]
+    monkeypatch.setattr(api, "_get_json", lambda _path, _params: payloads.pop(0))
+    with pytest.raises(ValueError, match="no valid bid/ask levels"):
+        api._snapshot("BTCUSDT")
