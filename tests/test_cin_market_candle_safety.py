@@ -408,3 +408,25 @@ def test_candle_time_consistency_allows_small_clock_skew():
     opened = now_ms + 60_000
     row = _row(opened, opened + 3_600_000 - 1)
     assert api._candle_time_consistent(row, "1h", now_ms=now_ms)
+
+@pytest.mark.parametrize(
+    "opened, expected",
+    [
+        ("2024-01-01T00:00:00+00:00", True),  # Monday UTC
+        ("2024-01-02T00:00:00+00:00", False), # Tuesday UTC
+        ("2024-01-01T00:01:00+00:00", False), # Not midnight UTC
+    ],
+)
+def test_weekly_candle_requires_monday_midnight_utc(opened, expected):
+    open_ms = int(datetime.fromisoformat(opened).timestamp() * 1000)
+    row = _row(open_ms, open_ms + 7 * 86_400_000 - 1)
+    assert api._candle_time_consistent(row, "1w", now_ms=open_ms) is expected
+
+
+def test_three_day_candle_checks_duration_without_assuming_epoch_anchor():
+    opened = int(datetime(2024, 1, 2, 12, tzinfo=timezone.utc).timestamp() * 1000)
+    row = _row(opened, opened + 3 * 86_400_000 - 1)
+    assert api._candle_time_consistent(row, "3d", now_ms=opened)
+    row["close_time"] -= 1
+    assert not api._candle_time_consistent(row, "3d", now_ms=opened)
+
