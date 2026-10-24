@@ -33,6 +33,35 @@ WRAPPED_SYMBOLS = {
 COMMODITY_BACKED_SYMBOLS = {"XAUT", "PAXG"}
 
 
+class MarketDataProviderFailure(Exception):
+    """Structured provider failure preserving primary and fallback attribution."""
+
+    def __init__(
+        self, *, primary_kind: str, primary_status: int | None,
+        fallback_kind: str, fallback_status: int | None,
+    ) -> None:
+        self.primary_kind = primary_kind
+        self.primary_status = primary_status
+        self.fallback_kind = fallback_kind
+        self.fallback_status = fallback_status
+        super().__init__(
+            f"CoinGecko {primary_kind}"
+            + (f" (HTTP {primary_status})" if primary_status is not None else "")
+            + f"; CoinPaprika fallback {fallback_kind}"
+            + (f" (HTTP {fallback_status})" if fallback_status is not None else "")
+        )
+
+
+def _failure_kind(error: Exception) -> tuple[str, int | None]:
+    if isinstance(error, urllib.error.HTTPError):
+        return "http_error", error.code
+    if isinstance(error, (urllib.error.URLError, TimeoutError)):
+        return "network_error", None
+    if isinstance(error, (ValueError, json.JSONDecodeError)):
+        return "invalid_response", None
+    return "provider_error", None
+
+
 def _number(value: Any) -> float | None:
     return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
@@ -129,10 +158,14 @@ def _request_markets(vs_currency: str, per_page: int) -> list[dict[str, Any]]:
                 raise ValueError("CoinPaprika returned no usable ticker rows")
             return mapped[:per_page]
         except Exception as fallback_error:
-            # Preserve the original CoinGecko 429 so the API can report rate limiting clearly.
-            if isinstance(primary_error, urllib.error.HTTPError) and primary_error.code == 429:
-                raise primary_error
-            raise fallback_error
+            primary_kind, primary_status = _failure_kind(primary_error)
+            fallback_kind, fallback_status = _failure_kind(fallback_error)
+            raise MarketDataProviderFailure(
+                primary_kind=primary_kind,
+                primary_status=primary_status,
+                fallback_kind=fallback_kind,
+                fallback_status=fallback_status,
+            ) from fallback_error
 
 
 def _fetch_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]], str, int]:
@@ -150,6 +183,11 @@ def _fetch_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]
         with _CACHE_LOCK:
             _CACHE[key] = (fetched_at, rows)
         return rows, "live", 0
+    except MarketDataProviderFailure as exc:
+        if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
+            # Preserve an HTTP status when either provider supplied one; 0 means no HTTP status.
+            return cached[1], "stale_cache", exc.fallback_status or exc.primary_status or 0
+        raise
     except urllib.error.HTTPError as exc:
         if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
             return cached[1], "stale_cache", exc.code
@@ -367,14 +405,50 @@ async def coin_screening(
             }
         else:
             raw, data_mode, provider_error_code = await asyncio.to_thread(_fetch_markets, currency, per_page)
+    except MarketDataProviderFailure as exc:
+        status_code = 503 if (
+            exc.primary_status == 429 or exc.fallback_status == 429
+            or exc.primary_kind == "network_error" or exc.fallback_kind == "network_error"
+        ) else 502
+        raise HTTPException(status_code=status_code, detail={
+            "message": "Both market-data providers failed; no cached data is available.",
+            "primary_provider": "CoinGecko",
+            "primary_error": exc.primary_kind,
+            "primary_http_status": exc.primary_status,
+            "fallback_provider": "CoinPaprika",
+            "fallback_error": exc.fallback_kind,
+            "fallback_http_status": exc.fallback_status,
+        }) from exc
     except urllib.error.HTTPError as exc:
         if exc.code == 429:
-            raise HTTPException(status_code=503, detail="CoinGecko rate-limited and fallback provider unavailable; retry later") from exc
-        raise HTTPException(status_code=502, detail=f"CoinGecko HTTP error: {exc.code}") from exc
+            raise HTTPException(status_code=503, detail={
+                "message": "CoinGecko rate-limited; fallback provider did not return usable data.",
+                "primary_provider": "CoinGecko",
+                "primary_error": "http_error",
+                "primary_http_status": exc.code,
+                "fallback_provider": "CoinPaprika",
+                "fallback_error": "not_usable",
+            }) from exc
+        raise HTTPException(status_code=502, detail={
+            "message": "CoinGecko HTTP error and no fallback result was available.",
+            "primary_provider": "CoinGecko",
+            "primary_error": "http_error",
+            "primary_http_status": exc.code,
+            "fallback_provider": "CoinPaprika",
+            "fallback_error": "not_usable",
+        }) from exc
     except (urllib.error.URLError, TimeoutError) as exc:
-        raise HTTPException(status_code=503, detail="Primary and fallback market-data providers are temporarily unavailable") from exc
+        raise HTTPException(status_code=503, detail={
+            "message": "Market-data provider network failure; no cached data is available.",
+            "primary_provider": "CoinGecko",
+            "primary_error": "network_error",
+        }) from exc
     except (ValueError, json.JSONDecodeError) as exc:
-        raise HTTPException(status_code=502, detail="Invalid CoinGecko response") from exc
+        raise HTTPException(status_code=502, detail={
+            "message": "Market-data response could not be parsed and no fallback result was available.",
+            "primary_provider": "CoinGecko",
+            "primary_error": "invalid_response",
+        }) from exc
 
     results = [_score(coin) for coin in raw]
     if asset_type == "growth":
