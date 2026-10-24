@@ -242,7 +242,7 @@ def _validate(symbol: str, interval: str, limit: int) -> str:
 @router.get(
     "/market-candles",
     responses={
-        400: {"description": "Invalid symbol or unsupported interval."},
+        400: {"description": "Unsupported interval or semantic parameter validation failure."},
         502: {"description": "Public market-data provider or response is invalid."},
         503: {"description": "Public market-data provider is temporarily unavailable."},
     },
@@ -290,7 +290,7 @@ async def get_market_candles(
 @router.get(
     "/technical-analysis/market",
     responses={
-        400: {"description": "Invalid symbol or unsupported interval."},
+        400: {"description": "Unsupported interval or semantic parameter validation failure."},
         422: {"description": "Insufficient completed candles for analysis."},
         502: {"description": "Public market-data provider or technical analysis failed."},
         503: {"description": "Public market-data provider is temporarily unavailable."},
