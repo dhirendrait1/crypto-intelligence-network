@@ -2,7 +2,7 @@
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 try:
     from app.cin_evidence_ingestion import (
@@ -21,6 +21,7 @@ router = APIRouter(tags=["public evidence ingestion"])
 
 
 class PublicEvidenceRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     symbol: str = Field(default="ETH", min_length=1, max_length=10, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
     repository: str = Field(default="ethereum/go-ethereum", min_length=1, max_length=100, pattern=r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
