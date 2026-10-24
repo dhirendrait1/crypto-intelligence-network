@@ -1,6 +1,6 @@
 """Read-only API router for CIN commodity-backed evidence review."""
 import re
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -20,7 +20,7 @@ class EvidenceRecord(BaseModel):
     source_url: str | None = Field(default=None, max_length=2048)
     published_at: str | None = Field(default=None, max_length=64)
     checked_at: str | None = Field(default=None, max_length=64)
-    status: str = Field(default="unverified", max_length=32)
+    status: Literal["verified", "unverified", "stale", "unavailable"] = "unverified"
     notes: str | None = Field(default=None, max_length=2000)
 
 
