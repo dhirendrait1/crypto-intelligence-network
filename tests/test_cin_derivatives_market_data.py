@@ -44,6 +44,9 @@ def test_snapshot_preserves_source_times_and_never_invents_liquidations(monkeypa
     assert result["order_book"]["best_ask"] == 65010.0
     assert result["order_book"]["spread"] == 10.0
     assert result["order_book"]["spread_percent"] > 0
+    assert result["order_book"]["bid_levels_used"] == 2
+    assert result["order_book"]["ask_levels_used"] == 2
+    assert result["order_book"]["retrieved_at"]
     assert result["order_book"]["bid_ask_notional_imbalance"] is not None
     assert len(calls) == 4
     assert all("order" not in params and "side" not in params for _, params in calls)
@@ -52,6 +55,18 @@ def test_snapshot_preserves_source_times_and_never_invents_liquidations(monkeypa
 def test_snapshot_rejects_wrong_symbol_or_invalid_payload(monkeypatch):
     monkeypatch.setattr(api, "_get_json", lambda _path, _params: {"symbol": "ETHUSDT"})
     with pytest.raises(ValueError, match="Unexpected open-interest"):
+        api._snapshot("BTCUSDT")
+
+
+def test_snapshot_rejects_crossed_order_book(monkeypatch):
+    payloads = [
+        {"symbol": "BTCUSDT", "openInterest": "1000", "time": 1_800_000_000_000},
+        {"symbol": "BTCUSDT", "markPrice": "65000", "indexPrice": "65000", "lastFundingRate": "0.0001", "time": 1_800_000_000_000},
+        [],
+        {"bids": [["65010", "2"]], "asks": [["65000", "1"]]},
+    ]
+    monkeypatch.setattr(api, "_get_json", lambda _path, _params: payloads.pop(0))
+    with pytest.raises(ValueError, match="best ask is below best bid"):
         api._snapshot("BTCUSDT")
 
 
