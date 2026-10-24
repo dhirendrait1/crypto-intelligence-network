@@ -474,6 +474,11 @@ def _score(coin: dict[str, Any]) -> dict[str, Any]:
         "price": price,
         "freshness_status": freshness_status,
         "freshness_age_seconds": freshness_age_seconds,
+        # Provider timestamp freshness is separate from cache fallback state.
+        # The endpoint may override freshness_status to stale_cache while these
+        # fields preserve what the provider's own last_updated timestamp says.
+        "provider_timestamp_status": freshness_status,
+        "provider_timestamp_age_seconds": freshness_age_seconds,
         "analysis_eligible": analysis_eligible,
         "screening_eligible": bool(growth_candidate_eligible and analysis_eligible),
         "market_cap": market_cap,
