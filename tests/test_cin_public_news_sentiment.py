@@ -219,3 +219,31 @@ def test_parse_articles_omits_unbounded_or_controlled_optional_metadata(field, v
     parsed = api._parse_articles({"articles": [row]}, 10)
     output_field = {"sourcecountry": "source_country"}.get(field, field)
     assert parsed[0][output_field] is None
+
+@pytest.mark.parametrize(
+    "title,url",
+    [
+        ("x" * 1001, "https://news.example/a"),
+        ("bad" + chr(10) + "title", "https://news.example/b"),
+        ("Valid title", "https://news.example/" + "x" * 2049),
+    ],
+)
+def test_parse_articles_skips_oversized_or_controlled_title_and_url(title, url):
+    rows = api._parse_articles({"articles": [{"title": title, "url": url}]}, 10)
+    assert rows == []
+
+
+def test_news_provider_response_size_is_bounded(monkeypatch):
+    class OversizedResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self, limit):
+            return b"x" * limit
+
+    monkeypatch.setattr(api.urllib.request, "urlopen", lambda *_args, **_kwargs: OversizedResponse())
+    with pytest.raises(ValueError, match="exceeded the configured size limit"):
+        api._get_json("bitcoin", 10)
