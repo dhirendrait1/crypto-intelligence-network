@@ -268,6 +268,6 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Added explicit `re.fullmatch` validators for commodity/growth/evidence-ingestion body identifiers and repository paths.
 - [x] Made public candle validation reject leading/trailing whitespace before normalization; added equivalent pre-provider symbol validation to the derivatives endpoint.
 - [x] Added trailing-newline regression tests at request-model and route boundaries.
-- [ ] Confirm all four CI workflows pass on the final code/test revision.
+- [x] All four workflows passed on code/test revision `13ebf4419442e61c6886164ef78536ca3a65bbf1`: screening checks (`40111232668`), technical-analysis tests (`40111232641`), evidence-ingestion API checks (`40111232681`), and automated tests (`40111232706`).
 - **Boundary:** the regex/validator checks enforce syntax only; provider pair listing and source authenticity remain separate concerns.
 
