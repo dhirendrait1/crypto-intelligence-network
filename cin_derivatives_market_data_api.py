@@ -54,6 +54,10 @@ def _validate_payloads(open_interest: Any, premium: Any, history: Any, symbol: s
         raise ValueError("Unexpected open-interest provider payload")
     if not isinstance(premium, dict) or premium.get("symbol") != symbol:
         raise ValueError("Unexpected premium-index provider payload")
+    if _iso_from_ms(open_interest.get("time")) is None:
+        raise ValueError("Open-interest provider payload contained an invalid timestamp")
+    if _iso_from_ms(premium.get("time")) is None:
+        raise ValueError("Premium-index provider payload contained an invalid timestamp")
     if not isinstance(history, list) or any(not isinstance(row, dict) for row in history):
         raise ValueError("Unexpected open-interest history provider payload")
     for row in history:
@@ -63,7 +67,7 @@ def _validate_payloads(open_interest: Any, premium: Any, history: Any, symbol: s
         history_timestamp = _finite_number(row.get("timestamp"))
         if history_value is None or history_value < 0:
             raise ValueError("Open-interest history contained an invalid notional value")
-        if history_timestamp is None or history_timestamp < 0:
+        if history_timestamp is None or history_timestamp < 0 or _iso_from_ms(history_timestamp) is None:
             raise ValueError("Open-interest history contained an invalid timestamp")
 
 
