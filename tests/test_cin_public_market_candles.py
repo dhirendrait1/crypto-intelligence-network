@@ -127,5 +127,30 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
 
 
 
+    async def test_market_analysis_excludes_forming_candle(self):
+        rows = [dict(row) for row in SAMPLE]
+        import time
+        rows[-1]["close_time"] = int(time.time() * 1000) + 60_000
+        with patch.object(api, "_load", return_value=rows):
+            result = await api.analyze_public_market("BTCUSDT", "1h", 50)
+        self.assertEqual(result["input"]["candles_requested"], 50)
+        self.assertEqual(result["input"]["candles_used"], 49)
+        self.assertEqual(result["input"]["forming_candles_excluded"], 1)
+        self.assertTrue(result["input"]["closed_candles_only"])
+        self.assertEqual(result["input"]["candle_count"], 49)
+
+    async def test_market_analysis_returns_422_when_fewer_than_five_candles_are_closed(self):
+        rows = [dict(row) for row in SAMPLE[:5]]
+        import time
+        future_close = int(time.time() * 1000) + 60_000
+        for row in rows:
+            row["close_time"] = future_close
+        with patch.object(api, "_load", return_value=rows):
+            with self.assertRaises(HTTPException) as ctx:
+                await api.analyze_public_market("BTCUSDT", "1h", 5)
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertIn("Fewer than 5 completed candles", ctx.exception.detail)
+
+
 if __name__ == "__main__":
     unittest.main()
