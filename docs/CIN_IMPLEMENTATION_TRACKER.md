@@ -328,6 +328,7 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Added offline regression coverage that proves a forming candle is excluded from the technical-analysis input while request/use counts and the exclusion count remain explicit.
 - [x] Added offline regression coverage that returns HTTP 422 when fewer than five completed candles are available for analysis.
 - [x] Wired `tests/test_cin_public_market_candles.py` into `.github/workflows/cin-ci.yml`; before this change, the new suite was not explicitly executed by the four workflows.
-- [ ] CI validation for the updated workflow commit is pending; do not mark this test batch passing until the public-candle suite and all other workflows are inspected.
+- [x] All four workflows passed on code/test/CI commit `e64e9bd5a8ebba9cb8039d94bba5272063ebc156`: CIN Automated Tests (run `40124087516`), CIN screening checks (`40124087510`), CIN Technical Analysis Tests (`40124087492`), and CIN evidence ingestion API checks (`40124087553`).
+- [x] Inspected the automated workflow job: the newly added `Run public candle API contract regression tests` step completed successfully.
 - **Boundary:** these tests mock the provider loader and verify API behavior only. They do not validate live exchange data or the deployed Render revision.
 
