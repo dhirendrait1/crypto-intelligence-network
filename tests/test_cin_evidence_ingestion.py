@@ -62,6 +62,7 @@ class EvidenceIngestionTests(unittest.TestCase):
         self.assertIn("retrieved_at", result)
         self.assertIn("published_at", result)
         self.assertEqual(result["source_timestamp_field"], "pushed_at")
+        self.assertEqual(result["source_timestamp"], "2026-10-20T10:00:00Z")
         self.assertEqual(result["metadata_completeness"], "complete")
         self.assertEqual(result["metadata_missing_fields"], [])
 
@@ -230,6 +231,7 @@ class EvidenceIngestionTests(unittest.TestCase):
         ])
         self.assertEqual(result["source_timestamp_field"], "updated_at")
         self.assertEqual(result["published_at"], "2026-10-24T10:00:00Z")
+        self.assertEqual(result["source_timestamp"], "2026-10-24T10:00:00Z")
         self.assertEqual(result["claim_verification_status"], "unverified")
         self.assertFalse(result["independently_verified"])
 
