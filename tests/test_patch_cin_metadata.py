@@ -95,13 +95,18 @@ class DeploymentPatchTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         main_path = self.app_dir / "main.py"
         original = main_path.read_text(encoding="utf-8")
-        broken = original.replace("app.include_router(cin_market_data_router)\n", "", 1)
+        # Simulate pending branding normalization and a partially registered route.
+        broken = original.replace("Crypto Intelligence Network (CIN)", "Crypto Intelligence Engine", 1)
+        broken = broken.replace("app.include_router(cin_market_data_router)\n", "", 1)
         main_path.write_text(broken, encoding="utf-8")
+        for module in MODULES:
+            (self.app_dir / module).unlink()
 
         result = self.run_patch()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Partial router registration detected", result.stderr)
         self.assertEqual(main_path.read_text(encoding="utf-8"), broken)
+        self.assertFalse(any((self.app_dir / name).exists() for name in MODULES))
 
 
 if __name__ == "__main__":
