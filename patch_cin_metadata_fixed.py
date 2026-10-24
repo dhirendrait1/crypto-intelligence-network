@@ -114,7 +114,7 @@ for marker, registration in registrations:
         )
 
     if main_guard in main_text:
-        main_text = main_text.replace(main_guard, registration + "\\n" + main_guard, 1)
+        main_text = main_text.replace(main_guard, registration + "\n" + main_guard, 1)
     else:
         main_text = main_text.rstrip() + registration
     changed += 1
