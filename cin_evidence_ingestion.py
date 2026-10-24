@@ -19,6 +19,7 @@ ALLOWED_REPOSITORIES = (
 )
 GITHUB_API_ROOT = "https://api.github.com/repos/"
 TIMEOUT_SECONDS = 8
+FRESHNESS_WINDOW_SECONDS = 7 * 24 * 60 * 60
 
 
 class EvidenceSourceError(RuntimeError):
@@ -27,6 +28,24 @@ class EvidenceSourceError(RuntimeError):
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _freshness_status(payload: dict[str, Any], *, now: datetime | None = None) -> str:
+    """Classify source metadata age without treating freshness as verification."""
+    timestamp = payload.get("pushed_at") or payload.get("updated_at")
+    if timestamp is None:
+        return "unknown"
+    # _validate_metadata has already guaranteed a timezone-aware timestamp.
+    source_time = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+    current_time = now or datetime.now(timezone.utc)
+    age_seconds = (current_time - source_time).total_seconds()
+    # Future timestamps are not considered fresh; this can indicate clock skew
+    # or unexpected upstream data and should be reviewed by policy.
+    if age_seconds < 0:
+        return "unknown"
+    if age_seconds <= FRESHNESS_WINDOW_SECONDS:
+        return "fresh"
+    return "stale"
 
 
 def _validate_metadata(payload: dict[str, Any]) -> None:
@@ -103,6 +122,7 @@ def fetch_github_repository_evidence(
     _validate_metadata(payload)
 
     retrieved_at = _utc_now()
+    freshness_status = _freshness_status(payload)
     return {
         "symbol": "ETH",
         "category": "developer_activity",
@@ -125,7 +145,7 @@ def fetch_github_repository_evidence(
         "unit": "repository metadata fields",
         "retrieval_status": "success",
         "validation_status": "metadata_shape_validated",
-        "freshness_status": "requires_policy_evaluation",
+        "freshness_status": freshness_status,
         "claim_verification_status": "unverified",
         "independently_verified": False,
         "provenance": "public GitHub REST API; allowlisted repository",
