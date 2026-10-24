@@ -140,3 +140,15 @@ This is validation of caller-supplied metadata, not independent source retrieval
 ## Growth fundamentals evidence audit — 2026-10-24
 
 The growth fundamentals assessment score is explicitly an evidence-coverage indicator, not a project-quality score or investment recommendation. The assessment accepts caller-supplied metadata and does not fetch source documents or independently verify claims. URL validation now requires a parsed absolute HTTP(S) URL with a hostname; regression tests cover scheme-only URLs, missing hostnames, and a valid HTTP URL. All four GitHub Actions workflows passed on commit `31f8ad04051e15ef028d85ee58f0dd79e2826b9f` (offline tests only). Future publication timestamps are still a known validation gap; do not interpret this audit as complete or as independent fundamentals verification.
+
+## Public evidence ingestion freshness policy — 2026-10-24
+
+The allowlisted GitHub repository connector now validates timestamps as timezone-aware ISO datetimes, rejects timestamps more than five minutes ahead of the local UTC clock, and computes repository-activity recency from pushed_at (falling back to updated_at):
+
+- fresh: selected timestamp is no more than seven days old.
+- stale: selected timestamp is older than seven days.
+- unknown: neither timestamp is available.
+- freshness_age_seconds is the non-negative age of the selected timestamp when available.
+- Missing optional metadata is reported as metadata_partial with a missing_fields list; malformed field values produce EvidenceSourceError.
+
+This freshness status describes the selected repository timestamp only. It is not proof of ecosystem-wide development, source truth, investment merit, or independent claim verification. Regression tests are mocked/offline. The exact test commit is 97729aa2d421fcd8fc07cc6a8f277b9d19741fc2; all four GitHub Actions workflows passed for that commit. No live provider check, merge, or production deployment is implied.
