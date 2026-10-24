@@ -1,8 +1,9 @@
 """Read-only API for allowlisted public evidence ingestion."""
+import re
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 try:
     from app.cin_evidence_ingestion import (
@@ -22,8 +23,22 @@ router = APIRouter(tags=["public evidence ingestion"])
 
 class PublicEvidenceRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    symbol: str = Field(default="ETH", min_length=1, max_length=10, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*\z")
-    repository: str = Field(default="ethereum/go-ethereum", min_length=1, max_length=100, pattern=r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\z")
+    symbol: str = Field(default="ETH", min_length=1, max_length=10, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+    repository: str = Field(default="ethereum/go-ethereum", min_length=1, max_length=100, pattern=r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+
+    @field_validator("symbol")
+    @classmethod
+    def symbol_must_match_full_string(cls, value: str) -> str:
+        if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", value) is None:
+            raise ValueError("symbol must contain only supported ticker characters")
+        return value
+
+    @field_validator("repository")
+    @classmethod
+    def repository_must_match_full_string(cls, value: str) -> str:
+        if re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", value) is None:
+            raise ValueError("repository must use owner/repository syntax")
+        return value
 
 
 @router.post("/public-evidence-ingestion")
