@@ -93,6 +93,8 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [ ] Add source-aware conflict resolution and independent source retrieval; current conflict detection compares supplied statuses and does not establish which source is authoritative.
 
 
+- Follow-up validation note: the latest intermediate PR workflow exposed a commodity assessment clock-scope regression in the merged test snapshot. Do not mark this clock-hardening batch release-ready until a fresh workflow run confirms all four workflows pass on the corrected revision.
+
 ## Assessment API boundary validation (2026-10-24)
 
 - [x] Restrict commodity-backed and growth-fundamentals request symbols to bounded alphanumeric identifiers with only `.`, `_`, or `-` after the first character; reject whitespace and pair-style separators.
