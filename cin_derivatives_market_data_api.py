@@ -65,6 +65,7 @@ def _snapshot(symbol: str) -> dict[str, Any]:
         {"symbol": symbol, "period": "4h", "limit": "2"},
     )
     depth = _get_json("/fapi/v1/depth", {"symbol": symbol, "limit": "20"})
+    depth_retrieved_at = datetime.now(timezone.utc).isoformat()
     _validate_payloads(open_interest, premium, history, symbol)
     if not isinstance(depth, dict) or not isinstance(depth.get("bids"), list) or not isinstance(depth.get("asks"), list):
         raise ValueError("Unexpected order-book depth provider payload")
