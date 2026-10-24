@@ -421,5 +421,5 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Collapse duplicate IDs case-insensitively, preserving the first provider row deterministically.
 - [x] Expose input, invalid-identity, duplicate-ID, and accepted-identity counts in response `data_quality` metadata.
 - [x] Add offline regression tests and document the identity policy and its limitations.
-- [ ] Verify all CI workflows on the final commit before marking the milestone fully verified.
+- [x] Verify all four CI workflows on final commit `fa8d0c443beb9d81f5bc5b1d539b310363026cc3`: CIN Automated Tests, CIN screening checks, CIN Technical Analysis Tests, and CIN evidence ingestion API checks all completed successfully (runs `40128798174`, `40128797810`, `40128797811`, `40128797876`). These are offline/mocked checks only.
 - **Boundary:** distinct provider IDs may still represent the same real-world asset; no canonical cross-provider identity mapping is claimed. PR #8 remains Draft and unmerged.
