@@ -148,6 +148,9 @@ def fetch_github_repository_evidence(
         "source_name": "GitHub public repository API",
         "source_url": url,
         "repository": repository,
+        # Explicitly name this as a repository metadata timestamp, not a
+        # publication timestamp. Keep published_at as a compatibility alias.
+        "source_timestamp": payload.get("pushed_at") or payload.get("updated_at"),
         "published_at": payload.get("pushed_at") or payload.get("updated_at"),
         "source_timestamp_field": source_timestamp_field,
         "retrieved_at": retrieved_at,
