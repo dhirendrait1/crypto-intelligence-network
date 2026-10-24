@@ -199,3 +199,10 @@ async def derivatives_market_snapshot(
             "provider": "Binance USDⓈ-M Futures",
             "error": "invalid_response",
         }) from exc
+    except Exception as exc:
+        # Keep unforeseen provider/parser failures inside the controlled API contract.
+        raise HTTPException(status_code=502, detail={
+            "message": "Derivatives provider response was invalid or incomplete.",
+            "provider": "Binance USDⓈ-M Futures",
+            "error": "invalid_response",
+        }) from exc
