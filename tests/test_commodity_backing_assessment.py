@@ -111,6 +111,21 @@ def test_naive_timestamps_do_not_support_verified_status():
     assert "checked_at" in result["missing_fields"]
 
 
+def test_conflicting_statuses_for_same_evidence_type_are_not_hidden():
+    result = assess_commodity_asset(
+        "PAXG",
+        [
+            valid_item(status="verified"),
+            valid_item(status="unverified", source_name="Second source"),
+        ],
+        now=NOW,
+    )
+    coverage = result["evidence_coverage"]["reserve_attestation"]
+    assert coverage["status"] == "conflicting"
+    assert coverage["conflict_detected"] is True
+    assert result["overall_status"] == "evidence_conflicting_or_incomplete"
+
+
 def test_valid_http_url_and_timestamp_metadata_remain_accepted():
     result = normalize_evidence(valid_item(source_url="http://example.com/report"), now=NOW)
     assert result["status"] == "verified"
