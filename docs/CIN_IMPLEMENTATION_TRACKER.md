@@ -562,3 +562,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Binance stream documentation describes weekly/monthly interval labels and UTC open/close timestamps; this supports testing weekly Monday UTC and calendar-month boundaries, but does not justify inventing an epoch-modulo anchor for 3-day candles. Reference: https://github.com/binance/binance-spot-api-docs/blob/master/web-socket-streams.md
 - Expanded deterministic tests for weekly Monday-midnight UTC acceptance/rejection and 3-day duration validation without an assumed epoch anchor. Test commit: 796518581664dfb8fc134a797a014c08b3ab6a7f.
 - Latest-head CI for the current code and test changes must pass before this matrix is counted as verified. Kraken boundary enforcement remains deferred; offline tests do not establish live-provider behavior.
+
+
+## Monthly freshness disclosure correction (2026-10-25)
+
+- Corrected stale API limitation text on both `/market-candles` and `/technical-analysis/market`: monthly freshness duration is calendar-aware, not a fixed 31-day approximation.
+- Added an offline regression test asserting both endpoint limitation lists match the implemented calendar-month duration and no longer claim a 31-day approximation.
+- Code commit: `ac2982945c8efcd4ce53c34fa20046b47d0e9d70`; test commit: `1bfa6145a6b740c87f7538aa985a451b1964c987`.
+- CI for the latest branch head must pass before this correction is counted as verified. This is a documentation/contract accuracy fix; it does not establish live provider or deployment health.
