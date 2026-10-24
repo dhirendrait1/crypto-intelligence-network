@@ -121,6 +121,9 @@ def _fetch_market_data(ids: list[str], vs_currency: str) -> list[dict[str, Any]]
             warnings.append(timestamp_warning)
         if freshness_status == "stale":
             warnings.append("market_data_older_than_15_minutes")
+        if price == 0:
+            warnings.append("zero_price_not_suitable_for_analysis")
+        analysis_eligible = freshness_status == "fresh" and price > 0
         normalized.append({
             "id": coin_id,
             "symbol": symbol,
@@ -133,6 +136,7 @@ def _fetch_market_data(ids: list[str], vs_currency: str) -> list[dict[str, Any]]
             "last_updated": last_updated,
             "freshness_status": freshness_status,
             "freshness_age_seconds": freshness_age_seconds,
+            "analysis_eligible": analysis_eligible,
             "data_quality_warnings": warnings,
         })
     return normalized
