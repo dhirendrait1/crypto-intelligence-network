@@ -543,3 +543,10 @@ This checkpoint validates configured offline automation only. It does not establ
 - Fixed-interval epoch alignment is deliberately not assumed without provider-specific evidence; 3-day anchoring remains provider-specific. Kraken integration still requires a separate compatibility pass before enforcing the helper there.
 - Code commits: `56b9578bba9df3b77168acf7051445ec924bfb15`, `0cb4e6efb60f4228142ceca005279afca54f3f39`; tests: `46e14b24f6c1ad98bb567bb4967242b41dd29f73`.
 - CI for this latest code/test head is pending. Live-provider and deployment health remain unverified.
+
+## Future-dated candle guard (2026-10-25)
+
+- `_candle_time_consistent` now rejects candle open timestamps more than 60 seconds ahead of current UTC time; the one-minute tolerance is an explicit clock-skew allowance.
+- Added deterministic tests for rejection beyond the tolerance and acceptance at the tolerance boundary.
+- Code: `8b7e415d0f910078731ee1c68762d85ede6bf509`; tests: `23da189d12018e73b114fba18a58c5a8c9ad857b`.
+- Latest-head CI is pending. Live-provider and deployment checks remain outstanding.
