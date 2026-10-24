@@ -243,4 +243,5 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Normalize parseable timezone-aware publication/review timestamps to UTC identity, so equivalent instants with different offsets deduplicate consistently.
 - [x] Invalid/credential-bearing URLs retain their literal identity rather than being canonicalized into a valid URL's identity; IPv6 hosts remain bracketed when canonicalized.
 - [x] Added offline regressions for host case/default port/fragment/trailing slash/timezone-offset equivalence and for distinct case-sensitive paths.
-- **Validation status:** workflow results for the final code/test revision are pending. Tests are offline/mocked and do not independently verify evidence claims or source contents.
+- [x] All four workflows passed on code/test revision `cee4f1bd9b4a61bf9b63bb12e451254884d4451d`: evidence-ingestion API checks (run `40110072726`), CIN Automated Tests (`40110072860`), screening checks (`40110072796`), and Technical Analysis Tests (`40110072728`). Job-level results were checked and each concluded `success`.
+- **Boundary:** tests are offline/mocked and do not independently verify evidence claims or source contents. No merge or production deployment was performed.
