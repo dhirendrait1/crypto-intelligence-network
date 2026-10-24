@@ -132,6 +132,15 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     return candles
 
 
+def _normalize_candle_sequence(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return candles in chronological order and reject ambiguous duplicate timestamps."""
+    ordered = sorted(rows, key=lambda row: row["open_time"])
+    for previous, current in zip(ordered, ordered[1:]):
+        if current["open_time"] == previous["open_time"]:
+            raise ValueError("Provider returned duplicate candle open timestamps")
+    return ordered
+
+
 def _fetch_klines(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
     """Compatibility wrapper retained for existing tests and integrations."""
     return _fetch_binance(symbol, interval, limit)
@@ -159,6 +168,10 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
         raise HTTPException(status_code=503, detail="Binance public market-data provider is temporarily unavailable.") from None
     except (ValueError, json.JSONDecodeError):
         raise HTTPException(status_code=502, detail="Binance public market-data provider returned an invalid response.") from None
+    try:
+        rows = _normalize_candle_sequence(rows)
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(status_code=502, detail="Public market-data provider returned an ambiguous candle sequence.") from None
     for row in rows:
         row["_source"] = source
         row["_source_endpoint"] = endpoint
