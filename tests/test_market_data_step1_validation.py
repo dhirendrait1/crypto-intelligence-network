@@ -46,6 +46,7 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         result = _fetch_market_data(["bitcoin"], "usd")
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["freshness_status"], "fresh")
+        self.assertTrue(result[0]["analysis_eligible"])
         self.assertIsInstance(result[0]["freshness_age_seconds"], int)
         self.assertEqual(result[0]["data_quality_warnings"], [])
 
@@ -141,6 +142,27 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         result = _fetch_market_data(["bitcoin"], "usd")[0]
         self.assertIsNone(result["name"])
         self.assertIsNone(result["symbol"])
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_stale_and_unknown_rows_are_not_analysis_eligible(self, mocked):
+        old = (datetime.now(timezone.utc) - timedelta(minutes=20)).isoformat()
+        mocked.return_value = FakeResponse([row(last_updated=old)])
+        stale = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertEqual(stale["freshness_status"], "stale")
+        self.assertFalse(stale["analysis_eligible"])
+
+        mocked.return_value = FakeResponse([row(last_updated="not-a-timestamp")])
+        unknown = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertEqual(unknown["freshness_status"], "unknown")
+        self.assertFalse(unknown["analysis_eligible"])
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_zero_price_is_preserved_but_not_analysis_eligible(self, mocked):
+        mocked.return_value = FakeResponse([row(current_price=0)])
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertEqual(result["price"], 0)
+        self.assertFalse(result["analysis_eligible"])
+        self.assertIn("zero_price_not_suitable_for_analysis", result["data_quality_warnings"])
 
 
     @patch("market_data_step1.urllib.request.urlopen")
