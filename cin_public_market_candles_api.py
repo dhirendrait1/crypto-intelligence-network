@@ -96,6 +96,12 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
                 "open_time": start, "open": float(row[1]), "high": float(row[2]),
                 "low": float(row[3]), "close": float(row[4]), "volume": float(row[6]),
                 "close_time": start + duration_ms - 1,
+                "_provider_pair_key": pair_key,
+                "_provider_quote_currency": (
+                    "USD" if pair_key.upper().endswith(("ZUSD", "USD"))
+                    else "USDT" if pair_key.upper().endswith("USDT")
+                    else None
+                ),
             })
         except (TypeError, ValueError, OverflowError):
             continue
@@ -131,9 +137,13 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
         raise HTTPException(status_code=503, detail="Binance public market-data provider is temporarily unavailable.") from None
     except (ValueError, json.JSONDecodeError):
         raise HTTPException(status_code=502, detail="Binance public market-data provider returned an invalid response.") from None
+    requested_pair = re.fullmatch(r"([A-Z0-9]+)(USDT|USD)", symbol)
     for row in rows:
         row["_source"] = source
         row["_source_endpoint"] = endpoint
+        if source.startswith("Binance"):
+            row["_provider_pair_key"] = symbol
+            row["_provider_quote_currency"] = requested_pair.group(2) if requested_pair else None
     return rows
 
 
@@ -159,15 +169,21 @@ async def get_market_candles(
     rows = await _load(normalized, interval, limit)
     source = rows[0].get("_source", "Binance public market-data API")
     endpoint = rows[0].get("_source_endpoint", BINANCE_KLINES_URL)
+    retrieved_at = datetime.now(timezone.utc)
+    now_ms = int(retrieved_at.timestamp() * 1000)
     return {
         "service": "cin", "mode": "read_only", "source": source, "source_endpoint": endpoint,
-        "retrieved_at": datetime.now(timezone.utc).isoformat(), "symbol": normalized,
+        "retrieved_at": retrieved_at.isoformat(), "symbol": normalized,
+        "provider_pair_key": rows[0].get("_provider_pair_key"),
+        "provider_quote_currency": rows[0].get("_provider_quote_currency"),
         "timeframe": interval, "count": len(rows),
         "data": [
             {
                 **{key: value for key, value in row.items() if not key.startswith("_")},
                 "open_time_utc": datetime.fromtimestamp(row["open_time"] / 1000, timezone.utc).isoformat(),
                 "close_time_utc": datetime.fromtimestamp(row["close_time"] / 1000, timezone.utc).isoformat(),
+                "is_closed": row["close_time"] < now_ms,
+                "candle_status": "closed" if row["close_time"] < now_ms else "forming",
             }
             for row in rows
         ],
@@ -191,20 +207,35 @@ async def analyze_public_market(
     rows = await _load(normalized, interval, limit)
     source = rows[0].get("_source", "Binance public market-data API")
     endpoint = rows[0].get("_source_endpoint", BINANCE_KLINES_URL)
+    retrieved_at = datetime.now(timezone.utc)
+    now_ms = int(retrieved_at.timestamp() * 1000)
+    closed_rows = [row for row in rows if row["close_time"] < now_ms]
+    forming_count = len(rows) - len(closed_rows)
+    if len(closed_rows) < 5:
+        raise HTTPException(
+            status_code=422,
+            detail="Fewer than 5 completed candles are available for analysis; retry after more candles close.",
+        )
     try:
-        analysis = analyze_ohlc([{key: row[key] for key in ("open", "high", "low", "close")} for row in rows])
+        analysis = analyze_ohlc([{key: row[key] for key in ("open", "high", "low", "close")} for row in closed_rows])
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=f"Fetched candles failed analysis validation: {exc}") from exc
     analysis["input"].update({
         "symbol": normalized, "timeframe": interval, "source": source, "source_endpoint": endpoint,
-        "retrieved_at": datetime.now(timezone.utc).isoformat(),
-        "first_candle_open_time_utc": datetime.fromtimestamp(rows[0]["open_time"] / 1000, timezone.utc).isoformat(),
-        "last_candle_close_time_utc": datetime.fromtimestamp(rows[-1]["close_time"] / 1000, timezone.utc).isoformat(),
+        "provider_pair_key": rows[0].get("_provider_pair_key"),
+        "provider_quote_currency": rows[0].get("_provider_quote_currency"),
+        "retrieved_at": retrieved_at.isoformat(),
+        "candles_requested": len(rows),
+        "candles_used": len(closed_rows),
+        "closed_candles_only": True,
+        "forming_candles_excluded": forming_count,
+        "first_candle_open_time_utc": datetime.fromtimestamp(closed_rows[0]["open_time"] / 1000, timezone.utc).isoformat(),
+        "last_candle_close_time_utc": datetime.fromtimestamp(closed_rows[-1]["close_time"] / 1000, timezone.utc).isoformat(),
         "volume_included_in_source_but_not_used_in_indicators": True,
     })
     analysis["limitations"].extend([
         "Public exchange data is not independently audited by CIN.",
-        "The last candle may still be forming; confirm closed-candle status before comparing snapshots.",
+        "This endpoint includes the latest candle even when it is still forming; use /technical-analysis/market for closed-candle-only calculations.",
         "Technical outputs and ATR scenarios are descriptive research, not investment advice or trade instructions.",
     ])
     return analysis
