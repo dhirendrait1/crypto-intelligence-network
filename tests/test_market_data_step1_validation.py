@@ -142,5 +142,20 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         self.assertIsNone(result["symbol"])
 
 
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_unrepresentable_timezone_timestamp_is_unknown(self, mocked):
+        mocked.return_value = FakeResponse([row(last_updated="0001-01-01T00:00:00+14:00")])
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertEqual(result["freshness_status"], "unknown")
+        self.assertIsNone(result["freshness_age_seconds"])
+        self.assertIn("invalid_last_updated_timestamp", result["data_quality_warnings"])
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_duplicate_provider_coin_ids_are_not_counted_twice(self, mocked):
+        mocked.return_value = FakeResponse([row(), row(current_price=101.0)])
+        result = _fetch_market_data(["bitcoin"], "usd")
+        self.assertEqual(len(result), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
