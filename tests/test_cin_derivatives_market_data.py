@@ -86,6 +86,18 @@ def test_finite_number_rejects_nan_and_infinity():
     assert api._finite_number("Infinity") is None
     assert api._finite_number("12.5") == 12.5
 
+@pytest.mark.parametrize(("mark_price", "index_price"), [("0", "64990"), ("65000", "0"), ("65000", "-1"), ("65000", "invalid")])
+def test_snapshot_rejects_invalid_mark_or_index_price(monkeypatch, mark_price, index_price):
+    payloads = [
+        {"symbol": "BTCUSDT", "openInterest": "1000", "time": 1_800_000_000_000},
+        {"symbol": "BTCUSDT", "markPrice": mark_price, "indexPrice": index_price, "lastFundingRate": "0.0001", "time": 1_800_000_000_000},
+        [],
+        {"bids": [["65000", "2"]], "asks": [["65010", "1"]]},
+    ]
+    monkeypatch.setattr(api, "_get_json", lambda _path, _params: payloads.pop(0))
+    with pytest.raises(ValueError, match="mark/index price"):
+        api._snapshot("BTCUSDT")
+
 
 
 def test_endpoint_classifies_provider_http_error(monkeypatch):
