@@ -107,20 +107,37 @@ def _fetch_market_data(ids: list[str], vs_currency: str) -> list[dict[str, Any]]
         if market_cap is not None and not _finite_number(market_cap, minimum=0):
             market_cap = None
             warnings.append("invalid_market_cap_omitted")
+        elif market_cap is not None:
+            market_cap = float(market_cap)
         volume = coin.get("total_volume")
         if volume is not None and not _finite_number(volume, minimum=0):
             volume = None
             warnings.append("invalid_total_volume_omitted")
+        elif volume is not None:
+            volume = float(volume)
         change = coin.get("price_change_percentage_24h")
         if change is not None and not _finite_number(change):
             change = None
             warnings.append("invalid_price_change_percentage_omitted")
+        elif change is not None:
+            change = float(change)
         last_updated = coin.get("last_updated")
         freshness_status, freshness_age_seconds, timestamp_warning = _timestamp_status(last_updated)
         if timestamp_warning:
             warnings.append(timestamp_warning)
         if freshness_status == "stale":
             warnings.append("market_data_older_than_15_minutes")
+        price = float(price)
+        market_cap_status = "missing" if market_cap is None else ("zero" if market_cap == 0 else "reported_positive")
+        volume_status = "missing" if volume is None else ("zero" if volume == 0 else "reported_positive")
+        if market_cap_status == "missing":
+            warnings.append("market_cap_unavailable")
+        elif market_cap_status == "zero":
+            warnings.append("zero_market_cap_not_liquidity_evidence")
+        if volume_status == "missing":
+            warnings.append("volume_24h_unavailable")
+        elif volume_status == "zero":
+            warnings.append("zero_volume_not_liquidity_evidence")
         if price == 0:
             warnings.append("zero_price_not_suitable_for_analysis")
         analysis_eligible = freshness_status == "fresh" and price > 0
@@ -131,7 +148,9 @@ def _fetch_market_data(ids: list[str], vs_currency: str) -> list[dict[str, Any]]
             "currency": vs_currency.upper(),
             "price": price,
             "market_cap": market_cap,
+            "market_cap_status": market_cap_status,
             "total_volume_24h": volume,
+            "volume_24h_status": volume_status,
             "price_change_percentage_24h": change,
             "last_updated": last_updated,
             "freshness_status": freshness_status,
