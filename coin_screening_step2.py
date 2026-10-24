@@ -93,13 +93,13 @@ def _market_freshness(value: Any) -> tuple[str, int | None]:
 
 def _safe_retrieved_at(value: Any) -> str | None:
     """Format internal retrieval timestamps defensively; never trust malformed metadata."""
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+    numeric = _number(value)
+    if numeric is None:
         return None
     try:
-        return datetime.fromtimestamp(value, timezone.utc).isoformat()
+        return datetime.fromtimestamp(numeric, timezone.utc).isoformat()
     except (OverflowError, OSError, ValueError):
         return None
-
 
 def _asset_type(coin: dict[str, Any]) -> tuple[str, str]:
     symbol = str(coin.get("symbol", "")).upper()
