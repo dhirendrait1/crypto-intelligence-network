@@ -51,6 +51,21 @@ def test_kraken_fallback_rejects_unsupported_interval_without_network(monkeypatc
         api._fetch_kraken("BTCUSDT", "2h", 10)
 
 
+def test_candle_routes_document_strict_symbol_format():
+    from fastapi import FastAPI
+
+    app = FastAPI()
+    app.include_router(api.router)
+    schema = app.openapi()
+
+    for path in ("/market-candles", "/technical-analysis/market"):
+        parameters = schema["paths"][path]["get"]["parameters"]
+        symbol = next(parameter for parameter in parameters if parameter["name"] == "symbol")
+        assert symbol["schema"]["pattern"] == "^[A-Za-z0-9]+$"
+        assert symbol["schema"]["minLength"] == 5
+        assert symbol["schema"]["maxLength"] == 20
+
+
 def test_market_candles_reports_pair_and_closed_status(monkeypatch):
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     rows = [
