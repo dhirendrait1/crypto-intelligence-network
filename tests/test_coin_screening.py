@@ -346,6 +346,32 @@ class ScreeningResponseMetadataTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreaterEqual(response["cache_age_seconds"], 30)
         self.assertLess(response["cache_age_seconds"], 35)
 
+    async def test_commodity_endpoint_attributes_uncached_http_failure_to_coinpaprika(self):
+        error = MODULE.urllib.error.HTTPError("coinpaprika", 429, "limited", {}, None)
+        async def fake_to_thread(func, *args, **kwargs):
+            raise error
+        with patch.object(MODULE.asyncio, "to_thread", side_effect=fake_to_thread):
+            with self.assertRaises(MODULE.HTTPException) as caught:
+                await MODULE.coin_screening(
+                    vs_currency="usd", per_page=5, min_score=0, asset_type="commodity_backed"
+                )
+        self.assertEqual(caught.exception.status_code, 503)
+        self.assertEqual(caught.exception.detail["primary_provider"], "CoinPaprika")
+        self.assertEqual(caught.exception.detail["primary_http_status"], 429)
+
+    async def test_commodity_endpoint_attributes_uncached_network_failure_to_coinpaprika(self):
+        error = MODULE.urllib.error.URLError("offline")
+        async def fake_to_thread(func, *args, **kwargs):
+            raise error
+        with patch.object(MODULE.asyncio, "to_thread", side_effect=fake_to_thread):
+            with self.assertRaises(MODULE.HTTPException) as caught:
+                await MODULE.coin_screening(
+                    vs_currency="usd", per_page=5, min_score=0, asset_type="commodity_backed"
+                )
+        self.assertEqual(caught.exception.status_code, 503)
+        self.assertEqual(caught.exception.detail["primary_provider"], "CoinPaprika")
+        self.assertEqual(caught.exception.detail["primary_error"], "network_error")
+
     async def test_commodity_endpoint_exposes_stale_cache_error_provenance(self):
         row = {
             "id": "tether-gold", "symbol": "XAUT", "name": "Tether Gold",
