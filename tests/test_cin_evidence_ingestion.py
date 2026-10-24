@@ -30,6 +30,15 @@ class FakeInvalidUtf8Response(FakeResponse):
         return b"\xff\xfe"
 
 
+class FakeRawResponse(FakeResponse):
+    def __init__(self, raw, status=200):
+        self.raw = raw
+        self.status = status
+
+    def read(self, limit=-1):
+        return self.raw[:limit]
+
+
 class EvidenceIngestionTests(unittest.TestCase):
     @patch("cin_evidence_ingestion.urlopen")
     def test_normalizes_allowlisted_repo_and_never_verifies_claim(self, mocked):
@@ -66,6 +75,20 @@ class EvidenceIngestionTests(unittest.TestCase):
     @patch("cin_evidence_ingestion.urlopen", side_effect=TimeoutError())
     def test_timeout_is_reported_as_source_error(self, mocked):
         with self.assertRaises(EvidenceSourceError):
+            fetch_github_repository_evidence()
+
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_malformed_json_is_reported_as_source_error(self, mocked):
+        mocked.return_value = FakeRawResponse(b'{"full_name":')
+        with self.assertRaisesRegex(EvidenceSourceError, "JSONDecodeError"):
+            fetch_github_repository_evidence()
+
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_oversized_response_is_rejected_before_json_parsing(self, mocked):
+        from cin_evidence_ingestion import MAX_RESPONSE_BYTES
+
+        mocked.return_value = FakeRawResponse(b" " * (MAX_RESPONSE_BYTES + 1))
+        with self.assertRaisesRegex(EvidenceSourceError, "exceeded the 1 MB size limit"):
             fetch_github_repository_evidence()
 
     @patch("cin_evidence_ingestion.urlopen")
