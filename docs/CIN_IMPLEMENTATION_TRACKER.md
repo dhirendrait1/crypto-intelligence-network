@@ -279,5 +279,5 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 
 - [x] Reviewed the failed screening workflow on PR merge revision `b6ecc336edf4080834090a646e44a6427ddbf4ff`. The commodity assessment path failed because the merge snapshot lacked the validated `current` / `assessment_clock_valid` initialization while normalization referenced those names.
 - [x] Confirmed the feature-branch implementation initializes a timezone-aware UTC assessment clock, passes it to each normalized row, and reports clock validity consistently in both summary and evidence rows; regression tests cover valid, naive, and malformed clocks.
-- [ ] Re-run CI on a fresh PR revision and verify all four workflows pass before treating this regression as closed.
+- [x] Re-ran CI on corrected code/test revision `d829699ac591e2ef6b430ae274108a844f576eef`; all four workflows concluded success: CIN screening checks (`40106430183`), CIN Automated Tests (`40106430190`), evidence ingestion API checks (`40106430187`), and Technical Analysis Tests (`40106430182`).
 - **Boundary:** the failed run is a real CI regression, not a live-provider issue. No merge or production deployment was performed.
