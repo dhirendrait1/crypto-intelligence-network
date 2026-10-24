@@ -161,8 +161,11 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
             and now.utcoffset() is not None
         )
     )
-    current = now if assessment_clock_valid and now is not None else datetime.now(timezone.utc)
-    current = current.astimezone(timezone.utc)
+    current = (
+        now.astimezone(timezone.utc)
+        if assessment_clock_valid and now is not None
+        else datetime.now(timezone.utc)
+    )
     required_types = {
         "reserve_attestation",
         "redemption_terms",
