@@ -178,5 +178,37 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(result["freshness"]["stale_data_warning"])
 
 
+    def test_openapi_documents_runtime_error_statuses_for_both_routes(self):
+        from fastapi import FastAPI
+
+        app = FastAPI()
+        app.include_router(api.router)
+        paths = app.openapi()["paths"]
+
+        candle_responses = paths["/market-candles"]["get"]["responses"]
+        self.assertTrue({"200", "400", "422", "502", "503"}.issubset(candle_responses))
+
+        analysis_responses = paths["/technical-analysis/market"]["get"]["responses"]
+        self.assertTrue({"200", "400", "422", "502", "503"}.issubset(analysis_responses))
+
+    def test_http_request_validation_and_semantic_errors_match_contract(self):
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        app = FastAPI()
+        app.include_router(api.router)
+        client = TestClient(app)
+
+        # FastAPI's query-schema validation rejects malformed symbols with 422.
+        malformed = client.get("/market-candles", params={"symbol": "BTC/USDT"})
+        self.assertEqual(malformed.status_code, 422)
+        self.assertIn("detail", malformed.json())
+
+        # The handler's semantic validation rejects unsupported intervals with 400.
+        unsupported = client.get("/market-candles", params={"symbol": "BTCUSDT", "interval": "17m"})
+        self.assertEqual(unsupported.status_code, 400)
+        self.assertEqual(unsupported.json()["detail"], "Unsupported interval.")
+
+
 if __name__ == "__main__":
     unittest.main()
