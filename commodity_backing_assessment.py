@@ -49,7 +49,7 @@ def _is_http_url(value: Any) -> bool:
         return False
 
 
-def normalize_evidence(item: dict[str, Any], *, now: datetime | None = None,
+def normalize_evidence(item: Any, *, now: datetime | None = None,
                        max_age_days: int = 90) -> dict[str, Any]:
     """Validate one evidence record and derive freshness without inventing proof.
 
@@ -63,8 +63,23 @@ def normalize_evidence(item: dict[str, Any], *, now: datetime | None = None,
         current = current.replace(tzinfo=timezone.utc)
     current = current.astimezone(timezone.utc)
 
+    if not isinstance(item, dict):
+        return {
+            **{field: None for field in REQUIRED_EVIDENCE_FIELDS},
+            "notes": None,
+            "status": "unverified",
+            "status_reason": "Evidence record must be an object; malformed record was retained for audit.",
+            "publication_age_days": None,
+            "missing_fields": list(REQUIRED_EVIDENCE_FIELDS),
+            "timestamp_validation_errors": [],
+            "source_url_valid": False,
+            "freshness_threshold_days": max_age_days,
+            "invalid_record": True,
+        }
+
     record = {field: item.get(field) for field in REQUIRED_EVIDENCE_FIELDS}
     record["notes"] = str(item.get("notes", "")).strip() or None
+    record["invalid_record"] = False
     status = str(record.get("status") or "unverified").lower()
     if status not in VALID_STATUSES:
         status = "unverified"
@@ -131,9 +146,10 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
         "redemption_terms",
         "custody_or_issuer_disclosure",
     }
+    source_records = evidence if isinstance(evidence, list) else []
     normalized = [
         normalize_evidence(item, now=now, max_age_days=max_age_days)
-        for item in evidence
+        for item in source_records
     ]
     by_type: dict[str, list[dict[str, Any]]] = {kind: [] for kind in required_types}
     for item in normalized:
@@ -180,6 +196,8 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
         "not_a_reserve_certification": True,
         "evidence_coverage": coverage,
         "evidence": normalized,
+        "invalid_evidence_record_count": sum(1 for item in normalized if item.get("invalid_record")),
+        "input_evidence_list_valid": isinstance(evidence, list),
         "limitations": [
             "CIN records evidence metadata; it does not itself audit reserves or certify issuer claims.",
             "A source publication or attestation is not a guarantee of solvency, custody, redemption, or future backing.",
