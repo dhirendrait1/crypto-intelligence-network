@@ -112,21 +112,25 @@ branding_text = {path: path.read_text(encoding="utf-8") for path in branding_fil
 if not any(OLD in content or NEW in content for content in branding_text.values()):
     raise SystemExit("Could not find a CIN application title to validate")
 
-main_path.write_text(main_text, encoding="utf-8")
+# Build every updated file in memory first. Use the route-patched main_text as
+# the source for main.py so branding normalization cannot restore stale content
+# and silently discard newly inserted router registrations.
+branding_text[main_path] = main_text
+updated_text = {
+    path: content.replace(OLD, NEW)
+    for path, content in branding_text.items()
+}
+changed = sum(
+    1 for path, content in updated_text.items()
+    if OLD in branding_text[path] and content != branding_text[path]
+)
 
-changed = 0
-found = False
-for path in branding_files:
-    text = branding_text[path]
-    if OLD in text:
-        text = text.replace(OLD, NEW)
-        path.write_text(text, encoding="utf-8")
-        changed += 1
-        found = True
-    if NEW in text:
-        found = True
-
-# The branding preflight above guarantees a title was present before mutation.
+# All input validation and transformations complete before the first write.
+for path, content in updated_text.items():
+    if content != branding_text[path]:
+        path.write_text(content, encoding="utf-8")
+if updated_text[main_path] != main_text:
+    main_path.write_text(updated_text[main_path], encoding="utf-8")
 
 for module_name in MODULES:
     shutil.copyfile(ROOT / module_name, APP_DIR / module_name)
