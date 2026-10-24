@@ -477,7 +477,7 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 ### Strict provider timestamp parsing (2026-10-25)
 - Tightened timestamp parsing beyond boolean rejection: Binance open/close timestamps must be integer JSON values; Kraken open timestamps must be numeric, finite, and whole epoch seconds. String-coercible and fractional timestamp values are skipped instead of silently coerced or truncated.
 - Added offline regression coverage for string timestamps from Binance and string/fractional timestamps from Kraken.
-- Code commit: `7a7e10ba8fd65abdb2d04a5dcd77d53370b03c42`; test commit: `5a39471cb6abec9ba6fd84423f5cf20a45b2ba9e`. CI validation for latest tracker commit is pending.
+- Code commit: `7a7e10ba8fd65abdb2d04a5dcd77d53370b03c42`; test commit: `5a39471cb6abec9ba6fd84423f5cf20a45b2ba9e`. The configured four-workflow CI suite subsequently passed on documentation checkpoint `1b847b843c14e0929f9ec972fbc36af14b70a356`; this is offline CI evidence, not live-provider validation.
 
 ### Provider OHLCV boolean-value hardening (2026-10-25)
 - Binance and Kraken parsing now rejects JSON booleans in price and volume fields before numeric conversion; Python would otherwise convert `true`/`false` into 1.0/0.0 and could let malformed provider evidence appear numeric.
@@ -495,7 +495,7 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - Created `docs/CIN_MASTER_ROADMAP.md` as the numbered delivery baseline: **7 stages / 35 steps**.
 - It distinguishes implemented/offline-tested work from partial acceptance work, pending capabilities, and release-blocked steps.
 - This count is a working baseline, not a guarantee that no future requirements will be added. Do not calculate a single completion percentage from mixed-status steps.
-- The roadmap creation commit is `9f42395b1775cd5bd1add8f9dd4a8afa275b2fa8`. CI on the new roadmap/tracker head must be checked before treating the documentation milestone as verified.
+- The roadmap creation commit is `9f42395b1775cd5bd1add8f9dd4a8afa275b2fa8`. The documentation milestone was subsequently verified by four successful workflows on `1b847b843c14e0929f9ec972fbc36af14b70a356`.
 
 
 ## Latest CI verification — 2026-10-25
@@ -507,3 +507,12 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
   - CIN evidence ingestion API checks — run `40142830681`
 - This verifies CI at the documentation/roadmap checkpoint. It does not constitute a live-provider smoke test or production deployment validation.
 - The prior provider-hardening entries above were marked pending at the time they were written; the successful workflow runs now confirm the configured automated CI suite passed on a later head containing those changes.
+
+
+## Market-candle acceptance boundary (2026-10-25)
+
+- Offline tests cover malformed OHLCV values, boolean coercion hazards, timestamp representation, duplicate/conflicting open timestamps, provider pair identity, fallback limit handling, forming-candle exclusion from technical analysis, freshness metadata, and sanitized provider failures.
+- The four configured CI workflows passed on checkpoint `1b847b843c14e0929f9ec972fbc36af14b70a356`.
+- Still not established: live exchange responses, real-world interval-boundary behavior for all Binance intervals, provider rate-limit behavior under live conditions, or deployed service health.
+- Do not describe candle interval alignment as fully validated until an explicit acceptance test covers fixed intervals, weekly boundaries, and the variable-length monthly interval without assuming every month is 31 days.
+- Next safe repository task: add a deterministic interval-boundary validation matrix before changing provider acceptance logic; do not perform live network checks in CI or add trading functionality.
