@@ -535,3 +535,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Added deterministic tests for 28-, 29-, 30-, and 31-day months and the monthly freshness threshold.
 - Code commit: `5259bc9500068d577cba6bc617b9083ae92fdbc3`; test commit: `b4d55897b08dc788e848b9273e4277dc31550702`.
 - CI for the new code/test head is pending. This does not yet validate candle open-time alignment, close-time consistency, live provider behavior, or deployed service health.
+
+## Candle boundary validation increment (2026-10-25)
+
+- Added `_candle_time_consistent` and applied it to Binance candle rows: validates close-time duration, weekly Monday UTC anchoring, and calendar-month open/close boundaries.
+- Added regression tests for fixed-interval close-time mismatch and monthly leap-year/common-year/month-end boundaries.
+- Fixed-interval epoch alignment is deliberately not assumed without provider-specific evidence; 3-day anchoring remains provider-specific. Kraken integration still requires a separate compatibility pass before enforcing the helper there.
+- Code commits: `56b9578bba9df3b77168acf7051445ec924bfb15`, `0cb4e6efb60f4228142ceca005279afca54f3f39`; tests: `46e14b24f6c1ad98bb567bb4967242b41dd29f73`.
+- CI for this latest code/test head is pending. Live-provider and deployment health remain unverified.
