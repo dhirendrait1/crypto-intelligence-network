@@ -109,6 +109,27 @@ def test_provider_transport_failures_return_sanitized_503(monkeypatch, transport
     assert "sensitive-provider" not in caught.value.detail
 
 
+@pytest.mark.parametrize("status_code", [418, 429])
+def test_provider_rate_limit_http_errors_return_retryable_503(monkeypatch, status_code):
+    def fail(*_args, **_kwargs):
+        raise api.urllib.error.HTTPError(
+            api.BINANCE_KLINES_URL,
+            status_code,
+            "sensitive-provider-rate-limit-detail",
+            {},
+            None,
+        )
+
+    monkeypatch.setattr(api, "_fetch_binance", fail)
+
+    with pytest.raises(api.HTTPException) as caught:
+        asyncio.run(api._load("BTCUSDT", "1h", 10))
+
+    assert caught.value.status_code == 503
+    assert caught.value.detail == "Public market-data rate limit reached; retry later."
+    assert "sensitive-provider" not in caught.value.detail
+
+
 def test_clean_candles_rejects_invalid_rows_and_orders_unique_timestamps():
     valid_later = _row(2_000, 2_999)
     valid_earlier = _row(1_000, 1_999)
