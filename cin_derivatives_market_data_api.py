@@ -51,6 +51,8 @@ def _iso_from_ms(value: Any) -> str | None:
 
 
 def _timestamp_quality(value: Any, now: datetime, stale_after_seconds: int, future_tolerance_seconds: int = 60) -> dict[str, Any]:
+    if value is None:
+        return {"timestamp": None, "age_seconds": None, "status": "unavailable"}
     timestamp = _finite_number(value)
     iso_timestamp = _iso_from_ms(value)
     if timestamp is None or iso_timestamp is None:
