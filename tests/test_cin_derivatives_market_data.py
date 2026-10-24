@@ -110,3 +110,26 @@ def test_snapshot_rejects_malformed_order_book_payload(monkeypatch):
     monkeypatch.setattr(api, "_get_json", lambda _path, _params: payloads.pop(0))
     with pytest.raises(ValueError, match="no valid bid/ask levels"):
         api._snapshot("BTCUSDT")
+
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        RuntimeError("unexpected provider response"),
+        UnicodeDecodeError("utf-8", b"\\xff", 0, 1, "invalid start byte"),
+        TypeError("unexpected provider payload"),
+    ],
+)
+def test_endpoint_sanitizes_unexpected_provider_response_errors(monkeypatch, failure):
+    def fail(_symbol):
+        raise failure
+
+    monkeypatch.setattr(api, "_snapshot", fail)
+    with pytest.raises(HTTPException) as caught:
+        asyncio.run(api.derivatives_market_snapshot(symbol="BTCUSDT"))
+
+    assert caught.value.status_code == 502
+    assert caught.value.detail["error"] == "invalid_response"
+    assert caught.value.detail["message"] == "Derivatives provider response was invalid or incomplete."
+    assert "unexpected provider response" not in str(caught.value.detail)
