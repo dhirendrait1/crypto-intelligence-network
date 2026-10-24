@@ -150,20 +150,34 @@ def _request_markets(vs_currency: str, per_page: int) -> list[dict[str, Any]]:
             for row in fallback_payload:
                 if not isinstance(row, dict):
                     continue
-                quotes = row.get("quotes") or {}
-                quote = quotes.get(quote_key) or {}
-                price = quote.get("price")
-                market_cap = quote.get("market_cap")
-                volume = quote.get("volume_24h")
-                circulating = row.get("circulating_supply")
-                total_supply = row.get("total_supply")
-                max_supply = row.get("max_supply")
-                # Do not label price * total_supply as FDV when max supply is unknown.
-                fdv = price * max_supply if (
-                    isinstance(price, (int, float)) and not isinstance(price, bool)
-                    and isinstance(max_supply, (int, float)) and not isinstance(max_supply, bool)
-                    and max_supply > 0
-                ) else None
+                quotes = row.get("quotes")
+                if not isinstance(quotes, dict):
+                    continue
+                quote = quotes.get(quote_key)
+                if not isinstance(quote, dict):
+                    continue
+                # Normalize provider numeric fields before arithmetic or sorting.
+                # Invalid/negative values become missing evidence, never rank keys.
+                price_raw = _number(quote.get("price"))
+                price = price_raw if price_raw is not None and price_raw >= 0 else None
+                market_cap_raw = _number(quote.get("market_cap"))
+                market_cap = market_cap_raw if market_cap_raw is not None and market_cap_raw >= 0 else None
+                volume_raw = _number(quote.get("volume_24h"))
+                volume = volume_raw if volume_raw is not None and volume_raw >= 0 else None
+                circulating_raw = _number(row.get("circulating_supply"))
+                circulating = circulating_raw if circulating_raw is not None and circulating_raw >= 0 else None
+                total_supply_raw = _number(row.get("total_supply"))
+                total_supply = total_supply_raw if total_supply_raw is not None and total_supply_raw >= 0 else None
+                max_supply_raw = _number(row.get("max_supply"))
+                max_supply = max_supply_raw if max_supply_raw is not None and max_supply_raw > 0 else None
+                # Derive FDV only from a finite price and known positive max supply.
+                fdv = None
+                if price is not None and max_supply is not None:
+                    candidate_fdv = price * max_supply
+                    if math.isfinite(candidate_fdv) and candidate_fdv >= 0:
+                        fdv = candidate_fdv
+                change_raw = _number(quote.get("percent_change_24h"))
+                change = change_raw if change_raw is not None else None
                 mapped.append({
                     "id": row.get("id"),
                     "symbol": row.get("symbol"),
@@ -174,11 +188,11 @@ def _request_markets(vs_currency: str, per_page: int) -> list[dict[str, Any]]:
                     "fully_diluted_valuation": fdv,
                     "circulating_supply": circulating,
                     "total_supply": total_supply,
-                    "price_change_percentage_24h": quote.get("percent_change_24h"),
+                    "price_change_percentage_24h": change,
                     "last_updated": row.get("last_updated"),
                     "_cin_provider": "CoinPaprika",
                 })
-            mapped.sort(key=lambda item: item.get("market_cap") or 0, reverse=True)
+            mapped.sort(key=lambda item: item["market_cap"] if item["market_cap"] is not None else -1, reverse=True)
             if not mapped:
                 raise ValueError("CoinPaprika returned no usable ticker rows")
             return mapped[:per_page]
