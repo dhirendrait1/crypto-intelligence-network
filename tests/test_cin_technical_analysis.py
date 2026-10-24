@@ -45,8 +45,8 @@ class TechnicalAnalysisTests(unittest.TestCase):
         bars[-1]["volume"] = 200.0
         result = module.analyze_ohlc(bars)
         self.assertEqual(result["indicators"]["volume_latest"], 200.0)
-        self.assertEqual(result["indicators"]["volume_average_20"], 105.0)
-        self.assertEqual(result["indicators"]["relative_volume_20"], 1.9048)
+        self.assertEqual(result["indicators"]["volume_average_20"], 100.0)
+        self.assertEqual(result["indicators"]["relative_volume_20"], 2.0)
         self.assertEqual(result["indicators"]["volume_analysis_status"], "available")
 
     def test_volume_must_be_present_for_all_candles_or_none(self):
