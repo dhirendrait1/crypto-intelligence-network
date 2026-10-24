@@ -423,3 +423,11 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Add offline regression tests and document the identity policy and its limitations.
 - [x] Verify all four CI workflows on final commit `fa8d0c443beb9d81f5bc5b1d539b310363026cc3`: CIN Automated Tests, CIN screening checks, CIN Technical Analysis Tests, and CIN evidence ingestion API checks all completed successfully (runs `40128798174`, `40128797810`, `40128797811`, `40128797876`). These are offline/mocked checks only.
 - **Boundary:** distinct provider IDs may still represent the same real-world asset; no canonical cross-provider identity mapping is claimed. PR #8 remains Draft and unmerged.
+
+
+## API contract documentation alignment — 2026-10-25
+
+- [x] Corrected public candle documentation to distinguish FastAPI request-schema HTTP 422 responses from explicit semantic HTTP 400 validation and insufficient completed-candle HTTP 422 responses.
+- [x] Corrected derivatives documentation: unavailable open-interest-history timestamps are included in freshness warnings, so empty history yields `freshness_status: warning` and `analysis_eligibility: not_recommended`; history-derived values remain null.
+- [ ] Verify all four CI workflows on the latest code/test head after these documentation changes.
+- **Boundary:** documentation-only edits; no runtime code, production configuration, or deployment changed. CI and live provider behavior remain unverified for these latest documentation commits.
