@@ -205,5 +205,25 @@ class ProviderFailureClassificationTests(unittest.TestCase):
         self.assertEqual(failure.fallback_status, 503)
 
 
+    def test_invalid_primary_payload_and_fallback_network_failure_are_distinct(self):
+        import io
+        primary_response = type(
+            "Response", (), {
+                "__enter__": lambda self: self,
+                "__exit__": lambda self, *args: False,
+                "read": lambda self: b"{}",
+            }
+        )()
+        fallback = MODULE.urllib.error.URLError("offline")
+        with patch.object(MODULE.urllib.request, "urlopen", side_effect=[primary_response, fallback]):
+            with self.assertRaises(MODULE.MarketDataProviderFailure) as caught:
+                MODULE._request_markets("usd", 5)
+        failure = caught.exception
+        self.assertEqual(failure.primary_kind, "invalid_response")
+        self.assertIsNone(failure.primary_status)
+        self.assertEqual(failure.fallback_kind, "network_error")
+        self.assertIsNone(failure.fallback_status)
+
+
 if __name__ == "__main__":
     unittest.main()
