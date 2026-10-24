@@ -68,5 +68,5 @@ Do **not** calculate a single completion percentage from this inventory: it mixe
 - [x] Downgrade caller-supplied `verified` metadata when the review timestamp precedes publication.
 - [x] Return explicit `source_url_valid` and `timestamp_validation_errors` metadata for auditability.
 - [x] Add offline regression tests for URL and timestamp chronology edge cases.
-- [ ] Verify the new regression tests and all four repository workflows on the resulting commit; until the run finishes, this change is not marked CI-validated.
+- [x] Verify the new regression tests and all four repository workflows on commit `7e26219dc57b752255f6e58e8aefdf1f28e749e1`; all four workflows passed. These are offline/mocked tests, not live provider validation.
 - **Boundary:** these checks validate supplied metadata only. CIN still does not fetch source documents or independently certify reserve, custody, solvency, or redemption claims.
