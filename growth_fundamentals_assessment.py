@@ -34,6 +34,16 @@ def _parse_date(value: Any) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
+
+def _is_http_url(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        parsed = urlsplit(value.strip())
+        return parsed.scheme.lower() in {"http", "https"} and bool(parsed.hostname)
+    except ValueError:
+        return False
+
 def assess_growth_fundamentals(
     symbol: str,
     evidence: list[dict[str, Any]] | None = None,
