@@ -140,7 +140,10 @@ def _fetch_binance(symbol: str, interval: str, limit: int) -> list[dict[str, Any
             })
         except (TypeError, ValueError, OverflowError):
             continue
-    return _clean_candles(candles, "Binance")
+    cleaned = _clean_candles(candles, "Binance")
+    if len(cleaned) > limit:
+        raise ValueError("Binance returned more candles than the requested limit")
+    return cleaned
 
 
 def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
