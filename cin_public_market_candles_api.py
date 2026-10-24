@@ -221,9 +221,11 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     payload = _request_json(f"{KRAKEN_OHLC_URL}?{query}")
     if not isinstance(payload, dict):
         raise ValueError("Kraken response was not an object")
-    errors = payload.get("error") or []
+    errors = payload.get("error")
+    if not isinstance(errors, list) or any(not isinstance(error, str) for error in errors):
+        raise ValueError("Kraken response had an invalid error field")
     if errors:
-        raise ValueError("Kraken rejected pair/timeframe: " + "; ".join(str(e) for e in errors))
+        raise ValueError("Kraken rejected pair/timeframe: " + "; ".join(errors))
     result = payload.get("result")
     if not isinstance(result, dict):
         raise ValueError("Kraken response had no result")
