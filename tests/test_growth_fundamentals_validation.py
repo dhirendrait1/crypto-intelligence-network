@@ -36,6 +36,15 @@ class GrowthFundamentalsValidationTests(unittest.TestCase):
         self.assertEqual(result["evidence"][0]["status"], "unverified")
         self.assertFalse(result["cin_independently_verified_claims"])
 
+    def test_timezone_naive_publication_timestamp_downgrades_verified_status(self):
+        result = assess_growth_fundamentals(
+            "ETH",
+            [self.record(published_at="2026-10-01T00:00:00")],
+            now=self.now,
+        )
+        self.assertEqual(result["evidence"][0]["status"], "unverified")
+        self.assertIn("published_at", result["evidence"][0]["missing_fields"])
+
     def test_valid_http_url_is_accepted_as_metadata(self):
         result = assess_growth_fundamentals("ETH", [self.record(source_url="http://example.com/report")], now=self.now)
         self.assertEqual(result["evidence"][0]["status"], "verified")
