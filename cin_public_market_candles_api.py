@@ -136,10 +136,14 @@ def _fetch_binance(symbol: str, interval: str, limit: int) -> list[dict[str, Any
         if isinstance(row[0], bool) or isinstance(row[6], bool):
             continue
         try:
+            # Binance timestamps are integer milliseconds. Reject fractional or
+            # string-coercible timestamps instead of truncating malformed data.
+            if not isinstance(row[0], int) or not isinstance(row[6], int):
+                continue
             candles.append({
-                "open_time": int(row[0]), "open": float(row[1]), "high": float(row[2]),
+                "open_time": row[0], "open": float(row[1]), "high": float(row[2]),
                 "low": float(row[3]), "close": float(row[4]), "volume": float(row[5]),
-                "close_time": int(row[6]),
+                "close_time": row[6],
             })
         except (TypeError, ValueError, OverflowError):
             continue
@@ -202,11 +206,14 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     for row in rows[-limit:]:
         if not isinstance(row, list) or len(row) < 7:
             continue
-        # Reject JSON booleans before numeric timestamp coercion.
-        if isinstance(row[0], bool):
+        # Kraken timestamps are epoch seconds; reject booleans, strings,
+        # and fractional seconds instead of silently coercing/truncating them.
+        if isinstance(row[0], bool) or not isinstance(row[0], (int, float)):
+            continue
+        if not math.isfinite(row[0]) or not float(row[0]).is_integer():
             continue
         try:
-            start = int(float(row[0]) * 1000)
+            start = int(row[0] * 1000)
             # Kraken returns OHLC, VWAP, volume, trade count; derive candle end
             # from the selected timeframe so the output schema matches Binance.
             duration_ms = KRAKEN_INTERVALS[interval] * 60_000
