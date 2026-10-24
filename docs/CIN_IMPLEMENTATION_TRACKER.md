@@ -339,3 +339,11 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] All four CI workflows passed on code/test commit `ed28e5f877847f5b0f1ae3eea17c46dc14b8fc6e`: CIN Automated Tests (`40124689165`), CIN screening checks (`40124689259`), CIN Technical Analysis Tests (`40124689273`), and CIN evidence ingestion API checks (`40124689601`). The public candle test step passed within CIN Automated Tests.
 - **Boundary:** all checks use mocked/offline provider responses. No live exchange or deployed API health was verified.
 
+## Caller-supplied technical-analysis request schema (2026-10-25)
+
+- [x] Restricted `timeframe` to alphanumeric characters, dots, underscores, and hyphens; whitespace and control characters now fail Pydantic request validation.
+- [x] Added request-model regression tests for valid timeframe, whitespace/control-character rejection, default timeframe, and forbidden extra fields.
+- [x] Added an explicit CI step to run `tests/test_cin_technical_analysis.py` from the repository root so the API request schema tests are actually executed.
+- [x] All four workflows passed on code/test/CI commit `d8571d3010dca26a0058f07676aaaa637d6fadc1`: CIN Automated Tests (`40124885343`), CIN Technical Analysis Tests (`40124885412`), CIN screening checks (`40124885344`), and CIN evidence ingestion API checks (`40124885349`). Both new technical-analysis request contract tests and existing public-candle contract tests passed in the automated suite.
+- **Boundary:** offline tests only; no live provider or production endpoint was contacted. PR remains open, Draft, and unmerged.
+
