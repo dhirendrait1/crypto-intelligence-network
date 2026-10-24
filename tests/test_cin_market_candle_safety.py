@@ -329,6 +329,13 @@ def test_market_provider_shape_failures_return_sanitized_502(monkeypatch, failur
         {"error": [], "result": {"XXBTZUSD": "not-a-row-list", "last": 123}},
         {"error": [], "result": {"XXBTZUSDC": [], "last": 123}},
         {"error": [], "result": {"ZZZZZUSD": [], "last": 123}},
+        {
+            "error": [],
+            "result": {
+                "XXBTZUSD": [[10**100, "1", "2", "0.5", "1.5", "1.2", "10", 4]],
+                "last": 123,
+            },
+        },
         {"error": ["EQuery:Invalid pair"], "result": {"last": 123}},
         {"result": {"XXBTZUSD": [], "last": 123}},
         {"error": None, "result": {"XXBTZUSD": [], "last": 123}},
