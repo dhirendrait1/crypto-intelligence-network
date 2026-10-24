@@ -52,7 +52,7 @@
 - [x] Add public GDELT news search with URL deduplication, source timestamps, explicit low-confidence headline sentiment, provider-failure tests, and scaffold router registration.
 - [x] Add scaffold CI checks for the news regression suite and expected read-only route registrations.
 - [x] Register the derivatives router in the scaffold patch and run its regression tests in scaffold CI.
-- [x] Verify all four workflows on commit `b712cdd6f3568e5193a329382ff52daf23211673` (screening, automated tests, technical analysis, evidence ingestion). Results are mocked/offline tests; the derivatives snapshot tests are included in the automated scaffold workflow.
+- [x] Verify all four workflows on commit `26b65c7868fb1393feb6ff1fb7a24ab35f4e5a94` (screening, automated tests, technical analysis, evidence ingestion). Results are mocked/offline tests; the derivatives snapshot tests are included in the automated scaffold workflow.
 - [ ] Perform live read-only provider smoke tests for screening, candles, and derivatives; compare provider timestamps, CIN retrieval time, cache age, and stale warning. Attempted from this environment using available public fetch paths, but the Render service endpoints were inaccessible and outbound DNS resolution had previously failed; this is an environment limitation, not evidence that Render or the providers are down.
 - [ ] Confirm the running Render service serves the tested code revision; do not deploy without explicit approval. This cannot be established from the current network-restricted environment.
 
