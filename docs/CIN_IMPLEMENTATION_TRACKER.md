@@ -516,3 +516,14 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - Still not established: live exchange responses, real-world interval-boundary behavior for all Binance intervals, provider rate-limit behavior under live conditions, or deployed service health.
 - Do not describe candle interval alignment as fully validated until an explicit acceptance test covers fixed intervals, weekly boundaries, and the variable-length monthly interval without assuming every month is 31 days.
 - Next safe repository task: add a deterministic interval-boundary validation matrix before changing provider acceptance logic; do not perform live network checks in CI or add trading functionality.
+
+
+## Latest-head CI verification (2026-10-25)
+
+All four configured workflows completed successfully on commit `2c1f816d59bc4fa6aa1c31ce2ee01228cd46f29b`:
+- CIN Automated Tests — run [40143004602](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40143004602)
+- CIN screening checks — run [40143004579](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40143004579)
+- CIN Technical Analysis Tests — run [40143004612](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40143004612)
+- CIN evidence ingestion API checks — run [40143004608](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40143004608)
+
+This checkpoint validates configured offline automation only. It does not establish live exchange availability, interval alignment for every timeframe, rate-limit resilience under live conditions, or deployed service health. In particular, monthly candles must use calendar-month boundaries rather than the existing approximate 31-day duration when validating boundaries or calculating interval-derived freshness thresholds.
