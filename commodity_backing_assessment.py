@@ -178,4 +178,3 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
             "Redemption availability may vary by jurisdiction, customer eligibility, minimum size, fees, and issuer terms.",
         ],
     }
-}
