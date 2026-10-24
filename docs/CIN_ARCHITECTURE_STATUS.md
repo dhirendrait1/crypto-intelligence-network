@@ -30,7 +30,7 @@ Layers 4–6 require further source-level and end-to-end verification; the list 
 
 ## Verified source and router inventory
 
-The deployment patch `patch_cin_metadata_fixed.py` names the following source modules and registers eight router families in the FastAPI application.
+The deployment patch `patch_cin_metadata_fixed.py` names the following source modules and registers nine router families in the FastAPI application.
 
 | Component | Source module(s) | Evidence/status |
 |---|---|---|
@@ -40,7 +40,9 @@ The deployment patch `patch_cin_metadata_fixed.py` names the following source mo
 | Growth fundamentals | `growth_fundamentals_assessment.py`, `growth_fundamentals_api.py` | Named in deployment patch; full behavior audit pending |
 | Public evidence ingestion | `cin_evidence_ingestion.py`, `cin_evidence_ingestion_api.py` | Named in deployment patch; full source and allowlist audit pending |
 | Caller-supplied OHLC analysis | `cin_technical_analysis.py`, `cin_technical_analysis_api.py` | Named in deployment patch; prior offline technical-analysis checks passed; full feature audit pending |
-| Exchange-backed candle data and analysis | `cin_public_market_candles_api.py` | Closed-candle and volume behavior covered by offline regression tests; no live-provider validation claimed |\n| Read-only derivatives snapshot | `cin_derivatives_market_data_api.py` | Public Binance USDⓈ-M futures endpoints for open interest, funding, mark/index price and latest two 4h OI aggregates; provider timestamps and explicit unavailable liquidation state; router registered by scaffold patch and offline tests pass |
+| Exchange-backed candle data and analysis | `cin_public_market_candles_api.py` | Closed-candle and volume behavior covered by offline regression tests; no live-provider validation claimed |
+| Read-only derivatives and order-book snapshot | `cin_derivatives_market_data_api.py` | Public Binance USDⓈ-M endpoints for open interest, funding, mark/index price, latest two 4h OI aggregates, best bid/ask, spread, per-side valid levels and approximate notional imbalance; order-book retrieval time included; offline tests cover invalid crossed books |
+| Public news search and headline sentiment | `cin_public_news_sentiment_api.py` | GDELT public article search, URL deduplication, article timestamps, transparent low-confidence keyword sentiment; offline tests; explicitly not social-platform sentiment |
 | API health/readiness | FastAPI app endpoints | Live `/health` and `/ready` returned healthy/ready in earlier checks; recheck after any future release |
 
 The patch copies the source modules into `cin/app` during the build. The source inventory therefore needs to be audited together with the generated scaffold and patch process.
