@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import math
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -63,7 +62,7 @@ def _headline_sentiment(title: str) -> dict[str, Any]:
 
 
 def _parse_articles(payload: Any, max_records: int) -> list[dict[str, Any]]:
-    if not isinstance(payload, dict) or not isinstance(payload.get("articles", []), list):
+    if not isinstance(payload, dict) or not isinstance(payload.get("articles"), list):
         raise ValueError("Unexpected GDELT article-search response")
     articles: list[dict[str, Any]] = []
     seen: set[str] = set()
