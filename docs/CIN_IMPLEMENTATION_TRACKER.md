@@ -229,3 +229,10 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Add offline regression tests for GDELT compact UTC timestamps, malformed timestamps, timezone-naive ISO timestamps, and missing timestamps.
 - [x] All four workflows passed on code/test revision `bf896c485891b39e972a4e538ed584ba1716d79a`: evidence-ingestion API checks (run `40109030489`), CIN Automated Tests (run `40109030510`), Technical Analysis Tests (run `40109030524`), and screening checks (run `40109030475`).
 - **Boundary:** timestamp parsing validates format and timezone presence only; it does not independently confirm publisher accuracy, article truth, or live GDELT reliability.
+
+## Public news duplicate URL normalization (2026-10-24)
+
+- [x] Canonicalize article URL identity for deduplication by normalizing scheme/hostname case, removing fragments and default ports, and treating a trailing slash as equivalent for duplicate detection; keep the first provider URL unchanged in output.
+- [x] Added a regression case for a duplicate article URL with uppercase hostname, default HTTPS port, trailing slash, and fragment.
+- [x] All four workflows passed on code/test revision `60b85f65f93f9d8d17cfb7650c20a61b73675c0f`: screening checks (run `40109111387`), CIN Automated Tests (run `40109111425`), Technical Analysis Tests (run `40109111492`), and evidence-ingestion API checks (run `40109111444`).
+- **Boundary:** URL normalization reduces duplicate entries but does not prove two publishers' content is equivalent or establish article accuracy.
