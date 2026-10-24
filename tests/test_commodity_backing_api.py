@@ -80,3 +80,39 @@ def test_endpoint_rejects_boolean_freshness_threshold():
 
     with pytest.raises(ValidationError):
         CommodityBackingAssessmentRequest(symbol="PAXG", max_age_days=True)
+
+
+def test_endpoint_rejects_oversized_evidence_batch():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        CommodityBackingAssessmentRequest(
+            symbol="PAXG",
+            evidence=[
+                {
+                    "evidence_type": "reserve_attestation",
+                    "source_name": "Example",
+                    "source_url": "https://example.com/report",
+                    "published_at": "2026-10-01T00:00:00Z",
+                    "checked_at": "2026-10-24T00:00:00Z",
+                    "status": "unverified",
+                }
+            ] * 101,
+        )
+
+
+def test_endpoint_rejects_freshness_threshold_above_documented_limit():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        CommodityBackingAssessmentRequest(symbol="PAXG", max_age_days=3651)
+
+
+def test_endpoint_rejects_symbol_longer_than_documented_limit():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        CommodityBackingAssessmentRequest(symbol="P" * 21)
