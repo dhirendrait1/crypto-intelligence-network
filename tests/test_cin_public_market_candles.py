@@ -86,7 +86,7 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         for route in ("/market-candles", "/technical-analysis/market"):
             parameters = schema[route]["get"]["parameters"]
             symbol = next(parameter for parameter in parameters if parameter["name"] == "symbol")
-            self.assertEqual(symbol["schema"]["pattern"], r"^[A-Za-z0-9]+\z")
+            self.assertEqual(symbol["schema"]["pattern"], "^[A-Za-z0-9]+$")
 
 
 if __name__ == "__main__":
