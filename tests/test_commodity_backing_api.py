@@ -58,3 +58,25 @@ def test_endpoint_stale_threshold_is_configurable():
         )
     )
     assert result["evidence"][0]["status"] == "stale"
+
+
+def test_endpoint_rejects_symbols_with_whitespace_or_separator():
+    import pytest
+    from pydantic import ValidationError
+
+    for symbol in (" PAXG", "PAXG ", "PAXG/USDT"):
+        with pytest.raises(ValidationError):
+            CommodityBackingAssessmentRequest(symbol=symbol)
+
+
+def test_endpoint_accepts_zero_day_freshness_threshold():
+    request = CommodityBackingAssessmentRequest(symbol="PAXG", max_age_days=0)
+    assert request.max_age_days == 0
+
+
+def test_endpoint_rejects_boolean_freshness_threshold():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        CommodityBackingAssessmentRequest(symbol="PAXG", max_age_days=True)
