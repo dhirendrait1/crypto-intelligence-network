@@ -152,5 +152,5 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 
 - [x] Added explicit symbol and repository-path format constraints to the public evidence ingestion request model; unsupported but well-formed symbols still receive the existing controlled API error, while malformed shapes fail request validation.
 - [x] Added offline tests for whitespace/separator-bearing symbols and malformed repository paths.
-- [ ] Confirm all four workflows on the request-validation revision before marking the batch complete.
+- [x] All four workflows passed on code/test commit `ce511118dd4416fd74d25440266a76b01d785b4c`: CIN Automated Tests, screening checks, technical-analysis tests, and evidence-ingestion API checks. Tests are offline/mocked.
 - **Boundary:** the repository allowlist remains authoritative; syntactic path validation does not permit arbitrary repository fetches.
