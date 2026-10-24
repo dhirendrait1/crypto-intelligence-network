@@ -76,8 +76,8 @@ def _snapshot(symbol: str) -> dict[str, Any]:
     index_price = _finite_number(premium.get("indexPrice"))
     if oi_contracts is None or oi_contracts < 0 or funding_rate is None:
         raise ValueError("Provider returned missing or invalid open-interest/funding values")
-    if mark_price is None or mark_price < 0:
-        raise ValueError("Provider returned missing or invalid mark price")
+    if mark_price is None or mark_price <= 0 or index_price is None or index_price <= 0:
+        raise ValueError("Provider returned missing or invalid mark/index price")
 
     bids = [(_finite_number(level[0]), _finite_number(level[1])) for level in depth["bids"] if isinstance(level, (list, tuple)) and len(level) >= 2]
     asks = [(_finite_number(level[0]), _finite_number(level[1])) for level in depth["asks"] if isinstance(level, (list, tuple)) and len(level) >= 2]
