@@ -91,6 +91,16 @@ def _market_freshness(value: Any) -> tuple[str, int | None]:
     age_seconds = max(0, int(age))
     return ("fresh" if age_seconds <= 900 else "stale"), age_seconds
 
+def _safe_retrieved_at(value: Any) -> str | None:
+    """Format internal retrieval timestamps defensively; never trust malformed metadata."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        return None
+    try:
+        return datetime.fromtimestamp(value, timezone.utc).isoformat()
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
 def _asset_type(coin: dict[str, Any]) -> tuple[str, str]:
     symbol = str(coin.get("symbol", "")).upper()
     name = str(coin.get("name", "")).lower()
@@ -129,6 +139,7 @@ def _request_markets(vs_currency: str, per_page: int) -> list[dict[str, Any]]:
         rows = [row for row in payload if isinstance(row, dict)]
         for row in rows:
             row["_cin_provider"] = "CoinGecko"
+            row["_cin_quote_currency"] = vs_currency.upper()
         if rows:
             return rows
         raise ValueError("CoinGecko returned no market rows")
@@ -191,6 +202,7 @@ def _request_markets(vs_currency: str, per_page: int) -> list[dict[str, Any]]:
                     "price_change_percentage_24h": change,
                     "last_updated": row.get("last_updated"),
                     "_cin_provider": "CoinPaprika",
+                    "_cin_quote_currency": quote_key,
                 })
             mapped.sort(key=lambda item: item["market_cap"] if item["market_cap"] is not None else -1, reverse=True)
             if not mapped:
@@ -303,6 +315,7 @@ def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict
                 "circulating_supply": circulating, "total_supply": total_supply,
                 "price_change_percentage_24h": change,
                 "last_updated": row.get("last_updated"), "_cin_provider": "CoinPaprika",
+                "_cin_quote_currency": vs_currency.upper(),
             })
         fetched_at = time.time()
         for row in mapped:
@@ -476,10 +489,9 @@ def _score(coin: dict[str, Any]) -> dict[str, Any]:
         "reasons": reasons,
         "warnings": warnings,
         "last_updated": coin.get("last_updated"),
-        "provider_retrieved_at": (
-            datetime.fromtimestamp(coin["_cin_retrieved_at"], timezone.utc).isoformat()
-            if isinstance(coin.get("_cin_retrieved_at"), (int, float)) else None
-        ),
+        "provider": coin.get("_cin_provider"),
+        "quote_currency": coin.get("_cin_quote_currency"),
+        "provider_retrieved_at": _safe_retrieved_at(coin.get("_cin_retrieved_at")),
     }
 
 
