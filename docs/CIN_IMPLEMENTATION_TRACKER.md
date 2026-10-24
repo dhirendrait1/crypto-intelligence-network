@@ -453,3 +453,11 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - Added regression tests for a valid bounded JSON response and an oversized body, including an assertion that the read is capped at limit + 1 byte.
 - Runtime code commit: `4ced9fb2743ba51ee2449b37f7b4ae659d5a8b6e`; test commit: `320f19829bf4e105197769b83342e5c40d60ef26`.
 - CI on the latest head is pending; no live-provider behavior or deployment is claimed.
+
+
+### Kraken fallback pair-identity validation (2026-10-25)
+- The Kraken OHLC fallback now requires exactly one returned pair key and validates its normalized base/quote identity against the requested symbol before accepting candles.
+- This prevents a malformed or unexpected provider result from being mislabeled as the requested asset pair.
+- Added offline regression tests for mismatched pair identity and ambiguous multi-pair responses; existing BTC/USD and BTC/USDT response-key cases remain covered.
+- Latest code commit: `f32a651380958c40e7adfdfc109e318e8891707f`; test commit: `91b4d8cf82cc98af57e59b2b770c43aacbbea95f`. CI validation on the updated head is pending.
+- Boundary: mocked tests do not verify live Kraken pair aliases or quote-currency support. PR #8 remains Draft and unmerged.
