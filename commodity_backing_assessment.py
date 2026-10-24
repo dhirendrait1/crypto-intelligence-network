@@ -151,6 +151,16 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
     """Summarize reserve/redemption/custody evidence without treating gaps as proof."""
     threshold_valid = isinstance(max_age_days, int) and not isinstance(max_age_days, bool) and max_age_days >= 0
     max_age_days = max_age_days if threshold_valid else 90
+    assessment_clock_valid = (
+        now is None
+        or (
+            isinstance(now, datetime)
+            and now.tzinfo is not None
+            and now.utcoffset() is not None
+        )
+    )
+    current = now if assessment_clock_valid and now is not None else datetime.now(timezone.utc)
+    current = current.astimezone(timezone.utc)
     required_types = {
         "reserve_attestation",
         "redemption_terms",
