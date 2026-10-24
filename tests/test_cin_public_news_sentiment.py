@@ -63,3 +63,25 @@ def test_endpoint_classifies_provider_network_failure(monkeypatch):
 def test_invalid_provider_payload_is_rejected():
     with pytest.raises(ValueError, match="Unexpected GDELT"):
         api._parse_articles([], 10)
+
+
+
+def test_empty_news_result_is_unavailable_not_neutral_claim(monkeypatch):
+    monkeypatch.setattr(api, "_get_json", lambda _query, _limit: {"articles": []})
+    result = api._search("a uniquely narrow query", 5)
+    assert result["count"] == 0
+    assert result["sentiment_summary"]["label"] == "unavailable"
+    assert result["sentiment_summary"]["score"] is None
+    assert "not that news or sentiment is absent globally" in result["data_quality"]["limitations"][-1]
+
+
+def test_endpoint_classifies_provider_rate_limit(monkeypatch):
+    def fail(_query, _limit):
+        raise urllib.error.HTTPError("https://example.invalid", 429, "rate limited", {}, None)
+
+    monkeypatch.setattr(api, "_search", fail)
+    with pytest.raises(HTTPException) as caught:
+        asyncio.run(api.news_sentiment(query="bitcoin", max_records=5))
+    assert caught.value.status_code == 503
+    assert caught.value.detail["error"] == "http_error"
+    assert caught.value.detail["http_status"] == 429
