@@ -64,5 +64,34 @@ class TechnicalAnalysisTests(unittest.TestCase):
             module.analyze_ohlc(bars)
 
 
+    def test_request_model_rejects_timeframe_whitespace_and_control_characters(self):
+        from pydantic import ValidationError
+        from cin_technical_analysis_api import TechnicalAnalysisRequest
+
+        valid = {
+            "symbol": "BTCUSDT",
+            "timeframe": "1h",
+            "candles": candles_from_closes([10, 11, 12, 11, 12]),
+        }
+        self.assertEqual(TechnicalAnalysisRequest.model_validate(valid).timeframe, "1h")
+        for timeframe in ("1 h", "1h\\n", "1h\\t", " "):
+            with self.subTest(timeframe=repr(timeframe)):
+                payload = dict(valid, timeframe=timeframe)
+                with self.assertRaises(ValidationError):
+                    TechnicalAnalysisRequest.model_validate(payload)
+
+    def test_request_model_rejects_unknown_fields_and_accepts_omitted_timeframe(self):
+        from pydantic import ValidationError
+        from cin_technical_analysis_api import TechnicalAnalysisRequest
+
+        payload = {
+            "symbol": "BTCUSDT",
+            "candles": candles_from_closes([10, 11, 12, 11, 12]),
+        }
+        self.assertEqual(TechnicalAnalysisRequest.model_validate(payload).timeframe, "unspecified")
+        with self.assertRaises(ValidationError):
+            TechnicalAnalysisRequest.model_validate(dict(payload, order_side="BUY"))
+
+
 if __name__ == "__main__":
     unittest.main()
