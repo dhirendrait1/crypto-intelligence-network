@@ -135,3 +135,8 @@ The isolated feature branch hardens `commodity_backing_assessment.py`:
 - Regression tests cover these edge cases and a valid HTTP URL.
 
 This is validation of caller-supplied metadata, not independent source retrieval or reserve certification. All four repository workflows passed on code commit `7e26219dc57b752255f6e58e8aefdf1f28e749e1`. These are offline/mocked checks and do not validate live providers or production deployment. No production deployment is implied.
+
+
+## Growth fundamentals evidence audit — 2026-10-24
+
+The growth fundamentals assessment score is explicitly an evidence-coverage indicator, not a project-quality score or investment recommendation. The assessment accepts caller-supplied metadata and does not fetch source documents or independently verify claims. URL validation now requires a parsed absolute HTTP(S) URL with a hostname; regression tests cover scheme-only URLs, missing hostnames, and a valid HTTP URL. All four GitHub Actions workflows passed on commit `31f8ad04051e15ef028d85ee58f0dd79e2826b9f` (offline tests only). Future publication timestamps are still a known validation gap; do not interpret this audit as complete or as independent fundamentals verification.
