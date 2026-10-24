@@ -97,6 +97,8 @@ def test_market_analysis_excludes_forming_candle_by_default(monkeypatch):
     assert response["input"]["candles_requested"] == 7
     assert response["input"]["candles_used"] == 6
     assert response["input"]["forming_candles_excluded"] == 1
+    assert any("excludes forming candles from analysis" in item for item in response["limitations"])
+    assert not any("includes the latest candle even when it is still forming" in item for item in response["limitations"])
     assert len(seen["candles"]) == 6
     assert all(c["close"] != 999.0 for c in seen["candles"])
 
