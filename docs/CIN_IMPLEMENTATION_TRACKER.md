@@ -89,6 +89,9 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Validate freshness thresholds in commodity and growth assessments; invalid thresholds fall back to the documented 90-day default and are flagged in output.
 - [x] Validate injected assessment clocks: timezone-naive or non-datetime clocks fall back to current UTC and are flagged; future publication timestamps no longer receive a misleading age of zero, and growth rows expose timestamp validation errors.
 - [x] Report duplicate evidence rows and count normalized source/timestamp identities once in category coverage; raw rows remain available for audit and differing statuses still surface as conflicts.
+- [x] Validate caller-supplied assessment clock values; reject naive/non-datetime clocks by falling back to the system UTC clock and expose `assessment_clock_valid` in response metadata.
+- [x] Do not report future-dated evidence as having a non-negative publication age; expose timestamp validation errors for growth-fundamentals records.
+- [x] Bound assessment API symbols, evidence batch sizes, metadata field lengths, and freshness thresholds; reject unknown fields and non-integer/boolean thresholds at the request boundary.
 - [x] Add direct assessment-level regression tests ensuring booleans and floats are rejected as integer freshness thresholds (safe 90-day fallback, explicitly flagged); all four workflows passed on test commit `87e37bb1bee73628bc2b47f80f903cec27ddf55b`.
 - [x] Align growth URL validation with commodity validation by rejecting embedded URL credentials; add offline regression tests.
 - [ ] Add source-aware conflict resolution and independent source retrieval; current conflict detection compares supplied statuses and does not establish which source is authoritative.
