@@ -53,6 +53,32 @@ def _is_http_url(value: Any) -> bool:
     except ValueError:
         return False
 
+def _canonical_source_url(value: Any) -> str:
+    """Normalize URL identity without changing case-sensitive path/query content."""
+    if not isinstance(value, str):
+        return ""
+    try:
+        parsed = urlsplit(value.strip())
+        if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname:
+            return value.strip()
+        port = parsed.port
+        host = parsed.hostname.lower()
+        if port is not None and not (
+            (parsed.scheme.lower() == "https" and port == 443)
+            or (parsed.scheme.lower() == "http" and port == 80)
+        ):
+            host = f"{host}:{port}"
+        path = parsed.path.rstrip("/") or "/"
+        return parsed.scheme.lower() + "://" + host + path + (f"?{parsed.query}" if parsed.query else "")
+    except ValueError:
+        return value.strip()
+
+
+def _timestamp_identity(value: Any) -> str | None:
+    parsed = _parse_date(value)
+    return parsed.isoformat() if parsed is not None else None
+
+
 def assess_growth_fundamentals(
     symbol: str,
     evidence: list[dict[str, Any]] | None = None,
@@ -153,8 +179,8 @@ def assess_growth_fundamentals(
         identities = {
             (
                 row.get("category"),
-                str(row.get("source_url") or "").strip().rstrip("/").lower(),
-                row.get("published_at"),
+                _canonical_source_url(row.get("source_url")),
+                _timestamp_identity(row.get("published_at")),
             )
             for row in rows
         }
