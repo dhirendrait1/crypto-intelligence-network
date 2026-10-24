@@ -242,7 +242,6 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
         "freshness_threshold_valid": threshold_valid,
         "freshness_threshold_days": max_age_days,
         "assessment_clock_valid": assessment_clock_valid,
-        "assessment_clock_valid": assessment_clock_valid,
         "limitations": [
             "CIN records evidence metadata; it does not itself audit reserves or certify issuer claims.",
             "A source publication or attestation is not a guarantee of solvency, custody, redemption, or future backing.",
