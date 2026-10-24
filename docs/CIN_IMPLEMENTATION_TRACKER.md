@@ -437,5 +437,5 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 
 - [x] Added explicit OpenAPI response documentation for HTTP 400 semantic validation, HTTP 422 request-schema/insufficient-closed-candle validation, HTTP 502 provider/analysis failures, and HTTP 503 temporary provider failures on both public candle routes.
 - [x] Added regression tests for the generated OpenAPI response status set and actual HTTP behavior: malformed symbol request schema returns 422; unsupported interval semantic validation returns 400.
-- [ ] Verify CI on this exact code-and-test head `7af77e83e3ba069005f1157593f3c34abbbbfe1b`.
+- [x] CI exposed an optional test-client dependency mismatch (`starlette.testclient` requires `httpx2`, which is not installed by the existing workflows). Reworked the regression test to validate OpenAPI request constraints and handler semantic validation without introducing that dependency. New verification head: `ce294dfd1bcb3abdc40e0f9bdd2d88b2b87dc066`; its CI result is pending.
 - **Boundary:** local execution is not claimed; CI results were not available when this tracker entry was written. No live provider smoke test, production configuration change, or deployment was performed. PR #8 remains Draft and unmerged.
