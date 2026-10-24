@@ -101,6 +101,8 @@ def test_market_analysis_excludes_forming_candle_by_default(monkeypatch):
     assert not any("includes the latest candle even when it is still forming" in item for item in response["limitations"])
     assert len(seen["candles"]) == 6
     assert all(c["close"] != 999.0 for c in seen["candles"])
+    assert all(c["volume"] == 12.5 for c in seen["candles"])
+    assert response["input"]["volume_included_in_source"] is True
 
 
 def test_market_analysis_rejects_fewer_than_five_closed_candles(monkeypatch):
