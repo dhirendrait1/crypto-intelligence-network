@@ -192,5 +192,18 @@ class ProviderFailureClassificationTests(unittest.TestCase):
         self.assertEqual(MODULE._failure_kind(ValueError("invalid")), ("invalid_response", None))
 
 
+    def test_primary_and_fallback_http_failures_preserve_both_statuses(self):
+        primary = MODULE.urllib.error.HTTPError("coingecko", 429, "limited", {}, None)
+        fallback = MODULE.urllib.error.HTTPError("coinpaprika", 503, "unavailable", {}, None)
+        with patch.object(MODULE.urllib.request, "urlopen", side_effect=[primary, fallback]):
+            with self.assertRaises(MODULE.MarketDataProviderFailure) as caught:
+                MODULE._request_markets("usd", 5)
+        failure = caught.exception
+        self.assertEqual(failure.primary_kind, "http_error")
+        self.assertEqual(failure.primary_status, 429)
+        self.assertEqual(failure.fallback_kind, "http_error")
+        self.assertEqual(failure.fallback_status, 503)
+
+
 if __name__ == "__main__":
     unittest.main()
