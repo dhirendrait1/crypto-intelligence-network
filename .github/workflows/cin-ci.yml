@@ -80,8 +80,3 @@ jobs:
           PYTHONPATH: ..
         run: python -m pytest -v ../tests/test_cin_public_news_sentiment.py
 
-      - name: Run public news sentiment regression tests
-        working-directory: cin
-        env:
-          PYTHONPATH: ..
-        run: python -m pytest -v ../tests/test_cin_public_news_sentiment.py
