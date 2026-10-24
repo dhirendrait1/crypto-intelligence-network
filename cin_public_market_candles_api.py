@@ -23,6 +23,33 @@ KRAKEN_OHLC_URL = "https://api.kraken.com/0/public/OHLC"
 TIMEFRAMES = {"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M"}
 KRAKEN_INTERVALS = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440, "1w": 10080}
 KRAKEN_SYMBOLS = {"BTC": "XBT"}
+_INTERVAL_MS = {
+    "1m": 60_000, "3m": 180_000, "5m": 300_000, "15m": 900_000,
+    "30m": 1_800_000, "1h": 3_600_000, "2h": 7_200_000,
+    "4h": 14_400_000, "6h": 21_600_000, "8h": 28_800_000,
+    "12h": 43_200_000, "1d": 86_400_000, "3d": 259_200_000,
+    "1w": 604_800_000, "1M": 2_678_400_000,
+}
+
+def _freshness_metadata(rows: list[dict[str, Any]], interval: str, now_ms: int) -> dict[str, Any]:
+    closed_rows = [row for row in rows if row["close_time"] < now_ms]
+    threshold_seconds = _INTERVAL_MS[interval] * 2 / 1000
+    if not closed_rows:
+        return {
+            "latest_closed_candle_close_time_utc": None,
+            "latest_closed_candle_age_seconds": None,
+            "stale_data_warning": "No completed candle is available; do not treat a forming candle as closed data.",
+            "stale_threshold_seconds": threshold_seconds,
+        }
+    latest = max(closed_rows, key=lambda row: row["close_time"])
+    age_seconds = max(0.0, (now_ms - latest["close_time"]) / 1000)
+    warning = f"Latest completed candle is older than the {interval} freshness threshold." if age_seconds > threshold_seconds else None
+    return {
+        "latest_closed_candle_close_time_utc": datetime.fromtimestamp(latest["close_time"] / 1000, timezone.utc).isoformat(),
+        "latest_closed_candle_age_seconds": round(age_seconds, 3),
+        "stale_data_warning": warning,
+        "stale_threshold_seconds": threshold_seconds,
+    }
 
 
 def _request_json(url: str) -> Any:
@@ -171,12 +198,14 @@ async def get_market_candles(
     endpoint = rows[0].get("_source_endpoint", BINANCE_KLINES_URL)
     retrieved_at = datetime.now(timezone.utc)
     now_ms = int(retrieved_at.timestamp() * 1000)
+    freshness = _freshness_metadata(rows, interval, now_ms)
     return {
         "service": "cin", "mode": "read_only", "source": source, "source_endpoint": endpoint,
         "retrieved_at": retrieved_at.isoformat(), "symbol": normalized,
         "provider_pair_key": rows[0].get("_provider_pair_key"),
         "provider_quote_currency": rows[0].get("_provider_quote_currency"),
         "timeframe": interval, "count": len(rows),
+        "freshness": freshness,
         "data": [
             {
                 **{key: value for key, value in row.items() if not key.startswith("_")},
@@ -190,6 +219,7 @@ async def get_market_candles(
         "limitations": [
             "Public exchange-provided market data; not independently audited by CIN.",
             "The latest candle may still be forming.",
+            "Freshness warning compares latest completed candle age against twice the requested interval; monthly intervals use a 31-day approximation.",
             "The source exchange can differ when a provider fallback is used.",
             "No account endpoints, API keys, orders, or trade execution are used.",
         ],
@@ -209,6 +239,7 @@ async def analyze_public_market(
     endpoint = rows[0].get("_source_endpoint", BINANCE_KLINES_URL)
     retrieved_at = datetime.now(timezone.utc)
     now_ms = int(retrieved_at.timestamp() * 1000)
+    freshness = _freshness_metadata(rows, interval, now_ms)
     closed_rows = [row for row in rows if row["close_time"] < now_ms]
     forming_count = len(rows) - len(closed_rows)
     if len(closed_rows) < 5:
@@ -225,6 +256,7 @@ async def analyze_public_market(
         "provider_pair_key": rows[0].get("_provider_pair_key"),
         "provider_quote_currency": rows[0].get("_provider_quote_currency"),
         "retrieved_at": retrieved_at.isoformat(),
+        "freshness": freshness,
         "candles_requested": len(rows),
         "candles_used": len(closed_rows),
         "closed_candles_only": True,
@@ -236,6 +268,7 @@ async def analyze_public_market(
     analysis["limitations"].extend([
         "Public exchange data is not independently audited by CIN.",
         "This endpoint excludes forming candles from analysis; /market-candles may still report the latest candle as forming.",
+        "Freshness warning compares latest completed candle age against twice the requested interval; monthly intervals use a 31-day approximation.",
         "Technical outputs and ATR scenarios are descriptive research, not investment advice or trade instructions.",
     ])
     return analysis
