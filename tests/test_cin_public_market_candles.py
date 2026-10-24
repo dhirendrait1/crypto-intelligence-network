@@ -73,8 +73,6 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.exception.status_code, 503)
 
 
-if __name__ == "__main__":
-    unittest.main()
     def test_public_candle_routes_use_absolute_end_symbol_pattern(self):
         from fastapi import FastAPI
         app = FastAPI()
@@ -85,3 +83,6 @@ if __name__ == "__main__":
             symbol = next(parameter for parameter in parameters if parameter["name"] == "symbol")
             self.assertEqual(symbol["schema"]["pattern"], r"^[A-Za-z0-9]+\z")
 
+
+if __name__ == "__main__":
+    unittest.main()
