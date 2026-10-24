@@ -116,7 +116,9 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     if not isinstance(rows, list):
         raise ValueError("Kraken returned no candle rows")
     candles = []
-    for row in rows[-limit:]:
+    # Validate rows before applying the requested limit so malformed tail rows
+    # do not unnecessarily reduce the number of usable recent candles.
+    for row in rows:
         if not isinstance(row, list) or len(row) < 7:
             continue
         try:
@@ -135,7 +137,7 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
             continue
     if not candles:
         raise ValueError("Kraken returned no valid candles")
-    return candles
+    return candles[-limit:]
 
 
 def _normalize_candle_sequence(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
