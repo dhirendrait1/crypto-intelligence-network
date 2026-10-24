@@ -7,7 +7,7 @@ No tokens, wallet access, trading, or arbitrary URL fetching are supported.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -19,6 +19,8 @@ ALLOWED_REPOSITORIES = (
 )
 GITHUB_API_ROOT = "https://api.github.com/repos/"
 TIMEOUT_SECONDS = 8
+FRESHNESS_MAX_AGE = timedelta(days=7)
+FUTURE_TIMESTAMP_TOLERANCE = timedelta(minutes=5)
 
 
 class EvidenceSourceError(RuntimeError):
@@ -73,6 +75,7 @@ def fetch_github_repository_evidence(
     integer_fields = ("stargazers_count", "forks_count", "open_issues_count")
     missing_fields = []
     invalid_fields = []
+    parsed_timestamps = {}
 
     for field in string_fields:
         value = payload.get(field)
@@ -93,6 +96,11 @@ def fetch_github_repository_evidence(
             parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
             if parsed.tzinfo is None or parsed.utcoffset() is None:
                 invalid_fields.append(field)
+            else:
+                parsed = parsed.astimezone(timezone.utc)
+                parsed_timestamps[field] = parsed
+                if parsed > datetime.now(timezone.utc) + FUTURE_TIMESTAMP_TOLERANCE:
+                    invalid_fields.append(field)
         except ValueError:
             invalid_fields.append(field)
 
@@ -115,7 +123,16 @@ def fetch_github_repository_evidence(
             + ", ".join(sorted(set(invalid_fields)))
         )
 
-    retrieved_at = _utc_now()
+    retrieved_at_dt = datetime.now(timezone.utc)
+    retrieved_at = retrieved_at_dt.isoformat().replace("+00:00", "Z")
+    freshness_timestamp = parsed_timestamps.get("pushed_at") or parsed_timestamps.get("updated_at")
+    if freshness_timestamp is None:
+        freshness_status = "unknown"
+        freshness_age_seconds = None
+    else:
+        freshness_age_seconds = max(0, int((retrieved_at_dt - freshness_timestamp).total_seconds()))
+        freshness_status = "fresh" if freshness_age_seconds <= FRESHNESS_MAX_AGE.total_seconds() else "stale"
+
     return {
         "symbol": "ETH",
         "category": "developer_activity",
@@ -139,7 +156,9 @@ def fetch_github_repository_evidence(
         "retrieval_status": "success",
         "validation_status": "metadata_shape_validated" if not missing_fields else "metadata_partial",
         "missing_fields": sorted(set(missing_fields)),
-        "freshness_status": "requires_policy_evaluation",
+        "freshness_status": freshness_status,
+        "freshness_age_seconds": freshness_age_seconds,
+        "freshness_policy": "fresh when pushed_at or fallback updated_at is no more than 7 days old; timestamps over 5 minutes in the future are rejected",
         "claim_verification_status": "unverified",
         "independently_verified": False,
         "provenance": "public GitHub REST API; allowlisted repository",
