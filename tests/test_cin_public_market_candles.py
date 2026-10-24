@@ -51,6 +51,17 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(candles), 5)
         self.assertEqual(candles[-1]["open_time"], 1700014400000)
 
+    async def test_binance_skips_fractional_and_boolean_timestamps(self):
+        payload = [
+            [1700000000000.5, "100", "102", "99", "101", "10", 1700003599999],
+            [True, "100", "102", "99", "101", "10", 1700003599999],
+            [1700000000000, "100", "102", "99", "101", "10", 1700003599999],
+        ]
+        with patch.object(api, "_request_json", return_value=payload):
+            rows = api._fetch_binance("BTCUSDT", "1h", 5)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["open_time"], 1700000000000)
+
     async def test_binance_rejects_more_rows_than_requested(self):
         payload = [
             [1700000000000 + i * 3600000, "100", "102", "99", "101", "10",
