@@ -98,7 +98,7 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Restrict commodity-backed and growth-fundamentals request symbols to bounded alphanumeric identifiers with only `.`, `_`, or `-` after the first character; reject whitespace and pair-style separators.
 - [x] Require `max_age_days` to be a strict integer in the documented 0–3650 range; booleans are not accepted as integers, and a zero-day freshness window is valid.
 - [x] Add regression tests for malformed symbols, boolean thresholds, zero-day thresholds, and oversized growth-evidence batches.
-- [ ] Confirm the new request-boundary regression tests and all four CI workflows pass on the resulting branch revision.
+- [x] Confirm the assessment API/news-query regression suite and all four CI workflows pass on revision `0925c3c39c300d29bade9e0b2ffa7071e5370704`; tests are offline/mocked, not live-provider validation.
 - **Boundary:** these checks validate API request shape. Evidence publication timestamps remain strings at the request boundary so malformed or unverifiable source metadata can be retained as unverified audit evidence rather than being mistaken for verified claims.
 
 - News endpoint hardening: reject a whitespace-only query after normalization with HTTP 422 before provider access; regression test added.
