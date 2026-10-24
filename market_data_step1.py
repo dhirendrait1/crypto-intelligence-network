@@ -40,12 +40,12 @@ def _timestamp_status(value: Any) -> tuple[str, int | None, str | None]:
         return "unknown", None, "missing_or_invalid_last_updated"
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            return "unknown", None, "timezone_missing_from_last_updated"
+        parsed = parsed.astimezone(timezone.utc)
+    except (ValueError, OverflowError, OSError):
         return "unknown", None, "invalid_last_updated_timestamp"
-    if parsed.tzinfo is None or parsed.utcoffset() is None:
-        return "unknown", None, "timezone_missing_from_last_updated"
     now = datetime.now(timezone.utc)
-    parsed = parsed.astimezone(timezone.utc)
     if parsed > now + FUTURE_TIMESTAMP_TOLERANCE:
         return "unknown", None, "future_last_updated_timestamp"
     age = max(0, int((now - parsed).total_seconds()))
