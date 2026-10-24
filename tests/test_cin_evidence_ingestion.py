@@ -1,5 +1,6 @@
 import json
 import unittest
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from cin_evidence_ingestion import (
@@ -121,6 +122,70 @@ class EvidenceIngestionTests(unittest.TestCase):
         result = fetch_github_repository_evidence()
         self.assertEqual(result["validation_status"], "metadata_partial")
         self.assertIn("stargazers_count", result["missing_fields"])
+
+
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_recent_repository_timestamp_is_fresh(self, mocked):
+        mocked.return_value = FakeResponse({
+            "full_name": "ethereum/go-ethereum",
+            "default_branch": "master",
+            "pushed_at": "2026-10-23T10:00:00Z",
+            "updated_at": "2026-10-23T10:00:00Z",
+            "stargazers_count": 50000,
+            "forks_count": 20000,
+            "open_issues_count": 1000,
+            "archived": False,
+        })
+        result = fetch_github_repository_evidence()
+        self.assertEqual(result["freshness_status"], "fresh")
+        self.assertIsInstance(result["freshness_age_seconds"], int)
+        self.assertIn("7 days", result["freshness_policy"])
+
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_old_repository_timestamp_is_stale(self, mocked):
+        mocked.return_value = FakeResponse({
+            "full_name": "ethereum/go-ethereum",
+            "default_branch": "master",
+            "pushed_at": "2020-01-01T00:00:00Z",
+            "updated_at": "2020-01-02T00:00:00Z",
+            "stargazers_count": 50000,
+            "forks_count": 20000,
+            "open_issues_count": 1000,
+            "archived": False,
+        })
+        result = fetch_github_repository_evidence()
+        self.assertEqual(result["freshness_status"], "stale")
+        self.assertGreater(result["freshness_age_seconds"], 7 * 24 * 60 * 60)
+
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_missing_repository_timestamps_have_unknown_freshness(self, mocked):
+        mocked.return_value = FakeResponse({
+            "full_name": "ethereum/go-ethereum",
+            "default_branch": "master",
+            "stargazers_count": 50000,
+            "forks_count": 20000,
+            "open_issues_count": 1000,
+            "archived": False,
+        })
+        result = fetch_github_repository_evidence()
+        self.assertEqual(result["freshness_status"], "unknown")
+        self.assertIsNone(result["freshness_age_seconds"])
+
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_future_repository_timestamp_is_rejected(self, mocked):
+        future = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+        mocked.return_value = FakeResponse({
+            "full_name": "ethereum/go-ethereum",
+            "default_branch": "master",
+            "pushed_at": future,
+            "updated_at": "2026-10-21T10:00:00Z",
+            "stargazers_count": 50000,
+            "forks_count": 20000,
+            "open_issues_count": 1000,
+            "archived": False,
+        })
+        with self.assertRaisesRegex(EvidenceSourceError, "pushed_at"):
+            fetch_github_repository_evidence()
 
 
 if __name__ == "__main__":
