@@ -64,6 +64,46 @@ def _request_json(url: str) -> Any:
         return json.loads(response.read().decode("utf-8"))
 
 
+
+def _valid_candle(row: dict[str, Any]) -> bool:
+    """Reject malformed provider rows before exposing them or analyzing them."""
+    try:
+        open_time = row["open_time"]
+        close_time = row["close_time"]
+        prices = [row[key] for key in ("open", "high", "low", "close")]
+        volume = row["volume"]
+        if isinstance(open_time, bool) or not isinstance(open_time, int) or open_time < 0:
+            return False
+        if isinstance(close_time, bool) or not isinstance(close_time, int) or close_time < open_time:
+            return False
+        if any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in prices):
+            return False
+        if any(not __import__("math").isfinite(value) or value <= 0 for value in prices):
+            return False
+        open_price, high, low, close = prices
+        if high < max(open_price, low, close) or low > min(open_price, high, close):
+            return False
+        if isinstance(volume, bool) or not isinstance(volume, (int, float)):
+            return False
+        if not __import__("math").isfinite(volume) or volume < 0:
+            return False
+        return True
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return False
+
+
+def _clean_candles(candles: list[dict[str, Any]], provider: str) -> list[dict[str, Any]]:
+    """Keep valid, unique candles in chronological order."""
+    by_open_time = {}
+    for row in candles:
+        if _valid_candle(row):
+            by_open_time[row["open_time"]] = row
+    cleaned = [by_open_time[key] for key in sorted(by_open_time)]
+    if not cleaned:
+        raise ValueError(f"{provider} returned no valid candles")
+    return cleaned
+
+
 def _fetch_binance(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
     query = urllib.parse.urlencode({"symbol": symbol, "interval": interval, "limit": limit})
     payload = _request_json(f"{BINANCE_KLINES_URL}?{query}")
@@ -81,9 +121,7 @@ def _fetch_binance(symbol: str, interval: str, limit: int) -> list[dict[str, Any
             })
         except (TypeError, ValueError, OverflowError):
             continue
-    if not candles:
-        raise ValueError("Binance returned no valid candles")
-    return candles
+    return _clean_candles(candles, "Binance")
 
 
 def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
@@ -132,9 +170,7 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
             })
         except (TypeError, ValueError, OverflowError):
             continue
-    if not candles:
-        raise ValueError("Kraken returned no valid candles")
-    return candles
+    return _clean_candles(candles, "Kraken")
 
 
 def _fetch_klines(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
