@@ -48,8 +48,8 @@ def _freshness_status(payload: dict[str, Any], *, now: datetime | None = None) -
     return "stale"
 
 
-def _validate_metadata(payload: dict[str, Any]) -> None:
-    """Reject malformed optional metadata rather than labeling it validated."""
+def _validate_metadata(payload: dict[str, Any]) -> str:
+    """Reject malformed metadata and report whether expected fields are present."""
     branch = payload.get("default_branch")
     if branch is not None and (not isinstance(branch, str) or not branch.strip()):
         raise EvidenceSourceError("GitHub default_branch must be a non-empty string or null")
@@ -78,7 +78,15 @@ def _validate_metadata(payload: dict[str, Any]) -> None:
     if archived is not None and not isinstance(archived, bool):
         raise EvidenceSourceError("GitHub archived must be a boolean or null")
 
-
+    expected_fields = (
+        "default_branch", "pushed_at", "updated_at", "stargazers_count",
+        "forks_count", "open_issues_count", "archived",
+    )
+    # Missing or null fields remain usable as partial evidence, but must not be
+    # represented as a complete metadata snapshot.
+    if all(field in payload and payload[field] is not None for field in expected_fields):
+        return "complete"
+    return "partial"
 
 
 def fetch_github_repository_evidence(
@@ -119,7 +127,11 @@ def fetch_github_repository_evidence(
     full_name = payload.get("full_name")
     if not isinstance(full_name, str) or full_name.lower() != repository:
         raise EvidenceSourceError("GitHub response did not match the requested repository")
-    _validate_metadata(payload)
+    metadata_completeness = _validate_metadata(payload)
+    source_timestamp_field = (
+        "pushed_at" if payload.get("pushed_at") else
+        "updated_at" if payload.get("updated_at") else None
+    )
 
     retrieved_at = _utc_now()
     freshness_status = _freshness_status(payload)
@@ -131,6 +143,7 @@ def fetch_github_repository_evidence(
         "source_url": url,
         "repository": repository,
         "published_at": payload.get("pushed_at") or payload.get("updated_at"),
+        "source_timestamp_field": source_timestamp_field,
         "retrieved_at": retrieved_at,
         "measurement_period": "repository metadata snapshot",
         "value": {
@@ -145,6 +158,7 @@ def fetch_github_repository_evidence(
         "unit": "repository metadata fields",
         "retrieval_status": "success",
         "validation_status": "metadata_shape_validated",
+        "metadata_completeness": metadata_completeness,
         "freshness_status": freshness_status,
         "claim_verification_status": "unverified",
         "independently_verified": False,
