@@ -83,6 +83,7 @@ registrations = [
 # Insert registrations before a direct-execution guard so routes are ready
 # even when the module is run as a script, not only imported by Uvicorn.
 main_guard = 'if __name__ == "__main__":'
+registrations_added = 0
 for marker, registration in registrations:
     lines = [line for line in registration.splitlines() if line.strip()]
     import_line = next((line for line in lines if line.startswith("from app.")), None)
@@ -103,7 +104,7 @@ for marker, registration in registrations:
         main_text = main_text.replace(main_guard, registration + "\n" + main_guard, 1)
     else:
         main_text = main_text.rstrip() + registration
-    changed += 1
+    registrations_added += 1
 
 main_path.write_text(main_text, encoding="utf-8")
 
