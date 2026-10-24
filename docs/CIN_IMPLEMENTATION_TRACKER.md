@@ -694,3 +694,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Confirms both map to the stable HTTP 503 availability response and do not expose low-level transport details to API clients.
 - Test commit: `f41eaf2a828dab886d2386404f015648fcf54136`.
 - CI verification pending on the latest tracker commit.
+
+
+## Provider rate-limit HTTP contract regression (2026-10-25)
+
+- Added parameterized offline coverage for HTTP 418 and 429 from the Binance public market-data endpoint.
+- Confirms both statuses map to the documented retryable HTTP 503 response and provider-specific error text is not leaked.
+- Test commit: `73c1a50c76416e9d3697bcdd061ebb4edbe0132e`.
+- CI verification pending on the latest tracker commit.
