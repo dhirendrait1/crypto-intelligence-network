@@ -44,9 +44,9 @@
 - [x] Test fresh screening response metadata.
 - [x] Add bounded stale-cache fallback for commodity scans after HTTP, network, and invalid-response failures.
 - [x] Add tests for commodity stale-cache provenance and endpoint serialization.
-- [ ] Verify all workflows on the latest branch head after the commodity endpoint test and tracker commits.
-- [ ] Perform live read-only provider smoke tests and compare provider timestamps, CIN retrieval time, cache age, and stale warning.
-- [ ] Confirm the running Render service serves the tested code revision; do not deploy without explicit approval.
+- [x] Verify all four workflows on commit `f3e4c4e858a28463bb2b7ec66f5bf87213319ae7` (screening, automated tests, technical analysis, evidence ingestion). Results are mocked/offline tests.
+- [ ] Perform live read-only provider smoke tests and compare provider timestamps, CIN retrieval time, cache age, and stale warning. Attempted from this environment, but outbound DNS resolution failed; this is an environment limitation, not evidence that Render itself is down.
+- [ ] Confirm the running Render service serves the tested code revision; do not deploy without explicit approval. This cannot be established from the current network-restricted environment.
 
 ## Completion accounting
 
