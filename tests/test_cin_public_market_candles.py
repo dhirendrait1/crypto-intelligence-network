@@ -16,6 +16,24 @@ SAMPLE = [
 
 
 class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_binance_skips_nonfinite_and_impossible_candles(self):
+        payload = [
+            [1700000000000, "100", "102", "99", "101", "10", 1700003599999],
+            [1700003600000, "100", "99", "101", "100", "10", 1700007199999],
+            [1700007200000, "100", "NaN", "99", "101", "10", 1700010799999],
+            [1700010800000, "100", "102", "99", "101", "Infinity", 1700014399999],
+        ]
+        with patch.object(api, "_request_json", return_value=payload):
+            rows = api._fetch_binance("BTCUSDT", "1h", 5)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["close"], 101.0)
+
+    async def test_binance_fails_when_all_candles_are_invalid(self):
+        payload = [[1700000000000, "100", "99", "101", "100", "10", 1700003599999]]
+        with patch.object(api, "_request_json", return_value=payload):
+            with self.assertRaisesRegex(ValueError, "no valid candles"):
+                api._fetch_binance("BTCUSDT", "1h", 5)
+
     async def test_candle_endpoint_returns_provenance_and_timestamps(self):
         with patch.object(api, "_load", return_value=SAMPLE):
             result = await api.get_market_candles("BTCUSDT", "1h", 50)
