@@ -142,8 +142,8 @@ def analyze_ohlc(candles: list[dict[str, Any]]) -> dict[str, Any]:
             "macd_histogram": round(macd - signal, 8) if macd is not None and signal is not None else None,
             "atr_14": atr,
             "volume_latest": normalized[-1].get("volume"),
-            "volume_average_20": round(sum(row["volume"] for row in normalized[-20:]) / min(20, len(normalized)), 8) if volume_count else None,
-            "relative_volume_20": round(normalized[-1]["volume"] / (sum(row["volume"] for row in normalized[-20:]) / min(20, len(normalized))), 4) if volume_count and sum(row["volume"] for row in normalized[-20:]) > 0 else None,
+            "volume_average_20": round(sum(row["volume"] for row in normalized[-21:-1]) / min(20, len(normalized) - 1), 8) if volume_count else None,
+            "relative_volume_20": round(normalized[-1]["volume"] / (sum(row["volume"] for row in normalized[-21:-1]) / min(20, len(normalized) - 1)), 4) if volume_count and sum(row["volume"] for row in normalized[-21:-1]) > 0 else None,
             "volume_analysis_status": "available" if volume_count else "not_supplied",
         },
         "liquidity_reference_levels": {
