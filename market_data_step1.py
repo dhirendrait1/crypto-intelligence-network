@@ -173,8 +173,11 @@ async def get_public_market_data(
     if any(not item.replace("-", "").isalnum() for item in ids):
         raise HTTPException(status_code=400, detail="Coin IDs may contain letters, numbers, and hyphens only.")
     currency = vs_currency.strip().lower()
-    if not currency.isalpha():
-        raise HTTPException(status_code=400, detail="Currency must contain letters only.")
+    if not 2 <= len(currency) <= 10 or not currency.isascii() or not currency.isalpha():
+        raise HTTPException(
+            status_code=400,
+            detail="Currency must be a 2-10 character ASCII alphabetic code.",
+        )
 
     try:
         rows = await asyncio.to_thread(_fetch_market_data, ids, currency)
