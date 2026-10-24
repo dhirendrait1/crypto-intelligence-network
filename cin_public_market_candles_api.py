@@ -207,7 +207,9 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     if not isinstance(rows, list):
         raise ValueError("Kraken returned no candle rows")
     candles = []
-    for row in rows[-limit:]:
+    # Validate before applying the requested limit so malformed trailing
+    # provider rows do not unnecessarily hide earlier valid candles.
+    for row in rows:
         if not isinstance(row, list) or len(row) < 7:
             continue
         # Kraken timestamps are epoch seconds; reject booleans, strings,
@@ -237,7 +239,8 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
             })
         except (TypeError, ValueError, OverflowError):
             continue
-    return _clean_candles(candles, "Kraken")
+    cleaned = _clean_candles(candles, "Kraken")
+    return cleaned[-limit:]
 
 
 def _fetch_klines(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
