@@ -289,7 +289,7 @@ class ScreeningResponseMetadataTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(response["provider_error_details"])
         self.assertIsNone(response["stale_data_warning"])
         self.assertIsNotNone(response["cache_age_seconds"])
-        self.assertTrue(response["assets"] or response["count"] >= 0)
+        self.assertIsInstance(response["data"], list)
 
     async def test_endpoint_exposes_structured_stale_cache_provider_errors(self):
         row = {
