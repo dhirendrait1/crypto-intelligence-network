@@ -89,5 +89,43 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(symbol["schema"]["pattern"], "^[A-Za-z0-9]+$")
 
 
+    def test_kraken_fallback_parses_alternate_xbt_usd_pair_key(self):
+        payload = {
+            "error": [],
+            "result": {
+                "XXBTZUSD": [[1700000000, "100", "105", "98", "102", "101", "12.5", 7]],
+                "last": 1700000000,
+            },
+        }
+        with patch.object(api, "_request_json", return_value=payload) as request_json:
+            rows = api._fetch_kraken("BTCUSD", "1h", 5)
+        self.assertIn("pair=XBTUSD", request_json.call_args.args[0])
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["_provider_quote_currency"], "USD")
+        self.assertEqual(rows[0]["_provider_pair_key"], "XXBTZUSD")
+        self.assertEqual(rows[0]["volume"], 12.5)
+        self.assertEqual(rows[0]["close_time"], rows[0]["open_time"] + 3_600_000 - 1)
+
+    def test_kraken_fallback_parses_usdt_pair_key(self):
+        payload = {
+            "error": [],
+            "result": {
+                "XBTUSDT": [[1700000000, "100", "105", "98", "102", "101", "12.5", 7]],
+                "last": 1700000000,
+            },
+        }
+        with patch.object(api, "_request_json", return_value=payload) as request_json:
+            rows = api._fetch_kraken("BTCUSDT", "1h", 5)
+        self.assertIn("pair=XBTUSDT", request_json.call_args.args[0])
+        self.assertEqual(rows[0]["_provider_quote_currency"], "USDT")
+        self.assertEqual(rows[0]["_provider_pair_key"], "XBTUSDT")
+
+    def test_kraken_fallback_rejects_malformed_response_shape(self):
+        with patch.object(api, "_request_json", return_value={"error": [], "result": []}):
+            with self.assertRaises(ValueError):
+                api._fetch_kraken("BTCUSD", "1h", 5)
+
+
+
 if __name__ == "__main__":
     unittest.main()
