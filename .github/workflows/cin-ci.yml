@@ -25,17 +25,19 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Extract scaffold archive
+      - name: Extract the same scaffold used by Render
         run: |
-          unzip -q cin_step203_bootable_scaffold.zip
+          unzip -q cin_step203_scaffold_fixed.zip
           test -d cin
           test -f cin/requirements.txt
           test -d cin/tests
+          test -f patch_cin_metadata_fixed.py
+
+      - name: Apply the read-only API router patch
+        run: python patch_cin_metadata_fixed.py
 
       - name: Install dependencies
-        working-directory: cin
-        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt pytest
+        run: python -m pip install --upgrade pip && python -m pip install -r cin/requirements.txt pytest
 
-      - name: Run automated tests
-        working-directory: cin
-        run: python -m pytest -v
+      - name: Run scaffold and market-data regression tests
+        run: python -m pytest -v cin/tests tests/test_cin_market_candle_safety.py
