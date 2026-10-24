@@ -100,8 +100,8 @@ def fetch_github_repository_evidence(
     """Fetch a small set of public repository metadata; keep evidence unverified."""
     if repository not in ALLOWED_REPOSITORIES:
         raise ValueError("Repository is not on CIN's public-source allowlist")
-    if timeout < 1 or timeout > 15:
-        raise ValueError("timeout must be between 1 and 15 seconds")
+    if isinstance(timeout, bool) or not isinstance(timeout, int) or not 1 <= timeout <= 15:
+        raise ValueError("timeout must be an integer between 1 and 15 seconds")
 
     url = GITHUB_API_ROOT + repository
     request = Request(
