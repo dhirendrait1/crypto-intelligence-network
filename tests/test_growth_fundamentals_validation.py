@@ -105,6 +105,21 @@ class GrowthFundamentalsValidationTests(unittest.TestCase):
         self.assertFalse(result["freshness_threshold_valid"])
         self.assertEqual(result["freshness_threshold_days"], 90)
 
+    def test_future_publication_has_no_nonnegative_age_claim(self):
+        result = assess_growth_fundamentals(
+            "ETH", [self.record(published_at="2026-10-25T00:00:00Z")], now=self.now
+        )
+        self.assertIsNone(result["evidence"][0]["publication_age_days"])
+        self.assertEqual(
+            result["evidence"][0]["timestamp_validation_errors"],
+            ["published_at_is_in_the_future"],
+        )
+
+    def test_invalid_assessment_clock_falls_back_and_is_reported(self):
+        result = assess_growth_fundamentals("ETH", [self.record()], now="not-a-datetime")
+        self.assertFalse(result["assessment_clock_valid"])
+        self.assertEqual(result["evidence"][0]["status"], "unverified")
+
     def test_valid_http_url_is_accepted_as_metadata(self):
         result = assess_growth_fundamentals("ETH", [self.record(source_url="http://example.com/report")], now=self.now)
         self.assertEqual(result["evidence"][0]["status"], "verified")
