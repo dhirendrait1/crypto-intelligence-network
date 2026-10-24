@@ -77,6 +77,10 @@ def _valid_candle(row: dict[str, Any]) -> bool:
             return False
         if isinstance(close_time, bool) or not isinstance(close_time, int) or close_time < open_time:
             return False
+        # Reject timestamps that cannot be represented as UTC datetimes before
+        # freshness metadata or response serialization attempts to convert them.
+        datetime.fromtimestamp(open_time / 1000, timezone.utc)
+        datetime.fromtimestamp(close_time / 1000, timezone.utc)
         if any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in prices):
             return False
         if any(not math.isfinite(value) or value <= 0 for value in prices):
