@@ -48,3 +48,9 @@ jobs:
         env:
           PYTHONPATH: ..
         run: python -m pytest -v ../tests/test_cin_market_candle_safety.py
+
+      - name: Run derivatives market-data regression tests
+        working-directory: cin
+        env:
+          PYTHONPATH: ..
+        run: python -m pytest -v ../tests/test_cin_derivatives_market_data.py
