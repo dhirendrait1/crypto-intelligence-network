@@ -65,6 +65,14 @@ class EvidenceIngestionTests(unittest.TestCase):
         with self.assertRaises(EvidenceSourceError):
             fetch_github_repository_evidence()
 
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_malformed_repository_identity_raises_source_error(self, mocked):
+        for full_name in (None, 42, [], {}):
+            with self.subTest(full_name=full_name):
+                mocked.return_value = FakeResponse({"full_name": full_name})
+                with self.assertRaises(EvidenceSourceError):
+                    fetch_github_repository_evidence()
+
 
 if __name__ == "__main__":
     unittest.main()
