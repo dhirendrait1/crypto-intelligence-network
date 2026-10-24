@@ -94,6 +94,24 @@ def test_kraken_fallback_preserves_provider_documented_forming_candle(monkeypatc
     assert rows[-1]["close_time"] == (current_hour_open + 3600) * 1000 - 1
 
 
+@pytest.mark.parametrize("returned_pair", ["ETHUSD", "XXBTUSDT"])
+def test_kraken_fallback_rejects_returned_pair_or_quote_mismatch(returned_pair, monkeypatch):
+    now_seconds = int(datetime.now(timezone.utc).timestamp()) - 7200
+    payload = {
+        "error": [],
+        "result": {
+            returned_pair: [
+                [now_seconds, "100", "102", "98", "101", "100", "4", 10],
+            ],
+            "last": now_seconds,
+        },
+    }
+    monkeypatch.setattr(api, "_request_json", lambda _url: payload)
+
+    with pytest.raises(ValueError, match="different trading pair"):
+        api._fetch_kraken("BTCUSD", "1h", 5)
+
+
 def test_kraken_fallback_rejects_unsupported_interval_without_network(monkeypatch):
     def unexpected_request(_url):
         raise AssertionError("unsupported interval must be rejected before network access")
