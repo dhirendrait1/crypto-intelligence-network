@@ -149,6 +149,32 @@ def test_duplicate_evidence_is_counted_once_in_coverage():
     assert coverage["duplicate_record_count"] == 1
 
 
+def test_duplicate_identity_normalizes_host_port_fragment_and_timestamp_offsets():
+    first = valid_item(
+        source_url="https://EXAMPLE.com:443/report#section",
+        published_at="2026-10-01T00:00:00Z",
+        checked_at="2026-10-24T00:00:00Z",
+    )
+    duplicate = valid_item(
+        source_url="HTTPS://example.COM/report/",
+        published_at="2026-10-01T05:30:00+05:30",
+        checked_at="2026-10-24T05:30:00+05:30",
+    )
+    result = assess_commodity_asset("PAXG", [first, duplicate], now=NOW)
+    coverage = result["evidence_coverage"]["reserve_attestation"]
+    assert coverage["evidence_count"] == 1
+    assert coverage["duplicate_record_count"] == 1
+
+
+def test_duplicate_identity_does_not_collapse_case_sensitive_paths():
+    first = valid_item(source_url="https://example.com/Report")
+    second = valid_item(source_url="https://example.com/report")
+    result = assess_commodity_asset("PAXG", [first, second], now=NOW)
+    coverage = result["evidence_coverage"]["reserve_attestation"]
+    assert coverage["evidence_count"] == 2
+    assert coverage["duplicate_record_count"] == 0
+
+
 def test_invalid_freshness_threshold_falls_back_safely():
     result = assess_commodity_asset("PAXG", [valid_item()], now=NOW, max_age_days=-1)
     assert result["freshness_threshold_valid"] is False
