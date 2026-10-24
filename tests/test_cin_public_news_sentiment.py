@@ -212,6 +212,7 @@ def test_parse_articles_sanitizes_malformed_optional_provider_metadata():
     ("language", "x" * 33),
     ("sourcecountry", "x" * 65),
     ("domain", "bad" + chr(10) + "value"),
+    ("domain", "bad" + chr(127) + "value"),
 ])
 def test_parse_articles_omits_unbounded_or_controlled_optional_metadata(field, value):
     row = {"title": "Market update", "url": "https://news.example/a", field: value}
