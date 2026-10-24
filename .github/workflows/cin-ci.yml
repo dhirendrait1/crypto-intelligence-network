@@ -86,6 +86,12 @@ jobs:
           PYTHONPATH: ..
         run: python -m pytest -v ../tests/test_cin_public_market_candles.py
 
+      - name: Run technical-analysis API request contract tests
+        working-directory: cin
+        env:
+          PYTHONPATH: ..
+        run: python -m pytest -v ../tests/test_cin_technical_analysis.py
+
       - name: Run Step 1 market-data validation tests
         working-directory: cin
         env:
