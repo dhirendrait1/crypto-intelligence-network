@@ -18,6 +18,7 @@ URL = "https://api.coingecko.com/api/v3/coins/markets"
 _CACHE_TTL_SECONDS = 90
 _STALE_CACHE_MAX_SECONDS = 900
 _CACHE: dict[tuple[str, int], tuple[float, list[dict[str, Any]]]] = {}
+_COMMODITY_SCAN_META: dict[tuple[str, int], tuple[float, int, int]] = {}
 _CACHE_LOCK = threading.Lock()
 
 # Conservative symbol/name heuristics only; this is not a canonical token taxonomy.
@@ -210,7 +211,7 @@ def _fetch_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]
         raise
 
 
-def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]], str, int, int, int, dict[str, Any] | None]:
+def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]], str, int, int, int, dict[str, Any] | None, float | None]:
     """Scan the full public CoinPaprika ticker list before applying the commodity filter."""
     key = (f"commodity:{vs_currency}", per_page)
     now = time.time()
@@ -218,8 +219,12 @@ def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict
         cached = _CACHE.get(key)
     if cached and now - cached[0] <= _CACHE_TTL_SECONDS:
         rows = cached[1]
-        scanned = int(rows[0].get("_cin_scanned_universe", 0)) if rows else 0
-        return rows, "cache", 0, scanned, (int(rows[0].get("_cin_match_count", len(rows))) if rows else 0), None
+        metadata = _COMMODITY_SCAN_META.get(key)
+        retrieved_at, scanned, matched = metadata if metadata else (
+            (rows[0].get("_cin_retrieved_at", cached[0]), int(rows[0].get("_cin_scanned_universe", 0)),
+             int(rows[0].get("_cin_match_count", len(rows))) if rows else 0)
+        )
+        return rows, "cache", 0, scanned, matched, None, retrieved_at
     url = "https://api.coinpaprika.com/v1/tickers?quotes=" + urllib.parse.quote(vs_currency.upper())
     req = urllib.request.Request(url, headers={"accept": "application/json", "user-agent": "CIN-Research-API/0.4.0"}, method="GET")
     try:
@@ -261,30 +266,38 @@ def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict
         for row in selected:
             row["_cin_scanned_universe"] = scanned
             row["_cin_match_count"] = len(matches)
-        # Do not cache empty matches: without a row there is no place to retain
-        # scanned-universe metadata, and an empty cache hit would report scanned=0.
-        if selected:
-            with _CACHE_LOCK:
-                _CACHE[key] = (time.time(), selected)
-        return selected, "live", 0, scanned, len(matches), None
+        # Cache empty scans too: separate metadata preserves the scanned universe and
+        # retrieval timestamp even when there are no matching assets to attach them to.
+        with _CACHE_LOCK:
+            _CACHE[key] = (fetched_at, selected)
+            _COMMODITY_SCAN_META[key] = (fetched_at, scanned, len(matches))
+        return selected, "live", 0, scanned, len(matches), None, fetched_at
     except urllib.error.HTTPError as exc:
         if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
             rows = cached[1]
-            scanned = int(rows[0].get("_cin_scanned_universe", 0)) if rows else 0
-            return rows, "stale_cache", exc.code, scanned, (int(rows[0].get("_cin_match_count", len(rows))) if rows else 0), {
+            metadata = _COMMODITY_SCAN_META.get(key)
+            retrieved_at, scanned, matched = metadata if metadata else (
+                (rows[0].get("_cin_retrieved_at", cached[0]), int(rows[0].get("_cin_scanned_universe", 0)),
+                 int(rows[0].get("_cin_match_count", len(rows))) if rows else 0)
+            )
+            return rows, "stale_cache", exc.code, scanned, matched, {
                 "primary_provider": "CoinPaprika", "primary_error": "http_error",
                 "primary_http_status": exc.code,
-            }
+            }, retrieved_at
         raise
     except (urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
         if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
             rows = cached[1]
-            scanned = int(rows[0].get("_cin_scanned_universe", 0)) if rows else 0
+            metadata = _COMMODITY_SCAN_META.get(key)
+            retrieved_at, scanned, matched = metadata if metadata else (
+                (rows[0].get("_cin_retrieved_at", cached[0]), int(rows[0].get("_cin_scanned_universe", 0)),
+                 int(rows[0].get("_cin_match_count", len(rows))) if rows else 0)
+            )
             error_kind = _failure_kind(exc)[0]
-            return rows, "stale_cache", 0, scanned, (int(rows[0].get("_cin_match_count", len(rows))) if rows else 0), {
+            return rows, "stale_cache", 0, scanned, matched, {
                 "primary_provider": "CoinPaprika", "primary_error": error_kind,
                 "primary_http_status": None,
-            }
+            }, retrieved_at
         raise
 
 def _score(coin: dict[str, Any]) -> dict[str, Any]:
@@ -417,14 +430,17 @@ async def coin_screening(
     """Screen top market-cap assets. Asset-type labels are heuristic. Read-only."""
     currency = vs_currency.lower()
     commodity_scan: dict[str, Any] | None = None
+    commodity_retrieved_at: float | None = None
     try:
         if asset_type == "commodity_backed":
-            raw, data_mode, provider_error_code, scanned_count, matched_count, provider_error_details = await asyncio.to_thread(_fetch_commodity_markets, currency, per_page)
+            raw, data_mode, provider_error_code, scanned_count, matched_count, provider_error_details, commodity_retrieved_at = await asyncio.to_thread(_fetch_commodity_markets, currency, per_page)
             commodity_scan = {
                 "provider": "CoinPaprika",
                 "scanned_universe_count": scanned_count,
                 "classified_match_count": matched_count,
                 "returned_count": len(raw),
+                "provider_retrieved_at": (datetime.fromtimestamp(commodity_retrieved_at, timezone.utc).isoformat() if commodity_retrieved_at is not None else None),
+                "cache_age_seconds": (max(0, int(time.time() - commodity_retrieved_at)) if commodity_retrieved_at is not None else None),
                 "scope": "All ticker rows returned by the public CoinPaprika tickers endpoint; not every token in existence",
                 "status": "matches_found" if matched_count else "no_matches_in_scanned_universe",
             }
@@ -506,7 +522,8 @@ async def coin_screening(
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
         "cache_age_seconds": (
             max(0, int(time.time() - raw[0]["_cin_retrieved_at"]))
-            if raw and isinstance(raw[0].get("_cin_retrieved_at"), (int, float)) else None
+            if raw and isinstance(raw[0].get("_cin_retrieved_at"), (int, float))
+            else (max(0, int(time.time() - commodity_retrieved_at)) if commodity_retrieved_at is not None else None)
         ),
         "currency": currency.upper(),
         "count": len(results),
