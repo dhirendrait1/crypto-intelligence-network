@@ -686,3 +686,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Confirms the transport rejection is translated into the established sanitized HTTP 502 response; the internal size-limit exception is not exposed to API clients.
 - Test commit: `0c69500179e763126d3d41e10d3a4fe4fd435392`.
 - CI verification pending on the latest tracker commit.
+
+
+## Provider transport failure sanitization regression (2026-10-25)
+
+- Added offline cases for URL/network failures and request timeouts at the provider transport boundary.
+- Confirms both map to the stable HTTP 503 availability response and do not expose low-level transport details to API clients.
+- Test commit: `f41eaf2a828dab886d2386404f015648fcf54136`.
+- CI verification pending on the latest tracker commit.
