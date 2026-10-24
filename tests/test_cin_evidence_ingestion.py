@@ -71,9 +71,11 @@ class EvidenceIngestionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             fetch_github_repository_evidence("attacker/arbitrary")
 
-    def test_rejects_unbounded_timeout(self):
-        with self.assertRaises(ValueError):
-            fetch_github_repository_evidence(timeout=60)
+    def test_rejects_invalid_timeout_types_and_bounds(self):
+        for timeout in (0, 16, 60, True, 2.5, "8", None):
+            with self.subTest(timeout=timeout):
+                with self.assertRaises(ValueError):
+                    fetch_github_repository_evidence(timeout=timeout)
 
     @patch("cin_evidence_ingestion.urlopen", side_effect=TimeoutError())
     def test_timeout_is_reported_as_source_error(self, mocked):
