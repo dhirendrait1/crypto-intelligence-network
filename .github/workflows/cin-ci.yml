@@ -80,6 +80,12 @@ jobs:
           PYTHONPATH: ..
         run: python -m pytest -v ../tests/test_cin_public_news_sentiment.py
 
+      - name: Run public candle API contract regression tests
+        working-directory: cin
+        env:
+          PYTHONPATH: ..
+        run: python -m pytest -v ../tests/test_cin_public_market_candles.py
+
       - name: Run Step 1 market-data validation tests
         working-directory: cin
         env:
