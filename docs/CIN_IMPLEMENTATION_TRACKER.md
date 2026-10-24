@@ -222,3 +222,10 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Added regression coverage asserting valid clock metadata appears consistently in the commodity summary and normalized evidence rows.
 - [x] All four workflows passed on revision `1020ee7c9aeebdd3fc461215dbe474362faf8146`: CIN Automated Tests (run `40108896479`), screening checks (run `40108896505`), evidence-ingestion API checks (run `40108896477`), and Technical Analysis Tests (run `40108896530`).
 - **Boundary:** these are automated offline/mocked regression checks. They do not verify live providers or the deployed Render service; no merge or deployment was performed.
+
+## Public news timestamp provenance (2026-10-24)
+
+- [x] Preserve GDELT's original `seendate` in `published_at` while adding `published_at_utc` and `published_at_validation_status` so malformed, missing, or timezone-naive provider timestamps are not silently treated as valid times.
+- [x] Add offline regression tests for GDELT compact UTC timestamps, malformed timestamps, timezone-naive ISO timestamps, and missing timestamps.
+- [x] All four workflows passed on code/test revision `bf896c485891b39e972a4e538ed584ba1716d79a`: evidence-ingestion API checks (run `40109030489`), CIN Automated Tests (run `40109030510`), Technical Analysis Tests (run `40109030524`), and screening checks (run `40109030475`).
+- **Boundary:** timestamp parsing validates format and timezone presence only; it does not independently confirm publisher accuracy, article truth, or live GDELT reliability.
