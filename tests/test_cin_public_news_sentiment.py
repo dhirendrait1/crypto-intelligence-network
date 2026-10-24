@@ -174,3 +174,47 @@ def test_article_timestamp_validation_preserves_raw_provider_value():
     assert rows[1]["published_at_validation_status"] == "invalid_timezone"
     assert rows[2]["published_at"] is None
     assert rows[2]["published_at_validation_status"] == "missing"
+
+
+def test_parse_articles_sanitizes_malformed_optional_provider_metadata():
+    rows = api._parse_articles(
+        {
+            "articles": [
+                {
+                    "title": "Market update",
+                    "url": "https://news.example/a",
+                    "domain": {"unexpected": "object"},
+                    "language": 123,
+                    "sourcecountry": ["not", "a", "string"],
+                },
+                {
+                    "title": "Valid metadata",
+                    "url": "https://news.example/b",
+                    "domain": " news.example ",
+                    "language": " en ",
+                    "sourcecountry": " US ",
+                },
+            ]
+        },
+        10,
+    )
+
+    assert rows[0]["domain"] is None
+    assert rows[0]["language"] is None
+    assert rows[0]["source_country"] is None
+    assert rows[1]["domain"] == "news.example"
+    assert rows[1]["language"] == "en"
+    assert rows[1]["source_country"] == "US"
+
+
+@pytest.mark.parametrize("field,value", [
+    ("domain", "x" * 254),
+    ("language", "x" * 33),
+    ("sourcecountry", "x" * 65),
+    ("domain", "bad" + chr(10) + "value"),
+])
+def test_parse_articles_omits_unbounded_or_controlled_optional_metadata(field, value):
+    row = {"title": "Market update", "url": "https://news.example/a", field: value}
+    parsed = api._parse_articles({"articles": [row]}, 10)
+    output_field = {"sourcecountry": "source_country"}.get(field, field)
+    assert parsed[0][output_field] is None
