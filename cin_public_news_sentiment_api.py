@@ -133,6 +133,8 @@ async def news_sentiment(
 ):
     """Search public news and score headlines with a transparent low-confidence lexicon."""
     normalized = " ".join(query.split())
+    if len(normalized) < 2:
+        raise HTTPException(status_code=422, detail="Query must contain at least two non-whitespace characters.")
     try:
         return await asyncio.to_thread(_search, normalized, max_records)
     except urllib.error.HTTPError as exc:
