@@ -102,6 +102,7 @@ def _request_markets(vs_currency: str, per_page: int) -> list[dict[str, Any]]:
                 market_cap = quote.get("market_cap")
                 volume = quote.get("volume_24h")
                 circulating = row.get("circulating_supply")
+                total_supply = row.get("total_supply")
                 max_supply = row.get("max_supply")
                 # Do not label price * total_supply as FDV when max supply is unknown.
                 fdv = price * max_supply if (
