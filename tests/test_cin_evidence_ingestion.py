@@ -1,6 +1,7 @@
 import json
 import unittest
 from unittest.mock import patch
+from urllib.error import HTTPError, URLError
 
 from cin_evidence_ingestion import (
     EvidenceSourceError,
@@ -75,6 +76,23 @@ class EvidenceIngestionTests(unittest.TestCase):
     @patch("cin_evidence_ingestion.urlopen", side_effect=TimeoutError())
     def test_timeout_is_reported_as_source_error(self, mocked):
         with self.assertRaises(EvidenceSourceError):
+            fetch_github_repository_evidence()
+
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_http_error_is_reported_as_source_error(self, mocked):
+        mocked.side_effect = HTTPError(
+            "https://api.github.com/repos/ethereum/go-ethereum",
+            503,
+            "Service Unavailable",
+            hdrs=None,
+            fp=None,
+        )
+        with self.assertRaisesRegex(EvidenceSourceError, "HTTP 503"):
+            fetch_github_repository_evidence()
+
+    @patch("cin_evidence_ingestion.urlopen", side_effect=URLError("connection refused"))
+    def test_url_error_is_reported_as_source_error(self, mocked):
+        with self.assertRaisesRegex(EvidenceSourceError, "URLError"):
             fetch_github_repository_evidence()
 
     @patch("cin_evidence_ingestion.urlopen")
