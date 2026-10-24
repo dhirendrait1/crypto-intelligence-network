@@ -60,8 +60,60 @@ def fetch_github_repository_evidence(
     except (URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
         raise EvidenceSourceError(f"Public GitHub metadata retrieval failed: {type(exc).__name__}") from exc
 
-    if not isinstance(payload, dict) or payload.get("full_name", "").lower() != repository:
+    # Validate the provider identity before normalizing it. Malformed JSON must
+    # become a controlled source error rather than an AttributeError.
+    if not isinstance(payload, dict):
+        raise EvidenceSourceError("GitHub response payload must be a JSON object")
+    full_name = payload.get("full_name")
+    if not isinstance(full_name, str) or full_name.lower() != repository:
         raise EvidenceSourceError("GitHub response did not match the requested repository")
+
+    string_fields = ("default_branch",)
+    timestamp_fields = ("pushed_at", "updated_at")
+    integer_fields = ("stargazers_count", "forks_count", "open_issues_count")
+    missing_fields = []
+    invalid_fields = []
+
+    for field in string_fields:
+        value = payload.get(field)
+        if value is None:
+            missing_fields.append(field)
+        elif not isinstance(value, str) or not value.strip():
+            invalid_fields.append(field)
+
+    for field in timestamp_fields:
+        value = payload.get(field)
+        if value is None:
+            missing_fields.append(field)
+            continue
+        if not isinstance(value, str):
+            invalid_fields.append(field)
+            continue
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if parsed.tzinfo is None or parsed.utcoffset() is None:
+                invalid_fields.append(field)
+        except ValueError:
+            invalid_fields.append(field)
+
+    for field in integer_fields:
+        value = payload.get(field)
+        if value is None:
+            missing_fields.append(field)
+        elif isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            invalid_fields.append(field)
+
+    archived = payload.get("archived")
+    if archived is None:
+        missing_fields.append("archived")
+    elif not isinstance(archived, bool):
+        invalid_fields.append("archived")
+
+    if invalid_fields:
+        raise EvidenceSourceError(
+            "GitHub response contained invalid field types or values: "
+            + ", ".join(sorted(set(invalid_fields)))
+        )
 
     retrieved_at = _utc_now()
     return {
@@ -85,7 +137,8 @@ def fetch_github_repository_evidence(
         },
         "unit": "repository metadata fields",
         "retrieval_status": "success",
-        "validation_status": "metadata_shape_validated",
+        "validation_status": "metadata_shape_validated" if not missing_fields else "metadata_partial",
+        "missing_fields": sorted(set(missing_fields)),
         "freshness_status": "requires_policy_evaluation",
         "claim_verification_status": "unverified",
         "independently_verified": False,
