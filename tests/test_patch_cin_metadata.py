@@ -90,6 +90,18 @@ class DeploymentPatchTests(unittest.TestCase):
         self.assertEqual(main_path.read_text(encoding="utf-8"), original_main)
         self.assertFalse(any((self.app_dir / name).exists() for name in MODULES))
 
+    def test_missing_branding_title_fails_before_any_scaffold_mutation(self):
+        main_path = self.app_dir / "main.py"
+        original_main = main_path.read_text(encoding="utf-8")
+        main_path.write_text("from fastapi import FastAPI\napp = FastAPI()\n", encoding="utf-8")
+
+        result = self.run_patch()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Could not find a CIN application title to validate", result.stderr)
+        self.assertEqual(main_path.read_text(encoding="utf-8"), "from fastapi import FastAPI\napp = FastAPI()\n")
+        self.assertFalse(any((self.app_dir / name).exists() for name in MODULES))
+
     def test_patch_fails_closed_on_partial_router_registration(self):
         result = self.run_patch()
         self.assertEqual(result.returncode, 0, result.stderr)
