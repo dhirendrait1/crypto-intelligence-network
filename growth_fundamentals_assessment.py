@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlsplit
 
 CATEGORIES = {
     "usage_and_adoption": "On-chain users, transactions, retention, or adoption",
