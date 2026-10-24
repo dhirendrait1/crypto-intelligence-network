@@ -468,3 +468,8 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - Binance candle parsing now rejects a provider response containing more valid candles than the requested `limit`, preserving the endpoint's response-count contract even if a provider returns unexpected data.
 - Added an offline regression test for an over-limit Binance response. Existing normal response and Kraken fallback behavior remains covered.
 - Code commit: `918a2021eea6d2da0afeb6d9af21d6346d4d6510`; test commit: `03824743898b814b818e6fcdeaadf5e7e48285f8`. CI validation for the latest tracker commit is pending.
+
+### Provider timestamp type hardening (2026-10-25)
+- Binance candle parsing now skips rows whose open or close timestamp is a JSON boolean; Kraken parsing likewise skips boolean open timestamps. Python treats booleans as integers, so coercion could otherwise turn malformed provider data into plausible timestamps.
+- Added offline regression tests for both providers.
+- Code commit: `707f1071f533082db98316e70810409a0a1a34e4`; test commit: `54389c9e979b723298ca9caa4c58bc9cb12fead4`. CI validation for the latest tracker commit is pending.
