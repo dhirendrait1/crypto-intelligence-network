@@ -201,6 +201,81 @@ def test_snapshot_keeps_open_interest_change_null_when_history_is_empty(monkeypa
     assert result["provider_timestamps"]["open_interest_history_latest"] is None
 
 
+
+def test_timestamp_quality_classifies_fresh_stale_and_future_dated_values():
+    from datetime import datetime, timezone, timedelta
+
+    now = datetime(2026, 10, 25, 12, 0, 0, tzinfo=timezone.utc)
+    fresh_ms = int((now - timedelta(seconds=30)).timestamp() * 1000)
+    stale_ms = int((now - timedelta(seconds=901)).timestamp() * 1000)
+    future_ms = int((now + timedelta(seconds=120)).timestamp() * 1000)
+
+    assert api._timestamp_quality(fresh_ms, now, 900)["status"] == "fresh"
+    stale = api._timestamp_quality(stale_ms, now, 900)
+    assert stale["status"] == "stale"
+    assert stale["age_seconds"] == 901.0
+    future = api._timestamp_quality(future_ms, now, 900)
+    assert future["status"] == "future_dated"
+    assert future["age_seconds"] == -120.0
+    assert api._timestamp_quality(None, now, 28800)["status"] == "unavailable"
+
+
+def test_snapshot_exposes_freshness_warnings_for_stale_and_future_provider_times(monkeypatch):
+    from datetime import datetime, timezone
+
+    fixed_now = datetime(2026, 10, 25, 12, 0, 0, tzinfo=timezone.utc)
+
+    class ControlledDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return fixed_now
+
+    old_ms = int(datetime(2026, 10, 25, 11, 0, 0, tzinfo=timezone.utc).timestamp() * 1000)
+    future_ms = int(datetime(2026, 10, 25, 12, 5, 0, tzinfo=timezone.utc).timestamp() * 1000)
+    history_ms = int(datetime(2026, 10, 25, 8, 0, 0, tzinfo=timezone.utc).timestamp() * 1000)
+    payloads = [
+        {"symbol": "BTCUSDT", "openInterest": "1000", "time": old_ms},
+        {"symbol": "BTCUSDT", "markPrice": "65000", "indexPrice": "65000", "lastFundingRate": "0.0001", "time": future_ms},
+        [{"symbol": "BTCUSDT", "sumOpenInterestValue": "1000000", "timestamp": history_ms}],
+        {"bids": [["65000", "2"]], "asks": [["65010", "1"]]},
+    ]
+    monkeypatch.setattr(api, "datetime", ControlledDateTime)
+    monkeypatch.setattr(api, "_get_json", lambda _path, _params: payloads.pop(0))
+
+    result = api._snapshot("BTCUSDT")
+
+    assert result["timestamp_quality"]["open_interest"]["status"] == "stale"
+    assert result["timestamp_quality"]["mark_price_and_funding"]["status"] == "future_dated"
+    assert result["timestamp_quality"]["open_interest_history_latest"]["status"] == "fresh"
+    assert result["data_quality"]["freshness_status"] == "warning"
+    assert set(result["data_quality"]["freshness_warnings"]) == {"open_interest", "mark_price_and_funding"}
+
+
+def test_snapshot_reports_missing_open_interest_history_as_unavailable_not_invalid(monkeypatch):
+    from datetime import datetime, timezone
+
+    fixed_now = datetime(2026, 10, 25, 12, 0, 0, tzinfo=timezone.utc)
+
+    class ControlledDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return fixed_now
+
+    payloads = [
+        {"symbol": "BTCUSDT", "openInterest": "1000", "time": int(fixed_now.timestamp() * 1000)},
+        {"symbol": "BTCUSDT", "markPrice": "65000", "indexPrice": "65000", "lastFundingRate": "0.0001", "time": int(fixed_now.timestamp() * 1000)},
+        [],
+        {"bids": [["65000", "2"]], "asks": [["65010", "1"]]},
+    ]
+    monkeypatch.setattr(api, "datetime", ControlledDateTime)
+    monkeypatch.setattr(api, "_get_json", lambda _path, _params: payloads.pop(0))
+
+    result = api._snapshot("BTCUSDT")
+
+    assert result["timestamp_quality"]["open_interest_history_latest"]["status"] == "unavailable"
+    assert result["data_quality"]["freshness_status"] == "ok"
+    assert result["data_quality"]["freshness_warnings"] == []
+
 def test_snapshot_rejects_crossed_order_book(monkeypatch):
     payloads = [
         {"symbol": "BTCUSDT", "openInterest": "1000", "time": 1_800_000_000_000},
