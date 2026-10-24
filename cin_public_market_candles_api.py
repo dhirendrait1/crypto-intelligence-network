@@ -14,7 +14,10 @@ from fastapi import APIRouter, HTTPException, Query
 
 try:
     from app.cin_technical_analysis import analyze_ohlc
-except ModuleNotFoundError:
+except ModuleNotFoundError as exc:
+    # Do not mask missing dependencies imported by the analysis module itself.
+    if exc.name not in {"app", "app.cin_technical_analysis"}:
+        raise
     from cin_technical_analysis import analyze_ohlc
 
 router = APIRouter(tags=["public-market-candles"])
