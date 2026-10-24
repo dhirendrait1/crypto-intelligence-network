@@ -266,6 +266,31 @@ class ProviderFailureClassificationTests(unittest.TestCase):
 
 
 class ScreeningResponseMetadataTests(unittest.IsolatedAsyncioTestCase):
+    async def test_endpoint_marks_fresh_response_without_provider_errors(self):
+        row = {
+            "id": "fresh-coin", "symbol": "FRSH", "name": "Fresh Coin",
+            "current_price": 2.0, "market_cap": 100.0, "total_volume": 10.0,
+            "fully_diluted_valuation": 120.0, "circulating_supply": 40.0,
+            "total_supply": 50.0, "price_change_percentage_24h": 1.0,
+            "last_updated": "2026-10-24T00:00:00Z",
+            "_cin_provider": "CoinGecko", "_cin_retrieved_at": MODULE.time.time(),
+        }
+
+        async def fake_to_thread(func, *args, **kwargs):
+            return ([row], "live", 0, None)
+
+        with patch.object(MODULE.asyncio, "to_thread", side_effect=fake_to_thread):
+            response = await MODULE.coin_screening(
+                vs_currency="usd", per_page=1, min_score=0, asset_type="all"
+            )
+
+        self.assertEqual(response["data_mode"], "live")
+        self.assertIsNone(response["provider_error_code"])
+        self.assertIsNone(response["provider_error_details"])
+        self.assertIsNone(response["stale_data_warning"])
+        self.assertIsNotNone(response["cache_age_seconds"])
+        self.assertTrue(response["assets"] or response["count"] >= 0)
+
     async def test_endpoint_exposes_structured_stale_cache_provider_errors(self):
         row = {
             "id": "cached-coin", "symbol": "CACH", "name": "Cached Coin",
