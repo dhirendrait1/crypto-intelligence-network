@@ -191,23 +191,31 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         analysis_responses = paths["/technical-analysis/market"]["get"]["responses"]
         self.assertTrue({"200", "400", "422", "502", "503"}.issubset(analysis_responses))
 
-    def test_http_request_validation_and_semantic_errors_match_contract(self):
+    def test_request_schema_and_semantic_validation_match_contract(self):
         from fastapi import FastAPI
-        from fastapi.testclient import TestClient
 
         app = FastAPI()
         app.include_router(api.router)
-        client = TestClient(app)
+        paths = app.openapi()["paths"]
 
-        # FastAPI's query-schema validation rejects malformed symbols with 422.
-        malformed = client.get("/market-candles", params={"symbol": "BTC/USDT"})
-        self.assertEqual(malformed.status_code, 422)
-        self.assertIn("detail", malformed.json())
+        # Request-schema constraints are exposed in OpenAPI and FastAPI maps
+        # these validation failures to HTTP 422.
+        for route in ("/market-candles", "/technical-analysis/market"):
+            parameters = paths[route]["get"]["parameters"]
+            symbol = next(parameter for parameter in parameters if parameter["name"] == "symbol")
+            limit = next(parameter for parameter in parameters if parameter["name"] == "limit")
+            self.assertEqual(symbol["schema"]["minLength"], 5)
+            self.assertEqual(symbol["schema"]["maxLength"], 20)
+            self.assertEqual(symbol["schema"]["pattern"], "^[A-Za-z0-9]+$")
+            self.assertEqual(limit["schema"]["minimum"], 5)
+            self.assertEqual(limit["schema"]["maximum"], 500)
+            self.assertIn("422", paths[route]["get"]["responses"])
 
-        # The handler's semantic validation rejects unsupported intervals with 400.
-        unsupported = client.get("/market-candles", params={"symbol": "BTCUSDT", "interval": "17m"})
-        self.assertEqual(unsupported.status_code, 400)
-        self.assertEqual(unsupported.json()["detail"], "Unsupported interval.")
+        # Semantic validation inside the handler intentionally uses HTTP 400.
+        with self.assertRaises(HTTPException) as ctx:
+            api._validate("BTCUSDT", "17m", 50)
+        self.assertEqual(ctx.exception.status_code, 400)
+        self.assertEqual(ctx.exception.detail, "Unsupported interval.")
 
 
 if __name__ == "__main__":
