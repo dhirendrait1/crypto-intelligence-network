@@ -33,6 +33,20 @@ def _parse_timestamp(value: Any) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
+
+def _assessment_clock(now: Any) -> tuple[datetime, bool]:
+    """Return a timezone-aware UTC clock and whether the caller supplied a valid one."""
+    if now is None:
+        return datetime.now(timezone.utc), True
+    if not isinstance(now, datetime) or now.tzinfo is None:
+        return datetime.now(timezone.utc), False
+    try:
+        if now.utcoffset() is None:
+            return datetime.now(timezone.utc), False
+        return now.astimezone(timezone.utc), True
+    except (OverflowError, TypeError, ValueError):
+        return datetime.now(timezone.utc), False
+
 def _is_http_url(value: Any) -> bool:
     """Accept only absolute HTTP(S) URLs with a hostname and no embedded credentials."""
     if not isinstance(value, str) or any(
@@ -92,16 +106,7 @@ def normalize_evidence(item: Any, *, now: datetime | None = None,
     """
     threshold_valid = isinstance(max_age_days, int) and not isinstance(max_age_days, bool) and max_age_days >= 0
     max_age_days = max_age_days if threshold_valid else 90
-    assessment_clock_valid = (
-        now is None
-        or (
-            isinstance(now, datetime)
-            and now.tzinfo is not None
-            and now.utcoffset() is not None
-        )
-    )
-    current = now if assessment_clock_valid and now is not None else datetime.now(timezone.utc)
-    current = current.astimezone(timezone.utc)
+    current, assessment_clock_valid = _assessment_clock(now)
 
     if not isinstance(item, dict):
         return {
@@ -185,19 +190,7 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
     """Summarize reserve/redemption/custody evidence without treating gaps as proof."""
     threshold_valid = isinstance(max_age_days, int) and not isinstance(max_age_days, bool) and max_age_days >= 0
     max_age_days = max_age_days if threshold_valid else 90
-    assessment_clock_valid = (
-        now is None
-        or (
-            isinstance(now, datetime)
-            and now.tzinfo is not None
-            and now.utcoffset() is not None
-        )
-    )
-    current = (
-        now.astimezone(timezone.utc)
-        if assessment_clock_valid and now is not None
-        else datetime.now(timezone.utc)
-    )
+    current, assessment_clock_valid = _assessment_clock(now)
     required_types = {
         "reserve_attestation",
         "redemption_terms",
