@@ -85,4 +85,6 @@ Do **not** calculate a single completion percentage from this inventory: it mixe
 
 These are timestamp sanity checks on caller-supplied metadata, not independent source verification.
 - [x] Surface mixed evidence statuses as `conflicting` at category/type level; summaries no longer let one supplied `verified` record hide other stale, unavailable, or unverified records. Regression tests added for commodity and growth assessments.
+- [x] Harden assessment input contracts: malformed non-object records are retained as unverified audit rows, non-list input cannot be interpreted as verified coverage, and unknown growth categories are surfaced in counts and prevent a complete overall status.
+- [x] Align growth URL validation with commodity validation by rejecting embedded URL credentials; add offline regression tests.
 - [ ] Add source-aware conflict resolution and independent source retrieval; current conflict detection compares supplied statuses and does not establish which source is authoritative.
