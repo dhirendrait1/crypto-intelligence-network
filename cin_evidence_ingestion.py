@@ -49,7 +49,7 @@ def _freshness_status(payload: dict[str, Any], *, now: datetime | None = None) -
     return "stale"
 
 
-def _validate_metadata(payload: dict[str, Any]) -> str:
+def _validate_metadata(payload: dict[str, Any]) -> tuple[str, list[str]]:
     """Reject malformed metadata and report whether expected fields are present."""
     branch = payload.get("default_branch")
     if branch is not None and (not isinstance(branch, str) or not branch.strip()):
