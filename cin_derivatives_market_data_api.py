@@ -49,6 +49,27 @@ def _iso_from_ms(value: Any) -> str | None:
         return None
 
 
+
+def _timestamp_quality(value: Any, now: datetime, stale_after_seconds: int, future_tolerance_seconds: int = 60) -> dict[str, Any]:
+    timestamp = _finite_number(value)
+    iso_timestamp = _iso_from_ms(value)
+    if timestamp is None or iso_timestamp is None:
+        return {"timestamp": None, "age_seconds": None, "status": "invalid"}
+    age_seconds = (now - datetime.fromtimestamp(timestamp / 1000, timezone.utc)).total_seconds()
+    if age_seconds < -future_tolerance_seconds:
+        status = "future_dated"
+    elif age_seconds > stale_after_seconds:
+        status = "stale"
+    else:
+        status = "fresh"
+    return {
+        "timestamp": iso_timestamp,
+        "age_seconds": round(age_seconds, 3),
+        "status": status,
+        "stale_after_seconds": stale_after_seconds,
+        "future_tolerance_seconds": future_tolerance_seconds,
+    }
+
 def _validate_payloads(open_interest: Any, premium: Any, history: Any, symbol: str) -> None:
     if not isinstance(open_interest, dict) or open_interest.get("symbol") != symbol:
         raise ValueError("Unexpected open-interest provider payload")
@@ -151,7 +172,21 @@ def _snapshot(symbol: str) -> dict[str, Any]:
 
     if change_pct is not None:
         change_pct = round(change_pct, 6)
-    retrieved_at = datetime.now(timezone.utc).isoformat()
+    retrieved_at_dt = datetime.now(timezone.utc)
+    retrieved_at = retrieved_at_dt.isoformat()
+    timestamp_quality = {
+        "open_interest": _timestamp_quality(open_interest.get("time"), retrieved_at_dt, 900),
+        "mark_price_and_funding": _timestamp_quality(premium.get("time"), retrieved_at_dt, 900),
+        "open_interest_history_latest": _timestamp_quality(
+            latest_history.get("timestamp") if latest_history else None,
+            retrieved_at_dt,
+            28800,
+        ),
+    }
+    freshness_warnings = [
+        name for name, quality in timestamp_quality.items()
+        if quality["status"] in ("stale", "future_dated", "invalid")
+    ]
 
     return {
         "service": "cin",
@@ -165,6 +200,7 @@ def _snapshot(symbol: str) -> dict[str, Any]:
             "mark_price_and_funding": _iso_from_ms(premium.get("time")),
             "open_interest_history_latest": _iso_from_ms(latest_history.get("timestamp")) if latest_history else None,
         },
+        "timestamp_quality": timestamp_quality,
         "order_book": {
             "source": "Binance USDⓈ-M Futures public depth endpoint",
             "retrieved_at": depth_retrieved_at,
@@ -196,6 +232,13 @@ def _snapshot(symbol: str) -> dict[str, Any]:
             "reason": "A reliable liquidation window requires continuous event ingestion and timestamped aggregation; no liquidation total is inferred from this snapshot.",
         },
         "data_quality": {
+            "freshness_status": "warning" if freshness_warnings else "ok",
+            "freshness_warnings": freshness_warnings,
+            "freshness_policy": {
+                "open_interest_and_premium_index_stale_after_seconds": 900,
+                "open_interest_history_stale_after_seconds": 28800,
+                "future_timestamp_tolerance_seconds": 60,
+            },
             "cache_used": False,
             "open_interest_change_window": "Latest two provider 4-hour aggregates; null when insufficient valid history exists",
             "limitations": [
