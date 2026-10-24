@@ -387,7 +387,7 @@ async def get_market_candles(
         "limitations": [
             "Public exchange-provided market data; not independently audited by CIN.",
             "The latest candle may still be forming.",
-            "Freshness warning compares latest completed candle age against twice the requested interval; monthly intervals use a 31-day approximation.",
+            "Freshness warning compares latest completed candle age against twice the requested interval; monthly intervals use calendar-month duration.",
             "The source exchange can differ when a provider fallback is used.",
             "No account endpoints, API keys, orders, or trade execution are used.",
         ],
@@ -453,7 +453,7 @@ async def analyze_public_market(
     analysis["limitations"].extend([
         "Public exchange data is not independently audited by CIN.",
         "This endpoint excludes forming candles from analysis; /market-candles may still report the latest candle as forming.",
-        "Freshness warning compares latest completed candle age against twice the requested interval; monthly intervals use a 31-day approximation.",
+        "Freshness warning compares latest completed candle age against twice the requested interval; monthly intervals use calendar-month duration.",
         "Technical outputs and ATR scenarios are descriptive research, not investment advice or trade instructions.",
     ])
     return analysis
