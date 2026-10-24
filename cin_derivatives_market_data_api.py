@@ -121,8 +121,8 @@ def _snapshot(symbol: str) -> dict[str, Any]:
         },
         "order_book": {
             "source": "Binance USDⓈ-M Futures public depth endpoint",
-            "valid_bid_levels": len(bids),
-            "valid_ask_levels": len(asks),
+            "bid_levels_used": len(bids),
+            "ask_levels_used": len(asks),
             "best_bid": best_bid,
             "best_ask": best_ask,
             "spread": round(best_ask - best_bid, 10),
