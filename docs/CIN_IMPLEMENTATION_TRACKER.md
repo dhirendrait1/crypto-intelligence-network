@@ -196,3 +196,11 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Updated the OpenAPI regression test to assert the 20-character bound.
 - [x] All four workflows passed on code/test commit `cb711fbc0f489f05a253933d1d200e5ee2185416`: CIN Automated Tests (run `40107114907`), screening checks (run `40107114890`), Technical Analysis Tests (run `40107114918`), and evidence-ingestion API checks (run `40107114916`).
 - **Boundary:** the shared format is a syntactic guard, not proof that a pair is listed by Binance or Kraken. Validation remains offline/mocked; no live-provider or production check is implied.
+
+## Technical-analysis API error contract (2026-10-24)
+
+- [x] Audited the public candle endpoint's technical-analysis exception boundary.
+- [x] Replaced exception-text leakage for invalid analysis input with a stable HTTP 502 detail and added a sanitized HTTP 502 fallback for unexpected runtime/parser exceptions.
+- [x] Added an offline regression test that injects an unexpected analysis runtime failure and asserts internal exception text is not returned.
+- [x] All four workflows passed on code/test commit `848d0b949c05f3cce4440e790c0361f071d1f2ce`: CIN Automated Tests (run `40107210314`), screening checks (run `40107210327`), Technical Analysis Tests (run `40107210326`), and evidence-ingestion API checks (run `40107210319`).
+- **Boundary:** the regression uses mocked candle data and an injected exception. It does not verify live exchange behavior or production deployment.
