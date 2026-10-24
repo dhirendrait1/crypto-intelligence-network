@@ -621,3 +621,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Code commit: `2ff41eb63615b24eff3402e00b4635405c029191`.
 - Test commit: `3761aa86b59388c3ac2f2c6956cd55fbe65e34bb`.
 - CI verification pending on the latest tracker commit.
+
+
+## Provider-error detail sanitization assertions (2026-10-25)
+
+- Strengthened malformed Kraken payload tests to explicitly assert that provider error codes/messages and malformed-field marker strings are not returned to API clients.
+- This locks down the public API contract: fallback failure is reported as a controlled 503 without leaking provider payload internals.
+- Test commit: `b5ac4b39b0ac52d4dd0836e090bee87344510887`.
+- CI verification pending on the latest tracker commit.
