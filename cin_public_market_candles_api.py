@@ -24,6 +24,7 @@ KRAKEN_OHLC_URL = "https://api.kraken.com/0/public/OHLC"
 TIMEFRAMES = {"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M"}
 KRAKEN_INTERVALS = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440, "1w": 10080}
 KRAKEN_SYMBOLS = {"BTC": "XBT"}
+_MAX_PROVIDER_RESPONSE_BYTES = 2_000_000
 _INTERVAL_MS = {
     "1m": 60_000, "3m": 180_000, "5m": 300_000, "15m": 900_000,
     "30m": 1_800_000, "1h": 3_600_000, "2h": 7_200_000,
@@ -62,7 +63,12 @@ def _request_json(url: str) -> Any:
     with urllib.request.urlopen(request, timeout=15) as response:
         if response.status != 200:
             raise RuntimeError(f"Provider returned HTTP {response.status}")
-        return json.loads(response.read().decode("utf-8"))
+        # Read at most one byte beyond the cap so oversized provider payloads
+        # are rejected before unbounded buffering or JSON parsing.
+        body = response.read(_MAX_PROVIDER_RESPONSE_BYTES + 1)
+        if len(body) > _MAX_PROVIDER_RESPONSE_BYTES:
+            raise ValueError("Public market-data provider response exceeded the configured size limit")
+        return json.loads(body.decode("utf-8"))
 
 
 
