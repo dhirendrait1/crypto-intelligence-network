@@ -9,8 +9,9 @@ from market_data_step1 import _fetch_market_data
 class FakeResponse:
     status = 200
 
-    def __init__(self, payload):
+    def __init__(self, payload, status=200):
         self.payload = payload
+        self.status = status
 
     def __enter__(self):
         return self
@@ -93,6 +94,14 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         result = _fetch_market_data(["bitcoin"], "usd")[0]
         self.assertEqual(result["freshness_status"], "unknown")
         self.assertIn("future_last_updated_timestamp", result["data_quality_warnings"])
+
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_unexpected_provider_status_is_controlled_error(self, mocked):
+        from market_data_step1 import _fetch_market_data
+        mocked.return_value = FakeResponse([], status=503)
+        with self.assertRaisesRegex(ValueError, "unexpected HTTP status"):
+            _fetch_market_data(["bitcoin"], "usd")
 
 
 if __name__ == "__main__":
