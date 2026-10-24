@@ -39,6 +39,25 @@ jobs:
       - name: Install dependencies
         run: python -m pip install --upgrade pip && python -m pip install -r cin/requirements.txt pytest
 
+      - name: Verify scaffold read-only routes are registered
+        working-directory: cin
+        run: |
+          python - <<'PY'
+          from app.main import app
+          paths = {route.path for route in app.routes}
+          required = {
+              "/coin-screening",
+              "/market-candles",
+              "/technical-analysis/market",
+              "/derivatives/market-snapshot",
+              "/news-sentiment",
+          }
+          missing = sorted(required - paths)
+          if missing:
+              raise SystemExit(f"Missing expected CIN routes: {missing}")
+          print(f"Verified {len(required)} read-only CIN routes")
+          PY
+
       - name: Run scaffold tests
         working-directory: cin
         run: python -m pytest -v tests
