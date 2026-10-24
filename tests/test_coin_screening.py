@@ -58,7 +58,7 @@ class ScreeningDataQualityPropagationTests(unittest.TestCase):
                 self.assertEqual(result["freshness_status"], expected)
                 self.assertFalse(result["analysis_eligible"])
                 self.assertEqual(result["screen_band"], "data_quality_hold")
-                self.assertFalse(result["screening_eligible"] if "screening_eligible" in result else False)
+                self.assertFalse(result["screening_eligible"])
                 self.assertTrue(any("candidate signal held" in warning for warning in result["warnings"]))
 
     def test_fresh_positive_price_is_analysis_eligible(self):
