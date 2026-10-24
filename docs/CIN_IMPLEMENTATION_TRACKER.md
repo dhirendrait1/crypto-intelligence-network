@@ -159,5 +159,5 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 ## News URL control-character parity (2026-10-24)
 
 - [x] Extended GDELT article URL validation to reject DEL (ASCII 127) as well as whitespace and lower control characters; added newline, tab, and DEL regression cases.
-- [ ] Confirm all four CI workflows on the final news URL validation revision.
+- [x] All four workflows passed on code/test commit `4fd998d23fa1f8cc0b9c78765933a2775a9cf7bd` (automated tests, screening, technical analysis, evidence-ingestion API checks). Validation is offline/mocked.
 - **Boundary:** this validates article-link syntax only. It does not prove the publisher is trustworthy or validate the article's claims.
