@@ -246,8 +246,18 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
         }
 
     statuses = [value["status"] for value in coverage.values()]
+    unrecognized_evidence_type_count = sum(
+        1 for row in normalized if row.get("evidence_type") not in required_types
+    )
+    invalid_evidence_record_count = sum(1 for row in normalized if row.get("invalid_record"))
     if "conflicting" in statuses:
         overall = "evidence_conflicting_or_incomplete"
+    elif (
+        unrecognized_evidence_type_count
+        or invalid_evidence_record_count
+        or not isinstance(evidence, list)
+    ):
+        overall = "evidence_invalid_or_incomplete"
     elif all(status == "verified" for status in statuses):
         overall = "evidence_coverage_complete"
     elif "stale" in statuses:
@@ -265,7 +275,8 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
         "not_a_reserve_certification": True,
         "evidence_coverage": coverage,
         "evidence": normalized,
-        "invalid_evidence_record_count": sum(1 for item in normalized if item.get("invalid_record")),
+        "invalid_evidence_record_count": invalid_evidence_record_count,
+        "unrecognized_evidence_type_count": unrecognized_evidence_type_count,
         "input_evidence_list_valid": isinstance(evidence, list),
         "freshness_threshold_valid": threshold_valid,
         "freshness_threshold_days": max_age_days,
