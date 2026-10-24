@@ -201,6 +201,22 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rows[0]["_provider_quote_currency"], "USDT")
         self.assertEqual(rows[0]["_provider_pair_key"], "XBTUSDT")
 
+    def test_kraken_applies_limit_after_filtering_malformed_rows(self):
+        valid_rows = [
+            [1700000000 + i * 3600, "100", "105", "98", "102", "101", "12.5", 7]
+            for i in range(6)
+        ]
+        malformed_tail = [True, "100", "105", "98", "102", "101", "12.5", 7]
+        payload = {
+            "error": [],
+            "result": {"XXBTZUSD": valid_rows + [malformed_tail], "last": 1700000000},
+        }
+        with patch.object(api, "_request_json", return_value=payload):
+            rows = api._fetch_kraken("BTCUSD", "1h", 5)
+        self.assertEqual(len(rows), 5)
+        self.assertEqual(rows[0]["open_time"], valid_rows[1][0] * 1000)
+        self.assertEqual(rows[-1]["open_time"], valid_rows[-1][0] * 1000)
+
     def test_kraken_skips_boolean_ohlcv_values(self):
         valid = [1700000000, "100", "105", "98", "102", "101", "12.5", 7]
         malformed = [1700000000, True, "105", "98", "102", "101", "12.5", 7]
