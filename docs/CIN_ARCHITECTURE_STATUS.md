@@ -34,7 +34,7 @@ The deployment patch `patch_cin_metadata_fixed.py` names the following source mo
 
 | Component | Source module(s) | Evidence/status |
 |---|---|---|
-| Public market data | `market_data_step1.py` | Named in deployment patch; full behavior audit pending |
+| Public market data | `market_data_step1.py` | Read-only CoinGecko adapter now rejects non-finite/negative prices, omits invalid optional metrics with warnings, exposes per-row freshness from provider timestamps (fresh ≤15 minutes, stale >15 minutes, unknown for missing/invalid/future timestamps), and maps unexpected status to controlled invalid-response handling; offline regression tests added; no live-provider validation claimed |
 | Coin screening | `coin_screening_step2.py` | Named in deployment patch; full behavior audit pending |
 | Commodity backing assessment | `commodity_backing_assessment.py`, `commodity_backing_api.py` | Named in deployment patch; full behavior audit pending |
 | Growth fundamentals | `growth_fundamentals_assessment.py`, `growth_fundamentals_api.py` | Named in deployment patch; full behavior audit pending |
