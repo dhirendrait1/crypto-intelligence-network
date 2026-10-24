@@ -105,3 +105,10 @@ All four configured workflows passed on checkpoint `1b847b843c14e0929f9ec972fbc3
 ## Latest automated verification (2026-10-25)
 
 All four configured workflows passed on code/documentation checkpoint `2c1f816d59bc4fa6aa1c31ce2ee01228cd46f29b`. The tracker was subsequently updated in commit `9a4dea4b00afe3fcf22d1335b8fc957539c6aad2` to record those results and the monthly-candle calendar-boundary caveat. CI must be refreshed for that newer tracker-only commit. Live-provider and deployment checks remain incomplete.
+
+## Monthly candle freshness fix (2026-10-25)
+
+- Implemented calendar-aware monthly duration for freshness thresholds using the latest closed candle open timestamp.
+- Regression coverage includes leap-year February, common-year February, 30/31-day months, December year rollover, and the derived freshness threshold.
+- Code: `5259bc9500068d577cba6bc617b9083ae92fdbc3`; tests: `b4d55897b08dc788e848b9273e4277dc31550702`; tracker: `59c421c11aad40c85ecf6263a8e70a76bdf102f9`.
+- Latest-head CI is not yet verified. Open-time alignment, close-time consistency, live-provider behavior, and deployment checks remain unfinished.
