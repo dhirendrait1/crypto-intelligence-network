@@ -319,6 +319,33 @@ def test_market_provider_shape_failures_return_sanitized_502(monkeypatch, failur
     assert "unexpected provider response" not in str(caught.value.detail)
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        [],
+        {"error": [], "result": []},
+        {"error": [], "result": {"last": 123}},
+        {"error": [], "result": {"XXBTZUSD": "not-a-row-list", "last": 123}},
+        {"error": ["EQuery:Invalid pair"], "result": {"last": 123}},
+    ],
+)
+def test_malformed_kraken_payload_returns_sanitized_503(monkeypatch, payload):
+    def binance_451(*_args):
+        raise api.urllib.error.HTTPError(
+            api.BINANCE_KLINES_URL, 451, "unavailable for legal reasons", {}, None
+        )
+
+    monkeypatch.setattr(api, "_fetch_binance", binance_451)
+    monkeypatch.setattr(api, "_request_json", lambda _url: payload)
+
+    with pytest.raises(api.HTTPException) as caught:
+        asyncio.run(api._load("BTCUSD", "1h", 10))
+
+    assert caught.value.status_code == 503
+    assert caught.value.detail.startswith("Kraken fallback unavailable or pair/timeframe unsupported")
+    assert "not-a-row-list" not in caught.value.detail
+
+
 def test_kraken_fallback_unexpected_response_returns_controlled_503(monkeypatch):
     def binance_451(*_args):
         raise api.urllib.error.HTTPError(
