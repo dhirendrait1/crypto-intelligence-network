@@ -387,3 +387,5 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Added offline regression tests for identical duplicates and conflicting duplicates; documented the rule and its limits.
 - [ ] Verify all four CI workflows on the latest head before marking this milestone verified.
 - **Boundary:** this validates duplicate consistency within one provider response. It does not compare Binance and Kraken simultaneously or verify live exchange data. PR #8 remains Draft and unmerged.
+
+- **Regression adjustment:** the existing market-candle safety test had intentionally used conflicting same-timestamp rows and expected silent last-row-wins behavior. Updated it to test exact duplicate collapse; the new dedicated test asserts conflicting evidence is rejected. The initial automated workflow failure on the intermediate docs commit exposed this stale expectation; latest-head CI is the verification gate.
