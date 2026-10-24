@@ -57,3 +57,8 @@ Each result exposes `provider_timestamp_status` and `provider_timestamp_age_seco
 ## Numeric evidence and ratio safety
 
 Financial magnitude inputs (market cap, volume, FDV, circulating supply, and total supply) must be finite and non-negative; invalid or negative values are treated as missing evidence and do not contribute to ratios or scoring. Volume/market-cap, FDV-gap, and circulating-supply ratios are checked for finite results before exposure. If arithmetic produces a non-finite ratio, CIN returns that metric as `null`, emits a warning, and does not award points for that metric. Raw scores remain heuristic metric totals and must be interpreted alongside `analysis_eligible`, `screening_eligible`, freshness, and warning fields. This is defensive input validation, not independent verification of provider data.
+
+
+## Provider identity and deterministic row handling
+
+Before scoring, CIN requires each market row to have a non-empty string provider ID. Rows without an ID are discarded, and duplicate IDs are collapsed case-insensitively by keeping the first row in provider input order. The response `data_quality` object reports input rows, identity-less rows, duplicate IDs, and unique accepted identities. This prevents duplicate provider records from inflating result counts and makes identity cleanup visible. The policy is deterministic for a given provider response, but it does not prove that provider IDs are globally canonical or that two distinct IDs cannot refer to the same underlying asset.
