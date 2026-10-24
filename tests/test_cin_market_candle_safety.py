@@ -267,3 +267,38 @@ def test_kraken_fallback_unexpected_response_returns_controlled_503(monkeypatch)
     assert caught.value.status_code == 503
     assert "Kraken fallback unavailable" in caught.value.detail
     assert "unexpected fallback response" not in str(caught.value.detail)
+
+@pytest.mark.parametrize(
+    "symbol, expected_pair_key, expected_quote",
+    [
+        ("BTCUSD", "XXBTZUSD", "USD"),
+        ("ETHUSDT", "ETHUSDT", "USDT"),
+    ],
+)
+def test_kraken_fallback_maps_requested_symbol_and_reports_actual_pair(
+    symbol, expected_pair_key, expected_quote, monkeypatch
+):
+    import urllib.parse
+
+    captured = {}
+
+    def fake_request(url):
+        captured.update(urllib.parse.parse_qs(urllib.parse.urlparse(url).query))
+        return {
+            "error": [],
+            "result": {
+                expected_pair_key: [
+                    [int(datetime.now(timezone.utc).timestamp()) - 7200,
+                     "100", "102", "98", "101", "100", "4", 10],
+                ],
+                "last": 123,
+            },
+        }
+
+    monkeypatch.setattr(api, "_request_json", fake_request)
+    rows = api._fetch_kraken(symbol, "1h", 5)
+
+    assert captured["pair"] == [symbol if symbol.startswith("ETH") else "XBTUSD"]
+    assert rows[0]["_provider_pair_key"] == expected_pair_key
+    assert rows[0]["_provider_quote_currency"] == expected_quote
+
