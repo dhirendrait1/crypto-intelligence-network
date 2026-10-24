@@ -189,7 +189,7 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
         overall = "evidence_unverified_or_incomplete"
 
     return {
-        "symbol": symbol.upper().strip(),
+        "symbol": str(symbol or "").strip().upper(),
         "assessment_type": "commodity_backing_evidence_review",
         "mode": "read_only",
         "overall_status": overall,
