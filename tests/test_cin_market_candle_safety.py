@@ -44,6 +44,27 @@ def test_request_json_rejects_provider_body_over_configured_size(monkeypatch):
         api._request_json("https://provider.invalid/ohlc")
 
 
+def test_request_json_accepts_body_exactly_at_configured_size_limit(monkeypatch):
+    body = b"{}" + b" " * (api._MAX_PROVIDER_RESPONSE_BYTES - 2)
+
+    class BoundaryResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self, size):
+            assert size == api._MAX_PROVIDER_RESPONSE_BYTES + 1
+            return body
+
+    monkeypatch.setattr(api.urllib.request, "urlopen", lambda *_args, **_kwargs: BoundaryResponse())
+
+    assert api._request_json("https://provider.invalid/ohlc") == {}
+
+
 def test_clean_candles_rejects_invalid_rows_and_orders_unique_timestamps():
     valid_later = _row(2_000, 2_999)
     valid_earlier = _row(1_000, 1_999)
