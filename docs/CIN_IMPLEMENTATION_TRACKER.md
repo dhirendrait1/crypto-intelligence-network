@@ -312,5 +312,13 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 
 - [x] Added offline tests for Kraken OHLC responses using the alternate `XXBTZUSD` pair key and the `XBTUSDT` pair key, including pair query construction, quote-currency provenance, volume extraction, and normalized candle close-time calculation.
 - [x] Added a malformed Kraken response-shape regression test.
-- [ ] CI for test commit `82219630a649f9273fad7e69c880a7b2b2549d2d` is running; do not mark the new tests validated until all four workflows finish successfully.
+- [x] All four workflows passed on test commit `82219630a649f9273fad7e69c880a7b2b2549d2d`: CIN Automated Tests (run `40123716245`), CIN screening checks (`40123716265`), CIN Technical Analysis Tests (`40123716292`), and CIN evidence ingestion API checks (`40123716284`).
 - **Boundary:** fixtures are mocked and validate parser behavior only; they do not confirm live Kraken pair availability or exchange response behavior. No merge or production deployment was performed.
+
+
+## Post-test CI and PR state recheck (2026-10-25)
+
+- [x] Confirmed the implementation-tracker update commit `b96c363a8178a2d1a549361c026d4eab7d25fcbe` also completed all four CI workflows successfully: CIN Automated Tests (run `40123745460`), CIN evidence ingestion API checks (`40123745385`), CIN Technical Analysis Tests (`40123745433`), and CIN screening checks (`40123745435`).
+- [x] Reconfirmed PR #8 is open, Draft, and unmerged.
+- [ ] Live Kraken pair availability and production health/readiness remain unverified. No production URL was established from repository evidence during this pass; do not guess one. Continue with repository-level OpenAPI/error-contract audit and request the existing deployment URL only if a live smoke test cannot be run from existing authorized configuration.
+- **Boundary:** passing CI verifies the repository's offline/mocked checks only. No merge, deployment, account connection, or trade execution was performed.
