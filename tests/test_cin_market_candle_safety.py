@@ -24,6 +24,26 @@ def _row(open_time_ms: int, close_time_ms: int, close: float = 100.0):
 
 
 
+def test_request_json_rejects_provider_body_over_configured_size(monkeypatch):
+    class OversizedResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self, size):
+            assert size == api._MAX_PROVIDER_RESPONSE_BYTES + 1
+            return b"x" * size
+
+    monkeypatch.setattr(api.urllib.request, "urlopen", lambda *_args, **_kwargs: OversizedResponse())
+
+    with pytest.raises(ValueError, match="exceeded the configured size limit"):
+        api._request_json("https://provider.invalid/ohlc")
+
+
 def test_clean_candles_rejects_invalid_rows_and_orders_unique_timestamps():
     valid_later = _row(2_000, 2_999)
     valid_earlier = _row(1_000, 1_999)
