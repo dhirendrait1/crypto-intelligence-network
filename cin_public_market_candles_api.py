@@ -233,6 +233,8 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     if len(pair_keys) != 1:
         raise ValueError("Kraken response did not identify exactly one requested trading pair")
     pair_key = pair_keys[0]
+    if not isinstance(pair_key, str):
+        raise ValueError("Kraken returned an invalid trading-pair identifier")
     # Kraken may return legacy asset prefixes (for example XXBTZUSD) instead
     # of the request spelling. Validate the returned identity before exposing
     # its candles; never assume the first result key matches the requested pair.
