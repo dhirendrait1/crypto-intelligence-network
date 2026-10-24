@@ -372,3 +372,11 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [ ] Await all four CI workflows on the latest documentation/tracker head before marking this milestone fully verified.
 - **Boundary:** offline/mocked tests only; no live GDELT request or production deployment check performed. PR #8 remains Draft and unmerged.
 
+
+## Cross-provider evidence consistency — news timestamp quality (2026-10-25)
+
+- [x] Added aggregate counts for GDELT provider seen-time states: valid, missing, invalid timezone, invalid, and future-dated.
+- [x] Explicitly states that the headline sentiment aggregate still includes all accepted headlines regardless of timestamp status; timestamp quality must be reviewed before time-sensitive use.
+- [x] Added offline regression coverage for mixed valid, missing, and future-dated provider timestamps.
+- [ ] Verify all CI workflows on the latest head before treating the milestone as complete.
+- **Boundary:** counts describe provider seen/indexing time, not verified original publication time. Offline tests do not verify live GDELT or production behavior. PR #8 remains Draft and unmerged.
