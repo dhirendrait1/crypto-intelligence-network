@@ -158,7 +158,7 @@ def test_non_object_evidence_record_is_retained_as_unverified():
 def test_non_list_evidence_input_does_not_raise_or_claim_complete_coverage():
     result = assess_commodity_asset("PAXG", "not-a-list", now=NOW)
     assert result["input_evidence_list_valid"] is False
-    assert result["overall_status"] == "evidence_unverified_or_incomplete"
+    assert result["overall_status"] == "evidence_invalid_or_incomplete"
     assert result["evidence"] == []
 
 
