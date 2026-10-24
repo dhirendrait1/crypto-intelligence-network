@@ -87,6 +87,7 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Surface mixed evidence statuses as `conflicting` at category/type level; summaries no longer let one supplied `verified` record hide other stale, unavailable, or unverified records. Regression tests added for commodity and growth assessments.
 - [x] Harden assessment input contracts: malformed non-object records are retained as unverified audit rows, non-list input cannot be interpreted as verified coverage, and unknown growth categories are surfaced in counts and prevent a complete overall status.
 - [x] Validate freshness thresholds in commodity and growth assessments; invalid thresholds fall back to the documented 90-day default and are flagged in output.
+- [x] Validate injected assessment clocks: timezone-naive or non-datetime clocks fall back to current UTC and are flagged; future publication timestamps no longer receive a misleading age of zero, and growth rows expose timestamp validation errors.
 - [x] Report duplicate evidence rows and count normalized source/timestamp identities once in category coverage; raw rows remain available for audit and differing statuses still surface as conflicts.
 - [x] Align growth URL validation with commodity validation by rejecting embedded URL credentials; add offline regression tests.
 - [ ] Add source-aware conflict resolution and independent source retrieval; current conflict detection compares supplied statuses and does not establish which source is authoritative.
