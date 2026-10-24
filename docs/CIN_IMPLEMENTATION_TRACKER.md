@@ -414,3 +414,12 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Documented that non-finite derived ratios are returned as null and do not earn points.
 - [ ] Verify all CI workflows on the final commit before marking the milestone fully verified.
 - **Boundary:** no live provider or deployment health is inferred from offline tests. PR #8 remains Draft and unmerged.
+
+## Screening identity and ranking determinism — 2026-10-25
+
+- [x] Discard rows without a non-empty provider asset ID before scoring.
+- [x] Collapse duplicate IDs case-insensitively, preserving the first provider row deterministically.
+- [x] Expose input, invalid-identity, duplicate-ID, and accepted-identity counts in response `data_quality` metadata.
+- [x] Add offline regression tests and document the identity policy and its limitations.
+- [ ] Verify all CI workflows on the final commit before marking the milestone fully verified.
+- **Boundary:** distinct provider IDs may still represent the same real-world asset; no canonical cross-provider identity mapping is claimed. PR #8 remains Draft and unmerged.
