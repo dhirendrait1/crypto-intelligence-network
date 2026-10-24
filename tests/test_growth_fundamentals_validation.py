@@ -136,8 +136,8 @@ class GrowthFundamentalsValidationTests(unittest.TestCase):
 
     def test_raw_whitespace_and_control_characters_in_source_urls_are_rejected(self):
         for url in (
-            "https://example.com/report\\n.evil",
-            "https://example.com/report\\t.evil",
+            "https://example.com/report\n.evil",
+            "https://example.com/report\t.evil",
             "https://example.com/report with-space",
         ):
             result = assess_growth_fundamentals(
