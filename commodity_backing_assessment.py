@@ -175,7 +175,7 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
     }
     source_records = evidence if isinstance(evidence, list) else []
     normalized = [
-        normalize_evidence(item, now=current, max_age_days=max_age_days)
+        normalize_evidence(item, now=now, max_age_days=max_age_days)
         for item in source_records
     ]
     for row in normalized:
