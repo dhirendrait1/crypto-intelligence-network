@@ -24,6 +24,7 @@ except ModuleNotFoundError as exc:
 router = APIRouter(tags=["public-market-candles"])
 BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines"
 KRAKEN_OHLC_URL = "https://api.kraken.com/0/public/OHLC"
+MAX_PROVIDER_RESPONSE_BYTES = 2 * 1024 * 1024
 TIMEFRAMES = {"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M"}
 KRAKEN_INTERVALS = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440, "1w": 10080}
 KRAKEN_SYMBOLS = {"BTC": "XBT"}
@@ -38,7 +39,10 @@ def _request_json(url: str) -> Any:
     with urllib.request.urlopen(request, timeout=15) as response:
         if response.status != 200:
             raise RuntimeError(f"Provider returned HTTP {response.status}")
-        return json.loads(response.read().decode("utf-8"))
+        body = response.read(MAX_PROVIDER_RESPONSE_BYTES + 1)
+        if len(body) > MAX_PROVIDER_RESPONSE_BYTES:
+            raise ValueError("Provider response exceeded the configured size limit")
+        return json.loads(body.decode("utf-8"))
 
 
 def _is_valid_candle(candle: dict[str, Any]) -> bool:
