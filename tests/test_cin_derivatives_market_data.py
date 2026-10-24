@@ -273,8 +273,10 @@ def test_snapshot_reports_missing_open_interest_history_as_unavailable_not_inval
     result = api._snapshot("BTCUSDT")
 
     assert result["timestamp_quality"]["open_interest_history_latest"]["status"] == "unavailable"
-    assert result["data_quality"]["freshness_status"] == "ok"
-    assert result["data_quality"]["freshness_warnings"] == []
+    assert result["data_quality"]["freshness_status"] == "warning"
+    assert result["data_quality"]["freshness_warnings"] == ["open_interest_history_latest"]
+    assert result["data_quality"]["analysis_eligibility"] == "not_recommended"
+    assert "unavailable" in result["data_quality"]["analysis_eligibility_reason"]
 
 def test_snapshot_rejects_crossed_order_book(monkeypatch):
     payloads = [
