@@ -133,6 +133,8 @@ def test_market_analysis_excludes_forming_candle_by_default(monkeypatch):
     assert all(c["close"] != 999.0 for c in seen["candles"])
     assert all(c["volume"] == 12.5 for c in seen["candles"])
     assert response["input"]["volume_included_in_source"] is True
+    assert response["input"]["freshness"]["latest_closed_candle_age_seconds"] is not None
+    assert response["input"]["freshness"]["stale_data_warning"] is None
 
 
 def test_market_analysis_rejects_fewer_than_five_closed_candles(monkeypatch):
