@@ -88,8 +88,8 @@ def _is_http_url(value: Any) -> bool:
         return False
 
 
-def _normalize_provider_timestamp(value: Any) -> tuple[str | None, str]:
-    """Preserve provider time separately from a validated UTC timestamp."""
+def _normalize_provider_timestamp(value: Any, now: datetime | None = None) -> tuple[str | None, str]:
+    """Validate GDELT's seen time; it is not necessarily the article's publication time."""
     if not isinstance(value, str) or not value.strip():
         return None, "missing"
     raw = value.strip()
@@ -100,7 +100,13 @@ def _normalize_provider_timestamp(value: Any) -> tuple[str | None, str]:
             parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
             if parsed.tzinfo is None or parsed.utcoffset() is None:
                 return None, "invalid_timezone"
-        return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"), "valid"
+        parsed_utc = parsed.astimezone(timezone.utc)
+        reference = now or datetime.now(timezone.utc)
+        if reference.tzinfo is None or reference.utcoffset() is None:
+            raise ValueError("Reference time must be timezone-aware")
+        if (parsed_utc - reference.astimezone(timezone.utc)).total_seconds() > 60:
+            return parsed_utc.isoformat().replace("+00:00", "Z"), "future_dated"
+        return parsed_utc.isoformat().replace("+00:00", "Z"), "valid"
     except (TypeError, ValueError, OverflowError):
         return None, "invalid"
 
@@ -159,6 +165,10 @@ def _parse_articles(payload: Any, max_records: int) -> list[dict[str, Any]]:
         articles.append({
             "title": title.strip(),
             "url": url,
+            "provider_seen_at": provider_timestamp,
+            "provider_seen_at_utc": normalized_timestamp,
+            "provider_seen_at_validation_status": timestamp_status,
+            # Backward-compatible aliases; GDELT seendate is not a verified publication timestamp.
             "published_at": provider_timestamp,
             "published_at_utc": normalized_timestamp,
             "published_at_validation_status": timestamp_status,
@@ -197,7 +207,11 @@ def _search(query: str, max_records: int) -> dict[str, Any]:
         "articles": articles,
         "data_quality": {
             "deduplicated_by_url": True,
-            "provider_article_time_preserved_as": "published_at",
+            "provider_article_time_preserved_as": "provider_seen_at",
+            "legacy_timestamp_aliases": {
+                "published_at": "Retained for compatibility; mirrors GDELT seendate and must not be interpreted as a verified publication timestamp."
+            },
+            "future_dated_provider_timestamps_are_flagged": True,
             "limitations": [
                 "Public news search coverage and timestamps depend on GDELT indexing.",
                 "Headline sentiment uses a small transparent keyword lexicon and can miss context, negation, sarcasm, and asset-specific meaning.",
