@@ -586,3 +586,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - This tests the existing fail-closed pair validation; production behavior is unchanged.
 - Test commit: `753031ec49d61a9a161cf3b1c0223068fb5bc5e6`.
 - Awaiting all four GitHub Actions workflows on the latest branch head.
+
+
+## Malformed Kraken payload regression coverage (2026-10-25)
+
+- Added offline tests for non-object payloads, non-object result containers, missing pair rows, non-list candle rows, and provider-declared pair errors.
+- Each malformed/failing fallback response must surface as a sanitized HTTP 503 through CIN's provider loader, without leaking parser details or payload contents.
+- Test commit: `1840cabb0cf17eba0c98ef5b41d501051becdf23`.
+- Awaiting all four CI workflows on the latest branch head.
