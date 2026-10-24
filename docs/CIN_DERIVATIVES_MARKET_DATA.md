@@ -24,3 +24,6 @@ This endpoint is read-only and uses public Binance USDⓈ-M Futures market-data 
 ## Validation boundary
 
 The automated tests mock provider payloads and failure paths. They validate mapping and error handling, not live Binance reachability, live values, regional availability, or production deployment. Live read-only smoke validation remains outstanding until a network-enabled validation environment is available.
+
+- Malformed, non-finite, or non-positive order-book levels are excluded from calculations and their rejected counts are exposed as `order_book.bid_levels_rejected` and `order_book.ask_levels_rejected`; this prevents a partially malformed depth payload from looking indistinguishable from a fully usable book.
+- Empty open-interest history is valid but yields null history-derived notional and change values, and a null latest-history timestamp. No change is inferred when there are no history points.
