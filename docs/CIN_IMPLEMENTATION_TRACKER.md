@@ -212,3 +212,6 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Added regression cases for `https://example.com:notaport/report` and `https://example.com:99999/report` in both assessment test suites.
 - [x] All four workflows passed on revision `5657b19942f44c587fac396f2e375b36468fdf9d`: screening checks (run `40108389592`), technical-analysis tests (run `40108389595`), evidence-ingestion API checks (run `40108389626`), and automated scaffold tests (run `40108389597`). Offline/mocked CI only.
 - **Boundary:** URL syntax validation does not fetch a source, confirm its ownership, or independently verify the underlying evidence claim.
+
+- [x] Follow-up URL syntax audit: commodity backing, growth fundamentals, and GDELT article URLs now reject non-numeric and out-of-range explicit ports by forcing parser port validation; regression cases added to all three test suites. This prevents malformed ports from being accepted as valid source links.
+- **Boundary:** URL parsing still does not fetch articles or verify publisher identity/claim accuracy.
