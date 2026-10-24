@@ -102,3 +102,6 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - **Boundary:** these checks validate API request shape. Evidence publication timestamps remain strings at the request boundary so malformed or unverifiable source metadata can be retained as unverified audit evidence rather than being mistaken for verified claims.
 
 - News endpoint hardening: reject a whitespace-only query after normalization with HTTP 422 before provider access; regression test added.
+
+- [x] Hardened injected assessment clocks in commodity and growth evidence assessment functions: naive/non-datetime clocks are rejected and safely replaced with current UTC; future publication dates return no misleading nonnegative age and growth rows expose timestamp errors. Regression coverage is present in both assessment test suites.
+- [ ] Re-run CI after the latest assessment-clock patch and confirm the run checks the branch's current revision; a prior screening workflow failed with `NameError` in the commodity assessment during an intermediate commit sequence, so the patch is not considered validated until a clean run succeeds.
