@@ -116,6 +116,33 @@ def _valid_candle(row: dict[str, Any]) -> bool:
         return False
 
 
+def _candle_time_consistent(row: dict[str, Any], interval: str) -> bool:
+    """Check candle boundaries where exchange interval semantics are explicit."""
+    try:
+        opened = row["open_time"]
+        closed = row["close_time"]
+        if isinstance(opened, bool) or not isinstance(opened, int):
+            return False
+        if isinstance(closed, bool) or not isinstance(closed, int):
+            return False
+        if interval == "1M":
+            start = datetime.fromtimestamp(opened / 1000, timezone.utc)
+            if start.day != 1 or any((start.hour, start.minute, start.second, start.microsecond)):
+                return False
+            return closed == opened + _interval_duration_ms("1M", opened) - 1
+        duration = _INTERVAL_MS[interval]
+        if closed != opened + duration - 1:
+            return False
+        if interval == "1w":
+            start = datetime.fromtimestamp(opened / 1000, timezone.utc)
+            return start.weekday() == 0 and start.hour == start.minute == start.second == start.microsecond == 0
+        if interval == "3d":
+            # Provider-specific 3-day anchoring is not inferred from epoch modulo.
+            return True
+        return opened % duration == 0
+    except (KeyError, TypeError, ValueError, OverflowError, OSError):
+        return False
+
 def _clean_candles(candles: list[dict[str, Any]], provider: str) -> list[dict[str, Any]]:
     """Keep valid, unique candles; reject conflicting evidence for one open time."""
     by_open_time: dict[int, dict[str, Any]] = {}
@@ -165,6 +192,9 @@ def _fetch_binance(symbol: str, interval: str, limit: int) -> list[dict[str, Any
         except (TypeError, ValueError, OverflowError):
             continue
     cleaned = _clean_candles(candles, "Binance")
+    cleaned = [row for row in cleaned if _candle_time_consistent(row, interval)]
+    if not cleaned:
+        raise ValueError("Binance returned no candles with consistent interval boundaries")
     if len(cleaned) > limit:
         raise ValueError("Binance returned more candles than the requested limit")
     return cleaned
@@ -253,6 +283,9 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
         except (TypeError, ValueError, OverflowError):
             continue
     cleaned = _clean_candles(candles, "Kraken")
+    cleaned = [row for row in cleaned if _candle_time_consistent(row, interval)]
+    if not cleaned:
+        raise ValueError("Kraken returned no candles with consistent interval boundaries")
     return cleaned[-limit:]
 
 
