@@ -106,12 +106,18 @@ for marker, registration in registrations:
         main_text = main_text.rstrip() + registration
     registrations_added += 1
 
+# Preflight branding metadata across the full app before writing any scaffold file.
+branding_files = list(APP_DIR.rglob("*.py"))
+branding_text = {path: path.read_text(encoding="utf-8") for path in branding_files}
+if not any(OLD in content or NEW in content for content in branding_text.values()):
+    raise SystemExit("Could not find a CIN application title to validate")
+
 main_path.write_text(main_text, encoding="utf-8")
 
 changed = 0
 found = False
-for path in APP_DIR.rglob("*.py"):
-    text = path.read_text(encoding="utf-8")
+for path in branding_files:
+    text = branding_text[path]
     if OLD in text:
         text = text.replace(OLD, NEW)
         path.write_text(text, encoding="utf-8")
@@ -120,8 +126,7 @@ for path in APP_DIR.rglob("*.py"):
     if NEW in text:
         found = True
 
-if not found:
-    raise SystemExit("Could not find a CIN application title to validate")
+# The branding preflight above guarantees a title was present before mutation.
 
 for module_name in MODULES:
     shutil.copyfile(ROOT / module_name, APP_DIR / module_name)
