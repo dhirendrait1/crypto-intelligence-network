@@ -79,6 +79,12 @@ class EvidenceIngestionTests(unittest.TestCase):
             fetch_github_repository_evidence()
 
     @patch("cin_evidence_ingestion.urlopen")
+    def test_non_200_response_status_is_rejected(self, mocked):
+        mocked.return_value = FakeRawResponse(b'{"full_name":"ethereum/go-ethereum"}', status=503)
+        with self.assertRaisesRegex(EvidenceSourceError, "HTTP 503"):
+            fetch_github_repository_evidence()
+
+    @patch("cin_evidence_ingestion.urlopen")
     def test_http_error_is_reported_as_source_error(self, mocked):
         mocked.side_effect = HTTPError(
             "https://api.github.com/repos/ethereum/go-ethereum",
