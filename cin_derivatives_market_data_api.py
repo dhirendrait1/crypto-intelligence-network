@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import math
-import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -121,7 +120,8 @@ def _snapshot(symbol: str) -> dict[str, Any]:
         },
         "order_book": {
             "source": "Binance USDⓈ-M Futures public depth endpoint",
-            "levels_per_side_returned": min(len(bids), len(asks)),
+            "valid_bid_levels": len(bids),
+            "valid_ask_levels": len(asks),
             "best_bid": best_bid,
             "best_ask": best_ask,
             "spread": round(best_ask - best_bid, 10),
