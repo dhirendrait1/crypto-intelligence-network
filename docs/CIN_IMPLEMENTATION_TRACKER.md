@@ -488,3 +488,11 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - Kraken candle rows are now validated and cleaned before applying the requested result limit. Malformed trailing rows no longer displace earlier valid candles from the response window.
 - Added offline regression coverage with six valid rows followed by a malformed row and a requested limit of five.
 - Code commit: `93235086ed413a411ac7ce5627f5b0a1afdce703`; test commit: `ad8222b7e2b4b178b2d4c86e405402cf3ec11a38`. CI validation for the latest tracker commit is pending.
+
+
+## Master roadmap reference (2026-10-25)
+
+- Created `docs/CIN_MASTER_ROADMAP.md` as the numbered delivery baseline: **7 stages / 35 steps**.
+- It distinguishes implemented/offline-tested work from partial acceptance work, pending capabilities, and release-blocked steps.
+- This count is a working baseline, not a guarantee that no future requirements will be added. Do not calculate a single completion percentage from mixed-status steps.
+- The roadmap creation commit is `9f42395b1775cd5bd1add8f9dd4a8afa275b2fa8`. CI on the new roadmap/tracker head must be checked before treating the documentation milestone as verified.
