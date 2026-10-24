@@ -174,3 +174,9 @@ def test_valid_http_url_and_timestamp_metadata_remain_accepted():
     assert result["status"] == "verified"
     assert result["source_url_valid"] is True
     assert result["timestamp_validation_errors"] == []
+
+
+def test_direct_normalization_rejects_invalid_assessment_clock_safely():
+    result = normalize_evidence(valid_item(), now="not-a-datetime")
+    assert result["assessment_clock_valid"] is False
+    assert result["status"] in {"verified", "unverified"}
