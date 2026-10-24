@@ -112,3 +112,10 @@ All four configured workflows passed on code/documentation checkpoint `2c1f816d5
 - Regression coverage includes leap-year February, common-year February, 30/31-day months, December year rollover, and the derived freshness threshold.
 - Code: `5259bc9500068d577cba6bc617b9083ae92fdbc3`; tests: `b4d55897b08dc788e848b9273e4277dc31550702`; tracker: `59c421c11aad40c85ecf6263a8e70a76bdf102f9`.
 - Latest-head CI is not yet verified. Open-time alignment, close-time consistency, live-provider behavior, and deployment checks remain unfinished.
+
+## Candle boundary validation increment (2026-10-25)
+
+- Binance candle boundary validation now checks close-time consistency, weekly Monday UTC anchoring, and monthly calendar boundaries; deterministic regression tests were added.
+- Fixed-interval epoch alignment is not assumed without provider-specific evidence, 3-day anchoring remains provider-specific, and Kraken enforcement is deferred pending a compatibility pass.
+- Code commits: `56b9578bba9df3b77168acf7051445ec924bfb15`, `0cb4e6efb60f4228142ceca005279afca54f3f39`; tests: `46e14b24f6c1ad98bb567bb4967242b41dd29f73`; tracker: `fd0f9c1b93c8f431ef679dc455df7d5e9b943366`.
+- Latest-head CI is pending; live-provider and deployment checks remain outstanding.
