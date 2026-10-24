@@ -320,6 +320,16 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Fewer than 5 completed candles", ctx.exception.detail)
 
 
+    async def test_monthly_freshness_limitations_match_calendar_aware_implementation(self):
+        with patch.object(api, "_load", return_value=[dict(row) for row in SAMPLE]):
+            candles = await api.get_market_candles("BTCUSDT", "1M", 50)
+            analysis = await api.analyze_public_market("BTCUSDT", "1M", 50)
+
+        for limitations in (candles["limitations"], analysis["limitations"]):
+            joined = " ".join(limitations)
+            self.assertIn("monthly intervals use calendar-month duration", joined)
+            self.assertNotIn("31-day approximation", joined)
+
     async def test_candle_endpoint_marks_forming_rows_and_warns_when_no_closed_candle_exists(self):
         import time
         rows = [dict(row) for row in SAMPLE[:5]]
