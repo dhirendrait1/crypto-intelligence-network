@@ -389,3 +389,11 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - **Boundary:** this validates duplicate consistency within one provider response. It does not compare Binance and Kraken simultaneously or verify live exchange data. PR #8 remains Draft and unmerged.
 
 - **Regression adjustment:** the existing market-candle safety test had intentionally used conflicting same-timestamp rows and expected silent last-row-wins behavior. Updated it to test exact duplicate collapse; the new dedicated test asserts conflicting evidence is rejected. The initial automated workflow failure on the intermediate docs commit exposed this stale expectation; latest-head CI is the verification gate.
+
+## Derivatives evidence completeness — unavailable history (2026-10-25)
+
+- [x] Empty open-interest history is now surfaced as a freshness warning rather than leaving the snapshot marked `ok`.
+- [x] Added `data_quality.analysis_eligibility` and an explanatory reason: `not_recommended` when timestamp evidence is stale, future-dated, invalid, or unavailable; the endpoint remains readable for inspection.
+- [x] Updated regression coverage and derivatives endpoint documentation.
+- [ ] Verify all CI workflows on latest head before marking the milestone verified.
+- **Boundary:** this is a consumer-facing quality warning, not a live-provider guarantee. Missing history-derived metrics remain null. PR #8 remains Draft and unmerged; no deployment performed.
