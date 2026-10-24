@@ -66,5 +66,62 @@ class EvidenceIngestionTests(unittest.TestCase):
             fetch_github_repository_evidence()
 
 
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_non_string_repository_identity_is_controlled_source_error(self, mocked):
+        mocked.return_value = FakeResponse({"full_name": None})
+        with self.assertRaisesRegex(EvidenceSourceError, "did not match"):
+            fetch_github_repository_evidence()
+
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_non_object_json_payload_is_controlled_source_error(self, mocked):
+        mocked.return_value = FakeResponse(["not", "an", "object"])
+        with self.assertRaisesRegex(EvidenceSourceError, "JSON object"):
+            fetch_github_repository_evidence()
+
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_negative_or_boolean_counter_is_rejected(self, mocked):
+        mocked.return_value = FakeResponse({
+            "full_name": "ethereum/go-ethereum",
+            "default_branch": "master",
+            "pushed_at": "2026-10-20T10:00:00Z",
+            "updated_at": "2026-10-21T10:00:00Z",
+            "stargazers_count": True,
+            "forks_count": 20,
+            "open_issues_count": -1,
+            "archived": False,
+        })
+        with self.assertRaisesRegex(EvidenceSourceError, "stargazers_count"):
+            fetch_github_repository_evidence()
+
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_malformed_or_timezone_naive_timestamp_is_rejected(self, mocked):
+        base = {
+            "full_name": "ethereum/go-ethereum",
+            "default_branch": "master",
+            "pushed_at": "not-a-timestamp",
+            "updated_at": "2026-10-21T10:00:00",
+            "stargazers_count": 50,
+            "forks_count": 20,
+            "open_issues_count": 1,
+            "archived": False,
+        }
+        mocked.return_value = FakeResponse(base)
+        with self.assertRaisesRegex(EvidenceSourceError, "pushed_at"):
+            fetch_github_repository_evidence()
+
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_missing_optional_metadata_is_reported_as_partial(self, mocked):
+        mocked.return_value = FakeResponse({
+            "full_name": "ethereum/go-ethereum",
+            "default_branch": "master",
+            "pushed_at": "2026-10-20T10:00:00Z",
+            "updated_at": "2026-10-21T10:00:00Z",
+            "archived": False,
+        })
+        result = fetch_github_repository_evidence()
+        self.assertEqual(result["validation_status"], "metadata_partial")
+        self.assertIn("stargazers_count", result["missing_fields"])
+
+
 if __name__ == "__main__":
     unittest.main()
