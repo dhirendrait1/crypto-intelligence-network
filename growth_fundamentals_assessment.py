@@ -98,11 +98,14 @@ def assess_growth_fundamentals(
     coverage = {}
     for category, description in CATEGORIES.items():
         rows = [row for row in normalized if row["category"] == category]
-        if any(row["status"] == "verified" for row in rows):
+        distinct_statuses = {row["status"] for row in rows}
+        if len(distinct_statuses) > 1:
+            status = "conflicting"
+        elif distinct_statuses == {"verified"}:
             status = "verified"
-        elif any(row["status"] == "stale" for row in rows):
+        elif distinct_statuses == {"stale"}:
             status = "stale"
-        elif any(row["status"] == "unavailable" for row in rows):
+        elif distinct_statuses == {"unavailable"}:
             status = "unavailable"
         else:
             status = "unverified"
@@ -110,11 +113,14 @@ def assess_growth_fundamentals(
             "description": description,
             "status": status,
             "evidence_count": len(rows),
+            "conflict_detected": status == "conflicting",
         }
 
     verified_count = sum(1 for item in coverage.values() if item["status"] == "verified")
     coverage_score = round(100 * verified_count / len(CATEGORIES))
-    if verified_count == len(CATEGORIES):
+    if any(item["status"] == "conflicting" for item in coverage.values()):
+        overall = "evidence_conflicting_or_incomplete"
+    elif verified_count == len(CATEGORIES):
         overall = "evidence_coverage_complete"
     elif any(item["status"] == "stale" for item in coverage.values()):
         overall = "evidence_stale_or_incomplete"
