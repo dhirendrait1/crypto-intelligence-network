@@ -94,10 +94,31 @@ registrations = [
         "app.include_router(cin_public_market_candles_router)\n",
     ),
 ]
+# Insert registrations before a direct-execution guard so routes are ready
+# even when the module is run as a script, not only imported by Uvicorn.
+main_guard = 'if __name__ == "__main__":'
 for marker, registration in registrations:
-    if marker not in main_text:
+    lines = [line for line in registration.splitlines() if line.strip()]
+    import_line = next((line for line in lines if line.startswith("from app.")), None)
+    include_line = next((line for line in lines if line.startswith("app.include_router(")), None)
+    if import_line is None or include_line is None:
+        raise SystemExit(f"Invalid router registration definition for {marker}")
+
+    has_import = import_line in main_text
+    has_include = include_line in main_text
+    if has_import and has_include:
+        continue
+    if marker in main_text or has_import or has_include:
+        raise SystemExit(
+            f"Partial router registration detected for {marker}; refusing to patch ambiguously"
+        )
+
+    if main_guard in main_text:
+        main_text = main_text.replace(main_guard, registration + "\\n" + main_guard, 1)
+    else:
         main_text = main_text.rstrip() + registration
-        changed += 1
+    changed += 1
+
 main_path.write_text(main_text, encoding="utf-8")
 
 print(f"CIN metadata verified; read-only market data, screening, assessment, evidence, and technical-analysis and public market-candle routers installed; files updated: {changed}")
