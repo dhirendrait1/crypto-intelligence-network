@@ -83,6 +83,28 @@ The following are not marked complete until code and evidence are inspected:
 - Security, rate limits, observability, error-path tests, reproducible builds and end-to-end validation.
 - Final deployment smoke test and rollback plan, only after explicit deployment authorization.
 
+
+## Findings from source inspection
+
+- **Market data**: the Step 1 adapter calls CoinGecko's public `/coins/markets` endpoint. Rate-limit, outage, and freshness behavior must be checked against its full implementation and tests.
+- **Coin screening**: the screening module uses CoinGecko market data and conservative symbol/name heuristics for some asset-type labels. Its own source comments say the taxonomy is not canonical or independently verified. Screening output must preserve that caveat.
+- **Commodity backing assessment**: the API accepts caller-supplied evidence metadata. It does not fetch reserve reports or independently verify custody, solvency, or redemption rights.
+- **Growth fundamentals**: the API accepts caller-supplied evidence metadata. Coverage scores are not a substitute for source ingestion or independently verified fundamentals.
+- **Evidence ingestion**: the first public connector is limited to an allowlist of three Ethereum-related public GitHub repositories and supports ETH only through the API. This is not yet a general-purpose news, social, whale, exchange-flow, or derivatives ingestion system.
+- **Technical analysis**: the caller-supplied OHLC API is deterministic and does not fetch market data itself. The market-backed endpoint is a separate adapter.
+- **Derivatives, order-book depth, exchange flows, whale attribution, news/social sentiment, alerts, and forecast outcome tracking**: no corresponding complete, independently verified end-to-end capability has been established by the source inventory inspected so far. Treat these as **not yet verified complete**, not as shipped features.
+
+## Practical completion rule
+
+For each planned capability, evidence must include:
+1. an implementation path and documented data contract;
+2. tests for normal, missing, stale, malformed, and provider-failure cases;
+3. source provenance and timestamps in outputs;
+4. an explicit unsupported/missing state instead of a fabricated value;
+5. confirmation that the running environment serves that exact code revision.
+
+Until those criteria are met, the feature remains partial or unverified.
+
 ## Completion accounting
 
 No defensible exact “X complete / Y remaining” count is published here yet. The full numbered roadmap has not been reconciled line-by-line against every source file and live endpoint, and some roadmap requirements may be specifications rather than code. Counting router registrations or passing test files as fully completed modules would overstate progress.
