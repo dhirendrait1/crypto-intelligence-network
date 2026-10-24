@@ -236,3 +236,11 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Added a regression case for a duplicate article URL with uppercase hostname, default HTTPS port, trailing slash, and fragment.
 - [x] All four workflows passed on code/test revision `60b85f65f93f9d8d17cfb7650c20a61b73675c0f`: screening checks (run `40109111387`), CIN Automated Tests (run `40109111425`), Technical Analysis Tests (run `40109111492`), and evidence-ingestion API checks (run `40109111444`).
 - **Boundary:** URL normalization reduces duplicate entries but does not prove two publishers' content is equivalent or establish article accuracy.
+
+## Evidence identity canonicalization follow-up (2026-10-24)
+
+- [x] Corrected commodity and growth evidence deduplication so URL identity normalizes scheme/hostname case, default ports, fragments, and trailing slashes without lowercasing case-sensitive paths or query strings.
+- [x] Normalize parseable timezone-aware publication/review timestamps to UTC identity, so equivalent instants with different offsets deduplicate consistently.
+- [x] Invalid/credential-bearing URLs retain their literal identity rather than being canonicalized into a valid URL's identity; IPv6 hosts remain bracketed when canonicalized.
+- [x] Added offline regressions for host case/default port/fragment/trailing slash/timezone-offset equivalence and for distinct case-sensitive paths.
+- **Validation status:** workflow results for the final code/test revision are pending. Tests are offline/mocked and do not independently verify evidence claims or source contents.
