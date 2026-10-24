@@ -155,6 +155,13 @@ def test_invalid_freshness_threshold_falls_back_safely():
     assert result["freshness_threshold_days"] == 90
 
 
+def test_boolean_and_float_freshness_thresholds_are_not_accepted_as_integers():
+    for threshold in (True, 90.0):
+        result = assess_commodity_asset("PAXG", [valid_item()], now=NOW, max_age_days=threshold)
+        assert result["freshness_threshold_valid"] is False
+        assert result["freshness_threshold_days"] == 90
+
+
 def test_future_publication_has_no_nonnegative_age_claim():
     result = normalize_evidence(
         valid_item(published_at="2026-10-25T00:00:00Z", checked_at="2026-10-25T01:00:00Z"),
