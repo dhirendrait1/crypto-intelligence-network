@@ -157,3 +157,11 @@ def test_derivatives_route_documents_strict_alphanumeric_symbol_contract():
     assert symbol["schema"]["pattern"] == r"^[A-Za-z0-9]+\z"
     assert symbol["schema"]["minLength"] == 5
     assert symbol["schema"]["maxLength"] == 20
+
+
+
+def test_derivatives_route_rejects_symbol_with_trailing_newline():
+    with pytest.raises(HTTPException) as caught:
+        asyncio.run(api.derivatives_market_snapshot(symbol="BTCUSDT\n"))
+    assert caught.value.status_code == 400
+    assert caught.value.detail["error"] == "invalid_symbol"
