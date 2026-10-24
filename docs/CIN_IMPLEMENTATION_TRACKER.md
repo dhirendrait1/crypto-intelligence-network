@@ -461,3 +461,5 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - Added offline regression tests for mismatched pair identity and ambiguous multi-pair responses; existing BTC/USD and BTC/USDT response-key cases remain covered.
 - Latest code commit: `f32a651380958c40e7adfdfc109e318e8891707f`; test commit: `91b4d8cf82cc98af57e59b2b770c43aacbbea95f`. CI validation on the updated head is pending.
 - Boundary: mocked tests do not verify live Kraken pair aliases or quote-currency support. PR #8 remains Draft and unmerged.
+
+- Follow-up regression coverage: explicitly rejects a Kraken BTC/USD result when the requested symbol is BTC/USDT, preventing quote-currency substitution even when the base asset matches (test commit `7a821b28c3e4ba95681df235c82ccd73f1bfeb94`). Latest-head CI is pending.
