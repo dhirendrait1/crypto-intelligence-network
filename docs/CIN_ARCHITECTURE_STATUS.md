@@ -130,7 +130,7 @@ The next audit should create one row per numbered roadmap requirement with colum
 The isolated feature branch hardens `commodity_backing_assessment.py`:
 
 - Evidence URLs must be absolute HTTP(S) URLs with a hostname; scheme-only values and URLs containing embedded credentials are rejected for supplied `verified` records.
-- Review timestamps earlier than publication are downgraded to `unverified`; future publication timestamps remain a known gap in `growth_fundamentals_assessment.py` and must not be described as handled until code and regression tests are updated.
+- Review timestamps earlier than publication are downgraded to `unverified`; future publication timestamps on supplied `verified` growth-fundamentals records are now also downgraded to `unverified`, with regression coverage. These checks validate metadata chronology only, not source claims.
 - Outputs include `source_url_valid` and `timestamp_validation_errors` to make the validation result inspectable.
 - Regression tests cover these edge cases and a valid HTTP URL.
 
@@ -139,7 +139,7 @@ This is validation of caller-supplied metadata, not independent source retrieval
 
 ## Growth fundamentals evidence audit — 2026-10-24
 
-The growth fundamentals assessment score is explicitly an evidence-coverage indicator, not a project-quality score or investment recommendation. The assessment accepts caller-supplied metadata and does not fetch source documents or independently verify claims. URL validation now requires a parsed absolute HTTP(S) URL with a hostname; regression tests cover scheme-only URLs, missing hostnames, and a valid HTTP URL. All four GitHub Actions workflows passed on commit `31f8ad04051e15ef028d85ee58f0dd79e2826b9f` (offline tests only). Future publication timestamps are still a known validation gap; do not interpret this audit as complete or as independent fundamentals verification.
+The growth fundamentals assessment score is explicitly an evidence-coverage indicator, not a project-quality score or investment recommendation. The assessment accepts caller-supplied metadata and does not fetch source documents or independently verify claims. URL validation now requires a parsed absolute HTTP(S) URL with a hostname; regression tests cover scheme-only URLs, missing hostnames, and a valid HTTP URL. All four GitHub Actions workflows passed on commit `31f8ad04051e15ef028d85ee58f0dd79e2826b9f` (offline tests only). Future publication timestamps on supplied `verified` records are now downgraded to `unverified` with a regression test. This remains caller-supplied metadata validation, not independent fundamentals verification.
 
 ## Public evidence ingestion freshness policy — 2026-10-24
 
