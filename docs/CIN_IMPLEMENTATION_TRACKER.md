@@ -405,3 +405,12 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Documented the distinction between response-level cache age, provider timestamp age, and analysis eligibility.
 - [ ] Verify all latest-head CI workflows before marking this milestone fully verified.
 - **Boundary:** this is offline regression coverage; it does not verify live CoinGecko/CoinPaprika behavior or deployed service health. PR #8 remains Draft and unmerged.
+
+## Screening numeric evidence and arithmetic safety — 2026-10-25
+
+- [x] Negative market-cap, volume, FDV, and supply magnitudes are treated as missing evidence.
+- [x] Added finite-result guards for volume/market-cap, FDV-gap, and circulating-supply ratios.
+- [x] Added offline regression coverage for negative metrics and extreme finite values that overflow ratios.
+- [x] Documented that non-finite derived ratios are returned as null and do not earn points.
+- [ ] Verify all CI workflows on the final commit before marking the milestone fully verified.
+- **Boundary:** no live provider or deployment health is inferred from offline tests. PR #8 remains Draft and unmerged.
