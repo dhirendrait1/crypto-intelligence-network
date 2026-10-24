@@ -176,3 +176,10 @@ async def news_sentiment(
             "provider": "GDELT DOC 2.0",
             "error": "invalid_response",
         }) from exc
+    except Exception as exc:
+        # Keep unforeseen provider/parser failures inside the controlled API contract.
+        raise HTTPException(status_code=502, detail={
+            "message": "Public news provider response was invalid.",
+            "provider": "GDELT DOC 2.0",
+            "error": "invalid_response",
+        }) from exc
