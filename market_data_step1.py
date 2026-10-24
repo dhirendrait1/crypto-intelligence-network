@@ -79,6 +79,7 @@ def _fetch_market_data(ids: list[str], vs_currency: str) -> list[dict[str, Any]]
 
     normalized = []
     requested_ids = set(ids)
+    seen_ids: set[str] = set()
     for coin in payload:
         if not isinstance(coin, dict):
             continue
@@ -86,8 +87,9 @@ def _fetch_market_data(ids: list[str], vs_currency: str) -> list[dict[str, Any]]
         if not isinstance(coin_id, str) or not coin_id or len(coin_id) > 100 or coin_id not in requested_ids:
             continue
         price = coin.get("current_price")
-        if not _finite_number(price, minimum=0):
+        if not _finite_number(price, minimum=0) or coin_id in seen_ids:
             continue
+        seen_ids.add(coin_id)
         warnings = []
         symbol = coin.get("symbol")
         if not isinstance(symbol, str) or not symbol.strip() or len(symbol) > 32 or any(ord(char) < 32 or ord(char) == 127 for char in symbol):
