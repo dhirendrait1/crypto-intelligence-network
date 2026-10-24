@@ -146,3 +146,11 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Added regression tests for newline, tab, and raw-space URL inputs; growth assessments now expose explicit `source_url_valid` metadata for audit consistency.
 - [x] All four workflows passed on final code/test commit `bdfce86b7608b2207693b50d59aeccf92796794c` (automated tests, screening checks, technical-analysis tests, evidence-ingestion API checks). An intermediate test-string escaping issue was corrected before this successful run.
 - **Boundary:** syntactic URL validation does not fetch the URL, verify source ownership, or certify evidence claims.
+
+
+## Public evidence ingestion request validation (2026-10-24)
+
+- [x] Added explicit symbol and repository-path format constraints to the public evidence ingestion request model; unsupported but well-formed symbols still receive the existing controlled API error, while malformed shapes fail request validation.
+- [x] Added offline tests for whitespace/separator-bearing symbols and malformed repository paths.
+- [ ] Confirm all four workflows on the request-validation revision before marking the batch complete.
+- **Boundary:** the repository allowlist remains authoritative; syntactic path validation does not permit arbitrary repository fetches.
