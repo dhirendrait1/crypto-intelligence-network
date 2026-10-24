@@ -254,3 +254,11 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Updated the pre-existing non-list-input regression expectation to match the stricter `evidence_invalid_or_incomplete` result; fix commit `5773934e0d5937cd1b2fa8e78de41ce1e11db398`.
 - [x] All four workflows passed on corrected code/test commit `5773934e0d5937cd1b2fa8e78de41ce1e11db398`: Technical Analysis Tests (run `40110294522`), evidence-ingestion API checks (`40110294507`), screening checks (`40110294532`), and CIN Automated Tests (`40110294558`). The prior run exposed a stale assertion; that expectation was corrected before this passing run.
 - **Boundary:** all checks are offline/mocked; no merge or production deployment was performed.
+
+## Strict identifier end-anchor follow-up (2026-10-24)
+
+- [x] Replaced end-of-line anchors with absolute end-of-input anchors in the commodity backing, growth fundamentals, public evidence ingestion, public candle, and derivatives request schemas. This closes the final-newline edge case where a regex end-of-line anchor may match before a trailing newline.
+- [x] Added regressions for trailing newlines in commodity/growth symbols and public evidence repository paths; updated OpenAPI pattern assertions for public candles and derivatives.
+- [ ] Confirm the four repository CI workflows pass on the final code/test revision before considering this batch complete.
+- **Boundary:** identifier validation only checks request syntax; it does not establish whether a market pair is listed or whether submitted evidence is authentic.
+
