@@ -8,6 +8,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -61,6 +62,24 @@ def _headline_sentiment(title: str) -> dict[str, Any]:
     }
 
 
+def _is_http_url(value: Any) -> bool:
+    """Accept absolute HTTP(S) URLs with a hostname and no embedded credentials."""
+    if not isinstance(value, str) or not value or any(
+        char.isspace() or ord(char) < 32 for char in value
+    ):
+        return False
+    try:
+        parsed = urlsplit(value)
+        return (
+            parsed.scheme.lower() in {"http", "https"}
+            and bool(parsed.hostname)
+            and parsed.username is None
+            and parsed.password is None
+        )
+    except ValueError:
+        return False
+
+
 def _parse_articles(payload: Any, max_records: int) -> list[dict[str, Any]]:
     if not isinstance(payload, dict) or not isinstance(payload.get("articles"), list):
         raise ValueError("Unexpected GDELT article-search response")
@@ -71,7 +90,7 @@ def _parse_articles(payload: Any, max_records: int) -> list[dict[str, Any]]:
             continue
         title = row.get("title")
         url = row.get("url")
-        if not isinstance(title, str) or not title.strip() or not isinstance(url, str) or not url.startswith(("https://", "http://")):
+        if not isinstance(title, str) or not title.strip() or not _is_http_url(url):
             continue
         if url in seen:
             continue
