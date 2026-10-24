@@ -174,6 +174,7 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 
 - [x] Reject unknown top-level fields and nested evidence fields in commodity-backed and growth-fundamentals assessment requests.
 - [x] Reject unknown fields in public evidence ingestion requests instead of silently ignoring misspellings or unsupported keys.
+- [x] Follow-up API-boundary audit: test strict freshness-threshold validation against floats, numeric strings, booleans, negative values, and out-of-range values across commodity and growth request models. All four workflows passed on test commit `f330510cc6a4db7ac948a487dc857979c3ac5eec` (runs `40106537667`, `40106537653`, `40106537650`, `40106537648`). Offline/mocked CI only.
 - [x] Add offline regression tests for unknown fields at each API boundary.
 - [x] All four workflows passed on test commit `da7d1fd2b0b1928fdc90f6396ce3c02e10d70ed7`: CIN Automated Tests, screening checks, technical-analysis tests, and evidence-ingestion API checks.
 - **Boundary:** these checks validate request shape only. They do not authenticate submitters, fetch caller-provided evidence URLs, or independently verify claims. CI is offline/mocked and does not certify live providers or production deployment.
