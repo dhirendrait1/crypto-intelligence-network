@@ -144,8 +144,11 @@ def _fetch_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]
         return cached[1], "cache", 0
     try:
         rows = _request_markets(vs_currency, per_page)
+        fetched_at = time.time()
+        for row in rows:
+            row["_cin_retrieved_at"] = fetched_at
         with _CACHE_LOCK:
-            _CACHE[key] = (time.time(), rows)
+            _CACHE[key] = (fetched_at, rows)
         return rows, "live", 0
     except urllib.error.HTTPError as exc:
         if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
@@ -198,6 +201,9 @@ def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict
                 "price_change_percentage_24h": quote.get("percent_change_24h"),
                 "last_updated": row.get("last_updated"), "_cin_provider": "CoinPaprika",
             })
+        fetched_at = time.time()
+        for row in mapped:
+            row["_cin_retrieved_at"] = fetched_at
         scanned = len(mapped)
         matches = [row for row in mapped if _asset_type(row)[0] == "commodity_backed"]
         matches.sort(key=lambda item: item.get("market_cap") or 0, reverse=True)
@@ -331,6 +337,10 @@ def _score(coin: dict[str, Any]) -> dict[str, Any]:
         "reasons": reasons,
         "warnings": warnings,
         "last_updated": coin.get("last_updated"),
+        "provider_retrieved_at": (
+            datetime.fromtimestamp(coin["_cin_retrieved_at"], timezone.utc).isoformat()
+            if isinstance(coin.get("_cin_retrieved_at"), (int, float)) else None
+        ),
     }
 
 
@@ -383,6 +393,10 @@ async def coin_screening(
         "provider_error_code": provider_error_code or None,
         "methodology": "Preliminary transparent heuristic; not financial advice or a safety rating",
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
+        "cache_age_seconds": (
+            max(0, int(time.time() - raw[0]["_cin_retrieved_at"]))
+            if raw and isinstance(raw[0].get("_cin_retrieved_at"), (int, float)) else None
+        ),
         "currency": currency.upper(),
         "count": len(results),
         "parameters": {"per_page": per_page, "min_score": min_score, "asset_type": asset_type},
