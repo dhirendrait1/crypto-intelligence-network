@@ -550,3 +550,5 @@ This checkpoint validates configured offline automation only. It does not establ
 - Added deterministic tests for rejection beyond the tolerance and acceptance at the tolerance boundary.
 - Code: `8b7e415d0f910078731ee1c68762d85ede6bf509`; tests: `23da189d12018e73b114fba18a58c5a8c9ad857b`.
 - Latest-head CI is pending. Live-provider and deployment checks remain outstanding.
+
+- Follow-up integration regression: Binance parser now has an end-to-end test proving a materially future-dated candle is filtered while a valid candle remains. Test commit: `d6b4797b57ad161b1632884f26e124246fb37a15`; CI pending.
