@@ -190,7 +190,7 @@ def _validate(symbol: str, interval: str, limit: int) -> str:
 
 @router.get("/market-candles")
 async def get_market_candles(
-    symbol: str = Query(default="BTCUSDT", min_length=5, max_length=20, pattern="^[A-Za-z0-9]+$"),
+    symbol: str = Query(default="BTCUSDT", min_length=5, max_length=20, pattern=r"^[A-Za-z0-9]+\z"),
     interval: str = Query(default="1h"),
     limit: int = Query(default=100, ge=5, le=500),
 ) -> dict[str, Any]:
