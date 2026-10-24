@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlsplit
 
 CATEGORIES = {
     "usage_and_adoption": "On-chain users, transactions, retention, or adoption",
@@ -28,9 +29,70 @@ def _parse_date(value: Any) -> datetime | None:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
     return parsed.astimezone(timezone.utc)
+
+
+
+
+def _assessment_clock(now: Any) -> tuple[datetime, bool]:
+    """Return a timezone-aware UTC clock and whether the caller supplied a valid one."""
+    if now is None:
+        return datetime.now(timezone.utc), True
+    if not isinstance(now, datetime) or now.tzinfo is None:
+        return datetime.now(timezone.utc), False
+    try:
+        if now.utcoffset() is None:
+            return datetime.now(timezone.utc), False
+        return now.astimezone(timezone.utc), True
+    except (OverflowError, TypeError, ValueError):
+        return datetime.now(timezone.utc), False
+
+def _is_http_url(value: Any) -> bool:
+    if not isinstance(value, str) or any(
+        char.isspace() or ord(char) < 32 or ord(char) == 127 for char in value
+    ):
+        return False
+    try:
+        parsed = urlsplit(value.strip())
+        # Accessing .port validates that a supplied port is numeric and in range.
+        parsed.port
+        return (
+            parsed.scheme.lower() in {"http", "https"}
+            and bool(parsed.hostname)
+            and parsed.username is None
+            and parsed.password is None
+        )
+    except ValueError:
+        return False
+
+def _canonical_source_url(value: Any) -> str:
+    """Normalize URL identity without changing case-sensitive path/query content."""
+    if not isinstance(value, str):
+        return ""
+    if not _is_http_url(value):
+        return value.strip()
+    try:
+        parsed = urlsplit(value.strip())
+        scheme = parsed.scheme.lower()
+        port = parsed.port
+        hostname = parsed.hostname.lower()
+        host = f"[{hostname}]" if ":" in hostname else hostname
+        if port is not None and not (
+            (scheme == "https" and port == 443)
+            or (scheme == "http" and port == 80)
+        ):
+            host = f"{host}:{port}"
+        path = parsed.path.rstrip("/") or "/"
+        return scheme + "://" + host + path + (f"?{parsed.query}" if parsed.query else "")
+    except ValueError:
+        return value.strip()
+
+
+def _timestamp_identity(value: Any) -> str | None:
+    parsed = _parse_date(value)
+    return parsed.isoformat() if parsed is not None else None
 
 
 def assess_growth_fundamentals(
@@ -41,13 +103,29 @@ def assess_growth_fundamentals(
     max_age_days: int = 90,
 ) -> dict[str, Any]:
     """Assess evidence coverage across growth fundamentals; never infer missing facts."""
-    current = now or datetime.now(timezone.utc)
-    if current.tzinfo is None:
-        current = current.replace(tzinfo=timezone.utc)
-    current = current.astimezone(timezone.utc)
+    threshold_valid = isinstance(max_age_days, int) and not isinstance(max_age_days, bool) and max_age_days >= 0
+    max_age_days = max_age_days if threshold_valid else 90
+    current, assessment_clock_valid = _assessment_clock(now)
 
     normalized: list[dict[str, Any]] = []
-    for item in evidence or []:
+    source_records = evidence if isinstance(evidence, list) else []
+    for item in source_records:
+        if not isinstance(item, dict):
+            normalized.append({
+                "category": "",
+                "category_description": "Unknown category",
+                "source_name": None,
+                "source_url": None,
+                "published_at": None,
+                "publication_age_days": None,
+                "status": "unverified",
+                "missing_fields": ["record_object", "recognized_category", "source_name", "source_url", "published_at"],
+                "notes": None,
+                "cin_independently_verified": False,
+                "assessment_clock_valid": assessment_clock_valid,
+                "invalid_record": True,
+            })
+            continue
         kind = str(item.get("category", "")).strip()
         status = str(item.get("status", "unverified")).lower()
         if status not in VALID_STATUSES:
@@ -55,16 +133,21 @@ def assess_growth_fundamentals(
         published = _parse_date(item.get("published_at"))
         source_name = item.get("source_name")
         source_url = item.get("source_url")
+        source_url_valid = _is_http_url(source_url)
         missing = []
         if kind not in CATEGORIES:
             missing.append("recognized_category")
         if not isinstance(source_name, str) or not source_name.strip():
             missing.append("source_name")
-        if not isinstance(source_url, str) or not source_url.startswith(("https://", "http://")):
+        if not source_url_valid:
             missing.append("source_url")
         if published is None:
             missing.append("published_at")
-        age = max(0, (current - published).days) if published else None
+        future_publication = published is not None and published > current
+        age = (current - published).days if published is not None and not future_publication else None
+        timestamp_validation_errors = ["published_at_is_in_the_future"] if future_publication else []
+        if future_publication and status == "verified":
+            status = "unverified"
         if status == "verified" and missing:
             status = "unverified"
         if status == "verified" and age is not None and age > max_age_days:
@@ -74,34 +157,59 @@ def assess_growth_fundamentals(
             "category_description": CATEGORIES.get(kind, "Unknown category"),
             "source_name": source_name,
             "source_url": source_url,
+            "source_url_valid": source_url_valid,
             "published_at": item.get("published_at"),
             "publication_age_days": age,
+            "timestamp_validation_errors": timestamp_validation_errors,
+            "assessment_clock_valid": assessment_clock_valid,
             "status": status,
             "missing_fields": missing,
             "notes": str(item.get("notes", "")).strip() or None,
             "cin_independently_verified": False,
+            "invalid_record": False,
         })
 
     coverage = {}
     for category, description in CATEGORIES.items():
         rows = [row for row in normalized if row["category"] == category]
-        if any(row["status"] == "verified" for row in rows):
+        distinct_statuses = {row["status"] for row in rows}
+        if len(distinct_statuses) > 1:
+            status = "conflicting"
+        elif distinct_statuses == {"verified"}:
             status = "verified"
-        elif any(row["status"] == "stale" for row in rows):
+        elif distinct_statuses == {"stale"}:
             status = "stale"
-        elif any(row["status"] == "unavailable" for row in rows):
+        elif distinct_statuses == {"unavailable"}:
             status = "unavailable"
         else:
             status = "unverified"
+        identities = {
+            (
+                row.get("category"),
+                _canonical_source_url(row.get("source_url")),
+                _timestamp_identity(row.get("published_at")),
+            )
+            for row in rows
+        }
         coverage[category] = {
             "description": description,
             "status": status,
-            "evidence_count": len(rows),
+            "evidence_count": len(identities),
+            "duplicate_record_count": max(0, len(rows) - len(identities)),
+            "conflict_detected": status == "conflicting",
         }
 
     verified_count = sum(1 for item in coverage.values() if item["status"] == "verified")
     coverage_score = round(100 * verified_count / len(CATEGORIES))
-    if verified_count == len(CATEGORIES):
+    unrecognized_category_count = sum(
+        1 for row in normalized if row["category"] not in CATEGORIES
+    )
+    invalid_record_count = sum(1 for row in normalized if row.get("invalid_record"))
+    if any(item["status"] == "conflicting" for item in coverage.values()):
+        overall = "evidence_conflicting_or_incomplete"
+    elif unrecognized_category_count or not isinstance(evidence, (list, type(None))):
+        overall = "evidence_invalid_or_incomplete"
+    elif verified_count == len(CATEGORIES):
         overall = "evidence_coverage_complete"
     elif any(item["status"] == "stale" for item in coverage.values()):
         overall = "evidence_stale_or_incomplete"
@@ -111,7 +219,7 @@ def assess_growth_fundamentals(
         overall = "evidence_unverified_or_incomplete"
 
     return {
-        "symbol": symbol.strip().upper(),
+        "symbol": str(symbol or "").strip().upper(),
         "assessment_type": "growth_fundamentals_evidence_review",
         "mode": "read_only",
         "overall_status": overall,
@@ -120,6 +228,12 @@ def assess_growth_fundamentals(
         "total_category_count": len(CATEGORIES),
         "coverage": coverage,
         "evidence": normalized,
+        "unrecognized_category_count": unrecognized_category_count,
+        "invalid_evidence_record_count": invalid_record_count,
+        "input_evidence_list_valid": isinstance(evidence, (list, type(None))),
+        "freshness_threshold_valid": threshold_valid,
+        "freshness_threshold_days": max_age_days,
+        "assessment_clock_valid": assessment_clock_valid,
         "not_an_investment_recommendation": True,
         "cin_independently_verified_claims": False,
         "limitations": [

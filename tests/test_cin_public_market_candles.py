@@ -54,6 +54,11 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.exception.status_code, 503)
         self.assertIn("Kraken fallback", ctx.exception.detail)
 
+    async def test_rejects_symbol_with_trailing_newline(self):
+        with self.assertRaises(HTTPException) as ctx:
+            await api.get_market_candles("BTCUSDT\n", "1h", 50)
+        self.assertEqual(ctx.exception.status_code, 400)
+
     async def test_rejects_bad_symbol(self):
         with self.assertRaises(HTTPException) as ctx:
             await api.get_market_candles("BTC/USDT", "1h", 50)
@@ -71,6 +76,95 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(HTTPException) as ctx:
                 await api._load("BTCUSDT", "1h", 50)
         self.assertEqual(ctx.exception.status_code, 503)
+
+
+    def test_public_candle_routes_use_absolute_end_symbol_pattern(self):
+        from fastapi import FastAPI
+        app = FastAPI()
+        app.include_router(api.router)
+        schema = app.openapi()["paths"]
+        for route in ("/market-candles", "/technical-analysis/market"):
+            parameters = schema[route]["get"]["parameters"]
+            symbol = next(parameter for parameter in parameters if parameter["name"] == "symbol")
+            self.assertEqual(symbol["schema"]["pattern"], "^[A-Za-z0-9]+$")
+
+
+    def test_kraken_fallback_parses_alternate_xbt_usd_pair_key(self):
+        payload = {
+            "error": [],
+            "result": {
+                "XXBTZUSD": [[1700000000, "100", "105", "98", "102", "101", "12.5", 7]],
+                "last": 1700000000,
+            },
+        }
+        with patch.object(api, "_request_json", return_value=payload) as request_json:
+            rows = api._fetch_kraken("BTCUSD", "1h", 5)
+        self.assertIn("pair=XBTUSD", request_json.call_args.args[0])
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["_provider_quote_currency"], "USD")
+        self.assertEqual(rows[0]["_provider_pair_key"], "XXBTZUSD")
+        self.assertEqual(rows[0]["volume"], 12.5)
+        self.assertEqual(rows[0]["close_time"], rows[0]["open_time"] + 3_600_000 - 1)
+
+    def test_kraken_fallback_parses_usdt_pair_key(self):
+        payload = {
+            "error": [],
+            "result": {
+                "XBTUSDT": [[1700000000, "100", "105", "98", "102", "101", "12.5", 7]],
+                "last": 1700000000,
+            },
+        }
+        with patch.object(api, "_request_json", return_value=payload) as request_json:
+            rows = api._fetch_kraken("BTCUSDT", "1h", 5)
+        self.assertIn("pair=XBTUSDT", request_json.call_args.args[0])
+        self.assertEqual(rows[0]["_provider_quote_currency"], "USDT")
+        self.assertEqual(rows[0]["_provider_pair_key"], "XBTUSDT")
+
+    def test_kraken_fallback_rejects_malformed_response_shape(self):
+        with patch.object(api, "_request_json", return_value={"error": [], "result": []}):
+            with self.assertRaises(ValueError):
+                api._fetch_kraken("BTCUSD", "1h", 5)
+
+
+
+    async def test_market_analysis_excludes_forming_candle(self):
+        rows = [dict(row) for row in SAMPLE]
+        import time
+        rows[-1]["close_time"] = int(time.time() * 1000) + 60_000
+        with patch.object(api, "_load", return_value=rows):
+            result = await api.analyze_public_market("BTCUSDT", "1h", 50)
+        self.assertEqual(result["input"]["candles_requested"], 50)
+        self.assertEqual(result["input"]["candles_used"], 49)
+        self.assertEqual(result["input"]["forming_candles_excluded"], 1)
+        self.assertTrue(result["input"]["closed_candles_only"])
+        self.assertEqual(result["input"]["candle_count"], 49)
+
+    async def test_market_analysis_returns_422_when_fewer_than_five_candles_are_closed(self):
+        rows = [dict(row) for row in SAMPLE[:5]]
+        import time
+        future_close = int(time.time() * 1000) + 60_000
+        for row in rows:
+            row["close_time"] = future_close
+        with patch.object(api, "_load", return_value=rows):
+            with self.assertRaises(HTTPException) as ctx:
+                await api.analyze_public_market("BTCUSDT", "1h", 5)
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertIn("Fewer than 5 completed candles", ctx.exception.detail)
+
+
+    async def test_candle_endpoint_marks_forming_rows_and_warns_when_no_closed_candle_exists(self):
+        import time
+        rows = [dict(row) for row in SAMPLE[:5]]
+        future_close = int(time.time() * 1000) + 60_000
+        for row in rows:
+            row["close_time"] = future_close
+        with patch.object(api, "_load", return_value=rows):
+            result = await api.get_market_candles("BTCUSDT", "1h", 5)
+        self.assertEqual(result["count"], 5)
+        self.assertTrue(all(row["is_closed"] is False for row in result["data"]))
+        self.assertTrue(all(row["candle_status"] == "forming" for row in result["data"]))
+        self.assertIsNone(result["freshness"]["latest_closed_candle_close_time_utc"])
+        self.assertIsNotNone(result["freshness"]["stale_data_warning"])
 
 
 if __name__ == "__main__":

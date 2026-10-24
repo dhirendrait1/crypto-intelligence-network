@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import threading
 import time
 import urllib.error
@@ -18,6 +19,7 @@ URL = "https://api.coingecko.com/api/v3/coins/markets"
 _CACHE_TTL_SECONDS = 90
 _STALE_CACHE_MAX_SECONDS = 900
 _CACHE: dict[tuple[str, int], tuple[float, list[dict[str, Any]]]] = {}
+_COMMODITY_SCAN_META: dict[tuple[str, int], tuple[float, int, int]] = {}
 _CACHE_LOCK = threading.Lock()
 
 # Conservative symbol/name heuristics only; this is not a canonical token taxonomy.
@@ -33,9 +35,71 @@ WRAPPED_SYMBOLS = {
 COMMODITY_BACKED_SYMBOLS = {"XAUT", "PAXG"}
 
 
-def _number(value: Any) -> float | None:
-    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+class MarketDataProviderFailure(Exception):
+    """Structured provider failure preserving primary and fallback attribution."""
 
+    def __init__(
+        self, *, primary_kind: str, primary_status: int | None,
+        fallback_kind: str, fallback_status: int | None,
+    ) -> None:
+        self.primary_kind = primary_kind
+        self.primary_status = primary_status
+        self.fallback_kind = fallback_kind
+        self.fallback_status = fallback_status
+        super().__init__(
+            f"CoinGecko {primary_kind}"
+            + (f" (HTTP {primary_status})" if primary_status is not None else "")
+            + f"; CoinPaprika fallback {fallback_kind}"
+            + (f" (HTTP {fallback_status})" if fallback_status is not None else "")
+        )
+
+
+def _failure_kind(error: Exception) -> tuple[str, int | None]:
+    if isinstance(error, urllib.error.HTTPError):
+        return "http_error", error.code
+    if isinstance(error, (urllib.error.URLError, TimeoutError)):
+        return "network_error", None
+    if isinstance(error, (ValueError, json.JSONDecodeError)):
+        return "invalid_response", None
+    return "provider_error", None
+
+
+def _number(value: Any) -> float | None:
+    """Return finite numeric provider data only; malformed magnitudes are missing evidence."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    try:
+        number = float(value)
+    except (OverflowError, TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _market_freshness(value: Any) -> tuple[str, int | None]:
+    """Classify provider update timestamps without treating retrieval time as price time."""
+    if not isinstance(value, str) or not value.strip():
+        return "unknown", None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            return "unknown", None
+        age = (datetime.now(timezone.utc) - parsed.astimezone(timezone.utc)).total_seconds()
+    except (ValueError, OverflowError, OSError):
+        return "unknown", None
+    if age < -300:
+        return "unknown", None
+    age_seconds = max(0, int(age))
+    return ("fresh" if age_seconds <= 900 else "stale"), age_seconds
+
+def _safe_retrieved_at(value: Any) -> str | None:
+    """Format internal retrieval timestamps defensively; never trust malformed metadata."""
+    numeric = _number(value)
+    if numeric is None:
+        return None
+    try:
+        return datetime.fromtimestamp(numeric, timezone.utc).isoformat()
+    except (OverflowError, OSError, ValueError):
+        return None
 
 def _asset_type(coin: dict[str, Any]) -> tuple[str, str]:
     symbol = str(coin.get("symbol", "")).upper()
@@ -75,6 +139,7 @@ def _request_markets(vs_currency: str, per_page: int) -> list[dict[str, Any]]:
         rows = [row for row in payload if isinstance(row, dict)]
         for row in rows:
             row["_cin_provider"] = "CoinGecko"
+            row["_cin_quote_currency"] = vs_currency.upper()
         if rows:
             return rows
         raise ValueError("CoinGecko returned no market rows")
@@ -96,16 +161,34 @@ def _request_markets(vs_currency: str, per_page: int) -> list[dict[str, Any]]:
             for row in fallback_payload:
                 if not isinstance(row, dict):
                     continue
-                quotes = row.get("quotes") or {}
-                quote = quotes.get(quote_key) or {}
-                price = quote.get("price")
-                market_cap = quote.get("market_cap")
-                volume = quote.get("volume_24h")
-                circulating = row.get("circulating_supply")
-                total_supply = row.get("total_supply")
-                max_supply = row.get("max_supply")
-                fdv_supply = max_supply if isinstance(max_supply, (int, float)) and max_supply > 0 else total_supply
-                fdv = price * fdv_supply if isinstance(price, (int, float)) and isinstance(fdv_supply, (int, float)) else None
+                quotes = row.get("quotes")
+                if not isinstance(quotes, dict):
+                    continue
+                quote = quotes.get(quote_key)
+                if not isinstance(quote, dict):
+                    continue
+                # Normalize provider numeric fields before arithmetic or sorting.
+                # Invalid/negative values become missing evidence, never rank keys.
+                price_raw = _number(quote.get("price"))
+                price = price_raw if price_raw is not None and price_raw >= 0 else None
+                market_cap_raw = _number(quote.get("market_cap"))
+                market_cap = market_cap_raw if market_cap_raw is not None and market_cap_raw >= 0 else None
+                volume_raw = _number(quote.get("volume_24h"))
+                volume = volume_raw if volume_raw is not None and volume_raw >= 0 else None
+                circulating_raw = _number(row.get("circulating_supply"))
+                circulating = circulating_raw if circulating_raw is not None and circulating_raw >= 0 else None
+                total_supply_raw = _number(row.get("total_supply"))
+                total_supply = total_supply_raw if total_supply_raw is not None and total_supply_raw >= 0 else None
+                max_supply_raw = _number(row.get("max_supply"))
+                max_supply = max_supply_raw if max_supply_raw is not None and max_supply_raw > 0 else None
+                # Derive FDV only from a finite price and known positive max supply.
+                fdv = None
+                if price is not None and max_supply is not None:
+                    candidate_fdv = price * max_supply
+                    if math.isfinite(candidate_fdv) and candidate_fdv >= 0:
+                        fdv = candidate_fdv
+                change_raw = _number(quote.get("percent_change_24h"))
+                change = change_raw if change_raw is not None else None
                 mapped.append({
                     "id": row.get("id"),
                     "symbol": row.get("symbol"),
@@ -116,44 +199,69 @@ def _request_markets(vs_currency: str, per_page: int) -> list[dict[str, Any]]:
                     "fully_diluted_valuation": fdv,
                     "circulating_supply": circulating,
                     "total_supply": total_supply,
-                    "price_change_percentage_24h": quote.get("percent_change_24h"),
+                    "price_change_percentage_24h": change,
                     "last_updated": row.get("last_updated"),
                     "_cin_provider": "CoinPaprika",
+                    "_cin_quote_currency": quote_key,
                 })
-            mapped.sort(key=lambda item: item.get("market_cap") or 0, reverse=True)
+            mapped.sort(key=lambda item: item["market_cap"] if item["market_cap"] is not None else -1, reverse=True)
             if not mapped:
                 raise ValueError("CoinPaprika returned no usable ticker rows")
             return mapped[:per_page]
         except Exception as fallback_error:
-            # Preserve the original CoinGecko 429 so the API can report rate limiting clearly.
-            if isinstance(primary_error, urllib.error.HTTPError) and primary_error.code == 429:
-                raise primary_error
-            raise fallback_error
+            primary_kind, primary_status = _failure_kind(primary_error)
+            fallback_kind, fallback_status = _failure_kind(fallback_error)
+            raise MarketDataProviderFailure(
+                primary_kind=primary_kind,
+                primary_status=primary_status,
+                fallback_kind=fallback_kind,
+                fallback_status=fallback_status,
+            ) from fallback_error
 
 
-def _fetch_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]], str, int]:
+def _fetch_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]], str, int, dict[str, Any] | None]:
     key = (vs_currency, per_page)
     now = time.time()
     with _CACHE_LOCK:
         cached = _CACHE.get(key)
     if cached and now - cached[0] <= _CACHE_TTL_SECONDS:
-        return cached[1], "cache", 0
+        return cached[1], "cache", 0, None
     try:
         rows = _request_markets(vs_currency, per_page)
+        fetched_at = time.time()
+        for row in rows:
+            row["_cin_retrieved_at"] = fetched_at
         with _CACHE_LOCK:
-            _CACHE[key] = (time.time(), rows)
-        return rows, "live", 0
+            _CACHE[key] = (fetched_at, rows)
+        return rows, "live", 0, None
+    except MarketDataProviderFailure as exc:
+        if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
+            # Preserve an HTTP status when either provider supplied one; 0 means no HTTP status.
+            return cached[1], "stale_cache", exc.fallback_status or exc.primary_status or 0, {
+                "primary_provider": "CoinGecko", "primary_error": exc.primary_kind,
+                "primary_http_status": exc.primary_status, "fallback_provider": "CoinPaprika",
+                "fallback_error": exc.fallback_kind, "fallback_http_status": exc.fallback_status,
+            }
+        raise
     except urllib.error.HTTPError as exc:
         if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
-            return cached[1], "stale_cache", exc.code
+            return cached[1], "stale_cache", exc.code, {
+                "primary_provider": "CoinGecko", "primary_error": "http_error",
+                "primary_http_status": exc.code, "fallback_provider": "CoinPaprika",
+                "fallback_error": "not_usable", "fallback_http_status": None,
+            }
         raise
     except (urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError):
         if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
-            return cached[1], "stale_cache", 0
+            return cached[1], "stale_cache", 0, {
+                "primary_provider": "CoinGecko", "primary_error": "network_or_response_error",
+                "primary_http_status": None, "fallback_provider": "CoinPaprika",
+                "fallback_error": "not_usable", "fallback_http_status": None,
+            }
         raise
 
 
-def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]], str, int, int, int]:
+def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]], str, int, int, int, dict[str, Any] | None, float | None]:
     """Scan the full public CoinPaprika ticker list before applying the commodity filter."""
     key = (f"commodity:{vs_currency}", per_page)
     now = time.time()
@@ -161,8 +269,12 @@ def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict
         cached = _CACHE.get(key)
     if cached and now - cached[0] <= _CACHE_TTL_SECONDS:
         rows = cached[1]
-        scanned = int(rows[0].get("_cin_scanned_universe", 0)) if rows else 0
-        return rows, "cache", 0, scanned, (int(rows[0].get("_cin_match_count", len(rows))) if rows else 0)
+        metadata = _COMMODITY_SCAN_META.get(key)
+        retrieved_at, scanned, matched = metadata if metadata else (
+            (rows[0].get("_cin_retrieved_at", cached[0]), int(rows[0].get("_cin_scanned_universe", 0)),
+             int(rows[0].get("_cin_match_count", len(rows))) if rows else 0)
+        )
+        return rows, "cache", 0, scanned, matched, None, retrieved_at
     url = "https://api.coinpaprika.com/v1/tickers?quotes=" + urllib.parse.quote(vs_currency.upper())
     req = urllib.request.Request(url, headers={"accept": "application/json", "user-agent": "CIN-Research-API/0.4.0"}, method="GET")
     try:
@@ -174,40 +286,79 @@ def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict
         for row in payload:
             if not isinstance(row, dict):
                 continue
-            quotes = row.get("quotes") or {}
-            quote = quotes.get(vs_currency.upper()) or {}
-            price = quote.get("price")
-            market_cap = quote.get("market_cap")
-            total_supply = row.get("total_supply")
-            max_supply = row.get("max_supply")
-            fdv_supply = max_supply if isinstance(max_supply, (int, float)) and max_supply > 0 else total_supply
-            fdv = price * fdv_supply if isinstance(price, (int, float)) and isinstance(fdv_supply, (int, float)) else None
+            quotes = row.get("quotes")
+            if not isinstance(quotes, dict):
+                continue
+            quote = quotes.get(vs_currency.upper())
+            if not isinstance(quote, dict):
+                continue
+            def nonnegative(value: Any) -> float | None:
+                number = _number(value)
+                return number if number is not None and number >= 0 else None
+            price = nonnegative(quote.get("price"))
+            market_cap = nonnegative(quote.get("market_cap"))
+            volume = nonnegative(quote.get("volume_24h"))
+            circulating = nonnegative(row.get("circulating_supply"))
+            total_supply = nonnegative(row.get("total_supply"))
+            max_supply = nonnegative(row.get("max_supply"))
+            # Unknown max supply means FDV is unknown; total supply is not a safe substitute.
+            fdv = None
+            if price is not None and max_supply is not None and max_supply > 0:
+                candidate_fdv = price * max_supply
+                if math.isfinite(candidate_fdv):
+                    fdv = candidate_fdv
+            change = _number(quote.get("percent_change_24h"))
             mapped.append({
                 "id": row.get("id"), "symbol": row.get("symbol"), "name": row.get("name"),
                 "current_price": price, "market_cap": market_cap,
-                "total_volume": quote.get("volume_24h"), "fully_diluted_valuation": fdv,
-                "circulating_supply": row.get("circulating_supply"), "total_supply": total_supply,
-                "price_change_percentage_24h": quote.get("percent_change_24h"),
+                "total_volume": volume, "fully_diluted_valuation": fdv,
+                "circulating_supply": circulating, "total_supply": total_supply,
+                "price_change_percentage_24h": change,
                 "last_updated": row.get("last_updated"), "_cin_provider": "CoinPaprika",
+                "_cin_quote_currency": vs_currency.upper(),
             })
+        fetched_at = time.time()
+        for row in mapped:
+            row["_cin_retrieved_at"] = fetched_at
         scanned = len(mapped)
         matches = [row for row in mapped if _asset_type(row)[0] == "commodity_backed"]
-        matches.sort(key=lambda item: item.get("market_cap") or 0, reverse=True)
+        matches.sort(key=lambda item: item["market_cap"] if item["market_cap"] is not None else -1, reverse=True)
         selected = matches[:per_page]
         for row in selected:
             row["_cin_scanned_universe"] = scanned
             row["_cin_match_count"] = len(matches)
-        # Do not cache empty matches: without a row there is no place to retain
-        # scanned-universe metadata, and an empty cache hit would report scanned=0.
-        if selected:
-            with _CACHE_LOCK:
-                _CACHE[key] = (time.time(), selected)
-        return selected, "live", 0, scanned, len(matches)
+        # Cache empty scans too: separate metadata preserves the scanned universe and
+        # retrieval timestamp even when there are no matching assets to attach them to.
+        with _CACHE_LOCK:
+            _CACHE[key] = (fetched_at, selected)
+            _COMMODITY_SCAN_META[key] = (fetched_at, scanned, len(matches))
+        return selected, "live", 0, scanned, len(matches), None, fetched_at
     except urllib.error.HTTPError as exc:
         if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
             rows = cached[1]
-            scanned = int(rows[0].get("_cin_scanned_universe", 0)) if rows else 0
-            return rows, "stale_cache", exc.code, scanned, (int(rows[0].get("_cin_match_count", len(rows))) if rows else 0)
+            metadata = _COMMODITY_SCAN_META.get(key)
+            retrieved_at, scanned, matched = metadata if metadata else (
+                (rows[0].get("_cin_retrieved_at", cached[0]), int(rows[0].get("_cin_scanned_universe", 0)),
+                 int(rows[0].get("_cin_match_count", len(rows))) if rows else 0)
+            )
+            return rows, "stale_cache", exc.code, scanned, matched, {
+                "primary_provider": "CoinPaprika", "primary_error": "http_error",
+                "primary_http_status": exc.code,
+            }, retrieved_at
+        raise
+    except (urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
+        if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
+            rows = cached[1]
+            metadata = _COMMODITY_SCAN_META.get(key)
+            retrieved_at, scanned, matched = metadata if metadata else (
+                (rows[0].get("_cin_retrieved_at", cached[0]), int(rows[0].get("_cin_scanned_universe", 0)),
+                 int(rows[0].get("_cin_match_count", len(rows))) if rows else 0)
+            )
+            error_kind = _failure_kind(exc)[0]
+            return rows, "stale_cache", 0, scanned, matched, {
+                "primary_provider": "CoinPaprika", "primary_error": error_kind,
+                "primary_http_status": None,
+            }, retrieved_at
         raise
 
 def _score(coin: dict[str, Any]) -> dict[str, Any]:
@@ -221,6 +372,15 @@ def _score(coin: dict[str, Any]) -> dict[str, Any]:
     score = 0
     reasons: list[str] = []
     warnings: list[str] = []
+    freshness_status, freshness_age_seconds = _market_freshness(coin.get("last_updated"))
+    price = _number(coin.get("current_price"))
+    analysis_eligible = freshness_status == "fresh" and price is not None and price > 0
+    if freshness_status == "stale":
+        warnings.append("Provider price timestamp is older than 15 minutes; candidate signal held")
+    elif freshness_status == "unknown":
+        warnings.append("Provider price timestamp is missing or invalid; candidate signal held")
+    if price is None or price <= 0:
+        warnings.append("Positive finite price unavailable; candidate signal held")
 
     if market_cap is not None and market_cap >= 100_000_000:
         score += 20
@@ -297,6 +457,8 @@ def _score(coin: dict[str, Any]) -> dict[str, Any]:
     screen_profile, growth_candidate_eligible = profile_by_type[asset_type]
     if not growth_candidate_eligible:
         screen_band = "excluded_non_growth_asset"
+    elif not analysis_eligible:
+        screen_band = "data_quality_hold"
     else:
         screen_band = "research_candidate" if score >= 70 else ("watchlist" if score >= 45 else "insufficient_fundamental_metrics")
 
@@ -309,7 +471,11 @@ def _score(coin: dict[str, Any]) -> dict[str, Any]:
         "asset_type_note": classification_note,
         "screen_profile": screen_profile,
         "growth_candidate_eligible": growth_candidate_eligible,
-        "price": coin.get("current_price"),
+        "price": price,
+        "freshness_status": freshness_status,
+        "freshness_age_seconds": freshness_age_seconds,
+        "analysis_eligible": analysis_eligible,
+        "screening_eligible": bool(growth_candidate_eligible and analysis_eligible),
         "market_cap": market_cap,
         "total_volume_24h": volume,
         "volume_to_market_cap": round(ratio, 6) if ratio is not None else None,
@@ -323,6 +489,9 @@ def _score(coin: dict[str, Any]) -> dict[str, Any]:
         "reasons": reasons,
         "warnings": warnings,
         "last_updated": coin.get("last_updated"),
+        "provider": coin.get("_cin_provider"),
+        "quote_currency": coin.get("_cin_quote_currency"),
+        "provider_retrieved_at": _safe_retrieved_at(coin.get("_cin_retrieved_at")),
     }
 
 
@@ -336,29 +505,90 @@ async def coin_screening(
     """Screen top market-cap assets. Asset-type labels are heuristic. Read-only."""
     currency = vs_currency.lower()
     commodity_scan: dict[str, Any] | None = None
+    commodity_retrieved_at: float | None = None
     try:
         if asset_type == "commodity_backed":
-            raw, data_mode, provider_error_code, scanned_count, matched_count = await asyncio.to_thread(_fetch_commodity_markets, currency, per_page)
+            raw, data_mode, provider_error_code, scanned_count, matched_count, provider_error_details, commodity_retrieved_at = await asyncio.to_thread(_fetch_commodity_markets, currency, per_page)
             commodity_scan = {
                 "provider": "CoinPaprika",
                 "scanned_universe_count": scanned_count,
                 "classified_match_count": matched_count,
                 "returned_count": len(raw),
+                "provider_retrieved_at": (datetime.fromtimestamp(commodity_retrieved_at, timezone.utc).isoformat() if commodity_retrieved_at is not None else None),
+                "cache_age_seconds": (max(0, int(time.time() - commodity_retrieved_at)) if commodity_retrieved_at is not None else None),
                 "scope": "All ticker rows returned by the public CoinPaprika tickers endpoint; not every token in existence",
                 "status": "matches_found" if matched_count else "no_matches_in_scanned_universe",
             }
         else:
-            raw, data_mode, provider_error_code = await asyncio.to_thread(_fetch_markets, currency, per_page)
+            raw, data_mode, provider_error_code, provider_error_details = await asyncio.to_thread(_fetch_markets, currency, per_page)
+    except MarketDataProviderFailure as exc:
+        status_code = 503 if (
+            exc.primary_status == 429 or exc.fallback_status == 429
+            or exc.primary_kind == "network_error" or exc.fallback_kind == "network_error"
+        ) else 502
+        raise HTTPException(status_code=status_code, detail={
+            "message": "Both market-data providers failed; no cached data is available.",
+            "primary_provider": "CoinGecko",
+            "primary_error": exc.primary_kind,
+            "primary_http_status": exc.primary_status,
+            "fallback_provider": "CoinPaprika",
+            "fallback_error": exc.fallback_kind,
+            "fallback_http_status": exc.fallback_status,
+        }) from exc
     except urllib.error.HTTPError as exc:
+        if asset_type == "commodity_backed":
+            raise HTTPException(status_code=503 if exc.code == 429 else 502, detail={
+                "message": "CoinPaprika commodity scan failed; no cached data is available.",
+                "primary_provider": "CoinPaprika",
+                "primary_error": "http_error",
+                "primary_http_status": exc.code,
+                "fallback_provider": None,
+                "fallback_error": None,
+            }) from exc
         if exc.code == 429:
-            raise HTTPException(status_code=503, detail="CoinGecko rate-limited and fallback provider unavailable; retry later") from exc
-        raise HTTPException(status_code=502, detail=f"CoinGecko HTTP error: {exc.code}") from exc
+            raise HTTPException(status_code=503, detail={
+                "message": "CoinGecko rate-limited; fallback provider did not return usable data.",
+                "primary_provider": "CoinGecko",
+                "primary_error": "http_error",
+                "primary_http_status": exc.code,
+                "fallback_provider": "CoinPaprika",
+                "fallback_error": "not_usable",
+            }) from exc
+        raise HTTPException(status_code=502, detail={
+            "message": "CoinGecko HTTP error and no fallback result was available.",
+            "primary_provider": "CoinGecko",
+            "primary_error": "http_error",
+            "primary_http_status": exc.code,
+            "fallback_provider": "CoinPaprika",
+            "fallback_error": "not_usable",
+        }) from exc
     except (urllib.error.URLError, TimeoutError) as exc:
-        raise HTTPException(status_code=503, detail="Primary and fallback market-data providers are temporarily unavailable") from exc
+        provider = "CoinPaprika" if asset_type == "commodity_backed" else "CoinGecko"
+        raise HTTPException(status_code=503, detail={
+            "message": f"{provider} market-data network failure; no cached data is available.",
+            "primary_provider": provider,
+            "primary_error": "network_error",
+        }) from exc
     except (ValueError, json.JSONDecodeError) as exc:
-        raise HTTPException(status_code=502, detail="Invalid CoinGecko response") from exc
+        provider = "CoinPaprika" if asset_type == "commodity_backed" else "CoinGecko"
+        raise HTTPException(status_code=502, detail={
+            "message": f"{provider} market-data response could not be parsed and no fallback result was available.",
+            "primary_provider": provider,
+            "primary_error": "invalid_response",
+        }) from exc
 
     results = [_score(coin) for coin in raw]
+    if data_mode == "stale_cache":
+        for result in results:
+            result["analysis_eligible"] = False
+            result["freshness_status"] = "stale_cache"
+            result["screening_eligible"] = False
+            result["warnings"].append("Cached fallback data used after provider failure; candidate signal held")
+            if result["growth_candidate_eligible"]:
+                result["screen_band"] = "data_quality_hold"
+    else:
+        for result in results:
+            result["screening_eligible"] = bool(result["growth_candidate_eligible"] and result["analysis_eligible"])
     if asset_type == "growth":
         results = [coin for coin in results if coin["growth_candidate_eligible"]]
     elif asset_type != "all":
@@ -373,8 +603,14 @@ async def coin_screening(
         "data_mode": data_mode,
         "stale_data_warning": ("Primary provider was unavailable; results use cached market data and may be up to 15 minutes old." if data_mode == "stale_cache" else None),
         "provider_error_code": provider_error_code or None,
+        "provider_error_details": provider_error_details,
         "methodology": "Preliminary transparent heuristic; not financial advice or a safety rating",
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
+        "cache_age_seconds": (
+            max(0, int(time.time() - raw[0]["_cin_retrieved_at"]))
+            if raw and isinstance(raw[0].get("_cin_retrieved_at"), (int, float))
+            else (max(0, int(time.time() - commodity_retrieved_at)) if commodity_retrieved_at is not None else None)
+        ),
         "currency": currency.upper(),
         "count": len(results),
         "parameters": {"per_page": per_page, "min_score": min_score, "asset_type": asset_type},

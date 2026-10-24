@@ -25,17 +25,76 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Extract scaffold archive
+      - name: Extract the same scaffold used by Render
         run: |
-          unzip -q cin_step203_bootable_scaffold.zip
+          unzip -q cin_step203_scaffold_fixed.zip
           test -d cin
           test -f cin/requirements.txt
           test -d cin/tests
+          test -f patch_cin_metadata_fixed.py
+
+      - name: Apply the read-only API router patch
+        run: python patch_cin_metadata_fixed.py
 
       - name: Install dependencies
-        working-directory: cin
-        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt pytest
+        run: python -m pip install --upgrade pip && python -m pip install -r cin/requirements.txt pytest
 
-      - name: Run automated tests
+      - name: Verify scaffold read-only routes are registered
         working-directory: cin
-        run: python -m pytest -v
+        run: |
+          python - <<'PY'
+          from app.main import app
+          paths = {route.path for route in app.routes}
+          required = {
+              "/coin-screening",
+              "/market-candles",
+              "/technical-analysis/market",
+              "/derivatives/market-snapshot",
+              "/news-sentiment",
+          }
+          missing = sorted(required - paths)
+          if missing:
+              raise SystemExit(f"Missing expected CIN routes: {missing}")
+          print(f"Verified {len(required)} read-only CIN routes")
+          PY
+
+      - name: Run scaffold tests
+        working-directory: cin
+        run: python -m pytest -v tests
+
+      - name: Run market-data regression tests
+        working-directory: cin
+        env:
+          PYTHONPATH: ..
+        run: python -m pytest -v ../tests/test_cin_market_candle_safety.py
+
+      - name: Run derivatives market-data regression tests
+        working-directory: cin
+        env:
+          PYTHONPATH: ..
+        run: python -m pytest -v ../tests/test_cin_derivatives_market_data.py
+
+      - name: Run public news sentiment regression tests
+        working-directory: cin
+        env:
+          PYTHONPATH: ..
+        run: python -m pytest -v ../tests/test_cin_public_news_sentiment.py
+
+      - name: Run public candle API contract regression tests
+        working-directory: cin
+        env:
+          PYTHONPATH: ..
+        run: python -m pytest -v ../tests/test_cin_public_market_candles.py
+
+      - name: Run technical-analysis API request contract tests
+        working-directory: cin
+        env:
+          PYTHONPATH: ..
+        run: python -m pytest -v ../tests/test_cin_technical_analysis.py
+
+      - name: Run Step 1 market-data validation tests
+        working-directory: cin
+        env:
+          PYTHONPATH: ..
+        run: python -m pytest -v ../tests/test_market_data_step1_validation.py
+
