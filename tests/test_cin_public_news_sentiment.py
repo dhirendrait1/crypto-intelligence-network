@@ -111,3 +111,38 @@ def test_endpoint_sanitizes_unexpected_provider_response_errors(monkeypatch, fai
     assert caught.value.detail["error"] == "invalid_response"
     assert caught.value.detail["message"] == "Public news provider response was invalid."
     assert "unexpected provider response" not in str(caught.value.detail)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://",
+        "https:///missing-host",
+        "https://user:secret@news.example/article",
+        "https://news.example/has space",
+        "ftp://news.example/article",
+        "javascript:alert(1)",
+    ],
+)
+def test_parse_articles_rejects_malformed_or_credentialed_urls(url):
+    rows = api._parse_articles(
+        {"articles": [{"title": "Article", "url": url}]},
+        10,
+    )
+    assert rows == []
+
+
+def test_parse_articles_accepts_valid_http_and_https_urls():
+    rows = api._parse_articles(
+        {
+            "articles": [
+                {"title": "HTTP article", "url": "http://news.example/a"},
+                {"title": "HTTPS article", "url": "https://news.example/b"},
+            ]
+        },
+        10,
+    )
+    assert [row["url"] for row in rows] == [
+        "http://news.example/a",
+        "https://news.example/b",
+    ]
