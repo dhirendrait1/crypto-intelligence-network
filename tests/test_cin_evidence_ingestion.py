@@ -110,6 +110,29 @@ class EvidenceIngestionTests(unittest.TestCase):
         with self.assertRaises(EvidenceSourceError):
             fetch_github_repository_evidence()
 
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_freshness_is_classified_from_source_timestamp(self, mocked):
+        from datetime import datetime, timezone, timedelta
+
+        now = datetime(2026, 10, 25, 12, 0, tzinfo=timezone.utc)
+        cases = (
+            (now - timedelta(days=2), "fresh"),
+            (now - timedelta(days=10), "stale"),
+            (None, "unknown"),
+            (now + timedelta(minutes=1), "unknown"),
+        )
+        for source_time, expected in cases:
+            with self.subTest(source_time=source_time):
+                payload = {"full_name": "ethereum/go-ethereum"}
+                if source_time is not None:
+                    payload["pushed_at"] = source_time.isoformat().replace("+00:00", "Z")
+                mocked.return_value = FakeResponse(payload)
+                with patch("cin_evidence_ingestion.datetime") as mock_datetime:
+                    mock_datetime.now.return_value = now
+                    mock_datetime.fromisoformat.side_effect = datetime.fromisoformat
+                    result = fetch_github_repository_evidence()
+                self.assertEqual(result["freshness_status"], expected)
+
 
 if __name__ == "__main__":
     unittest.main()
