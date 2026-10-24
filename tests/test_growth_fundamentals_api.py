@@ -88,3 +88,7 @@ def test_request_accepts_maximum_documented_evidence_batch():
     }
     request = GrowthFundamentalsRequest(symbol="ETH", evidence=[record] * 200)
     assert len(request.evidence) == 200
+def test_request_rejects_symbol_with_trailing_newline():
+    with pytest.raises(ValidationError):
+        GrowthFundamentalsRequest(symbol="ETH\n")
+
