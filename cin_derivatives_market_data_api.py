@@ -123,7 +123,7 @@ def _snapshot(symbol: str) -> dict[str, Any]:
         },
         "order_book": {
             "source": "Binance USDⓈ-M Futures public depth endpoint",
-            "retrieved_at": retrieved_at,
+            "retrieved_at": depth_retrieved_at,
             "bid_levels_used": len(bids),
             "ask_levels_used": len(asks),
             "best_bid": best_bid,
