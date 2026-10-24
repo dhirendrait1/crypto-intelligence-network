@@ -132,6 +132,9 @@ def _fetch_binance(symbol: str, interval: str, limit: int) -> list[dict[str, Any
     for row in payload:
         if not isinstance(row, list) or len(row) < 7:
             continue
+        # JSON booleans are Python integers; do not coerce them into timestamps.
+        if isinstance(row[0], bool) or isinstance(row[6], bool):
+            continue
         try:
             candles.append({
                 "open_time": int(row[0]), "open": float(row[1]), "high": float(row[2]),
@@ -198,6 +201,9 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     candles = []
     for row in rows[-limit:]:
         if not isinstance(row, list) or len(row) < 7:
+            continue
+        # Reject JSON booleans before numeric timestamp coercion.
+        if isinstance(row[0], bool):
             continue
         try:
             start = int(float(row[0]) * 1000)
