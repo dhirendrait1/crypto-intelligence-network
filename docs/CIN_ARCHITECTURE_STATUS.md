@@ -53,7 +53,7 @@ The patch copies the source modules into `cin/app` during the build. The source 
 - Analysis excludes forming candles and reports requested, used and excluded counts.
 - Unsupported fallback intervals/pairs fail clearly; no fabricated fallback data.
 - Missing, stale, partial or unverified inputs are surfaced instead of silently guessed.
-- Volume is not represented as an active indicator input until the analysis code actually uses it.
+- When volume is present, analysis reports latest volume, the mean of up to 20 preceding candles, and relative volume against that baseline; if volume is absent, outputs explicitly mark it `not_supplied`. These are descriptive metrics, not standalone buy/sell signals.
 - Swing highs/lows are described as reference levels, not verified resting liquidity.
 - Tests use mocks/offline fixtures and never place orders or access private accounts.
 
