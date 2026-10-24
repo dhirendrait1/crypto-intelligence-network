@@ -445,6 +445,15 @@ async def coin_screening(
             "fallback_http_status": exc.fallback_status,
         }) from exc
     except urllib.error.HTTPError as exc:
+        if asset_type == "commodity_backed":
+            raise HTTPException(status_code=503 if exc.code == 429 else 502, detail={
+                "message": "CoinPaprika commodity scan failed; no cached data is available.",
+                "primary_provider": "CoinPaprika",
+                "primary_error": "http_error",
+                "primary_http_status": exc.code,
+                "fallback_provider": None,
+                "fallback_error": None,
+            }) from exc
         if exc.code == 429:
             raise HTTPException(status_code=503, detail={
                 "message": "CoinGecko rate-limited; fallback provider did not return usable data.",
@@ -463,15 +472,17 @@ async def coin_screening(
             "fallback_error": "not_usable",
         }) from exc
     except (urllib.error.URLError, TimeoutError) as exc:
+        provider = "CoinPaprika" if asset_type == "commodity_backed" else "CoinGecko"
         raise HTTPException(status_code=503, detail={
-            "message": "Market-data provider network failure; no cached data is available.",
-            "primary_provider": "CoinGecko",
+            "message": f"{provider} market-data network failure; no cached data is available.",
+            "primary_provider": provider,
             "primary_error": "network_error",
         }) from exc
     except (ValueError, json.JSONDecodeError) as exc:
+        provider = "CoinPaprika" if asset_type == "commodity_backed" else "CoinGecko"
         raise HTTPException(status_code=502, detail={
-            "message": "Market-data response could not be parsed and no fallback result was available.",
-            "primary_provider": "CoinGecko",
+            "message": f"{provider} market-data response could not be parsed and no fallback result was available.",
+            "primary_provider": provider,
             "primary_error": "invalid_response",
         }) from exc
 
