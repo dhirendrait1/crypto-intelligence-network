@@ -89,6 +89,7 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Validate freshness thresholds in commodity and growth assessments; invalid thresholds fall back to the documented 90-day default and are flagged in output.
 - [x] Validate injected assessment clocks: timezone-naive or non-datetime clocks fall back to current UTC and are flagged; future publication timestamps no longer receive a misleading age of zero, and growth rows expose timestamp validation errors.
 - [x] Report duplicate evidence rows and count normalized source/timestamp identities once in category coverage; raw rows remain available for audit and differing statuses still surface as conflicts.
+- [x] Add direct assessment-level regression tests ensuring booleans and floats are rejected as integer freshness thresholds (safe 90-day fallback, explicitly flagged); all four workflows passed on test commit `87e37bb1bee73628bc2b47f80f903cec27ddf55b`.
 - [x] Align growth URL validation with commodity validation by rejecting embedded URL credentials; add offline regression tests.
 - [ ] Add source-aware conflict resolution and independent source retrieval; current conflict detection compares supplied statuses and does not establish which source is authoritative.
 
@@ -110,7 +111,7 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 
 - [x] Keep injected-clock validity consistent at assessment and evidence-row level for commodity and growth assessments; add regression coverage for timezone-naive clocks. All four workflows passed on commit `5d1539492ef93dff081af807463b696a9da4cedb` (CIN Automated Tests, screening, technical analysis, evidence-ingestion API). Tests are offline/mocked; no live provider or production validation is implied.
 
-- [ ] Follow-up on 2026-10-24: an intermediate commodity clock propagation commit (`a1a9e2b`) failed screening tests because `current`/`assessment_clock_valid` were not scoped in `assess_commodity_asset`. The current branch source now defines and validates the assessment clock in the assessment function and propagates it to evidence rows; keep this item open until fresh CI runs confirm the corrected branch snapshot.
+- [x] Follow-up on 2026-10-24: an intermediate commodity clock propagation commit (`a1a9e2b`) failed screening tests because `current`/`assessment_clock_valid` were not scoped in `assess_commodity_asset`. The corrected branch snapshot defines and validates the assessment clock in the assessment function and propagates it to evidence rows. All four workflows passed on test commit `87e37bb1bee73628bc2b47f80f903cec27ddf55b`; this is offline/mocked validation, not live-provider or production verification.
 
 ## Public candle provider boundary hardening (2026-10-24)
 
