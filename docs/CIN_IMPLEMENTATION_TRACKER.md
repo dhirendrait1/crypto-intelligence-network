@@ -78,5 +78,5 @@ Do **not** calculate a single completion percentage from this inventory: it mixe
 - [x] Require absolute HTTP(S) URLs with a parsed hostname rather than accepting a scheme-prefix string.
 - [x] Add regression tests for scheme-only URLs, URLs without a hostname, and valid HTTP URLs.
 - [x] Verify all four GitHub Actions workflows on commit `31f8ad04051e15ef028d85ee58f0dd79e2826b9f`; all passed. Results are offline tests only.
-- [ ] Reject future publication timestamps for supplied `verified` records; this remains an identified gap and is not claimed as fixed.
+- [x] Downgrade supplied `verified` growth-fundamentals records with future publication timestamps to `unverified`; regression test added. This is timestamp sanity checking only, not independent source verification.
 - [ ] Add evidence conflict resolution and independent source retrieval; the endpoint currently assesses caller-supplied metadata only.
