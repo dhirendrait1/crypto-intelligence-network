@@ -80,10 +80,17 @@ def _fetch_binance(symbol: str, interval: str, limit: int) -> list[dict[str, Any
         if not isinstance(row, list) or len(row) < 7:
             continue
         try:
+            # Binance timestamps are integer milliseconds. Do not silently truncate
+            # fractional values or accept booleans as numeric timestamps.
+            if isinstance(row[0], bool) or isinstance(row[6], bool):
+                continue
+            open_time_value, close_time_value = float(row[0]), float(row[6])
+            if not open_time_value.is_integer() or not close_time_value.is_integer():
+                continue
             candle = {
-                "open_time": int(row[0]), "open": float(row[1]), "high": float(row[2]),
+                "open_time": int(open_time_value), "open": float(row[1]), "high": float(row[2]),
                 "low": float(row[3]), "close": float(row[4]), "volume": float(row[5]),
-                "close_time": int(row[6]),
+                "close_time": int(close_time_value),
             }
             if _is_valid_candle(candle):
                 candles.append(candle)
