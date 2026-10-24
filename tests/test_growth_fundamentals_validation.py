@@ -130,4 +130,4 @@ class GrowthFundamentalsValidationTests(unittest.TestCase):
             "ETH", [self.record()], now=self.now.replace(tzinfo=None)
         )
         self.assertFalse(result["assessment_clock_valid"])
-        self.assertIsNotNone(result["evidence"][0]["publication_age_days"])
+        self.assertTrue(result["evidence"][0]["assessment_clock_valid"])
