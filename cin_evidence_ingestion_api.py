@@ -38,8 +38,6 @@ def public_evidence_ingestion(request: PublicEvidenceRequest) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="Repository is not on the public-source allowlist")
     try:
         return fetch_github_repository_evidence(request.repository)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except EvidenceSourceError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except Exception:
