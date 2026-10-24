@@ -553,3 +553,5 @@ This checkpoint validates configured offline automation only. It does not establ
 
 - Follow-up integration regression: Binance parser now has an end-to-end test proving a materially future-dated candle is filtered while a valid candle remains. Test commit: `d6b4797b57ad161b1632884f26e124246fb37a15`; CI pending.
 - CI caught a regression-test-only issue: the new end-to-end test referenced `datetime` without importing it. Fixed in `d7b6550dd2a1bc23d0a8de6055598c85cd5d976b`; rerun is pending. The application logic was not implicated by this failure.
+
+- Follow-up CI found the import fix had been inserted at a nested `import asyncio` site, causing an `IndentationError`. Moved `datetime`/`timezone` to the module-level imports in `cdd4e28c4ad1d70e189cea7350cede5ea91e1c8b`. Latest rerun must confirm collection and tests pass.
