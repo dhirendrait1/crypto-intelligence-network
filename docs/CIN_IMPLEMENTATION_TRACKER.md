@@ -123,6 +123,12 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Verify all four repository workflows on commit `63b81046f252f293a4be952b28447b1417df6c1b`; screening, evidence-ingestion API, technical analysis, and automated scaffold tests all passed.
 - **Boundary:** provider checks are mocked/offline. They do not establish live exchange availability, source correctness, or production deployment health.
 
+## Derivatives API symbol validation (2026-10-24)
+
+- [x] Tighten the public derivatives snapshot query parameter to the alphanumeric symbol format already used by the public candle API; reject underscore-bearing malformed symbols during FastAPI request validation rather than forwarding them to the provider.
+- [x] Add a regression assertion for the published OpenAPI parameter pattern and bounds.
+- [x] All four workflows passed on commit `86ed2e5682e86b490a1310d517ff272aa373f28a`: CIN Automated Tests (`40106663241`), evidence ingestion API checks (`40106663312`), Technical Analysis Tests (`40106663239`), and screening checks (`40106663252`). Validation is offline/mocked; no live provider or production verification is implied.
+
 ## Derivatives provider error handling (2026-10-24)
 
 - [x] Added a final catch-all at the read-only derivatives API boundary so unexpected provider/parser exceptions are sanitized as HTTP 502; added `AttributeError` and generic `Exception` regression cases. All four workflows passed on commit `10dc7ee845d2184dadb660333b921202361f1ae9` (offline/mocked tests only).
