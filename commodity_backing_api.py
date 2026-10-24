@@ -1,8 +1,9 @@
 """Read-only API router for CIN commodity-backed evidence review."""
+import re
 from typing import Any
 
 from fastapi import APIRouter
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 try:
     from app.commodity_backing_assessment import assess_commodity_asset
@@ -25,9 +26,16 @@ class EvidenceRecord(BaseModel):
 
 class CommodityBackingAssessmentRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    symbol: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*\z")
+    symbol: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
     evidence: list[EvidenceRecord] = Field(default_factory=list, max_length=100)
     max_age_days: int = Field(default=90, strict=True, ge=0, le=3650)
+
+    @field_validator("symbol")
+    @classmethod
+    def symbol_must_match_full_string(cls, value: str) -> str:
+        if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", value) is None:
+            raise ValueError("symbol must contain only supported ticker characters")
+        return value
 
 
 @router.post("/commodity-backing-assessment")
