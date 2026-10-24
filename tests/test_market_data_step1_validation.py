@@ -1,9 +1,10 @@
+import asyncio
 import json
 import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
-from market_data_step1 import _fetch_market_data
+from market_data_step1 import _fetch_market_data, get_public_market_data
 
 
 class FakeResponse:
@@ -155,6 +156,50 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         mocked.return_value = FakeResponse([row(), row(current_price=101.0)])
         result = _fetch_market_data(["bitcoin"], "usd")
         self.assertEqual(len(result), 1)
+
+
+    @patch("market_data_step1._fetch_market_data")
+    def test_endpoint_discloses_partial_market_coverage(self, mocked):
+        mocked.return_value = [{
+            "id": "bitcoin",
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "currency": "USD",
+            "price": 100.0,
+            "market_cap": 1000,
+            "total_volume_24h": 100,
+            "price_change_percentage_24h": 1.5,
+            "last_updated": datetime.now(timezone.utc).isoformat(),
+            "freshness_status": "fresh",
+            "freshness_age_seconds": 0,
+            "data_quality_warnings": [],
+        }]
+        result = asyncio.run(get_public_market_data("bitcoin,ethereum", "usd"))
+        self.assertEqual(result["requested_count"], 2)
+        self.assertEqual(result["count"], 1)
+        self.assertTrue(result["partial_result"])
+        self.assertEqual(result["missing_coins"], ["ethereum"])
+
+    @patch("market_data_step1._fetch_market_data")
+    def test_endpoint_deduplicates_requested_coin_ids(self, mocked):
+        mocked.return_value = [{
+            "id": "bitcoin",
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "currency": "USD",
+            "price": 100.0,
+            "market_cap": 1000,
+            "total_volume_24h": 100,
+            "price_change_percentage_24h": 1.5,
+            "last_updated": datetime.now(timezone.utc).isoformat(),
+            "freshness_status": "fresh",
+            "freshness_age_seconds": 0,
+            "data_quality_warnings": [],
+        }]
+        result = asyncio.run(get_public_market_data("bitcoin,bitcoin", "usd"))
+        self.assertEqual(result["requested_count"], 1)
+        self.assertFalse(result["partial_result"])
+        self.assertEqual(result["missing_coins"], [])
 
 
 if __name__ == "__main__":
