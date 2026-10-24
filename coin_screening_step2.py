@@ -75,6 +75,22 @@ def _number(value: Any) -> float | None:
     return number if math.isfinite(number) else None
 
 
+def _market_freshness(value: Any) -> tuple[str, int | None]:
+    """Classify provider update timestamps without treating retrieval time as price time."""
+    if not isinstance(value, str) or not value.strip():
+        return "unknown", None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            return "unknown", None
+        age = (datetime.now(timezone.utc) - parsed.astimezone(timezone.utc)).total_seconds()
+    except (ValueError, OverflowError, OSError):
+        return "unknown", None
+    if age < -300:
+        return "unknown", None
+    age_seconds = max(0, int(age))
+    return ("fresh" if age_seconds <= 900 else "stale"), age_seconds
+
 def _asset_type(coin: dict[str, Any]) -> tuple[str, str]:
     symbol = str(coin.get("symbol", "")).upper()
     name = str(coin.get("name", "")).lower()
