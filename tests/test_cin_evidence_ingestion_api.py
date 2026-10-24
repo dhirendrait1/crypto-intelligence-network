@@ -70,5 +70,21 @@ class PublicEvidenceIngestionApiTests(unittest.TestCase):
         self.assertIn("timeout must be between", raised.exception.detail)
 
 
+    def test_unexpected_provider_error_is_sanitized(self):
+        request = api.PublicEvidenceRequest()
+        with patch.object(
+            api, "fetch_github_repository_evidence",
+            side_effect=RuntimeError("sensitive provider internals"),
+        ):
+            with self.assertRaises(HTTPException) as raised:
+                api.public_evidence_ingestion(request)
+
+        self.assertEqual(raised.exception.status_code, 502)
+        self.assertEqual(
+            raised.exception.detail,
+            "Public evidence provider returned an unexpected response",
+        )
+        self.assertNotIn("sensitive provider internals", raised.exception.detail)
+
 if __name__ == "__main__":
     unittest.main()
