@@ -306,3 +306,11 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [ ] Record the production-only checks and results separately from offline CI. Do not claim live verification until those checks have actually run and their outputs have been inspected.
 - **Release decision:** not cleared. Keep PR #8 in Draft until the release gates above are completed. Merging is not authorized by this audit because the `main` Render configuration may automatically deploy.
 - **Safety boundary:** CIN remains read-only research, analysis, monitoring and alerting. No trade/order execution, wallet control, private keys, seed phrases, or fund movement. Preserve the ₹0-first approach.
+
+
+## Kraken fallback parser regression coverage (2026-10-25)
+
+- [x] Added offline tests for Kraken OHLC responses using the alternate `XXBTZUSD` pair key and the `XBTUSDT` pair key, including pair query construction, quote-currency provenance, volume extraction, and normalized candle close-time calculation.
+- [x] Added a malformed Kraken response-shape regression test.
+- [ ] CI for test commit `82219630a649f9273fad7e69c880a7b2b2549d2d` is running; do not mark the new tests validated until all four workflows finish successfully.
+- **Boundary:** fixtures are mocked and validate parser behavior only; they do not confirm live Kraken pair availability or exchange response behavior. No merge or production deployment was performed.
