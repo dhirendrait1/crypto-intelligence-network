@@ -105,3 +105,13 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 
 - [x] Hardened injected assessment clocks in commodity and growth evidence assessment functions: naive/non-datetime clocks are rejected and safely replaced with current UTC; future publication dates return no misleading nonnegative age and growth rows expose timestamp errors. Regression coverage is present in both assessment test suites.
 - [x] Re-ran all four workflows on commit `6455ca486d0883914150cf1c1d518dad19c058d7`; screening, evidence-ingestion API, automated scaffold tests, and technical-analysis workflows all passed. An earlier intermediate revision failed because the commodity clock-validation edits had not yet landed together; the later clean run passed. These remain offline/mocked checks, not live-provider validation.
+
+
+## Public candle provider boundary hardening (2026-10-24)
+
+- [x] Audit public candle provider parsing and error translation for unexpected provider response exceptions.
+- [x] Convert unexpected provider runtime/type/shape and invalid UTF-8 failures into a sanitized HTTP 502 instead of leaking an uncaught exception to the API boundary.
+- [x] Convert equivalent Kraken fallback failures after Binance HTTP 451 into a controlled HTTP 503 with a generic fallback-unavailable message.
+- [x] Add mocked regression tests for provider runtime errors, invalid UTF-8, malformed payload type, and fallback runtime failure.
+- [x] Verify all four repository workflows on commit `63b81046f252f293a4be952b28447b1417df6c1b`; screening, evidence-ingestion API, technical analysis, and automated scaffold tests all passed.
+- **Boundary:** provider checks are mocked/offline. They do not establish live exchange availability, source correctness, or production deployment health.
