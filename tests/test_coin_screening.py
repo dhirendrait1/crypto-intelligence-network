@@ -251,6 +251,9 @@ class ProviderFallbackNumericQualityTests(unittest.TestCase):
         self.assertIsNone(malformed["price_change_percentage_24h"])
         self.assertEqual(by_id["valid-coin"]["market_cap"], 100.0)
         self.assertEqual(by_id["valid-coin"]["fully_diluted_valuation"], 40.0)
+        self.assertEqual(malformed["_cin_provider"], "CoinPaprika")
+        self.assertEqual(malformed["_cin_quote_currency"], "USD")
+        self.assertEqual(by_id["valid-coin"]["_cin_quote_currency"], "USD")
 
     def test_coinpaprika_fallback_skips_malformed_quote_containers(self):
         payload = [
@@ -338,6 +341,7 @@ class ScreeningFreshnessTests(unittest.TestCase):
     def test_provider_retrieval_timestamp_is_preserved_and_cache_age_is_measurable(self):
         fixture = [{
             "id": "fresh-coin", "symbol": "FRSH", "name": "Fresh Coin",
+            "_cin_provider": "CoinGecko", "_cin_quote_currency": "USD",
             "current_price": 2.0, "market_cap": 100.0, "total_volume": 10.0,
             "fully_diluted_valuation": 120.0, "circulating_supply": 40.0,
             "total_supply": 50.0, "price_change_percentage_24h": 1.0,
@@ -350,10 +354,14 @@ class ScreeningFreshnessTests(unittest.TestCase):
         self.assertIsInstance(rows[0].get("_cin_retrieved_at"), (int, float))
         output = MODULE._score(rows[0])
         self.assertIsNotNone(output["provider_retrieved_at"])
+        self.assertEqual(output["provider"], "CoinGecko")
+        self.assertEqual(output["quote_currency"], "USD")
         rows_cached, cached_mode, cached_error, cached_details = MODULE._fetch_markets("usd", 1)
         self.assertEqual(cached_mode, "cache")
         self.assertEqual(cached_error, 0)
         self.assertEqual(rows_cached[0]["_cin_retrieved_at"], rows[0]["_cin_retrieved_at"])
+        self.assertEqual(rows_cached[0]["_cin_provider"], "CoinGecko")
+        self.assertEqual(rows_cached[0]["_cin_quote_currency"], "USD")
         self.assertIsNone(cached_details)
 
 
