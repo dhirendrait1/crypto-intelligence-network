@@ -35,6 +35,20 @@ def _parse_date(value: Any) -> datetime | None:
 
 
 
+
+def _assessment_clock(now: Any) -> tuple[datetime, bool]:
+    """Return a timezone-aware UTC clock and whether the caller supplied a valid one."""
+    if now is None:
+        return datetime.now(timezone.utc), True
+    if not isinstance(now, datetime) or now.tzinfo is None:
+        return datetime.now(timezone.utc), False
+    try:
+        if now.utcoffset() is None:
+            return datetime.now(timezone.utc), False
+        return now.astimezone(timezone.utc), True
+    except (OverflowError, TypeError, ValueError):
+        return datetime.now(timezone.utc), False
+
 def _is_http_url(value: Any) -> bool:
     if not isinstance(value, str) or any(
         char.isspace() or ord(char) < 32 or ord(char) == 127 for char in value
@@ -91,16 +105,7 @@ def assess_growth_fundamentals(
     """Assess evidence coverage across growth fundamentals; never infer missing facts."""
     threshold_valid = isinstance(max_age_days, int) and not isinstance(max_age_days, bool) and max_age_days >= 0
     max_age_days = max_age_days if threshold_valid else 90
-    assessment_clock_valid = (
-        now is None
-        or (
-            isinstance(now, datetime)
-            and now.tzinfo is not None
-            and now.utcoffset() is not None
-        )
-    )
-    current = now if assessment_clock_valid and now is not None else datetime.now(timezone.utc)
-    current = current.astimezone(timezone.utc)
+    current, assessment_clock_valid = _assessment_clock(now)
 
     normalized: list[dict[str, Any]] = []
     source_records = evidence if isinstance(evidence, list) else []
