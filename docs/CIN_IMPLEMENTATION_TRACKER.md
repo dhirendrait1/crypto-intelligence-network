@@ -439,3 +439,10 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Added regression tests for the generated OpenAPI response status set and actual HTTP behavior: malformed symbol request schema returns 422; unsupported interval semantic validation returns 400.
 - [x] CI exposed an optional test-client dependency mismatch (`starlette.testclient` requires `httpx2`, which is not installed by the existing workflows). Reworked the regression test to validate OpenAPI request constraints and handler semantic validation without introducing that dependency. New verification head: `ce294dfd1bcb3abdc40e0f9bdd2d88b2b87dc066`; all four workflows passed: Automated Tests (`40141916209`), screening checks (`40141916234`), Technical Analysis Tests (`40141916212`), and evidence ingestion API checks (`40141916215`). The tracker-only follow-up commit does not rerun these workflows.
 - **Boundary:** local execution is not claimed; CI results were not available when this tracker entry was written. No live provider smoke test, production configuration change, or deployment was performed. PR #8 remains Draft and unmerged.
+
+
+### Public candle API error-contract clarification (2026-10-25)
+- Corrected OpenAPI 400 descriptions: they no longer imply all invalid symbols return 400. Query-schema failures (including symbol length/pattern and limit bounds) are represented as 422 by FastAPI; unsupported intervals and semantic validation handled by the route return 400.
+- Added regression assertions for the documented 400 semantics and presence of the 422 response description on both candle endpoints.
+- Code commit: `4536d9616a7be95c155fa4c8ee51f707ab39ba36`; regression test commit: `f2aa7c40fa840dd7a1f303b31f9206d2210faa4e`.
+- CI status for this latest test commit has not yet been confirmed. No live-provider smoke test or deployment is claimed.
