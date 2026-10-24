@@ -187,7 +187,7 @@ def _snapshot(symbol: str) -> dict[str, Any]:
     }
     freshness_warnings = [
         name for name, quality in timestamp_quality.items()
-        if quality["status"] in ("stale", "future_dated", "invalid")
+        if quality["status"] in ("stale", "future_dated", "invalid", "unavailable")
     ]
 
     return {
@@ -235,6 +235,11 @@ def _snapshot(symbol: str) -> dict[str, Any]:
         },
         "data_quality": {
             "freshness_status": "warning" if freshness_warnings else "ok",
+            "analysis_eligibility": "not_recommended" if freshness_warnings else "eligible",
+            "analysis_eligibility_reason": (
+                "One or more provider timestamp checks are stale, future-dated, invalid, or unavailable; review timestamp_quality before relying on derived metrics."
+                if freshness_warnings else None
+            ),
             "freshness_warnings": freshness_warnings,
             "freshness_policy": {
                 "open_interest_and_premium_index_stale_after_seconds": 900,
