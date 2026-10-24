@@ -201,6 +201,7 @@ def _snapshot(symbol: str) -> dict[str, Any]:
             "limitations": [
                 "Single-exchange derivatives data; it does not represent the entire market.",
                 "Provider timestamps are retained separately from CIN retrieval time.",
+                "Malformed or non-positive order-book levels are excluded and counted in the order_book rejected-level fields.",
                 "Open-interest history is limited by the upstream provider's retention and availability.",
                 "This endpoint is informational only and does not place, modify, or cancel orders.",
             ],
