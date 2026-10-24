@@ -152,7 +152,7 @@ def fetch_github_repository_evidence(
         # publication timestamp. Keep published_at as a compatibility alias.
         "source_timestamp": payload.get("pushed_at") or payload.get("updated_at"),
         "source_timestamp_field": source_timestamp_field,
-        "timestamp_semantics": "repository_activity_not_publication",
+        "timestamp_semantics": "repository_metadata_timestamp_not_publication",
         # Deprecated compatibility alias; consumers should use source_timestamp.
         "published_at": payload.get("pushed_at") or payload.get("updated_at"),
         "retrieved_at": retrieved_at,
