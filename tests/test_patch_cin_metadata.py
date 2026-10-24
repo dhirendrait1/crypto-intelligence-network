@@ -77,6 +77,19 @@ class DeploymentPatchTests(unittest.TestCase):
             with self.subTest(router=router):
                 self.assertEqual(second_text.count(f"app.include_router({router})"), 1)
 
+    def test_missing_required_module_fails_before_any_scaffold_mutation(self):
+        main_path = self.app_dir / "main.py"
+        original_main = main_path.read_text(encoding="utf-8")
+        missing_module = self.root / MODULES[-1]
+        missing_module.unlink()
+
+        result = self.run_patch()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Required CIN module(s) not found", result.stderr)
+        self.assertEqual(main_path.read_text(encoding="utf-8"), original_main)
+        self.assertFalse(any((self.app_dir / name).exists() for name in MODULES))
+
     def test_patch_fails_closed_on_partial_router_registration(self):
         result = self.run_patch()
         self.assertEqual(result.returncode, 0, result.stderr)
