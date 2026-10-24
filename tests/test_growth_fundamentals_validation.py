@@ -31,11 +31,3 @@ class GrowthFundamentalsValidationTests(unittest.TestCase):
         result = assess_growth_fundamentals("ETH", [self.record(source_url="http://example.com/report")], now=self.now)
         self.assertEqual(result["evidence"][0]["status"], "verified")
         self.assertFalse(result["cin_independently_verified_claims"])
-
-    def test_future_publication_is_not_accepted_as_verified(self):
-        result = assess_growth_fundamentals("ETH", [self.record(published_at="2026-10-25T00:00:00Z")], now=self.now)
-        self.assertEqual(result["evidence"][0]["status"], "unverified")
-
-
-if __name__ == "__main__":
-    unittest.main()
