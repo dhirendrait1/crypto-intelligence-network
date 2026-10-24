@@ -176,6 +176,12 @@ def test_invalid_assessment_clock_falls_back_and_is_reported():
     assert result["evidence"][0]["publication_age_days"] is not None
 
 
+def test_valid_assessment_clock_is_reported_in_summary_and_rows():
+    result = assess_commodity_asset("PAXG", [valid_item()], now=NOW)
+    assert result["assessment_clock_valid"] is True
+    assert result["evidence"][0]["assessment_clock_valid"] is True
+
+
 def test_valid_http_url_and_timestamp_metadata_remain_accepted():
     result = normalize_evidence(valid_item(source_url="http://example.com/report"), now=NOW)
     assert result["status"] == "verified"
