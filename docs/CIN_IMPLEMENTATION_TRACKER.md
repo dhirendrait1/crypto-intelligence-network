@@ -210,5 +210,5 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 
 - [x] Tightened commodity and growth evidence URL syntax checks by forcing URL parser port validation; malformed non-numeric ports and out-of-range ports are rejected instead of being treated as valid HTTP(S) source metadata.
 - [x] Added regression cases for `https://example.com:notaport/report` and `https://example.com:99999/report` in both assessment test suites.
-- [ ] Confirm all four CI workflows pass on the final code/test revision before considering this batch complete.
+- [x] All four workflows passed on revision `5657b19942f44c587fac396f2e375b36468fdf9d`: screening checks (run `40108389592`), technical-analysis tests (run `40108389595`), evidence-ingestion API checks (run `40108389626`), and automated scaffold tests (run `40108389597`). Offline/mocked CI only.
 - **Boundary:** URL syntax validation does not fetch a source, confirm its ownership, or independently verify the underlying evidence claim.
