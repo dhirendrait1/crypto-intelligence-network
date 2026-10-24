@@ -135,6 +135,14 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["open_time"], valid[0])
 
+    def test_binance_skips_boolean_ohlcv_values(self):
+        valid = [1700000000000, "100", "105", "98", "102", "12.5", 1700003599999]
+        malformed = [1700000000000, True, "105", "98", "102", "12.5", 1700003599999]
+        with patch.object(api, "_request_json", return_value=[malformed, valid]):
+            rows = api._fetch_binance("BTCUSDT", "1h", 5)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["open"], 100.0)
+
     def test_binance_skips_string_timestamps(self):
         valid = [1700000000000, "100", "105", "98", "102", "12.5", 1700003599999]
         malformed = ["1700000000000", "100", "105", "98", "102", "12.5", 1700003599999]
@@ -192,6 +200,15 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("pair=XBTUSDT", request_json.call_args.args[0])
         self.assertEqual(rows[0]["_provider_quote_currency"], "USDT")
         self.assertEqual(rows[0]["_provider_pair_key"], "XBTUSDT")
+
+    def test_kraken_skips_boolean_ohlcv_values(self):
+        valid = [1700000000, "100", "105", "98", "102", "101", "12.5", 7]
+        malformed = [1700000000, True, "105", "98", "102", "101", "12.5", 7]
+        payload = {"error": [], "result": {"XXBTZUSD": [malformed, valid], "last": 1700000000}}
+        with patch.object(api, "_request_json", return_value=payload):
+            rows = api._fetch_kraken("BTCUSD", "1h", 5)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["open"], 100.0)
 
     def test_kraken_skips_string_and_fractional_timestamps(self):
         valid = [1700000000, "100", "105", "98", "102", "101", "12.5", 7]
