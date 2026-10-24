@@ -25,6 +25,7 @@ def test_parse_articles_deduplicates_and_skips_invalid_urls():
         "articles": [
             {"title": "Bullish adoption", "url": "https://news.example/a", "seendate": "20261024T000000Z", "domain": "news.example"},
             {"title": "Duplicate", "url": "https://news.example/a"},
+            {"title": "Duplicate variant", "url": "https://NEWS.EXAMPLE:443/a/#section"},
             {"title": "Unsafe", "url": "javascript:alert(1)"},
             {"title": "", "url": "https://news.example/empty"},
             {"title": "Crash risks", "url": "https://news.example/b"},
