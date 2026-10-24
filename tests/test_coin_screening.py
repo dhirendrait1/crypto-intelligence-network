@@ -165,16 +165,16 @@ class ScreeningFreshnessTests(unittest.TestCase):
             "last_updated": "2026-10-24T00:00:00Z",
         }]
         with patch.object(MODULE, "_request_markets", return_value=fixture):
-            rows, mode, error_code = MODULE._fetch_markets("usd", 1)
+            rows, mode, error_code, error_details = MODULE._fetch_markets("usd", 1)
         self.assertEqual(mode, "live")
         self.assertEqual(error_code, 0)
         self.assertIsInstance(rows[0].get("_cin_retrieved_at"), (int, float))
         output = MODULE._score(rows[0])
         self.assertIsNotNone(output["provider_retrieved_at"])
-        rows_cached, cached_mode, cached_error = MODULE._fetch_markets("usd", 1)
+        rows_cached, cached_mode, cached_error, cached_details = MODULE._fetch_markets("usd", 1)
         self.assertEqual(cached_mode, "cache")
         self.assertEqual(cached_error, 0)
-        self.assertEqual(rows_cached[0]["_cin_retrieved_at"], rows[0]["_cin_retrieved_at"])
+        self.assertEqual(rows_cached[0]["_cin_retrieved_at"], rows[0]["_cin_retrieved_at"])\n        self.assertIsNone(cached_details)
 
 
 
@@ -240,9 +240,9 @@ class ProviderFailureClassificationTests(unittest.TestCase):
         with patch.object(MODULE.time, "time", return_value=now), patch.object(
             MODULE, "_request_markets", side_effect=failure
         ):
-            rows, mode, error_code = MODULE._fetch_markets("usd", 5)
+            rows, mode, error_code, error_details = MODULE._fetch_markets("usd", 5)
         self.assertEqual(mode, "stale_cache")
-        self.assertEqual(error_code, 503)
+        self.assertEqual(error_code, 503)\n        self.assertEqual(error_details["primary_http_status"], 429)\n        self.assertEqual(error_details["fallback_http_status"], 503)\n        self.assertEqual(error_details["primary_error"], "http_error")\n        self.assertEqual(error_details["fallback_error"], "http_error")
         self.assertEqual(rows[0]["_cin_retrieved_at"], now - 120)
         MODULE._CACHE.clear()
 
