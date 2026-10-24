@@ -189,3 +189,10 @@ def test_endpoint_accepts_maximum_documented_evidence_batch():
     }
     request = CommodityBackingAssessmentRequest(symbol="PAXG", evidence=[record] * 100)
     assert len(request.evidence) == 100
+def test_request_rejects_symbol_with_trailing_newline():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        CommodityBackingAssessmentRequest(symbol="PAXG\n")
+
