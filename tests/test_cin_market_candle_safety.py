@@ -137,6 +137,30 @@ def test_market_analysis_excludes_forming_candle_by_default(monkeypatch):
     assert response["input"]["freshness"]["stale_data_warning"] is None
 
 
+def test_market_analysis_sanitizes_unexpected_analysis_failure(monkeypatch):
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    rows = [
+        _row(now_ms - (7 - i) * 3_600_000, now_ms - (6 - i) * 3_600_000, 100 + i)
+        for i in range(6)
+    ]
+
+    async def fake_load(*_args):
+        return rows
+
+    def fail_analysis(_candles):
+        raise RuntimeError("private parser detail")
+
+    monkeypatch.setattr(api, "_load", fake_load)
+    monkeypatch.setattr(api, "analyze_ohlc", fail_analysis)
+
+    with pytest.raises(api.HTTPException) as exc:
+        asyncio.run(api.analyze_public_market("BTCUSDT", "1h", 10))
+
+    assert exc.value.status_code == 502
+    assert exc.value.detail == "Technical analysis failed on the fetched candle data."
+    assert "private parser detail" not in str(exc.value.detail)
+
+
 def test_market_analysis_rejects_fewer_than_five_closed_candles(monkeypatch):
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     rows = [
