@@ -163,8 +163,33 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     result = payload.get("result")
     if not isinstance(result, dict):
         raise ValueError("Kraken response had no result")
-    pair_key = next((key for key in result if key != "last"), None)
-    rows = result.get(pair_key) if pair_key else None
+    pair_keys = [key for key in result if key != "last"]
+    if len(pair_keys) != 1:
+        raise ValueError("Kraken response did not identify exactly one requested trading pair")
+    pair_key = pair_keys[0]
+    # Kraken may return legacy asset prefixes (for example XXBTZUSD) instead
+    # of the request spelling. Validate the returned identity before exposing
+    # its candles; never assume the first result key matches the requested pair.
+    requested_base, requested_quote = base, quote
+    key_upper = pair_key.upper()
+    if key_upper.endswith("ZUSD"):
+        returned_quote = "USD"
+        returned_base = key_upper[:-4]
+    elif key_upper.endswith("USD"):
+        returned_quote = "USD"
+        returned_base = key_upper[:-3]
+    elif key_upper.endswith("USDT"):
+        returned_quote = "USDT"
+        returned_base = key_upper[:-4]
+    else:
+        raise ValueError("Kraken returned an unsupported quote currency")
+    if returned_base.startswith("X") and len(returned_base) > 3:
+        returned_base = returned_base[1:]
+    returned_base = {"XBT": "BTC"}.get(returned_base, returned_base)
+    requested_base = {"XBT": "BTC"}.get(requested_base, requested_base)
+    if returned_quote != requested_quote or returned_base != requested_base:
+        raise ValueError("Kraken returned a different trading pair than requested")
+    rows = result.get(pair_key)
     if not isinstance(rows, list):
         raise ValueError("Kraken returned no candle rows")
     candles = []
