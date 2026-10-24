@@ -54,6 +54,11 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.exception.status_code, 503)
         self.assertIn("Kraken fallback", ctx.exception.detail)
 
+    async def test_rejects_symbol_with_trailing_newline(self):
+        with self.assertRaises(HTTPException) as ctx:
+            await api.get_market_candles("BTCUSDT\n", "1h", 50)
+        self.assertEqual(ctx.exception.status_code, 400)
+
     async def test_rejects_bad_symbol(self):
         with self.assertRaises(HTTPException) as ctx:
             await api.get_market_candles("BTC/USDT", "1h", 50)
