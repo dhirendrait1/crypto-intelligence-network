@@ -83,10 +83,12 @@ def _validate_metadata(payload: dict[str, Any]) -> str:
         "forks_count", "open_issues_count", "archived",
     )
     # Missing or null fields remain usable as partial evidence, but must not be
-    # represented as a complete metadata snapshot.
-    if all(field in payload and payload[field] is not None for field in expected_fields):
-        return "complete"
-    return "partial"
+    # represented as a complete metadata snapshot. Return the exact gaps too.
+    missing_fields = [
+        field for field in expected_fields
+        if field not in payload or payload[field] is None
+    ]
+    return ("complete" if not missing_fields else "partial"), missing_fields
 
 
 def fetch_github_repository_evidence(
@@ -127,7 +129,7 @@ def fetch_github_repository_evidence(
     full_name = payload.get("full_name")
     if not isinstance(full_name, str) or full_name.lower() != repository:
         raise EvidenceSourceError("GitHub response did not match the requested repository")
-    metadata_completeness = _validate_metadata(payload)
+    metadata_completeness, metadata_missing_fields = _validate_metadata(payload)
     source_timestamp_field = (
         "pushed_at" if payload.get("pushed_at") else
         "updated_at" if payload.get("updated_at") else None
@@ -159,6 +161,7 @@ def fetch_github_repository_evidence(
         "retrieval_status": "success",
         "validation_status": "metadata_shape_validated",
         "metadata_completeness": metadata_completeness,
+        "metadata_missing_fields": metadata_missing_fields,
         "freshness_status": freshness_status,
         "claim_verification_status": "unverified",
         "independently_verified": False,
