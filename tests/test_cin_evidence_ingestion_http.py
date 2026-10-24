@@ -1,16 +1,19 @@
 """HTTP-level regression tests for the public evidence API."""
+import sys
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-import cin_evidence_ingestion_api as api
-from cin_evidence_ingestion import EvidenceSourceError
+# Exercise the same patched scaffold application that CI validates for deployment.
+CIN_DIR = Path(__file__).resolve().parents[1] / "cin"
+sys.path.insert(0, str(CIN_DIR))
 
+from app.main import app
+from app import cin_evidence_ingestion_api as api
+from app.cin_evidence_ingestion import EvidenceSourceError
 
-app = FastAPI()
-app.include_router(api.router)
 client = TestClient(app)
 
 
