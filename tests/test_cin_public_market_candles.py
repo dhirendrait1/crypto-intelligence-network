@@ -61,6 +61,16 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(ValueError, "more candles than requested"):
                 api._fetch_binance("BTCUSDT", "1h", 5)
 
+    async def test_binance_skips_timestamps_outside_datetime_range(self):
+        payload = [
+            [10**30, "100", "102", "99", "101", "10", 10**30 + 3600000],
+            [1700000000000, "100", "102", "99", "101", "10", 1700003599999],
+        ]
+        with patch.object(api, "_request_json", return_value=payload):
+            rows = api._fetch_binance("BTCUSDT", "1h", 5)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["open_time"], 1700000000000)
+
     async def test_binance_fails_when_all_candles_are_invalid(self):
         payload = [[1700000000000, "100", "99", "101", "100", "10", 1700003599999]]
         with patch.object(api, "_request_json", return_value=payload):
