@@ -93,10 +93,23 @@ def _snapshot(symbol: str) -> dict[str, Any]:
     if mark_price is None or mark_price <= 0 or index_price is None or index_price <= 0:
         raise ValueError("Provider returned missing or invalid mark/index price")
 
-    bids = [(_finite_number(level[0]), _finite_number(level[1])) for level in depth["bids"] if isinstance(level, (list, tuple)) and len(level) >= 2]
-    asks = [(_finite_number(level[0]), _finite_number(level[1])) for level in depth["asks"] if isinstance(level, (list, tuple)) and len(level) >= 2]
-    bids = [(price, qty) for price, qty in bids if price is not None and price > 0 and qty is not None and qty > 0]
-    asks = [(price, qty) for price, qty in asks if price is not None and price > 0 and qty is not None and qty > 0]
+    def parse_levels(levels: list[Any]) -> tuple[list[tuple[float, float]], int]:
+        parsed: list[tuple[float, float]] = []
+        rejected = 0
+        for level in levels:
+            if not isinstance(level, (list, tuple)) or len(level) < 2:
+                rejected += 1
+                continue
+            price = _finite_number(level[0])
+            quantity = _finite_number(level[1])
+            if price is None or price <= 0 or quantity is None or quantity <= 0:
+                rejected += 1
+                continue
+            parsed.append((price, quantity))
+        return parsed, rejected
+
+    bids, rejected_bid_levels = parse_levels(depth["bids"])
+    asks, rejected_ask_levels = parse_levels(depth["asks"])
     if not bids or not asks:
         raise ValueError("Provider returned no valid bid/ask levels")
     best_bid = max(price for price, _ in bids)
@@ -157,6 +170,8 @@ def _snapshot(symbol: str) -> dict[str, Any]:
             "retrieved_at": depth_retrieved_at,
             "bid_levels_used": len(bids),
             "ask_levels_used": len(asks),
+            "bid_levels_rejected": rejected_bid_levels,
+            "ask_levels_rejected": rejected_ask_levels,
             "best_bid": best_bid,
             "best_ask": best_ask,
             "spread": round(spread, 10),
