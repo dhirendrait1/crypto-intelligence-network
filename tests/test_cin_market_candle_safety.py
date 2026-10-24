@@ -345,3 +345,26 @@ def test_clean_candles_rejects_os_error_from_timestamp_conversion(monkeypatch):
     row = _row(1_000, 1_999)
     with pytest.raises(ValueError, match="returned no valid candles"):
         api._clean_candles([row], "Test provider")
+
+@pytest.mark.parametrize(
+    "month_start, expected_days",
+    [
+        ("2024-01-01T00:00:00+00:00", 31),
+        ("2024-02-01T00:00:00+00:00", 29),
+        ("2023-02-01T00:00:00+00:00", 28),
+        ("2024-04-01T00:00:00+00:00", 30),
+        ("2024-12-01T00:00:00+00:00", 31),
+    ],
+)
+def test_monthly_interval_duration_uses_calendar_month_boundaries(month_start, expected_days):
+    start_ms = int(datetime.fromisoformat(month_start).timestamp() * 1000)
+    assert api._interval_duration_ms("1M", start_ms) == expected_days * 86_400_000
+
+
+def test_monthly_freshness_threshold_uses_latest_candle_calendar_month():
+    start = datetime(2024, 2, 1, tzinfo=timezone.utc)
+    open_ms = int(start.timestamp() * 1000)
+    close_ms = int(datetime(2024, 2, 29, 23, 59, 59, 999000, tzinfo=timezone.utc).timestamp() * 1000)
+    row = _row(open_ms, close_ms)
+    result = api._freshness_metadata([row], "1M", close_ms + 1000)
+    assert result["stale_threshold_seconds"] == 2 * 29 * 86_400
