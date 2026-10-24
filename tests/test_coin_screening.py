@@ -346,6 +346,33 @@ class ScreeningResponseMetadataTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreaterEqual(response["cache_age_seconds"], 30)
         self.assertLess(response["cache_age_seconds"], 35)
 
+    async def test_commodity_endpoint_exposes_stale_cache_error_provenance(self):
+        row = {
+            "id": "tether-gold", "symbol": "XAUT", "name": "Tether Gold",
+            "current_price": 2000.0, "market_cap": 100.0, "total_volume": 10.0,
+            "fully_diluted_valuation": None, "circulating_supply": 10.0,
+            "total_supply": 10.0, "price_change_percentage_24h": 1.0,
+            "_cin_provider": "CoinPaprika", "_cin_retrieved_at": MODULE.time.time() - 120,
+            "_cin_scanned_universe": 500, "_cin_match_count": 2,
+        }
+        details = {
+            "primary_provider": "CoinPaprika", "primary_error": "network_error",
+            "primary_http_status": None,
+        }
+
+        async def fake_to_thread(func, *args, **kwargs):
+            return ([row], "stale_cache", 0, 500, 2, details)
+
+        with patch.object(MODULE.asyncio, "to_thread", side_effect=fake_to_thread):
+            response = await MODULE.coin_screening(
+                vs_currency="usd", per_page=5, min_score=0, asset_type="commodity_backed"
+            )
+
+        self.assertEqual(response["data_mode"], "stale_cache")
+        self.assertEqual(response["provider_error_details"], details)
+        self.assertIsNotNone(response["stale_data_warning"])
+        self.assertEqual(response["universe_scan"]["scanned_universe_count"], 500)
+
     async def test_endpoint_exposes_structured_stale_cache_provider_errors(self):
         row = {
             "id": "cached-coin", "symbol": "CACH", "name": "Cached Coin",
