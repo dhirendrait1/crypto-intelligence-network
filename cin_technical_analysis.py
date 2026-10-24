@@ -73,7 +73,20 @@ def analyze_ohlc(candles: list[dict[str, Any]]) -> dict[str, Any]:
             raise ValueError(f"Candle {i} contains a non-finite price.")
         if min(o, h, lo, c) <= 0 or h < max(o, c, lo) or lo > min(o, c, h):
             raise ValueError(f"Candle {i} has inconsistent OHLC prices.")
-        normalized.append({"open": o, "high": h, "low": lo, "close": c})
+        normalized_row = {"open": o, "high": h, "low": lo, "close": c}
+        if "volume" in row and row["volume"] is not None:
+            try:
+                volume = float(row["volume"])
+            except (TypeError, ValueError):
+                raise ValueError(f"Candle {i} volume must be numeric when supplied.") from None
+            if not (volume == volume and abs(volume) != float("inf")) or volume < 0:
+                raise ValueError(f"Candle {i} volume must be finite and non-negative.")
+            normalized_row["volume"] = volume
+        normalized.append(normalized_row)
+
+    volume_count = sum("volume" in row for row in normalized)
+    if volume_count not in (0, len(normalized)):
+        raise ValueError("Volume must be supplied for every candle or omitted for every candle.")
 
     closes = [x["close"] for x in normalized]
     last = closes[-1]
@@ -128,6 +141,10 @@ def analyze_ohlc(candles: list[dict[str, Any]]) -> dict[str, Any]:
             "macd_signal": round(signal, 8) if signal is not None else None,
             "macd_histogram": round(macd - signal, 8) if macd is not None and signal is not None else None,
             "atr_14": atr,
+            "volume_latest": normalized[-1].get("volume"),
+            "volume_average_20": round(sum(row["volume"] for row in normalized[-20:]) / min(20, len(normalized)), 8) if volume_count else None,
+            "relative_volume_20": round(normalized[-1]["volume"] / (sum(row["volume"] for row in normalized[-20:]) / min(20, len(normalized))), 4) if volume_count and sum(row["volume"] for row in normalized[-20:]) > 0 else None,
+            "volume_analysis_status": "available" if volume_count else "not_supplied",
         },
         "liquidity_reference_levels": {
             "buy_side_reference": previous_high,
