@@ -262,3 +262,12 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] All four repository CI workflows passed on code/test revision `ff4baa97e07a8fcc4f93298259ac48466fe8f91a`: screening checks (run `40111015218`), technical-analysis tests (`40111015225`), evidence-ingestion API checks (`40111015262`), and automated tests (`40111015247`).
 - **Boundary:** identifier validation only checks request syntax; it does not establish whether a market pair is listed or whether submitted evidence is authentic.
 
+## Portable schema and strict full-string validation correction (2026-10-24)
+
+- [x] Kept OpenAPI patterns in portable regex syntax rather than exposing an engine-specific absolute-end anchor to downstream clients.
+- [x] Added explicit `re.fullmatch` validators for commodity/growth/evidence-ingestion body identifiers and repository paths.
+- [x] Made public candle validation reject leading/trailing whitespace before normalization; added equivalent pre-provider symbol validation to the derivatives endpoint.
+- [x] Added trailing-newline regression tests at request-model and route boundaries.
+- [ ] Confirm all four CI workflows pass on the final code/test revision.
+- **Boundary:** the regex/validator checks enforce syntax only; provider pair listing and source authenticity remain separate concerns.
+
