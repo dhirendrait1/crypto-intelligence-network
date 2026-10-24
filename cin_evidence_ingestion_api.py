@@ -38,3 +38,5 @@ def public_evidence_ingestion(request: PublicEvidenceRequest) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except EvidenceSourceError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except AttributeError as exc:
+        raise HTTPException(status_code=502, detail="Public evidence provider returned an unexpected response") from exc
