@@ -63,7 +63,7 @@ def _fetch_market_data(ids: list[str], vs_currency: str) -> list[dict[str, Any]]
     )
     with urllib.request.urlopen(request, timeout=12) as response:
         if response.status != 200:
-            raise RuntimeError(f"Provider returned HTTP {response.status}")
+            raise ValueError(f"Provider returned unexpected HTTP status {response.status}")
         payload = json.loads(response.read().decode("utf-8"))
 
     if not isinstance(payload, list):
