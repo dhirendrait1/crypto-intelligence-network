@@ -47,6 +47,7 @@ class EvidenceIngestionTests(unittest.TestCase):
         self.assertIn("published_at", result)
         self.assertEqual(result["source_timestamp_field"], "pushed_at")
         self.assertEqual(result["metadata_completeness"], "complete")
+        self.assertEqual(result["metadata_missing_fields"], [])
 
     def test_rejects_arbitrary_repository(self):
         with self.assertRaises(ValueError):
@@ -120,6 +121,10 @@ class EvidenceIngestionTests(unittest.TestCase):
         })
         result = fetch_github_repository_evidence()
         self.assertEqual(result["metadata_completeness"], "partial")
+        self.assertEqual(result["metadata_missing_fields"], [
+            "default_branch", "pushed_at", "stargazers_count", "forks_count",
+            "open_issues_count", "archived",
+        ])
         self.assertEqual(result["source_timestamp_field"], "updated_at")
         self.assertEqual(result["published_at"], "2026-10-24T10:00:00Z")
         self.assertEqual(result["claim_verification_status"], "unverified")
