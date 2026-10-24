@@ -27,3 +27,8 @@ def test_request_rejects_excessive_evidence_batch():
             symbol="ETH",
             evidence=[{"category": "usage_and_adoption"}] * 201,
         )
+
+
+def test_request_accepts_normalized_symbol_alphabet():
+    request = GrowthFundamentalsRequest(symbol="eth.v2-test_1")
+    assert request.symbol == "eth.v2-test_1"
