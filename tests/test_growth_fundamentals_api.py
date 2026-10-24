@@ -94,3 +94,11 @@ def test_request_rejects_symbol_with_trailing_newline():
     with pytest.raises(ValidationError):
         GrowthFundamentalsRequest(symbol="ETH\n")
 
+
+
+def test_request_rejects_unsupported_evidence_status():
+    with pytest.raises(ValidationError):
+        GrowthFundamentalsRequest(
+            symbol="ETH",
+            evidence=[{"category": "usage_and_adoption", "status": "confirmed"}],
+        )
