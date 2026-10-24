@@ -37,6 +37,7 @@ MODULES = (
     "cin_technical_analysis.py",
     "cin_technical_analysis_api.py",
     "cin_public_market_candles_api.py",
+    "cin_derivatives_market_data_api.py",
 )
 for module_name in MODULES:
     source_module = ROOT / module_name
@@ -92,6 +93,12 @@ registrations = [
         "\n# CIN: public timestamped OHLCV and market-backed analysis (read-only)\n"
         "from app.cin_public_market_candles_api import router as cin_public_market_candles_router\n"
         "app.include_router(cin_public_market_candles_router)\n",
+    ),
+    (
+        "cin_derivatives_market_data_router",
+        "\n# CIN: read-only public derivatives market snapshot; no trading operations\n"
+        "from app.cin_derivatives_market_data_api import router as cin_derivatives_market_data_router\n"
+        "app.include_router(cin_derivatives_market_data_router)\n",
     ),
 ]
 for marker, registration in registrations:
