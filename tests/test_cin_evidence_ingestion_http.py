@@ -66,5 +66,20 @@ class PublicEvidenceHttpTests(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
 
 
+    def test_unexpected_provider_error_returns_sanitized_http_502(self):
+        with patch.object(
+            api,
+            "fetch_github_repository_evidence",
+            side_effect=RuntimeError("sensitive provider internals"),
+        ):
+            response = client.post("/public-evidence-ingestion", json={})
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(
+            response.json()["detail"],
+            "Public evidence provider returned an unexpected response",
+        )
+        self.assertNotIn("sensitive provider internals", response.text)
+
 if __name__ == "__main__":
     unittest.main()
