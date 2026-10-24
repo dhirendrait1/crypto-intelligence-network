@@ -438,6 +438,7 @@ def _score(coin: dict[str, Any]) -> dict[str, Any]:
         "freshness_status": freshness_status,
         "freshness_age_seconds": freshness_age_seconds,
         "analysis_eligible": analysis_eligible,
+        "screening_eligible": bool(growth_candidate_eligible and analysis_eligible),
         "market_cap": market_cap,
         "total_volume_24h": volume,
         "volume_to_market_cap": round(ratio, 6) if ratio is not None else None,
