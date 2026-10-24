@@ -84,4 +84,5 @@ Do **not** calculate a single completion percentage from this inventory: it mixe
 - [x] Require explicit timezone offsets for commodity publication/review timestamps; naive timestamps are treated as missing and cannot support `verified` status.
 
 These are timestamp sanity checks on caller-supplied metadata, not independent source verification.
-- [ ] Add evidence conflict resolution and independent source retrieval; the endpoint currently assesses caller-supplied metadata only.
+- [x] Surface mixed evidence statuses as `conflicting` at category/type level; summaries no longer let one supplied `verified` record hide other stale, unavailable, or unverified records. Regression tests added for commodity and growth assessments.
+- [ ] Add source-aware conflict resolution and independent source retrieval; current conflict detection compares supplied statuses and does not establish which source is authoritative.
