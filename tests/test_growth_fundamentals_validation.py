@@ -105,6 +105,14 @@ class GrowthFundamentalsValidationTests(unittest.TestCase):
         self.assertFalse(result["freshness_threshold_valid"])
         self.assertEqual(result["freshness_threshold_days"], 90)
 
+    def test_boolean_and_float_freshness_thresholds_are_not_accepted_as_integers(self):
+        for threshold in (True, 90.0):
+            result = assess_growth_fundamentals(
+                "ETH", [self.record()], now=self.now, max_age_days=threshold
+            )
+            self.assertFalse(result["freshness_threshold_valid"])
+            self.assertEqual(result["freshness_threshold_days"], 90)
+
     def test_future_publication_has_no_nonnegative_age_claim(self):
         result = assess_growth_fundamentals(
             "ETH", [self.record(published_at="2026-10-25T00:00:00Z")], now=self.now
