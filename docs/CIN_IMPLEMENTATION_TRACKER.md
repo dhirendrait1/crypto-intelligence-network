@@ -68,6 +68,7 @@ Do **not** calculate a single completion percentage from this inventory: it mixe
 - [x] Downgrade caller-supplied `verified` metadata when the review timestamp precedes publication.
 - [x] Return explicit `source_url_valid` and `timestamp_validation_errors` metadata for auditability.
 - [x] Add offline regression tests for URL and timestamp chronology edge cases.
+- [x] Reject timezone-naive publication/review timestamps instead of silently assuming UTC; regression coverage added for both commodity and growth evidence.
 - [x] Verify the new regression tests and all four repository workflows on commit `7e26219dc57b752255f6e58e8aefdf1f28e749e1`; all four workflows passed. These are offline/mocked tests, not live provider validation.
 - **Boundary:** these checks validate supplied metadata only. CIN still does not fetch source documents or independently certify reserve, custody, solvency, or redemption claims.
 
@@ -78,5 +79,9 @@ Do **not** calculate a single completion percentage from this inventory: it mixe
 - [x] Require absolute HTTP(S) URLs with a parsed hostname rather than accepting a scheme-prefix string.
 - [x] Add regression tests for scheme-only URLs, URLs without a hostname, and valid HTTP URLs.
 - [x] Verify all four GitHub Actions workflows on commit `31f8ad04051e15ef028d85ee58f0dd79e2826b9f`; all passed. Results are offline tests only.
-- [x] Downgrade supplied `verified` growth-fundamentals records with future publication timestamps to `unverified`; regression test added. This is timestamp sanity checking only, not independent source verification.
+- [x] Downgrade supplied `verified` growth-fundamentals records with future publication timestamps to `unverified`; regression test added.
+- [x] Require explicit timezone offsets for growth publication timestamps; naive timestamps are treated as missing and cannot support `verified` status.
+- [x] Require explicit timezone offsets for commodity publication/review timestamps; naive timestamps are treated as missing and cannot support `verified` status.
+
+These are timestamp sanity checks on caller-supplied metadata, not independent source verification.
 - [ ] Add evidence conflict resolution and independent source retrieval; the endpoint currently assesses caller-supplied metadata only.
