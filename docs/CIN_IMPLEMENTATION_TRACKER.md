@@ -397,3 +397,11 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Updated regression coverage and derivatives endpoint documentation.
 - [ ] Verify all CI workflows on latest head before marking the milestone verified.
 - **Boundary:** this is a consumer-facing quality warning, not a live-provider guarantee. Missing history-derived metrics remain null. PR #8 remains Draft and unmerged; no deployment performed.
+
+## Screening cache and provider timestamp consistency — 2026-10-25
+
+- [x] Preserve provider timestamp status and age separately from the effective `stale_cache` state.
+- [x] Regression test verifies stale-cache results remain ineligible even when the provider's own `last_updated` timestamp appears fresh.
+- [x] Documented the distinction between response-level cache age, provider timestamp age, and analysis eligibility.
+- [ ] Verify all latest-head CI workflows before marking this milestone fully verified.
+- **Boundary:** this is offline regression coverage; it does not verify live CoinGecko/CoinPaprika behavior or deployed service health. PR #8 remains Draft and unmerged.
