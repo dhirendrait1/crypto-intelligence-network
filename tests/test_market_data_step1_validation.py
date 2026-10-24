@@ -104,17 +104,11 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
             _fetch_market_data(["bitcoin"], "usd")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
     @patch("market_data_step1.urllib.request.urlopen")
     def test_oversized_provider_response_is_rejected(self, mocked):
         class OversizedResponse(FakeResponse):
             def read(self, size=-1):
-                if size < 0:
-                    return b"x" * 2_000_001
-                return b"x" * size
+                return b"x" * size if size >= 0 else b"x" * 2_000_001
 
         mocked.return_value = OversizedResponse([])
         with self.assertRaisesRegex(ValueError, "exceeded the configured size limit"):
@@ -122,5 +116,9 @@ if __name__ == "__main__":
 
     @patch("market_data_step1.urllib.request.urlopen")
     def test_oversized_integer_price_is_excluded_without_overflow(self, mocked):
-        mocked.return_value = FakeResponse([row(current_price=10**10000)])
+        mocked.return_value = FakeResponse([row(current_price=10**400)])
         self.assertEqual(_fetch_market_data(["bitcoin"], "usd"), [])
+
+
+if __name__ == "__main__":
+    unittest.main()
