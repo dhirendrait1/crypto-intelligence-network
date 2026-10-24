@@ -124,3 +124,10 @@ class GrowthFundamentalsValidationTests(unittest.TestCase):
         result = assess_growth_fundamentals("ETH", [self.record(source_url="http://example.com/report")], now=self.now)
         self.assertEqual(result["evidence"][0]["status"], "verified")
         self.assertFalse(result["cin_independently_verified_claims"])
+
+    def test_timezone_naive_assessment_clock_falls_back_and_is_reported(self):
+        result = assess_growth_fundamentals(
+            "ETH", [self.record()], now=self.now.replace(tzinfo=None)
+        )
+        self.assertFalse(result["assessment_clock_valid"])
+        self.assertTrue(result["evidence"][0]["assessment_clock_valid"])
