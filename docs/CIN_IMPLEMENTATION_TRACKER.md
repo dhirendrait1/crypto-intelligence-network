@@ -662,3 +662,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Confirms both integer-to-float validation and float-to-millisecond conversion are contained as invalid rows.
 - Test commit: `8a7b4e4565f25c3f51b142859643953a165b8448`.
 - CI verification pending on the latest tracker commit.
+
+
+## Public provider response-size limit regression (2026-10-25)
+
+- Added an offline test proving the JSON transport reads no more than the configured response cap plus one byte and rejects an oversized provider body before JSON decoding.
+- This protects the public market-data path against unexpectedly large responses and unbounded buffering.
+- Test commit: `6d9b0790f455fca840c890ecd7c9255699e6ed59`.
+- CI verification pending on the latest tracker commit.
