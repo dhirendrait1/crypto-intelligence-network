@@ -85,3 +85,13 @@ def test_endpoint_classifies_provider_rate_limit(monkeypatch):
     assert caught.value.status_code == 503
     assert caught.value.detail["error"] == "http_error"
     assert caught.value.detail["http_status"] == 429
+
+
+def test_endpoint_rejects_whitespace_only_query_before_provider_call(monkeypatch):
+    def unexpected_search(*_args):
+        raise AssertionError("blank query must be rejected before provider access")
+
+    monkeypatch.setattr(api, "_search", unexpected_search)
+    with pytest.raises(HTTPException) as caught:
+        asyncio.run(api.news_sentiment(query="   ", max_records=5))
+    assert caught.value.status_code == 422
