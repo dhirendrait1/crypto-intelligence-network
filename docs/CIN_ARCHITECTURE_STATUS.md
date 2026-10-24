@@ -134,4 +134,4 @@ The isolated feature branch hardens `commodity_backing_assessment.py`:
 - Outputs include `source_url_valid` and `timestamp_validation_errors` to make the validation result inspectable.
 - Regression tests cover these edge cases and a valid HTTP URL.
 
-This is validation of caller-supplied metadata, not independent source retrieval or reserve certification. The updated code remains pending CI verification until workflows for the resulting commit complete. No production deployment is implied.
+This is validation of caller-supplied metadata, not independent source retrieval or reserve certification. All four repository workflows passed on code commit `7e26219dc57b752255f6e58e8aefdf1f28e749e1`. These are offline/mocked checks and do not validate live providers or production deployment. No production deployment is implied.
