@@ -124,6 +124,7 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 
 ## Derivatives provider error handling (2026-10-24)
 
+- [x] Added a final catch-all at the read-only derivatives API boundary so unexpected provider/parser exceptions are sanitized as HTTP 502; added `AttributeError` and generic `Exception` regression cases. All four workflows passed on commit `10dc7ee845d2184dadb660333b921202361f1ae9` (offline/mocked tests only).
 - [x] Unexpected provider runtime/type/shape errors and invalid UTF-8 are mapped to a sanitized HTTP 502.
 - [x] Added mocked regression tests for these failure classes.
 - [x] Screening, evidence-ingestion API, and technical-analysis workflows passed on revision f789b282be76d59598778b4e891b61efb34475b3.
