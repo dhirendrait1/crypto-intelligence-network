@@ -80,3 +80,9 @@ jobs:
           PYTHONPATH: ..
         run: python -m pytest -v ../tests/test_cin_public_news_sentiment.py
 
+      - name: Run Step 1 market-data validation tests
+        working-directory: cin
+        env:
+          PYTHONPATH: ..
+        run: python -m pytest -v ../tests/test_market_data_step1_validation.py
+
