@@ -70,6 +70,8 @@ def _fetch_binance(symbol: str, interval: str, limit: int) -> list[dict[str, Any
     payload = _request_json(f"{BINANCE_KLINES_URL}?{query}")
     if not isinstance(payload, list):
         raise ValueError("Binance response was not a list")
+    if len(payload) > limit:
+        raise ValueError("Binance returned more candles than requested")
     candles = []
     for row in payload:
         if not isinstance(row, list) or len(row) < 7:
