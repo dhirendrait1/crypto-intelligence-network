@@ -76,6 +76,8 @@ def assess_growth_fundamentals(
         if published is None:
             missing.append("published_at")
         age = max(0, (current - published).days) if published else None
+        if published is not None and published > current and status == "verified":
+            status = "unverified"
         if status == "verified" and missing:
             status = "unverified"
         if status == "verified" and age is not None and age > max_age_days:
