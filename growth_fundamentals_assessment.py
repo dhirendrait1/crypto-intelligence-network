@@ -42,6 +42,8 @@ def _is_http_url(value: Any) -> bool:
         return False
     try:
         parsed = urlsplit(value.strip())
+        # Accessing .port validates that a supplied port is numeric and in range.
+        parsed.port
         return (
             parsed.scheme.lower() in {"http", "https"}
             and bool(parsed.hostname)
