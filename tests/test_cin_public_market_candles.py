@@ -76,6 +76,7 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_451_falls_back_to_kraken_and_labels_source(self):
         import asyncio
+from datetime import datetime, timezone
         with patch.object(api, "_fetch_binance", side_effect=urllib.error.HTTPError(
             api.BINANCE_KLINES_URL, 451, "unavailable for legal reasons", {}, None
         )), patch.object(api, "_fetch_kraken", return_value=[dict(SAMPLE[0])]):
