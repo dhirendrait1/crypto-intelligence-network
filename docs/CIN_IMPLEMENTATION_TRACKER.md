@@ -429,5 +429,5 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 
 - [x] Corrected public candle documentation to distinguish FastAPI request-schema HTTP 422 responses from explicit semantic HTTP 400 validation and insufficient completed-candle HTTP 422 responses.
 - [x] Corrected derivatives documentation: unavailable open-interest-history timestamps are included in freshness warnings, so empty history yields `freshness_status: warning` and `analysis_eligibility: not_recommended`; history-derived values remain null.
-- [ ] Verify all four CI workflows on the latest code/test head after these documentation changes.
+- [x] Confirmed all four CI workflows passed on the candle-contract documentation commit `da718a35a2bd3bd1829024d201d85198ed3b6588`: Automated Tests (`40141730746`), screening checks (`40141730799`), Technical Analysis Tests (`40141730768`), and evidence ingestion API checks (`40141730771`). The subsequent derivatives-doc and tracker commits have no reported workflow runs; this does **not** certify the final documentation head.
 - **Boundary:** documentation-only edits; no runtime code, production configuration, or deployment changed. CI and live provider behavior remain unverified for these latest documentation commits.
