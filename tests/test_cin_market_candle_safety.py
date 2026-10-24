@@ -192,6 +192,8 @@ def test_each_declared_kraken_fallback_interval_is_mapped(interval, kraken_minut
         RuntimeError("unexpected provider response"),
         UnicodeDecodeError("utf-8", b"\\xff", 0, 1, "invalid start byte"),
         TypeError("unexpected provider payload"),
+        AttributeError("unexpected parser state"),
+        Exception("unexpected generic provider failure"),
     ],
 )
 def test_market_provider_shape_failures_return_sanitized_502(monkeypatch, failure):
