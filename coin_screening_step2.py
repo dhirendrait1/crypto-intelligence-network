@@ -102,10 +102,13 @@ def _request_markets(vs_currency: str, per_page: int) -> list[dict[str, Any]]:
                 market_cap = quote.get("market_cap")
                 volume = quote.get("volume_24h")
                 circulating = row.get("circulating_supply")
-                total_supply = row.get("total_supply")
                 max_supply = row.get("max_supply")
-                fdv_supply = max_supply if isinstance(max_supply, (int, float)) and max_supply > 0 else total_supply
-                fdv = price * fdv_supply if isinstance(price, (int, float)) and isinstance(fdv_supply, (int, float)) else None
+                # Do not label price * total_supply as FDV when max supply is unknown.
+                fdv = price * max_supply if (
+                    isinstance(price, (int, float)) and not isinstance(price, bool)
+                    and isinstance(max_supply, (int, float)) and not isinstance(max_supply, bool)
+                    and max_supply > 0
+                ) else None
                 mapped.append({
                     "id": row.get("id"),
                     "symbol": row.get("symbol"),
@@ -180,8 +183,12 @@ def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict
             market_cap = quote.get("market_cap")
             total_supply = row.get("total_supply")
             max_supply = row.get("max_supply")
-            fdv_supply = max_supply if isinstance(max_supply, (int, float)) and max_supply > 0 else total_supply
-            fdv = price * fdv_supply if isinstance(price, (int, float)) and isinstance(fdv_supply, (int, float)) else None
+            # Unknown max supply means FDV is unknown; total supply is not a safe substitute.
+            fdv = price * max_supply if (
+                isinstance(price, (int, float)) and not isinstance(price, bool)
+                and isinstance(max_supply, (int, float)) and not isinstance(max_supply, bool)
+                and max_supply > 0
+            ) else None
             mapped.append({
                 "id": row.get("id"), "symbol": row.get("symbol"), "name": row.get("name"),
                 "current_price": price, "market_cap": market_cap,
