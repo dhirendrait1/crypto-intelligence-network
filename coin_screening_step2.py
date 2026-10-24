@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import threading
 import time
 import urllib.error
@@ -64,7 +65,11 @@ def _failure_kind(error: Exception) -> tuple[str, int | None]:
 
 
 def _number(value: Any) -> float | None:
-    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+    """Return finite numeric provider data only; NaN/Infinity are missing evidence."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    number = float(value)
+    return number if math.isfinite(number) else None
 
 
 def _asset_type(coin: dict[str, Any]) -> tuple[str, str]:
@@ -399,7 +404,7 @@ def _score(coin: dict[str, Any]) -> dict[str, Any]:
         "asset_type_note": classification_note,
         "screen_profile": screen_profile,
         "growth_candidate_eligible": growth_candidate_eligible,
-        "price": coin.get("current_price"),
+        "price": _number(coin.get("current_price")),
         "market_cap": market_cap,
         "total_volume_24h": volume,
         "volume_to_market_cap": round(ratio, 6) if ratio is not None else None,
