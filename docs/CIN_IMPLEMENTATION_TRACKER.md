@@ -59,3 +59,14 @@
 ## Completion accounting
 
 Do **not** calculate a single completion percentage from this inventory: it mixes implemented modules, partially specified capabilities, and future capabilities. A defensible count requires a user-approved numbered product requirements baseline and a one-to-one mapping from each requirement to acceptance evidence. This tracker is a source-inventory baseline, not that missing requirements baseline.
+
+
+## Commodity evidence metadata hardening (2026-10-24)
+
+- [x] Validate evidence URLs as absolute HTTP(S) URLs with a hostname; reject scheme-only URLs and embedded credentials.
+- [x] Downgrade caller-supplied `verified` metadata when publication or review timestamps are in the future.
+- [x] Downgrade caller-supplied `verified` metadata when the review timestamp precedes publication.
+- [x] Return explicit `source_url_valid` and `timestamp_validation_errors` metadata for auditability.
+- [x] Add offline regression tests for URL and timestamp chronology edge cases.
+- [ ] Verify the new regression tests and all four repository workflows on the resulting commit; until the run finishes, this change is not marked CI-validated.
+- **Boundary:** these checks validate supplied metadata only. CIN still does not fetch source documents or independently certify reserve, custody, solvency, or redemption claims.
