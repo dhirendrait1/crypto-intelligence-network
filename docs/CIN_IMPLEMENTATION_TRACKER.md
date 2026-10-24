@@ -245,3 +245,10 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Added offline regressions for host case/default port/fragment/trailing slash/timezone-offset equivalence and for distinct case-sensitive paths.
 - [x] All four workflows passed on code/test revision `cee4f1bd9b4a61bf9b63bb12e451254884d4451d`: evidence-ingestion API checks (run `40110072726`), CIN Automated Tests (`40110072860`), screening checks (`40110072796`), and Technical Analysis Tests (`40110072728`). Job-level results were checked and each concluded `success`.
 - **Boundary:** tests are offline/mocked and do not independently verify evidence claims or source contents. No merge or production deployment was performed.
+
+## Commodity assessment invalid-row status parity (2026-10-24)
+
+- [x] Prevent an assessment with all three required commodity evidence types marked verified from returning `evidence_coverage_complete` when additional malformed rows or unrecognized evidence types are present.
+- [x] Expose `unrecognized_evidence_type_count` and retain `invalid_evidence_record_count`; invalid inputs now produce `evidence_invalid_or_incomplete` unless a status conflict takes precedence.
+- [x] Add offline regression tests for unknown evidence types and malformed extra rows alongside otherwise complete evidence.
+- **Validation status:** CI for the final code/test revision is pending. No merge or production deployment was performed.
