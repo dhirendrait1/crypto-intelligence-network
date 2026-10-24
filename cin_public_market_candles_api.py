@@ -235,7 +235,7 @@ async def analyze_public_market(
     })
     analysis["limitations"].extend([
         "Public exchange data is not independently audited by CIN.",
-        "This endpoint includes the latest candle even when it is still forming; use /technical-analysis/market for closed-candle-only calculations.",
+        "This endpoint excludes forming candles from analysis; /market-candles may still report the latest candle as forming.",
         "Technical outputs and ATR scenarios are descriptive research, not investment advice or trade instructions.",
     ])
     return analysis
