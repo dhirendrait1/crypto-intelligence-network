@@ -67,6 +67,33 @@ def test_kraken_fallback_reports_actual_pair_key_and_quote(monkeypatch):
     assert rows[0]["_provider_quote_currency"] == "USD"
 
 
+def test_kraken_fallback_preserves_provider_documented_forming_candle(monkeypatch):
+    # Kraken documents that the final OHLC row is always the current,
+    # not-yet-committed timeframe. Keep it available for status labeling;
+    # downstream technical analysis separately excludes unclosed candles.
+    now_seconds = int(datetime.now(timezone.utc).timestamp())
+    current_hour_open = now_seconds - (now_seconds % 3600)
+    previous_hour_open = current_hour_open - 3600
+    payload = {
+        "error": [],
+        "result": {
+            "XXBTZUSD": [
+                [previous_hour_open, "100", "102", "98", "101", "100", "4", 10],
+                [current_hour_open, "101", "103", "100", "102", "101", "2", 4],
+            ],
+            "last": current_hour_open,
+        },
+    }
+    monkeypatch.setattr(api, "_request_json", lambda _url: payload)
+
+    rows = api._fetch_kraken("BTCUSD", "1h", 5)
+
+    assert [row["open_time"] for row in rows] == [
+        previous_hour_open * 1000, current_hour_open * 1000
+    ]
+    assert rows[-1]["close_time"] == (current_hour_open + 3600) * 1000 - 1
+
+
 def test_kraken_fallback_rejects_unsupported_interval_without_network(monkeypatch):
     def unexpected_request(_url):
         raise AssertionError("unsupported interval must be rejected before network access")
