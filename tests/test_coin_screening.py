@@ -11,6 +11,28 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 
+
+class FiniteNumericValidationTests(unittest.TestCase):
+    def test_non_finite_provider_values_are_treated_as_missing(self):
+        for value in (float("nan"), float("inf"), float("-inf"), True, "12.5", None):
+            with self.subTest(value=value):
+                self.assertIsNone(MODULE._number(value))
+
+    def test_finite_numeric_provider_values_are_preserved(self):
+        for value in (0, 12, 12.5, -2.0):
+            with self.subTest(value=value):
+                self.assertEqual(MODULE._number(value), float(value))
+
+    def test_screening_price_does_not_expose_non_finite_provider_value(self):
+        for value in (float("nan"), float("inf"), float("-inf")):
+            with self.subTest(value=value):
+                scored = MODULE._score({
+                    "id": "test-coin", "symbol": "TST", "name": "Test Coin",
+                    "current_price": value,
+                })
+                self.assertIsNone(scored["price"])
+                self.assertEqual(scored["screen_score"], 0)
+
 class AssetClassificationTests(unittest.TestCase):
     def test_known_stablecoin_symbol_is_classified(self):
         kind, note = MODULE._asset_type({"symbol": "USDC", "name": "USD Coin", "id": "usd-coin"})
