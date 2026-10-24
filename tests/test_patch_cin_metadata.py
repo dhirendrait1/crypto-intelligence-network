@@ -102,6 +102,27 @@ class DeploymentPatchTests(unittest.TestCase):
         self.assertEqual(main_path.read_text(encoding="utf-8"), "from fastapi import FastAPI\napp = FastAPI()\n")
         self.assertFalse(any((self.app_dir / name).exists() for name in MODULES))
 
+    def test_old_branding_normalization_preserves_new_router_registrations(self):
+        main_path = self.app_dir / "main.py"
+        original = main_path.read_text(encoding="utf-8")
+        main_path.write_text(
+            original.replace("Crypto Intelligence Network (CIN)", "Crypto Intelligence Engine", 1),
+            encoding="utf-8",
+        )
+
+        result = self.run_patch()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        patched = main_path.read_text(encoding="utf-8")
+        self.assertIn('"""Crypto Intelligence Network (CIN) test app."""', patched)
+        self.assertIn("from app.market_data_step1 import router as cin_market_data_router", patched)
+        self.assertIn("app.include_router(cin_market_data_router)", patched)
+        self.assertLess(patched.index("cin_market_data_router"), patched.index('if __name__ == "__main__":'))
+
+        second = self.run_patch()
+        self.assertEqual(second.returncode, 0, second.stderr)
+        self.assertEqual(main_path.read_text(encoding="utf-8"), patched)
+
     def test_patch_fails_closed_on_partial_router_registration(self):
         result = self.run_patch()
         self.assertEqual(result.returncode, 0, result.stderr)
