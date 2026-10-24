@@ -71,7 +71,7 @@ def assess_growth_fundamentals(
             missing.append("recognized_category")
         if not isinstance(source_name, str) or not source_name.strip():
             missing.append("source_name")
-        if not isinstance(source_url, str) or not source_url.startswith(("https://", "http://")):
+        if not _is_http_url(source_url):
             missing.append("source_url")
         if published is None:
             missing.append("published_at")
