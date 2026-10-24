@@ -65,7 +65,7 @@ def _headline_sentiment(title: str) -> dict[str, Any]:
 def _is_http_url(value: Any) -> bool:
     """Accept absolute HTTP(S) URLs with a hostname and no embedded credentials."""
     if not isinstance(value, str) or not value or any(
-        char.isspace() or ord(char) < 32 for char in value
+        char.isspace() or ord(char) < 32 or ord(char) == 127 for char in value
     ):
         return False
     try:
