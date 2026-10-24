@@ -156,4 +156,4 @@ def test_derivatives_route_documents_strict_alphanumeric_symbol_contract():
     symbol = next(parameter for parameter in parameters if parameter["name"] == "symbol")
     assert symbol["schema"]["pattern"] == "^[A-Za-z0-9]+$"
     assert symbol["schema"]["minLength"] == 5
-    assert symbol["schema"]["maxLength"] == 30
+    assert symbol["schema"]["maxLength"] == 20
