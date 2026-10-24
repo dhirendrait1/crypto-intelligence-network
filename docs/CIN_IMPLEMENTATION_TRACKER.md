@@ -204,3 +204,11 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Added an offline regression test that injects an unexpected analysis runtime failure and asserts internal exception text is not returned.
 - [x] All four workflows passed on code/test commit `848d0b949c05f3cce4440e790c0361f071d1f2ce`: CIN Automated Tests (run `40107210314`), screening checks (run `40107210327`), Technical Analysis Tests (run `40107210326`), and evidence-ingestion API checks (run `40107210319`).
 - **Boundary:** the regression uses mocked candle data and an injected exception. It does not verify live exchange behavior or production deployment.
+
+
+## Evidence URL port validation (2026-10-24)
+
+- [x] Tightened commodity and growth evidence URL syntax checks by forcing URL parser port validation; malformed non-numeric ports and out-of-range ports are rejected instead of being treated as valid HTTP(S) source metadata.
+- [x] Added regression cases for `https://example.com:notaport/report` and `https://example.com:99999/report` in both assessment test suites.
+- [ ] Confirm all four CI workflows pass on the final code/test revision before considering this batch complete.
+- **Boundary:** URL syntax validation does not fetch a source, confirm its ownership, or independently verify the underlying evidence claim.
