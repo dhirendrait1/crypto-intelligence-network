@@ -173,3 +173,19 @@ def test_request_rejects_unknown_evidence_record_fields():
             evidence=[{"evidence_type": "reserve_attestation", "published": "2026-10-01"}],
         )
 
+def test_endpoint_accepts_maximum_documented_freshness_threshold():
+    request = CommodityBackingAssessmentRequest(symbol="PAXG", max_age_days=3650)
+    assert request.max_age_days == 3650
+
+
+def test_endpoint_accepts_maximum_documented_evidence_batch():
+    record = {
+        "evidence_type": "reserve_attestation",
+        "source_name": "Example",
+        "source_url": "https://example.com/report",
+        "published_at": "2026-10-01T00:00:00Z",
+        "checked_at": "2026-10-24T00:00:00Z",
+        "status": "unverified",
+    }
+    request = CommodityBackingAssessmentRequest(symbol="PAXG", evidence=[record] * 100)
+    assert len(request.evidence) == 100
