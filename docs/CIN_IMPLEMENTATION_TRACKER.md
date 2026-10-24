@@ -121,5 +121,5 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Unexpected provider runtime/type/shape errors and invalid UTF-8 are mapped to a sanitized HTTP 502.
 - [x] Added mocked regression tests for these failure classes.
 - [x] Screening, evidence-ingestion API, and technical-analysis workflows passed on revision f789b282be76d59598778b4e891b61efb34475b3.
-- [ ] Verify the automated scaffold workflow on that exact revision; it was not present in the returned workflow listing.
+- [x] All four workflows subsequently confirmed on that exact revision: CIN Automated Tests, screening checks, technical-analysis tests, and evidence-ingestion API checks all passed.
 - Boundary: offline/mocked validation only; no live provider or deployment verification.
