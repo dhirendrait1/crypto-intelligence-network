@@ -128,6 +128,18 @@ def test_snapshot_rejects_mislabelled_or_invalid_open_interest_history(monkeypat
     with pytest.raises(ValueError, match=message):
         api._snapshot("BTCUSDT")
 
+def test_snapshot_rejects_non_finite_derived_funding_percent(monkeypatch):
+    payloads = [
+        {"symbol": "BTCUSDT", "openInterest": "1000", "time": 1_800_000_000_000},
+        {"symbol": "BTCUSDT", "markPrice": "65000", "indexPrice": "65000", "lastFundingRate": "1e308", "time": 1_800_000_000_000},
+        [],
+        {"bids": [["65000", "2"]], "asks": [["65010", "1"]]},
+    ]
+    monkeypatch.setattr(api, "_get_json", lambda _path, _params: payloads.pop(0))
+    with pytest.raises(ValueError, match="Derived derivatives metrics"):
+        api._snapshot("BTCUSDT")
+
+
 def test_snapshot_rejects_crossed_order_book(monkeypatch):
     payloads = [
         {"symbol": "BTCUSDT", "openInterest": "1000", "time": 1_800_000_000_000},
