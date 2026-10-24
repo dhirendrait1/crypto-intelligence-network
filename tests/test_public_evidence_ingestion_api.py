@@ -87,5 +87,23 @@ class PublicEvidenceIngestionApiTests(unittest.TestCase):
         fetch.assert_called_once_with("ethereum/go-ethereum")
 
 
+    @patch(
+        "cin_evidence_ingestion_api.fetch_github_repository_evidence",
+        side_effect=RuntimeError("sensitive provider internals"),
+    )
+    def test_unexpected_provider_runtime_error_is_sanitized(self, fetch):
+        with self.assertRaises(HTTPException) as raised:
+            public_evidence_ingestion(
+                PublicEvidenceRequest(symbol="ETH", repository="ethereum/go-ethereum")
+            )
+        self.assertEqual(raised.exception.status_code, 502)
+        self.assertEqual(
+            raised.exception.detail,
+            "Public evidence provider returned an unexpected response",
+        )
+        self.assertNotIn("sensitive provider internals", raised.exception.detail)
+        fetch.assert_called_once_with("ethereum/go-ethereum")
+
+
 if __name__ == "__main__":
     unittest.main()
