@@ -362,11 +362,18 @@ def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict
         raise
 
 def _score(coin: dict[str, Any]) -> dict[str, Any]:
-    market_cap = _number(coin.get("market_cap"))
-    volume = _number(coin.get("total_volume"))
-    fdv = _number(coin.get("fully_diluted_valuation"))
-    circulating = _number(coin.get("circulating_supply"))
-    total_supply = _number(coin.get("total_supply"))
+    # Financial magnitude fields cannot be negative; treat such provider values as
+    # unavailable evidence rather than allowing them into ratios or the response.
+    market_cap_raw = _number(coin.get("market_cap"))
+    volume_raw = _number(coin.get("total_volume"))
+    fdv_raw = _number(coin.get("fully_diluted_valuation"))
+    circulating_raw = _number(coin.get("circulating_supply"))
+    total_supply_raw = _number(coin.get("total_supply"))
+    market_cap = market_cap_raw if market_cap_raw is not None and market_cap_raw >= 0 else None
+    volume = volume_raw if volume_raw is not None and volume_raw >= 0 else None
+    fdv = fdv_raw if fdv_raw is not None and fdv_raw >= 0 else None
+    circulating = circulating_raw if circulating_raw is not None and circulating_raw >= 0 else None
+    total_supply = total_supply_raw if total_supply_raw is not None and total_supply_raw >= 0 else None
     change = _number(coin.get("price_change_percentage_24h"))
     asset_type, classification_note = _asset_type(coin)
     score = 0
@@ -398,35 +405,50 @@ def _score(coin: dict[str, Any]) -> dict[str, Any]:
     else:
         warnings.append("24h volume below preliminary 5M threshold")
 
-    if market_cap and volume is not None:
-        ratio = volume / market_cap
-        if ratio >= 0.01:
-            score += 20
-            reasons.append("24h volume / market cap is at least 1%")
+    if market_cap is not None and market_cap > 0 and volume is not None:
+        candidate_ratio = volume / market_cap
+        if math.isfinite(candidate_ratio):
+            ratio = candidate_ratio
+            if ratio >= 0.01:
+                score += 20
+                reasons.append("24h volume / market cap is at least 1%")
+            else:
+                warnings.append("Low 24h volume relative to market cap")
         else:
-            warnings.append("Low 24h volume relative to market cap")
+            ratio = None
+            warnings.append("Volume-to-market-cap ratio is non-finite; metric not scored")
     else:
         ratio = None
         warnings.append("Volume-to-market-cap ratio unavailable")
 
     if fdv is not None and market_cap is not None and fdv > 0:
-        fdv_gap = max(0.0, (fdv - market_cap) / fdv)
-        if fdv_gap <= 0.25:
-            score += 15
-            reasons.append("FDV-to-market-cap gap is at most 25%")
+        candidate_gap = max(0.0, (fdv - market_cap) / fdv)
+        if math.isfinite(candidate_gap):
+            fdv_gap = candidate_gap
+            if fdv_gap <= 0.25:
+                score += 15
+                reasons.append("FDV-to-market-cap gap is at most 25%")
+            else:
+                warnings.append("Large FDV-to-market-cap gap; inspect dilution risk")
         else:
-            warnings.append("Large FDV-to-market-cap gap; inspect dilution risk")
+            fdv_gap = None
+            warnings.append("FDV-to-market-cap gap is non-finite; metric not scored")
     else:
         fdv_gap = None
         warnings.append("FDV or market-cap data missing; dilution risk not scored")
 
     if circulating is not None and total_supply is not None and total_supply > 0:
-        circulating_ratio = min(1.0, circulating / total_supply)
-        if circulating_ratio >= 0.7:
-            score += 15
-            reasons.append("At least 70% of reported total supply is circulating")
+        candidate_supply_ratio = circulating / total_supply
+        if math.isfinite(candidate_supply_ratio):
+            circulating_ratio = min(1.0, candidate_supply_ratio)
+            if circulating_ratio >= 0.7:
+                score += 15
+                reasons.append("At least 70% of reported total supply is circulating")
+            else:
+                warnings.append("Less than 70% of reported total supply is circulating")
         else:
-            warnings.append("Less than 70% of reported total supply is circulating")
+            circulating_ratio = None
+            warnings.append("Circulating-supply ratio is non-finite; metric not scored")
     else:
         circulating_ratio = None
         warnings.append("Supply data missing; unlock schedule not verified")
