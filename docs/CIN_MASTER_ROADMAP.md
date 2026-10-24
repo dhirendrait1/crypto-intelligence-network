@@ -86,8 +86,8 @@
 
 ## Current checkpoint (2026-10-25)
 
-- Latest CI-verified documentation checkpoint before this update: `1b847b843c14e0929f9ec972fbc36af14b70a356`.
-- All four workflows passed on that checkpoint: CIN Automated Tests (`40142830679`), CIN screening checks (`40142830668`), CIN Technical Analysis Tests (`40142830721`), and CIN evidence ingestion API checks (`40142830681`).
+- Latest CI-verified code/documentation checkpoint before this tracker clarification: `1b847b843c14e0929f9ec972fbc36af14b70a356`.
+- All four workflows passed on that checkpoint: CIN Automated Tests (`40142830679`), CIN screening checks (`40142830668`), CIN Technical Analysis Tests (`40142830721`), and CIN evidence ingestion API checks (`40142830681`). A later tracker-only clarification records remaining live and interval-boundary acceptance gaps.
 - The CI results establish automated test success only; they do not establish live-provider correctness or deployed service health.
 - PR #8 is Draft and unmerged. No Render changes or deployment were performed.
 - **Do not report a single completion percentage:** step statuses mix implemented modules, partial acceptance work, future capabilities, and an approval-blocked release gate. Count by status only after refreshing this roadmap against the current head and CI evidence.
@@ -99,4 +99,4 @@ When continuing work, choose the earliest unfinished step that can be completed 
 
 ## CI evidence refresh (2026-10-25)
 
-All four configured workflows passed on the roadmap/tracker checkpoint `1b847b843c14e0929f9ec972fbc36af14b70a356`. See `docs/CIN_IMPLEMENTATION_TRACKER.md` for run IDs. Live-provider behavior and production health remain unverified.
+All four configured workflows passed on checkpoint `1b847b843c14e0929f9ec972fbc36af14b70a356`. The tracker was subsequently clarified in commit `a9f7e96b4a86e7c139806feca312e407ecc32505`; CI on that new head must be refreshed. Live-provider behavior and production health remain unverified.
