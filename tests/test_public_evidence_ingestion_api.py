@@ -128,6 +128,12 @@ class PublicEvidenceIngestionApiTests(unittest.TestCase):
                 repo="ethereum/go-ethereum",
             )
 
+    def test_request_rejects_trailing_newline_in_repository_path(self):
+        from pydantic import ValidationError
+
+        with self.assertRaises(ValidationError):
+            PublicEvidenceRequest(repository="ethereum/go-ethereum\n")
+
 
 if __name__ == "__main__":
     unittest.main()
