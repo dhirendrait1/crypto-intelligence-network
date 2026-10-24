@@ -142,5 +142,5 @@ class GrowthFundamentalsValidationTests(unittest.TestCase):
             result = assess_growth_fundamentals(
                 "ETH", [self.record(source_url=url)], now=self.now
             )
-            self.assertFalse(result["evidence"][0]["source_url_valid"] if "source_url_valid" in result["evidence"][0] else result["evidence"][0]["status"] == "verified")
+            self.assertFalse(result["evidence"][0]["source_url_valid"])
             self.assertEqual(result["evidence"][0]["status"], "unverified")
