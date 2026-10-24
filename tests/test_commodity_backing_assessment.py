@@ -126,6 +126,20 @@ def test_conflicting_statuses_for_same_evidence_type_are_not_hidden():
     assert result["overall_status"] == "evidence_conflicting_or_incomplete"
 
 
+def test_non_object_evidence_record_is_retained_as_unverified():
+    result = assess_commodity_asset("PAXG", ["not-a-record"], now=NOW)
+    assert result["invalid_evidence_record_count"] == 1
+    assert result["evidence"][0]["status"] == "unverified"
+    assert result["evidence"][0]["invalid_record"] is True
+
+
+def test_non_list_evidence_input_does_not_raise_or_claim_complete_coverage():
+    result = assess_commodity_asset("PAXG", "not-a-list", now=NOW)
+    assert result["input_evidence_list_valid"] is False
+    assert result["overall_status"] == "evidence_unverified_or_incomplete"
+    assert result["evidence"] == []
+
+
 def test_valid_http_url_and_timestamp_metadata_remain_accepted():
     result = normalize_evidence(valid_item(source_url="http://example.com/report"), now=NOW)
     assert result["status"] == "verified"
