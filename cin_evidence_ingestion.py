@@ -1,4 +1,4 @@
-""""Read-only, allowlisted public evidence ingestion for CIN (stdlib only).
+"""Read-only, allowlisted public evidence ingestion for CIN (stdlib only).
 
 This first connector retrieves public GitHub repository metadata for Ethereum
 developer-activity context. Retrieval is not independent claim verification.
