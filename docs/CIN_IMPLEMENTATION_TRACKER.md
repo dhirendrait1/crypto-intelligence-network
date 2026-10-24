@@ -555,3 +555,10 @@ This checkpoint validates configured offline automation only. It does not establ
 - CI caught a regression-test-only issue: the new end-to-end test referenced `datetime` without importing it. Fixed in `d7b6550dd2a1bc23d0a8de6055598c85cd5d976b`; rerun is pending. The application logic was not implicated by this failure.
 
 - Follow-up CI found the import fix had been inserted at a nested `import asyncio` site, causing an `IndentationError`. Moved `datetime`/`timezone` to the module-level imports in `cdd4e28c4ad1d70e189cea7350cede5ea91e1c8b`. Latest rerun must confirm collection and tests pass.
+
+## Interval-boundary matrix and provider-doc review (2026-10-25)
+
+- Official Binance Spot documentation identifies kline open and close timestamps, lists supported intervals including 3d, 1w, and 1M, and notes that interval interpretation can depend on the optional timeZone parameter. This client does not set timeZone, so its REST requests use the documented UTC default. Reference: https://github.com/binance/binance-spot-api-docs/blob/master/rest-api.md
+- Binance stream documentation describes weekly/monthly interval labels and UTC open/close timestamps; this supports testing weekly Monday UTC and calendar-month boundaries, but does not justify inventing an epoch-modulo anchor for 3-day candles. Reference: https://github.com/binance/binance-spot-api-docs/blob/master/web-socket-streams.md
+- Expanded deterministic tests for weekly Monday-midnight UTC acceptance/rejection and 3-day duration validation without an assumed epoch anchor. Test commit: 796518581664dfb8fc134a797a014c08b3ab6a7f.
+- Latest-head CI for the current code and test changes must pass before this matrix is counted as verified. Kraken boundary enforcement remains deferred; offline tests do not establish live-provider behavior.
