@@ -91,6 +91,16 @@ def test_embedded_url_credentials_are_not_accepted():
     assert result["source_url_valid"] is False
 
 
+def test_non_string_timestamps_do_not_raise_or_support_verified_status():
+    result = normalize_evidence(
+        valid_item(published_at=123, checked_at={"unexpected": "shape"}),
+        now=NOW,
+    )
+    assert result["status"] == "unverified"
+    assert "published_at" in result["missing_fields"]
+    assert "checked_at" in result["missing_fields"]
+
+
 def test_naive_timestamps_do_not_support_verified_status():
     result = normalize_evidence(
         valid_item(published_at="2026-10-01T00:00:00", checked_at="2026-10-24T00:00:00"),
