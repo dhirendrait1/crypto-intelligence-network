@@ -364,3 +364,11 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] All four workflows passed on code/test commit `6fd11d8e90d1b0340574ebec97bed9ab3a6edc54`: CIN Automated Tests (run `40125347836`), CIN screening checks (`40125347837`), CIN Technical Analysis Tests (`40125347825`), and CIN evidence ingestion API checks (`40125347822`). The derivatives regression step passed in CIN Automated Tests.
 - **Boundary:** fixed-time and mocked-provider tests only; no live exchange or production endpoint was contacted. PR #8 remains Draft and unmerged.
 
+## Public news provider timestamp semantics (2026-10-25)
+
+- [x] Corrected the news response contract to expose GDELT `seendate` under `provider_seen_at`, `provider_seen_at_utc`, and `provider_seen_at_validation_status`; legacy `published_at*` fields remain for compatibility and are documented as aliases, not verified publication times.
+- [x] Added detection for provider timestamps more than 60 seconds in the future, preserving the normalized value while returning `future_dated`.
+- [x] Added deterministic regression coverage for future timestamps and assertions that the new fields and compatibility aliases agree.
+- [ ] Await all four CI workflows on the latest documentation/tracker head before marking this milestone fully verified.
+- **Boundary:** offline/mocked tests only; no live GDELT request or production deployment check performed. PR #8 remains Draft and unmerged.
+
