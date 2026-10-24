@@ -332,7 +332,7 @@ def test_market_provider_shape_failures_return_sanitized_502(monkeypatch, failur
         {
             "error": [],
             "result": {
-                "XXBTZUSD": [[10**100, "1", "2", "0.5", "1.5", "1.2", "10", 4]],
+                "XXBTZUSD": [[10**1000, "1", "2", "0.5", "1.5", "1.2", "10", 4]],
                 "last": 123,
             },
         },
