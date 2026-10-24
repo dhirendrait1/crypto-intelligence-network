@@ -163,7 +163,7 @@ def _snapshot(symbol: str) -> dict[str, Any]:
 
 @router.get("/derivatives/market-snapshot")
 async def derivatives_market_snapshot(
-    symbol: str = Query(default="BTCUSDT", min_length=5, max_length=20, pattern="^[A-Za-z0-9]+$"),
+    symbol: str = Query(default="BTCUSDT", min_length=5, max_length=20, pattern=r"^[A-Za-z0-9]+\z"),
 ):
     """Return a read-only public derivatives snapshot; no account or trading endpoints are used."""
     normalized = symbol.upper()
