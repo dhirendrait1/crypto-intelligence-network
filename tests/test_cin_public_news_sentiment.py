@@ -67,6 +67,25 @@ def test_endpoint_classifies_provider_network_failure(monkeypatch):
     assert caught.value.detail["error"] == "network_error"
 
 
+def test_search_response_exposes_provider_timestamp_quality_counts(monkeypatch):
+    monkeypatch.setattr(api, "_get_json", lambda _query, _limit: {
+        "articles": [
+            {"title": "Bullish adoption", "url": "https://news.example/a", "seendate": "20991231T235959Z"},
+            {"title": "Market update", "url": "https://news.example/b"},
+            {"title": "Crash risks", "url": "https://news.example/c", "seendate": "20261024T000000Z"},
+        ]
+    })
+    result = api._search("bitcoin", 5)
+    quality = result["data_quality"]["provider_timestamp_quality_counts"]
+    assert quality == {
+        "valid": 1, "missing": 1, "invalid_timezone": 0, "invalid": 0, "future_dated": 1
+    }
+    # Sentiment is still computed from all accepted headlines; consumers are told that
+    # timestamp quality does not filter the aggregate.
+    assert result["count"] == 3
+    assert result["data_quality"]["sentiment_aggregate_includes_all_accepted_headlines_regardless_of_timestamp_status"] is True
+
+
 def test_invalid_provider_payload_is_rejected():
     with pytest.raises(ValueError, match="Unexpected GDELT"):
         api._parse_articles([], 10)
