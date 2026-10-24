@@ -82,6 +82,15 @@ def test_endpoint_rejects_boolean_freshness_threshold():
         CommodityBackingAssessmentRequest(symbol="PAXG", max_age_days=True)
 
 
+def test_endpoint_rejects_non_integer_freshness_thresholds():
+    import pytest
+    from pydantic import ValidationError
+
+    for threshold in (30.0, "30", -1):
+        with pytest.raises(ValidationError):
+            CommodityBackingAssessmentRequest(symbol="PAXG", max_age_days=threshold)
+
+
 def test_endpoint_rejects_oversized_evidence_batch():
     import pytest
     from pydantic import ValidationError
