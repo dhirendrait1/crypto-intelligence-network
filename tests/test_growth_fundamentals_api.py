@@ -53,3 +53,17 @@ def test_request_rejects_oversized_evidence_metadata_fields():
     for field, oversized in limits.items():
         with pytest.raises(ValidationError):
             GrowthFundamentalsRequest(symbol="ETH", evidence=[{**valid, field: oversized}])
+
+
+def test_request_rejects_unknown_top_level_fields():
+    with pytest.raises(ValidationError):
+        GrowthFundamentalsRequest(symbol="ETH", max_age_day=30)
+
+
+def test_request_rejects_unknown_evidence_record_fields():
+    with pytest.raises(ValidationError):
+        GrowthFundamentalsRequest(
+            symbol="ETH",
+            evidence=[{"category": "usage_and_adoption", "published": "2026-10-01"}],
+        )
+
