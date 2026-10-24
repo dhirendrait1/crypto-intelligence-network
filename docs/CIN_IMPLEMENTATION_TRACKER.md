@@ -463,3 +463,8 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - Boundary: mocked tests do not verify live Kraken pair aliases or quote-currency support. PR #8 remains Draft and unmerged.
 
 - Follow-up regression coverage: explicitly rejects a Kraken BTC/USD result when the requested symbol is BTC/USDT, preventing quote-currency substitution even when the base asset matches (test commit `7a821b28c3e4ba95681df235c82ccd73f1bfeb94`). Latest-head CI is pending.
+
+### Requested candle-count enforcement (2026-10-25)
+- Binance candle parsing now rejects a provider response containing more valid candles than the requested `limit`, preserving the endpoint's response-count contract even if a provider returns unexpected data.
+- Added an offline regression test for an over-limit Binance response. Existing normal response and Kraken fallback behavior remains covered.
+- Code commit: `918a2021eea6d2da0afeb6d9af21d6346d4d6510`; test commit: `03824743898b814b818e6fcdeaadf5e7e48285f8`. CI validation for the latest tracker commit is pending.
