@@ -49,6 +49,28 @@ def test_full_evidence_coverage_is_only_metadata_status():
     assert result["not_a_reserve_certification"] is True
 
 
+def test_unknown_evidence_type_prevents_complete_overall_status():
+    evidence = [
+        valid_item(evidence_type=kind)
+        for kind in ("reserve_attestation", "redemption_terms", "custody_or_issuer_disclosure")
+    ]
+    evidence.append(valid_item(evidence_type="unrecognized_type"))
+    result = assess_commodity_asset("PAXG", evidence, now=NOW)
+    assert result["unrecognized_evidence_type_count"] == 1
+    assert result["overall_status"] == "evidence_invalid_or_incomplete"
+
+
+def test_malformed_extra_record_prevents_complete_overall_status():
+    evidence = [
+        valid_item(evidence_type=kind)
+        for kind in ("reserve_attestation", "redemption_terms", "custody_or_issuer_disclosure")
+    ]
+    evidence.append("malformed-extra-row")
+    result = assess_commodity_asset("PAXG", evidence, now=NOW)
+    assert result["invalid_evidence_record_count"] == 1
+    assert result["overall_status"] == "evidence_invalid_or_incomplete"
+
+
 def test_future_publication_timestamp_downgrades_supplied_verified_status():
     result = normalize_evidence(
         valid_item(published_at="2026-10-25T00:00:00Z"), now=NOW
