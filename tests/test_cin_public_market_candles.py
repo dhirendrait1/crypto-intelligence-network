@@ -34,6 +34,20 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(ValueError, "no valid candles"):
                 api._fetch_binance("BTCUSDT", "1h", 5)
 
+    async def test_load_sorts_out_of_order_candles_chronologically(self):
+        reversed_rows = [dict(SAMPLE[2]), dict(SAMPLE[0]), dict(SAMPLE[1])]
+        with patch.object(api, "_fetch_binance", return_value=reversed_rows):
+            rows = await api._load("BTCUSDT", "1h", 5)
+        self.assertEqual([row["open_time"] for row in rows], sorted(row["open_time"] for row in rows))
+
+    async def test_load_rejects_duplicate_candle_timestamps(self):
+        duplicate_rows = [dict(SAMPLE[0]), dict(SAMPLE[0])]
+        with patch.object(api, "_fetch_binance", return_value=duplicate_rows):
+            with self.assertRaises(HTTPException) as ctx:
+                await api._load("BTCUSDT", "1h", 5)
+        self.assertEqual(ctx.exception.status_code, 502)
+        self.assertIn("ambiguous candle sequence", ctx.exception.detail)
+
     async def test_candle_endpoint_returns_provenance_and_timestamps(self):
         with patch.object(api, "_load", return_value=SAMPLE):
             result = await api.get_market_candles("BTCUSDT", "1h", 50)
