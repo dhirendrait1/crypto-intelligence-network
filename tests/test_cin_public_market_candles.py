@@ -75,3 +75,13 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+    def test_public_candle_routes_use_absolute_end_symbol_pattern(self):
+        from fastapi import FastAPI
+        app = FastAPI()
+        app.include_router(api.router)
+        schema = app.openapi()["paths"]
+        for route in ("/market-candles", "/technical-analysis/market"):
+            parameters = schema[route]["get"]["parameters"]
+            symbol = next(parameter for parameter in parameters if parameter["name"] == "symbol")
+            self.assertEqual(symbol["schema"]["pattern"], r"^[A-Za-z0-9]+\z")
+
