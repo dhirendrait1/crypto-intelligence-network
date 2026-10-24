@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import re
 import urllib.error
 import urllib.parse
@@ -78,14 +79,14 @@ def _valid_candle(row: dict[str, Any]) -> bool:
             return False
         if any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in prices):
             return False
-        if any(not __import__("math").isfinite(value) or value <= 0 for value in prices):
+        if any(not math.isfinite(value) or value <= 0 for value in prices):
             return False
         open_price, high, low, close = prices
         if high < max(open_price, low, close) or low > min(open_price, high, close):
             return False
         if isinstance(volume, bool) or not isinstance(volume, (int, float)):
             return False
-        if not __import__("math").isfinite(volume) or volume < 0:
+        if not math.isfinite(volume) or volume < 0:
             return False
         return True
     except (KeyError, TypeError, ValueError, OverflowError):
