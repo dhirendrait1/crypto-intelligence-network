@@ -2,7 +2,7 @@
 from typing import Any
 
 from fastapi import APIRouter
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 try:
     from app.commodity_backing_assessment import assess_commodity_asset
@@ -13,6 +13,7 @@ router = APIRouter(tags=["commodity backing evidence"])
 
 
 class EvidenceRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     evidence_type: str = Field(min_length=1, max_length=80)
     source_name: str | None = Field(default=None, max_length=200)
     source_url: str | None = Field(default=None, max_length=2048)
@@ -23,6 +24,7 @@ class EvidenceRecord(BaseModel):
 
 
 class CommodityBackingAssessmentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     symbol: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
     evidence: list[EvidenceRecord] = Field(default_factory=list, max_length=100)
     max_age_days: int = Field(default=90, strict=True, ge=0, le=3650)
