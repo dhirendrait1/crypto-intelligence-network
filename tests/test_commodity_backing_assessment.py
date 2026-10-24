@@ -186,3 +186,14 @@ def test_timezone_naive_assessment_clock_falls_back_and_is_reported():
     result = assess_commodity_asset("PAXG", [valid_item()], now=NOW.replace(tzinfo=None))
     assert result["assessment_clock_valid"] is False
     assert result["evidence"][0]["assessment_clock_valid"] is False
+
+
+def test_raw_whitespace_and_control_characters_in_source_urls_are_rejected():
+    for url in (
+        "https://example.com/report\n.evil",
+        "https://example.com/report\t.evil",
+        "https://example.com/report with-space",
+    ):
+        result = normalize_evidence(valid_item(source_url=url), now=NOW)
+        assert result["source_url_valid"] is False
+        assert result["status"] == "unverified"
