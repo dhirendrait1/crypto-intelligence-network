@@ -89,6 +89,26 @@ def test_snapshot_rejects_wrong_symbol_or_invalid_payload(monkeypatch):
         api._snapshot("BTCUSDT")
 
 
+
+@pytest.mark.parametrize(
+    "history_row, message",
+    [
+        ({"symbol": "ETHUSDT", "sumOpenInterestValue": "1000000", "timestamp": 1_800_000_000_000}, "symbol did not match"),
+        ({"symbol": "BTCUSDT", "sumOpenInterestValue": "-1", "timestamp": 1_800_000_000_000}, "invalid notional value"),
+        ({"symbol": "BTCUSDT", "sumOpenInterestValue": "1000000", "timestamp": "invalid"}, "invalid timestamp"),
+    ],
+)
+def test_snapshot_rejects_mislabelled_or_invalid_open_interest_history(monkeypatch, history_row, message):
+    payloads = [
+        {"symbol": "BTCUSDT", "openInterest": "1000", "time": 1_800_000_000_000},
+        {"symbol": "BTCUSDT", "markPrice": "65000", "indexPrice": "64990", "lastFundingRate": "0.0001", "time": 1_800_000_000_000},
+        [history_row],
+        {"bids": [["65000", "2"]], "asks": [["65010", "1"]]},
+    ]
+    monkeypatch.setattr(api, "_get_json", lambda _path, _params: payloads.pop(0))
+    with pytest.raises(ValueError, match=message):
+        api._snapshot("BTCUSDT")
+
 def test_snapshot_rejects_crossed_order_book(monkeypatch):
     payloads = [
         {"symbol": "BTCUSDT", "openInterest": "1000", "time": 1_800_000_000_000},
