@@ -23,6 +23,30 @@ def _row(open_time_ms: int, close_time_ms: int, close: float = 100.0):
     }
 
 
+
+def test_clean_candles_rejects_invalid_rows_and_orders_unique_timestamps():
+    valid_later = _row(2_000, 2_999)
+    valid_earlier = _row(1_000, 1_999)
+    invalid_price = _row(3_000, 3_999)
+    invalid_price["close"] = float("nan")
+    invalid_volume = _row(4_000, 4_999)
+    invalid_volume["volume"] = -1
+    duplicate = _row(1_000, 1_999, close=101.0)
+
+    cleaned = api._clean_candles(
+        [valid_later, invalid_price, valid_earlier, invalid_volume, duplicate],
+        "Test provider",
+    )
+
+    assert [row["open_time"] for row in cleaned] == [1_000, 2_000]
+    assert cleaned[0]["close"] == 101.0
+
+
+def test_clean_candles_fails_when_provider_returns_only_invalid_rows():
+    invalid = _row(1_000, 999)
+    with pytest.raises(ValueError, match="returned no valid candles"):
+        api._clean_candles([invalid], "Test provider")
+
 def test_kraken_fallback_reports_actual_pair_key_and_quote(monkeypatch):
     now_seconds = int(datetime.now(timezone.utc).timestamp()) - 600
     payload = {
