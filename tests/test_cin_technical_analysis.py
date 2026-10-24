@@ -38,6 +38,31 @@ class TechnicalAnalysisTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             module.analyze_ohlc(candles_from_closes([100 + i for i in range(501)]))
 
+    def test_volume_metrics_are_reported_when_volume_is_supplied(self):
+        bars = candles_from_closes([100 + i for i in range(25)])
+        for i, bar in enumerate(bars):
+            bar["volume"] = 100.0
+        bars[-1]["volume"] = 200.0
+        result = module.analyze_ohlc(bars)
+        self.assertEqual(result["indicators"]["volume_latest"], 200.0)
+        self.assertEqual(result["indicators"]["volume_average_20"], 105.0)
+        self.assertEqual(result["indicators"]["relative_volume_20"], 1.9048)
+        self.assertEqual(result["indicators"]["volume_analysis_status"], "available")
+
+    def test_volume_must_be_present_for_all_candles_or_none(self):
+        bars = candles_from_closes([10, 11, 12, 11, 12])
+        bars[0]["volume"] = 10
+        with self.assertRaisesRegex(ValueError, "every candle"):
+            module.analyze_ohlc(bars)
+
+    def test_negative_volume_is_rejected(self):
+        bars = candles_from_closes([10, 11, 12, 11, 12])
+        for bar in bars:
+            bar["volume"] = 10
+        bars[-1]["volume"] = -1
+        with self.assertRaisesRegex(ValueError, "non-negative"):
+            module.analyze_ohlc(bars)
+
 
 if __name__ == "__main__":
     unittest.main()
