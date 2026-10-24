@@ -99,11 +99,17 @@ def _snapshot(symbol: str) -> dict[str, Any]:
     best_ask = min(price for price, _ in asks)
     if best_ask < best_bid:
         raise ValueError("Order-book best ask is below best bid")
-    midpoint = (best_bid + best_ask) / 2
+    midpoint = best_bid / 2 + best_ask / 2
     bid_notional = sum(price * qty for price, qty in bids)
     ask_notional = sum(price * qty for price, qty in asks)
     total_notional = bid_notional + ask_notional
-    depth_imbalance = (bid_notional - ask_notional) / total_notional if total_notional > 0 else None
+    if not all(math.isfinite(value) for value in (midpoint, bid_notional, ask_notional, total_notional)):
+        raise ValueError("Order-book arithmetic exceeded finite numeric limits")
+    if midpoint <= 0 or total_notional <= 0:
+        raise ValueError("Order-book arithmetic produced a non-positive midpoint or notional")
+    depth_imbalance = (bid_notional - ask_notional) / total_notional
+    if not math.isfinite(depth_imbalance):
+        raise ValueError("Order-book imbalance was not finite")
 
     history_rows = sorted(
         history,
