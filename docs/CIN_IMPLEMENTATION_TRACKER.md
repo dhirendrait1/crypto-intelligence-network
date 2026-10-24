@@ -188,3 +188,11 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Validate the injected assessment clock before using it in commodity/growth evidence calculations; reject naive/non-datetime test clocks safely, expose the validity flag, and avoid reporting future publication ages as zero.
 - [x] Correct commodity assessment clock propagation so endpoint callers and malformed injected-clock tests do not raise unexpected `NameError` / `AttributeError` exceptions; preserve the invalid-clock audit flag on normalized rows.
 - [x] Correct commodity clock propagation so normalized evidence rows use the validated UTC assessment clock rather than the raw injected value. All four workflows passed on commit `d829699ac591e2ef6b430ae274108a844f576eef`: CIN screening checks (run `40106430183`), CIN Automated Tests (`40106430190`), evidence ingestion API checks (`40106430187`), and Technical Analysis Tests (`40106430182`). These are CI regression tests, not live-provider or production verification.
+
+## Public API symbol-bound consistency (2026-10-24)
+
+- [x] Cross-checked the public candle and derivatives snapshot request contracts.
+- [x] Reduced the derivatives symbol maximum length from 30 to 20 characters to match the public candle API's accepted alphanumeric pair length; kept the existing 5-character minimum and alphanumeric pattern.
+- [x] Updated the OpenAPI regression test to assert the 20-character bound.
+- [x] All four workflows passed on code/test commit `cb711fbc0f489f05a253933d1d200e5ee2185416`: CIN Automated Tests (run `40107114907`), screening checks (run `40107114890`), Technical Analysis Tests (run `40107114918`), and evidence-ingestion API checks (run `40107114916`).
+- **Boundary:** the shared format is a syntactic guard, not proof that a pair is listed by Binance or Kraken. Validation remains offline/mocked; no live-provider or production check is implied.
