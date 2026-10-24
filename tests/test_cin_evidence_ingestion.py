@@ -45,6 +45,8 @@ class EvidenceIngestionTests(unittest.TestCase):
         self.assertFalse(result["independently_verified"])
         self.assertIn("retrieved_at", result)
         self.assertIn("published_at", result)
+        self.assertEqual(result["source_timestamp_field"], "pushed_at")
+        self.assertEqual(result["metadata_completeness"], "complete")
 
     def test_rejects_arbitrary_repository(self):
         with self.assertRaises(ValueError):
@@ -109,6 +111,19 @@ class EvidenceIngestionTests(unittest.TestCase):
         })
         with self.assertRaises(EvidenceSourceError):
             fetch_github_repository_evidence()
+
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_partial_metadata_is_flagged_and_updated_timestamp_provenance_is_explicit(self, mocked):
+        mocked.return_value = FakeResponse({
+            "full_name": "ethereum/go-ethereum",
+            "updated_at": "2026-10-24T10:00:00Z",
+        })
+        result = fetch_github_repository_evidence()
+        self.assertEqual(result["metadata_completeness"], "partial")
+        self.assertEqual(result["source_timestamp_field"], "updated_at")
+        self.assertEqual(result["published_at"], "2026-10-24T10:00:00Z")
+        self.assertEqual(result["claim_verification_status"], "unverified")
+        self.assertFalse(result["independently_verified"])
 
     @patch("cin_evidence_ingestion.urlopen")
     def test_freshness_is_classified_from_source_timestamp(self, mocked):
