@@ -37,7 +37,7 @@ The response keeps the original provider timestamps in `provider_timestamps` and
 - Open interest and mark-price/funding timestamps are marked `stale` when older than 15 minutes.
 - The latest 4-hour open-interest history aggregate is marked `stale` when older than 8 hours.
 - Provider timestamps more than 60 seconds in the future are marked `future_dated`; this does not silently relabel them as fresh.
-- A missing history timestamp is `unavailable`, not an invalid provider timestamp. It does not itself raise a freshness warning when no history exists.
+- A missing history timestamp is `unavailable`, not an invalid provider timestamp. Because unavailable timestamps are conservatively included in `freshness_warnings`, empty history makes `freshness_status` a `warning` and `analysis_eligibility` `not_recommended`; history-derived metrics remain null.
 - `data_quality.freshness_status` is `warning` if any source timestamp is stale, future-dated, or invalid; `freshness_warnings` names the affected sources. The endpoint retains the snapshot but callers should not treat a warned snapshot as fully fresh.
 
 These thresholds are CIN heuristics, not exchange guarantees. Automated tests use fixed timestamps and mocked payloads; live provider clock behavior remains unverified.
