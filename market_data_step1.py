@@ -184,6 +184,11 @@ async def get_public_market_data(
     except urllib.error.HTTPError as exc:
         if exc.code == 429:
             raise HTTPException(status_code=503, detail="Market-data provider rate limit reached; retry later.") from exc
+        if exc.code == 400:
+            raise HTTPException(
+                status_code=400,
+                detail="Currency or market-data request is not supported by the provider.",
+            ) from exc
         raise HTTPException(status_code=502, detail=f"Market-data provider returned HTTP {exc.code}.") from exc
     except (urllib.error.URLError, TimeoutError, OSError):
         raise HTTPException(status_code=503, detail="Market-data provider is temporarily unavailable.") from None
