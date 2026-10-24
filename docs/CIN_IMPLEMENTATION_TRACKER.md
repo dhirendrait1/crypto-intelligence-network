@@ -322,3 +322,11 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Reconfirmed PR #8 is open, Draft, and unmerged.
 - [ ] Live Kraken pair availability and production health/readiness remain unverified. No production URL was established from repository evidence during this pass; do not guess one. Continue with repository-level OpenAPI/error-contract audit and request the existing deployment URL only if a live smoke test cannot be run from existing authorized configuration.
 - **Boundary:** passing CI verifies the repository's offline/mocked checks only. No merge, deployment, account connection, or trade execution was performed.
+
+## Public candle analysis API contract regression tests (2026-10-25)
+
+- [x] Added offline regression coverage that proves a forming candle is excluded from the technical-analysis input while request/use counts and the exclusion count remain explicit.
+- [x] Added offline regression coverage that returns HTTP 422 when fewer than five completed candles are available for analysis.
+- [ ] CI validation for code/test commit `9f2b8ab9d1623f237b273fd2d571881b6b449e13` is pending; do not mark this test batch passing until the workflow results are inspected.
+- **Boundary:** these tests mock the provider loader and verify API behavior only. They do not validate live exchange data or the deployed Render revision.
+
