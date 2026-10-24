@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import math
 import urllib.error
 import urllib.parse
@@ -163,9 +164,14 @@ def _snapshot(symbol: str) -> dict[str, Any]:
 
 @router.get("/derivatives/market-snapshot")
 async def derivatives_market_snapshot(
-    symbol: str = Query(default="BTCUSDT", min_length=5, max_length=20, pattern=r"^[A-Za-z0-9]+\z"),
+    symbol: str = Query(default="BTCUSDT", min_length=5, max_length=20, pattern="^[A-Za-z0-9]+$"),
 ):
     """Return a read-only public derivatives snapshot; no account or trading endpoints are used."""
+    if re.fullmatch(r"[A-Za-z0-9]{5,20}", symbol) is None:
+        raise HTTPException(status_code=400, detail={
+            "message": "Symbol must be a 5–20 character alphanumeric trading pair.",
+            "error": "invalid_symbol",
+        })
     normalized = symbol.upper()
     try:
         import asyncio
