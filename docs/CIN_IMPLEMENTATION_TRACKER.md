@@ -70,3 +70,13 @@ Do **not** calculate a single completion percentage from this inventory: it mixe
 - [x] Add offline regression tests for URL and timestamp chronology edge cases.
 - [x] Verify the new regression tests and all four repository workflows on commit `7e26219dc57b752255f6e58e8aefdf1f28e749e1`; all four workflows passed. These are offline/mocked tests, not live provider validation.
 - **Boundary:** these checks validate supplied metadata only. CIN still does not fetch source documents or independently certify reserve, custody, solvency, or redemption claims.
+
+
+## Growth fundamentals evidence validation (2026-10-24)
+
+- [x] Audit the current assessment contract and confirm the coverage score measures submitted evidence metadata, not project quality or investment merit.
+- [x] Require absolute HTTP(S) URLs with a parsed hostname rather than accepting a scheme-prefix string.
+- [x] Add regression tests for scheme-only URLs, URLs without a hostname, and valid HTTP URLs.
+- [x] Verify all four GitHub Actions workflows on commit `31f8ad04051e15ef028d85ee58f0dd79e2826b9f`; all passed. Results are offline tests only.
+- [ ] Reject future publication timestamps for supplied `verified` records; this remains an identified gap and is not claimed as fixed.
+- [ ] Add evidence conflict resolution and independent source retrieval; the endpoint currently assesses caller-supplied metadata only.
