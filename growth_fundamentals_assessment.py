@@ -98,12 +98,13 @@ def assess_growth_fundamentals(
         published = _parse_date(item.get("published_at"))
         source_name = item.get("source_name")
         source_url = item.get("source_url")
+        source_url_valid = _is_http_url(source_url)
         missing = []
         if kind not in CATEGORIES:
             missing.append("recognized_category")
         if not isinstance(source_name, str) or not source_name.strip():
             missing.append("source_name")
-        if not _is_http_url(source_url):
+        if not source_url_valid:
             missing.append("source_url")
         if published is None:
             missing.append("published_at")
@@ -121,6 +122,7 @@ def assess_growth_fundamentals(
             "category_description": CATEGORIES.get(kind, "Unknown category"),
             "source_name": source_name,
             "source_url": source_url,
+            "source_url_valid": source_url_valid,
             "published_at": item.get("published_at"),
             "publication_age_days": age,
             "timestamp_validation_errors": timestamp_validation_errors,
