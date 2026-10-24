@@ -654,3 +654,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Code commit: `c3b51db8fdd5d7cc8a1e9bc567b1a97854ff1905`.
 - Test commit: `1cd3a8a32f0da6ca4ace87b25c08fe39dd6d9954`.
 - CI verification pending on the latest tracker commit.
+
+
+## Kraken floating-point timestamp overflow case (2026-10-25)
+
+- Extended the oversized-timestamp regression payload to include both a 1,001-digit integer and a finite `1e308` float whose millisecond conversion overflows.
+- Confirms both integer-to-float validation and float-to-millisecond conversion are contained as invalid rows.
+- Test commit: `8a7b4e4565f25c3f51b142859643953a165b8448`.
+- CI verification pending on the latest tracker commit.
