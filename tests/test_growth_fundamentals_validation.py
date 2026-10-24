@@ -45,6 +45,21 @@ class GrowthFundamentalsValidationTests(unittest.TestCase):
         self.assertEqual(result["evidence"][0]["status"], "unverified")
         self.assertIn("published_at", result["evidence"][0]["missing_fields"])
 
+    def test_conflicting_statuses_for_same_category_are_not_hidden(self):
+        result = assess_growth_fundamentals(
+            "ETH",
+            [
+                self.record(status="verified"),
+                self.record(status="unverified", source_name="Second source"),
+            ],
+            now=self.now,
+        )
+        coverage = result["coverage"]["usage_and_adoption"]
+        self.assertEqual(coverage["status"], "conflicting")
+        self.assertTrue(coverage["conflict_detected"])
+        self.assertEqual(result["overall_status"], "evidence_conflicting_or_incomplete")
+        self.assertEqual(result["evidence_coverage_score"], 0)
+
     def test_valid_http_url_is_accepted_as_metadata(self):
         result = assess_growth_fundamentals("ETH", [self.record(source_url="http://example.com/report")], now=self.now)
         self.assertEqual(result["evidence"][0]["status"], "verified")
