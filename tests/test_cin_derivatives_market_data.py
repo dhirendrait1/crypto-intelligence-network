@@ -164,6 +164,43 @@ def test_snapshot_rejects_unrepresentable_provider_timestamps(monkeypatch, field
         api._snapshot("BTCUSDT")
 
 
+def test_snapshot_counts_rejected_order_book_levels_without_hiding_them(monkeypatch):
+    payloads = [
+        {"symbol": "BTCUSDT", "openInterest": "1000", "time": 1_800_000_000_000},
+        {"symbol": "BTCUSDT", "markPrice": "65000", "indexPrice": "65000", "lastFundingRate": "0.0001", "time": 1_800_000_000_000},
+        [],
+        {
+            "bids": [["65000", "2"], ["bad-price", "1"], ["64990", "0"], ["short"]],
+            "asks": [["65010", "1"], [None, "3"]],
+        },
+    ]
+    monkeypatch.setattr(api, "_get_json", lambda _path, _params: payloads.pop(0))
+
+    result = api._snapshot("BTCUSDT")
+
+    assert result["order_book"]["bid_levels_used"] == 1
+    assert result["order_book"]["ask_levels_used"] == 1
+    assert result["order_book"]["bid_levels_rejected"] == 3
+    assert result["order_book"]["ask_levels_rejected"] == 1
+    assert any("rejected-level fields" in item for item in result["data_quality"]["limitations"])
+
+
+def test_snapshot_keeps_open_interest_change_null_when_history_is_empty(monkeypatch):
+    payloads = [
+        {"symbol": "BTCUSDT", "openInterest": "1000", "time": 1_800_000_000_000},
+        {"symbol": "BTCUSDT", "markPrice": "65000", "indexPrice": "65000", "lastFundingRate": "0.0001", "time": 1_800_000_000_000},
+        [],
+        {"bids": [["65000", "2"]], "asks": [["65010", "1"]]},
+    ]
+    monkeypatch.setattr(api, "_get_json", lambda _path, _params: payloads.pop(0))
+
+    result = api._snapshot("BTCUSDT")
+
+    assert result["data"]["open_interest_value_quote_approx"] is None
+    assert result["data"]["open_interest_value_change_4h_percent"] is None
+    assert result["provider_timestamps"]["open_interest_history_latest"] is None
+
+
 def test_snapshot_rejects_crossed_order_book(monkeypatch):
     payloads = [
         {"symbol": "BTCUSDT", "openInterest": "1000", "time": 1_800_000_000_000},
