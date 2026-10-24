@@ -177,3 +177,7 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Add offline regression tests for unknown fields at each API boundary.
 - [x] All four workflows passed on test commit `da7d1fd2b0b1928fdc90f6396ce3c02e10d70ed7`: CIN Automated Tests, screening checks, technical-analysis tests, and evidence-ingestion API checks.
 - **Boundary:** these checks validate request shape only. They do not authenticate submitters, fetch caller-provided evidence URLs, or independently verify claims. CI is offline/mocked and does not certify live providers or production deployment.
+
+- [x] Validate the injected assessment clock before using it in commodity/growth evidence calculations; reject naive/non-datetime test clocks safely, expose the validity flag, and avoid reporting future publication ages as zero.
+- [x] Correct commodity assessment clock propagation so endpoint callers and malformed injected-clock tests do not raise unexpected `NameError` / `AttributeError` exceptions; preserve the invalid-clock audit flag on normalized rows.
+- [ ] Confirm all four workflows after the clock-propagation correction. The preceding run exposed a regression in commodity clock propagation; it is corrected in the latest feature-branch commit and must not be described as passing until rerun results are available.
