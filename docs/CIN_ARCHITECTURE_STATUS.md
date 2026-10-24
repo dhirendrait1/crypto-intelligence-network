@@ -130,7 +130,7 @@ The next audit should create one row per numbered roadmap requirement with colum
 The isolated feature branch hardens `commodity_backing_assessment.py`:
 
 - Evidence URLs must be absolute HTTP(S) URLs with a hostname; scheme-only values and URLs containing embedded credentials are rejected for supplied `verified` records.
-- Future publication/review timestamps and review timestamps earlier than publication cause supplied `verified` status to be downgraded to `unverified`.
+- Review timestamps earlier than publication are downgraded to `unverified`; future publication timestamps remain a known gap in `growth_fundamentals_assessment.py` and must not be described as handled until code and regression tests are updated.
 - Outputs include `source_url_valid` and `timestamp_validation_errors` to make the validation result inspectable.
 - Regression tests cover these edge cases and a valid HTTP URL.
 
