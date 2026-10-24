@@ -15,6 +15,9 @@ from fastapi import APIRouter, HTTPException, Query
 router = APIRouter(tags=["public-news-sentiment"])
 _GDELT_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
 _USER_AGENT = "CIN-Research-API/0.4.0"
+_MAX_PROVIDER_RESPONSE_BYTES = 2_000_000
+_MAX_ARTICLE_TITLE_LENGTH = 1_000
+_MAX_ARTICLE_URL_LENGTH = 2_048
 _POSITIVE = {
     "adoption", "approved", "approval", "bullish", "gain", "gains", "growth",
     "launch", "launched", "partnership", "positive", "record", "surge", "surges",
@@ -41,7 +44,10 @@ def _get_json(query: str, max_records: int) -> Any:
         method="GET",
     )
     with urllib.request.urlopen(request, timeout=12) as response:
-        return json.loads(response.read().decode("utf-8"))
+        raw = response.read(_MAX_PROVIDER_RESPONSE_BYTES + 1)
+    if len(raw) > _MAX_PROVIDER_RESPONSE_BYTES:
+        raise ValueError("GDELT response exceeded the configured size limit")
+    return json.loads(raw.decode("utf-8"))
 
 
 def _headline_sentiment(title: str) -> dict[str, Any]:
@@ -135,7 +141,14 @@ def _parse_articles(payload: Any, max_records: int) -> list[dict[str, Any]]:
             continue
         title = row.get("title")
         url = row.get("url")
-        if not isinstance(title, str) or not title.strip() or not _is_http_url(url):
+        if (
+            not isinstance(title, str)
+            or not title.strip()
+            or len(title) > _MAX_ARTICLE_TITLE_LENGTH
+            or any(ord(char) < 32 or ord(char) == 127 for char in title)
+            or not _is_http_url(url)
+            or len(url) > _MAX_ARTICLE_URL_LENGTH
+        ):
             continue
         identity = _article_url_identity(url)
         if identity in seen:
