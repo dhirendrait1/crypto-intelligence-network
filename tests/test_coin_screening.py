@@ -100,5 +100,56 @@ class ScoreTests(unittest.TestCase):
         self.assertEqual(result["screen_band"], "excluded_non_growth_asset")
 
 
+class ProviderFallbackMappingTests(unittest.TestCase):
+    def test_coinpaprika_fallback_does_not_invent_fdv_from_total_supply(self):
+        payload = [
+            {
+                "id": "unknown-supply-coin", "symbol": "UNK", "name": "Unknown Supply",
+                "circulating_supply": 5, "total_supply": 10, "max_supply": None,
+                "last_updated": "2026-10-24T00:00:00Z",
+                "quotes": {"USD": {"price": 2.0, "market_cap": 10.0, "volume_24h": 3.0, "percent_change_24h": 1.0}},
+            },
+            {
+                "id": "capped-coin", "symbol": "CAP", "name": "Capped Coin",
+                "circulating_supply": 5, "total_supply": 8, "max_supply": 10,
+                "last_updated": "2026-10-24T00:00:00Z",
+                "quotes": {"USD": {"price": 2.0, "market_cap": 10.0, "volume_24h": 3.0, "percent_change_24h": 1.0}},
+            },
+        ]
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = json.dumps(payload).encode("utf-8")
+        primary_error = MODULE.urllib.error.HTTPError(
+            "https://api.coingecko.com/api/v3/coins/markets", 503, "unavailable", {}, None
+        )
+        with patch.object(MODULE.urllib.request, "urlopen", side_effect=[primary_error, response]):
+            rows = MODULE._request_markets("usd", 2)
+
+        self.assertEqual([row["_cin_provider"] for row in rows], ["CoinPaprika", "CoinPaprika"])
+        self.assertIsNone(rows[0]["fully_diluted_valuation"])
+        self.assertEqual(rows[1]["fully_diluted_valuation"], 20.0)
+        self.assertEqual(rows[0]["total_supply"], 10)
+        self.assertEqual(rows[0]["last_updated"], "2026-10-24T00:00:00Z")
+
+    def test_coinpaprika_commodity_scan_also_leaves_fdv_unknown_without_max_supply(self):
+        payload = [
+            {
+                "id": "tether-gold", "symbol": "XAUT", "name": "Tether Gold",
+                "circulating_supply": 5, "total_supply": 10, "max_supply": None,
+                "quotes": {"USD": {"price": 2.0, "market_cap": 10.0, "volume_24h": 3.0}},
+            },
+        ]
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = json.dumps(payload).encode("utf-8")
+        with patch.object(MODULE.urllib.request, "urlopen", return_value=response):
+            rows, mode, error_code, scanned, matches = MODULE._fetch_commodity_markets("usd", 5)
+        self.assertEqual(mode, "live")
+        self.assertEqual(error_code, 0)
+        self.assertEqual(scanned, 1)
+        self.assertEqual(matches, 1)
+        self.assertIsNone(rows[0]["fully_diluted_valuation"])
+
+
+
+
 if __name__ == "__main__":
     unittest.main()
