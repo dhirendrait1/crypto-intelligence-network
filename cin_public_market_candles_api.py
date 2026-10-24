@@ -253,7 +253,16 @@ async def analyze_public_market(
     try:
         analysis = analyze_ohlc([{key: row[key] for key in ("open", "high", "low", "close", "volume")} for row in closed_rows])
     except ValueError as exc:
-        raise HTTPException(status_code=502, detail=f"Fetched candles failed analysis validation: {exc}") from exc
+        raise HTTPException(
+            status_code=502,
+            detail="Fetched candles failed technical-analysis validation.",
+        ) from exc
+    except Exception as exc:
+        # Keep unexpected analysis/runtime failures within the public API contract.
+        raise HTTPException(
+            status_code=502,
+            detail="Technical analysis failed on the fetched candle data.",
+        ) from exc
     analysis["input"].update({
         "symbol": normalized, "timeframe": interval, "source": source, "source_endpoint": endpoint,
         "provider_pair_key": rows[0].get("_provider_pair_key"),
