@@ -115,6 +115,7 @@ if not any(OLD in content or NEW in content for content in branding_text.values(
 # Build every updated file in memory first. Use the route-patched main_text as
 # the source for main.py so branding normalization cannot restore stale content
 # and silently discard newly inserted router registrations.
+original_branding_text = branding_text.copy()
 branding_text[main_path] = main_text
 updated_text = {
     path: content.replace(OLD, NEW)
@@ -122,15 +123,13 @@ updated_text = {
 }
 changed = sum(
     1 for path, content in updated_text.items()
-    if OLD in branding_text[path] and content != branding_text[path]
+    if OLD in original_branding_text[path] and content != original_branding_text[path]
 )
 
 # All input validation and transformations complete before the first write.
 for path, content in updated_text.items():
-    if content != branding_text[path]:
+    if content != original_branding_text[path]:
         path.write_text(content, encoding="utf-8")
-if updated_text[main_path] != main_text:
-    main_path.write_text(updated_text[main_path], encoding="utf-8")
 
 for module_name in MODULES:
     shutil.copyfile(ROOT / module_name, APP_DIR / module_name)
