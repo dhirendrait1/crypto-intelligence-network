@@ -120,6 +120,17 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rows[0]["_provider_quote_currency"], "USDT")
         self.assertEqual(rows[0]["_provider_pair_key"], "XBTUSDT")
 
+    def test_clean_candles_deduplicates_identical_rows_for_same_open_time(self):
+        row = dict(SAMPLE[0])
+        cleaned = api._clean_candles([row, dict(row)], "test provider")
+        self.assertEqual(cleaned, [row])
+
+    def test_clean_candles_rejects_conflicting_rows_for_same_open_time(self):
+        first = dict(SAMPLE[0])
+        conflicting = dict(first, close=first["close"] + 0.5)
+        with self.assertRaisesRegex(ValueError, "conflicting candles for the same open timestamp"):
+            api._clean_candles([first, conflicting], "test provider")
+
     def test_kraken_fallback_rejects_malformed_response_shape(self):
         with patch.object(api, "_request_json", return_value={"error": [], "result": []}):
             with self.assertRaises(ValueError):
