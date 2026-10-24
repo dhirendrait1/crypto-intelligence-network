@@ -115,6 +115,16 @@ def _article_url_identity(value: str) -> str:
     return urllib.parse.urlunsplit((scheme, hostname, path, parsed.query, ""))
 
 
+def _optional_provider_text(value: Any, max_length: int = 256) -> str | None:
+    """Expose optional provider metadata only when it is a bounded string."""
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    if not normalized or len(normalized) > max_length or any(ord(char) < 32 for char in normalized):
+        return None
+    return normalized
+
+
 def _parse_articles(payload: Any, max_records: int) -> list[dict[str, Any]]:
     if not isinstance(payload, dict) or not isinstance(payload.get("articles"), list):
         raise ValueError("Unexpected GDELT article-search response")
@@ -139,9 +149,9 @@ def _parse_articles(payload: Any, max_records: int) -> list[dict[str, Any]]:
             "published_at": provider_timestamp,
             "published_at_utc": normalized_timestamp,
             "published_at_validation_status": timestamp_status,
-            "domain": row.get("domain"),
-            "language": row.get("language"),
-            "source_country": row.get("sourcecountry"),
+            "domain": _optional_provider_text(row.get("domain"), 253),
+            "language": _optional_provider_text(row.get("language"), 32),
+            "source_country": _optional_provider_text(row.get("sourcecountry"), 64),
             "headline_sentiment": _headline_sentiment(title),
         })
         if len(articles) >= max_records:
