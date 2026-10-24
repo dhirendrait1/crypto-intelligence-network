@@ -1,4 +1,4 @@
-"""Read-only, allowlisted public evidence ingestion for CIN (stdlib only).
+""""Read-only, allowlisted public evidence ingestion for CIN (stdlib only).
 
 This first connector retrieves public GitHub repository metadata for Ethereum
 developer-activity context. Retrieval is not independent claim verification.
@@ -60,7 +60,12 @@ def fetch_github_repository_evidence(
     except (URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
         raise EvidenceSourceError(f"Public GitHub metadata retrieval failed: {type(exc).__name__}") from exc
 
-    if not isinstance(payload, dict) or payload.get("full_name", "").lower() != repository:
+    # Validate the response shape before calling string methods. Upstream JSON
+    # is external evidence and may be malformed or unexpectedly typed.
+    if not isinstance(payload, dict):
+        raise EvidenceSourceError("GitHub response must be a JSON object")
+    full_name = payload.get("full_name")
+    if not isinstance(full_name, str) or full_name.lower() != repository:
         raise EvidenceSourceError("GitHub response did not match the requested repository")
 
     retrieved_at = _utc_now()
