@@ -696,3 +696,29 @@ class MarketIdentityDeterminismTests(unittest.TestCase):
             "input_row_count": 0, "invalid_identity_count": 0,
             "duplicate_id_count": 0, "unique_identity_count": 0,
         }))
+
+
+class MarketCacheProvenanceTests(unittest.TestCase):
+    def setUp(self):
+        MODULE._CACHE.clear()
+
+    def tearDown(self):
+        MODULE._CACHE.clear()
+
+    def test_cache_hit_preserves_original_retrieval_timestamp_and_currency_isolation(self):
+        usd_rows = [{"id": "bitcoin", "current_price": 100, "_cin_provider": "CoinGecko", "_cin_quote_currency": "USD"}]
+        eur_rows = [{"id": "bitcoin", "current_price": 90, "_cin_provider": "CoinGecko", "_cin_quote_currency": "EUR"}]
+        with patch.object(MODULE, "_request_markets", side_effect=[usd_rows, eur_rows]) as request:
+            first, first_mode, _, _ = MODULE._fetch_markets("usd", 1)
+            original_retrieved_at = first[0]["_cin_retrieved_at"]
+            second, second_mode, _, _ = MODULE._fetch_markets("usd", 1)
+            euro, euro_mode, _, _ = MODULE._fetch_markets("eur", 1)
+
+        self.assertEqual(first_mode, "live")
+        self.assertEqual(second_mode, "cache")
+        self.assertEqual(euro_mode, "live")
+        self.assertEqual(second[0]["_cin_retrieved_at"], original_retrieved_at)
+        self.assertEqual(second[0]["_cin_quote_currency"], "USD")
+        self.assertEqual(euro[0]["_cin_quote_currency"], "EUR")
+        self.assertEqual(request.call_count, 2)
+
