@@ -215,6 +215,58 @@ class ScoreTests(unittest.TestCase):
         self.assertEqual(result["screen_band"], "excluded_non_growth_asset")
 
 
+class ProviderFallbackNumericQualityTests(unittest.TestCase):
+    def test_coinpaprika_fallback_omits_malformed_numeric_metrics(self):
+        payload = [
+            {
+                "id": "malformed-coin", "symbol": "BAD", "name": "Malformed Coin",
+                "circulating_supply": "unknown", "total_supply": -10, "max_supply": "many",
+                "last_updated": "2026-10-24T00:00:00Z",
+                "quotes": {"USD": {"price": "1.5", "market_cap": "not-a-number",
+                    "volume_24h": float("inf"), "percent_change_24h": True}},
+            },
+            {
+                "id": "valid-coin", "symbol": "VAL", "name": "Valid Coin",
+                "circulating_supply": 5, "total_supply": 10, "max_supply": 20,
+                "last_updated": "2026-10-24T00:00:00Z",
+                "quotes": {"USD": {"price": 2.0, "market_cap": 100.0,
+                    "volume_24h": 10.0, "percent_change_24h": 1.0}},
+            },
+        ]
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = json.dumps(payload).encode("utf-8")
+        primary_error = MODULE.urllib.error.HTTPError(
+            "https://api.coingecko.com/api/v3/coins/markets", 503, "unavailable", {}, None
+        )
+        with patch.object(MODULE.urllib.request, "urlopen", side_effect=[primary_error, response]):
+            rows = MODULE._request_markets("usd", 10)
+        by_id = {row["id"]: row for row in rows}
+        malformed = by_id["malformed-coin"]
+        self.assertIsNone(malformed["current_price"])
+        self.assertIsNone(malformed["market_cap"])
+        self.assertIsNone(malformed["total_volume"])
+        self.assertIsNone(malformed["fully_diluted_valuation"])
+        self.assertIsNone(malformed["circulating_supply"])
+        self.assertIsNone(malformed["total_supply"])
+        self.assertIsNone(malformed["price_change_percentage_24h"])
+        self.assertEqual(by_id["valid-coin"]["market_cap"], 100.0)
+        self.assertEqual(by_id["valid-coin"]["fully_diluted_valuation"], 40.0)
+
+    def test_coinpaprika_fallback_skips_malformed_quote_containers(self):
+        payload = [
+            {"id": "bad-quotes", "symbol": "BAD", "name": "Bad Quotes", "quotes": []},
+            {"id": "good-quotes", "symbol": "GOOD", "name": "Good Quotes",
+             "quotes": {"USD": {"price": 2, "market_cap": 20, "volume_24h": 3}}},
+        ]
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = json.dumps(payload).encode("utf-8")
+        primary_error = MODULE.urllib.error.HTTPError(
+            "https://api.coingecko.com/api/v3/coins/markets", 503, "unavailable", {}, None
+        )
+        with patch.object(MODULE.urllib.request, "urlopen", side_effect=[primary_error, response]):
+            rows = MODULE._request_markets("usd", 10)
+        self.assertEqual([row["id"] for row in rows], ["good-quotes"])
+
 class ProviderFallbackMappingTests(unittest.TestCase):
     def test_coinpaprika_fallback_does_not_invent_fdv_from_total_supply(self):
         payload = [
