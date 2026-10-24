@@ -34,6 +34,11 @@ class GrowthFundamentalsValidationTests(unittest.TestCase):
             now=self.now,
         )
         self.assertEqual(result["evidence"][0]["status"], "unverified")
+        self.assertIsNone(result["evidence"][0]["publication_age_days"])
+        self.assertEqual(
+            result["evidence"][0]["timestamp_validation_errors"],
+            ["published_at_is_in_the_future"],
+        )
         self.assertFalse(result["cin_independently_verified_claims"])
 
     def test_timezone_naive_publication_timestamp_downgrades_verified_status(self):
