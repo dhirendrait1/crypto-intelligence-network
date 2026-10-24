@@ -183,3 +183,46 @@ def test_each_declared_kraken_fallback_interval_is_mapped(interval, kraken_minut
 
     assert rows
     assert captured["interval"] == [str(kraken_minutes)]
+
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        RuntimeError("unexpected provider response"),
+        UnicodeDecodeError("utf-8", b"\\xff", 0, 1, "invalid start byte"),
+        TypeError("unexpected provider payload"),
+    ],
+)
+def test_market_provider_shape_failures_return_sanitized_502(monkeypatch, failure):
+    def fail(*_args):
+        raise failure
+
+    monkeypatch.setattr(api, "_fetch_binance", fail)
+
+    with pytest.raises(api.HTTPException) as caught:
+        asyncio.run(api._load("BTCUSDT", "1h", 10))
+
+    assert caught.value.status_code == 502
+    assert caught.value.detail == "Public market-data provider returned an invalid response."
+    assert "unexpected provider response" not in str(caught.value.detail)
+
+
+def test_kraken_fallback_unexpected_response_returns_controlled_503(monkeypatch):
+    def binance_451(*_args):
+        raise api.urllib.error.HTTPError(
+            api.BINANCE_KLINES_URL, 451, "unavailable for legal reasons", {}, None
+        )
+
+    def fail_fallback(*_args):
+        raise RuntimeError("unexpected fallback response")
+
+    monkeypatch.setattr(api, "_fetch_binance", binance_451)
+    monkeypatch.setattr(api, "_fetch_kraken", fail_fallback)
+
+    with pytest.raises(api.HTTPException) as caught:
+        asyncio.run(api._load("BTCUSD", "1h", 10))
+
+    assert caught.value.status_code == 503
+    assert "Kraken fallback unavailable" in caught.value.detail
+    assert "unexpected fallback response" not in str(caught.value.detail)
