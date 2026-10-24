@@ -259,6 +259,6 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 
 - [x] Replaced end-of-line anchors with absolute end-of-input anchors in the commodity backing, growth fundamentals, public evidence ingestion, public candle, and derivatives request schemas. This closes the final-newline edge case where a regex end-of-line anchor may match before a trailing newline.
 - [x] Added regressions for trailing newlines in commodity/growth symbols and public evidence repository paths; updated OpenAPI pattern assertions for public candles and derivatives.
-- [ ] Confirm the four repository CI workflows pass on the final code/test revision before considering this batch complete.
+- [x] All four repository CI workflows passed on code/test revision `ff4baa97e07a8fcc4f93298259ac48466fe8f91a`: screening checks (run `40111015218`), technical-analysis tests (`40111015225`), evidence-ingestion API checks (`40111015262`), and automated tests (`40111015247`).
 - **Boundary:** identifier validation only checks request syntax; it does not establish whether a market pair is listed or whether submitted evidence is authentic.
 
