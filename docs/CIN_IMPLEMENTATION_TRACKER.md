@@ -637,3 +637,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - These cases ensure pair identity validation rejects unsupported or unexpected provider keys before candle data can be returned.
 - Test commit: `aa0834be6e6788277587429365c4f4ca8b8aadfb`.
 - CI verification pending on the latest tracker commit.
+
+
+## Oversized Kraken timestamp regression case (2026-10-25)
+
+- Added a malformed provider payload with an integer timestamp far beyond the representable epoch range.
+- This verifies that extreme timestamp values are contained by the controlled fallback error path and cannot escape as an unhandled parser failure or expose provider details.
+- Test commit: `48f589a64fd7956d67e020ee2afed2464add915c`.
+- CI verification pending on the latest tracker commit.
