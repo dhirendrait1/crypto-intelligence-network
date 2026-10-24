@@ -570,3 +570,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Added an offline regression test asserting both endpoint limitation lists match the implemented calendar-month duration and no longer claim a 31-day approximation.
 - Code commit: `ac2982945c8efcd4ce53c34fa20046b47d0e9d70`; test commit: `1bfa6145a6b740c87f7538aa985a451b1964c987`.
 - CI for the latest branch head must pass before this correction is counted as verified. This is a documentation/contract accuracy fix; it does not establish live provider or deployment health.
+
+
+## Kraken forming-candle compatibility regression (2026-10-25)
+
+- Kraken's official Spot REST OHLC docs state that the last OHLC array entry is the current, not-yet-committed timeframe and is always present. Source: https://docs.kraken.com/api-reference/market-data/get-ohlc-data
+- Added an offline regression test that supplies one completed hourly candle and one current-hour candle, then verifies the fallback preserves both and derives the current candle's close boundary. This protects the provider contract while technical-analysis endpoints separately exclude candles not yet closed.
+- Test commit: `43de485f250079dc0d8af7ecbabb536fef249b7a`.
+- This does not enable stricter Kraken boundary enforcement or establish live exchange health. Verify all CI workflows on the latest branch head before marking the test as passed.
