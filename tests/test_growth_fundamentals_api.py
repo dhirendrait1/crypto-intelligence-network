@@ -73,3 +73,18 @@ def test_request_rejects_unknown_evidence_record_fields():
             evidence=[{"category": "usage_and_adoption", "published": "2026-10-01"}],
         )
 
+def test_request_accepts_maximum_documented_freshness_threshold():
+    request = GrowthFundamentalsRequest(symbol="ETH", max_age_days=3650)
+    assert request.max_age_days == 3650
+
+
+def test_request_accepts_maximum_documented_evidence_batch():
+    record = {
+        "category": "usage_and_adoption",
+        "source_name": "Example",
+        "source_url": "https://example.com/report",
+        "published_at": "2026-10-01T00:00:00Z",
+        "status": "unverified",
+    }
+    request = GrowthFundamentalsRequest(symbol="ETH", evidence=[record] * 200)
+    assert len(request.evidence) == 200
