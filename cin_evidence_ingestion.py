@@ -59,7 +59,7 @@ def fetch_github_repository_evidence(
             payload = json.loads(response.read(1_000_000).decode("utf-8"))
     except HTTPError as exc:
         raise EvidenceSourceError(f"GitHub returned HTTP {exc.code}") from exc
-    except (URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+    except (URLError, TimeoutError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise EvidenceSourceError(f"Public GitHub metadata retrieval failed: {type(exc).__name__}") from exc
 
     # Validate the provider identity before normalizing it. Malformed JSON must
