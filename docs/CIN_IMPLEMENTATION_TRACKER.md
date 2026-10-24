@@ -115,3 +115,11 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Add mocked regression tests for provider runtime errors, invalid UTF-8, malformed payload type, and fallback runtime failure.
 - [x] Verify all four repository workflows on commit `63b81046f252f293a4be952b28447b1417df6c1b`; screening, evidence-ingestion API, technical analysis, and automated scaffold tests all passed.
 - **Boundary:** provider checks are mocked/offline. They do not establish live exchange availability, source correctness, or production deployment health.
+
+## Derivatives provider error handling (2026-10-24)
+
+- [x] Unexpected provider runtime/type/shape errors and invalid UTF-8 are mapped to a sanitized HTTP 502.
+- [x] Added mocked regression tests for these failure classes.
+- [x] Screening, evidence-ingestion API, and technical-analysis workflows passed on revision f789b282be76d59598778b4e891b61efb34475b3.
+- [ ] Verify the automated scaffold workflow on that exact revision; it was not present in the returned workflow listing.
+- Boundary: offline/mocked validation only; no live provider or deployment verification.
