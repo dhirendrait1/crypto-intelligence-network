@@ -24,7 +24,7 @@ jobs:
       - name: Prepare the patched application scaffold
         run: python -m zipfile -e cin_step203_scaffold_fixed.zip . && python patch_cin_metadata_fixed.py
       - name: Install application and API test dependencies
-        run: python -m pip install -r cin/requirements.txt pytest httpx2
+        run: python -m pip install -r cin/requirements.txt pytest httpx
       - name: Compile API, provider, and contract tests
         run: python -m py_compile cin_evidence_ingestion.py cin_evidence_ingestion_api.py tests/test_public_evidence_ingestion_api.py tests/test_cin_evidence_ingestion_api.py tests/test_cin_evidence_ingestion.py tests/test_cin_evidence_ingestion_http.py
       - name: Run offline provider and API contract tests
