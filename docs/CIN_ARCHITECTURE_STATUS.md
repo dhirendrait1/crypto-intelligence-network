@@ -40,7 +40,7 @@ The deployment patch `patch_cin_metadata_fixed.py` names the following source mo
 | Growth fundamentals | `growth_fundamentals_assessment.py`, `growth_fundamentals_api.py` | Named in deployment patch; full behavior audit pending |
 | Public evidence ingestion | `cin_evidence_ingestion.py`, `cin_evidence_ingestion_api.py` | Named in deployment patch; full source and allowlist audit pending |
 | Caller-supplied OHLC analysis | `cin_technical_analysis.py`, `cin_technical_analysis_api.py` | Named in deployment patch; prior offline technical-analysis checks passed; full feature audit pending |
-| Exchange-backed candle data and analysis | `cin_public_market_candles_api.py` | Closed-candle and volume behavior covered by offline regression tests; no live-provider validation claimed |
+| Exchange-backed candle data and analysis | `cin_public_market_candles_api.py` | Closed-candle, volume and completed-candle freshness behavior covered by offline regression tests; no live-provider validation claimed |
 | Read-only derivatives and order-book snapshot | `cin_derivatives_market_data_api.py` | Public Binance USDⓈ-M endpoints for open interest, funding, mark/index price, latest two 4h OI aggregates, best bid/ask, spread, per-side valid levels and approximate notional imbalance; order-book retrieval time included; offline tests cover invalid crossed books |
 | Public news search and headline sentiment | `cin_public_news_sentiment_api.py` | GDELT public article search, URL deduplication, article timestamps, transparent low-confidence keyword sentiment; offline tests; explicitly not social-platform sentiment |
 | API health/readiness | FastAPI app endpoints | Live `/health` and `/ready` returned healthy/ready in earlier checks; recheck after any future release |
@@ -52,6 +52,7 @@ The patch copies the source modules into `cin/app` during the build. The source 
 - Provider name and endpoint are explicit.
 - Actual provider pair key and quote currency are reported when reliably known.
 - Every candle reports UTC open/close timestamps and closed/forming state.
+- Market-candle and market-analysis responses report the latest completed candle's age and a transparent stale-data warning threshold (twice the requested interval; monthly intervals use a 31-day approximation). No-completed-candle states are explicit.
 - Analysis excludes forming candles and reports requested, used and excluded counts.
 - Unsupported fallback intervals/pairs fail clearly; no fabricated fallback data.
 - Missing, stale, partial or unverified inputs are surfaced instead of silently guessed.
