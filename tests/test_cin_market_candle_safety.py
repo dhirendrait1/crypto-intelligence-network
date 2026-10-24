@@ -326,3 +326,10 @@ def test_kraken_fallback_maps_requested_symbol_and_reports_actual_pair(
     assert rows[0]["_provider_pair_key"] == expected_pair_key
     assert rows[0]["_provider_quote_currency"] == expected_quote
 
+
+
+@pytest.mark.parametrize("timestamp", [10**100, -(10**100)])
+def test_clean_candles_rejects_unrepresentable_timestamps(timestamp):
+    row = _row(timestamp, timestamp + 1)
+    with pytest.raises(ValueError, match="returned no valid candles"):
+        api._clean_candles([row], "Test provider")
