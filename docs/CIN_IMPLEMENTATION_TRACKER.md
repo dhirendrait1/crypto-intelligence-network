@@ -281,3 +281,11 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Confirmed the feature-branch implementation initializes a timezone-aware UTC assessment clock, passes it to each normalized row, and reports clock validity consistently in both summary and evidence rows; regression tests cover valid, naive, and malformed clocks.
 - [x] Re-ran CI on corrected code/test revision `d829699ac591e2ef6b430ae274108a844f576eef`; all four workflows concluded success: CIN screening checks (`40106430183`), CIN Automated Tests (`40106430190`), evidence ingestion API checks (`40106430187`), and Technical Analysis Tests (`40106430182`).
 - **Boundary:** the failed run is a real CI regression, not a live-provider issue. No merge or production deployment was performed.
+
+## Future-dated assessment evidence age regression follow-up (2026-10-24)
+
+- [x] Added regression assertions that future-dated commodity evidence has no non-negative publication-age value, rather than being reported as age zero.
+- [x] Added equivalent growth-fundamentals assertions for null publication age and the explicit `published_at_is_in_the_future` validation error.
+- [x] Reviewed the earlier screening workflow failure on revision `a1a9e2bfa7fe1ffb6a006c6cddda0b7a7cd80b41`: the commodity assessment code at that revision referenced the assessment clock before defining it. The current feature-branch file has a shared `_assessment_clock` helper, initializes the clock before normalization, and propagates clock validity to the summary and evidence rows.
+- [ ] CI confirmation for current PR head `9124da9a6a38b39bef272d5be66fde57fd20d148` remains pending: the workflow lookup returned no runs for that SHA. Do not treat the historical failed run as a passing check.
+- **Boundary:** these are metadata sanity checks, not independent verification of the underlying evidence claims. No merge or production deployment was performed.
