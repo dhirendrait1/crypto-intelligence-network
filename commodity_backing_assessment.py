@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlsplit
 
 VALID_STATUSES = {"verified", "unverified", "stale", "unavailable"}
 REQUIRED_EVIDENCE_FIELDS = (
@@ -32,13 +33,30 @@ def _parse_timestamp(value: str | None) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
+def _is_http_url(value: Any) -> bool:
+    """Accept only absolute HTTP(S) URLs with a hostname and no embedded credentials."""
+    if not isinstance(value, str):
+        return False
+    try:
+        parsed = urlsplit(value.strip())
+        return (
+            parsed.scheme.lower() in {"http", "https"}
+            and bool(parsed.hostname)
+            and parsed.username is None
+            and parsed.password is None
+        )
+    except ValueError:
+        return False
+
+
 def normalize_evidence(item: dict[str, Any], *, now: datetime | None = None,
                        max_age_days: int = 90) -> dict[str, Any]:
     """Validate one evidence record and derive freshness without inventing proof.
 
-    'verified' is accepted only as a supplied review status with a source URL,
-    source name, and parseable publication/check timestamps. This is metadata
-    validation, not an independent audit of the source's claims.
+    'verified' is accepted only as a supplied review status with a valid absolute
+    HTTP(S) source URL, source name, and parseable publication/check timestamps.
+    Future timestamps and impossible publication/check ordering downgrade the
+    supplied status. This is metadata validation, not an independent audit.
     """
     current = now or datetime.now(timezone.utc)
     if current.tzinfo is None:
@@ -62,9 +80,23 @@ def normalize_evidence(item: dict[str, Any], *, now: datetime | None = None,
     if checked is None:
         missing.append("checked_at")
 
-    if status == "verified" and (missing or not str(record.get("source_url", "")).startswith(("https://", "http://"))):
+    timestamp_errors = []
+    if published is not None and published > current:
+        timestamp_errors.append("published_at_is_in_the_future")
+    if checked is not None and checked > current:
+        timestamp_errors.append("checked_at_is_in_the_future")
+    if published is not None and checked is not None and checked < published:
+        timestamp_errors.append("checked_at_precedes_published_at")
+
+    url_valid = _is_http_url(record.get("source_url"))
+    if status == "verified" and (missing or not url_valid or timestamp_errors):
         status = "unverified"
-        record["status_reason"] = "Verification metadata incomplete; source claims have not been independently certified by CIN."
+        if timestamp_errors:
+            record["status_reason"] = "Timestamp chronology is invalid; supplied verification status was downgraded."
+        elif not url_valid:
+            record["status_reason"] = "Source URL must be an absolute HTTP(S) URL with a hostname and no embedded credentials."
+        else:
+            record["status_reason"] = "Verification metadata incomplete; source claims have not been independently certified by CIN."
     elif status == "verified":
         record["status_reason"] = "Marked verified by the supplied reviewer metadata; CIN has not independently audited the underlying claim."
     elif status == "unavailable":
@@ -84,6 +116,8 @@ def normalize_evidence(item: dict[str, Any], *, now: datetime | None = None,
     record["status"] = status
     record["publication_age_days"] = age_days
     record["missing_fields"] = missing
+    record["timestamp_validation_errors"] = timestamp_errors
+    record["source_url_valid"] = url_valid
     record["freshness_threshold_days"] = max_age_days
     return record
 
@@ -144,3 +178,4 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
             "Redemption availability may vary by jurisdiction, customer eligibility, minimum size, fees, and issuer terms.",
         ],
     }
+}
