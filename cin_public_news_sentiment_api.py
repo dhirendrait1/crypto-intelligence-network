@@ -82,6 +82,23 @@ def _is_http_url(value: Any) -> bool:
         return False
 
 
+def _normalize_provider_timestamp(value: Any) -> tuple[str | None, str]:
+    """Preserve provider time separately from a validated UTC timestamp."""
+    if not isinstance(value, str) or not value.strip():
+        return None, "missing"
+    raw = value.strip()
+    try:
+        if len(raw) == 16 and raw.endswith("Z") and "T" in raw:
+            parsed = datetime.strptime(raw, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+        else:
+            parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            if parsed.tzinfo is None or parsed.utcoffset() is None:
+                return None, "invalid_timezone"
+        return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"), "valid"
+    except (TypeError, ValueError, OverflowError):
+        return None, "invalid"
+
+
 def _parse_articles(payload: Any, max_records: int) -> list[dict[str, Any]]:
     if not isinstance(payload, dict) or not isinstance(payload.get("articles"), list):
         raise ValueError("Unexpected GDELT article-search response")
@@ -97,10 +114,14 @@ def _parse_articles(payload: Any, max_records: int) -> list[dict[str, Any]]:
         if url in seen:
             continue
         seen.add(url)
+        provider_timestamp = row.get("seendate")
+        normalized_timestamp, timestamp_status = _normalize_provider_timestamp(provider_timestamp)
         articles.append({
             "title": title.strip(),
             "url": url,
-            "published_at": row.get("seendate"),
+            "published_at": provider_timestamp,
+            "published_at_utc": normalized_timestamp,
+            "published_at_validation_status": timestamp_status,
             "domain": row.get("domain"),
             "language": row.get("language"),
             "source_country": row.get("sourcecountry"),
