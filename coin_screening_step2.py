@@ -75,6 +75,31 @@ def _number(value: Any) -> float | None:
     return number if math.isfinite(number) else None
 
 
+def _canonical_market_rows(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    """Keep one deterministic row per provider asset ID; discard identity-less rows."""
+    accepted: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    invalid_identity_count = 0
+    duplicate_id_count = 0
+    for row in rows:
+        raw_id = row.get("id")
+        if not isinstance(raw_id, str) or not raw_id.strip():
+            invalid_identity_count += 1
+            continue
+        key = raw_id.strip().casefold()
+        if key in seen:
+            duplicate_id_count += 1
+            continue
+        seen.add(key)
+        accepted.append(row)
+    return accepted, {
+        "input_row_count": len(rows),
+        "invalid_identity_count": invalid_identity_count,
+        "duplicate_id_count": duplicate_id_count,
+        "unique_identity_count": len(accepted),
+    }
+
+
 def _market_freshness(value: Any) -> tuple[str, int | None]:
     """Classify provider update timestamps without treating retrieval time as price time."""
     if not isinstance(value, str) or not value.strip():
@@ -604,6 +629,7 @@ async def coin_screening(
             "primary_error": "invalid_response",
         }) from exc
 
+    raw, identity_quality = _canonical_market_rows(raw)
     results = [_score(coin) for coin in raw]
     if data_mode == "stale_cache":
         for result in results:
@@ -632,6 +658,10 @@ async def coin_screening(
         "provider_error_code": provider_error_code or None,
         "provider_error_details": provider_error_details,
         "methodology": "Preliminary transparent heuristic; not financial advice or a safety rating",
+        "data_quality": {
+            **identity_quality,
+            "identity_policy": "Rows without a non-empty provider ID are discarded; duplicate IDs keep the first provider row in input order",
+        },
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
         "cache_age_seconds": (
             max(0, int(time.time() - raw[0]["_cin_retrieved_at"]))
