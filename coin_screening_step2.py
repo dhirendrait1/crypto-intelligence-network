@@ -210,7 +210,7 @@ def _fetch_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]
         raise
 
 
-def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]], str, int, int, int]:
+def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]], str, int, int, int, dict[str, Any] | None]:
     """Scan the full public CoinPaprika ticker list before applying the commodity filter."""
     key = (f"commodity:{vs_currency}", per_page)
     now = time.time()
@@ -219,7 +219,7 @@ def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict
     if cached and now - cached[0] <= _CACHE_TTL_SECONDS:
         rows = cached[1]
         scanned = int(rows[0].get("_cin_scanned_universe", 0)) if rows else 0
-        return rows, "cache", 0, scanned, (int(rows[0].get("_cin_match_count", len(rows))) if rows else 0)
+        return rows, "cache", 0, scanned, (int(rows[0].get("_cin_match_count", len(rows))) if rows else 0), None
     url = "https://api.coinpaprika.com/v1/tickers?quotes=" + urllib.parse.quote(vs_currency.upper())
     req = urllib.request.Request(url, headers={"accept": "application/json", "user-agent": "CIN-Research-API/0.4.0"}, method="GET")
     try:
@@ -266,12 +266,25 @@ def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict
         if selected:
             with _CACHE_LOCK:
                 _CACHE[key] = (time.time(), selected)
-        return selected, "live", 0, scanned, len(matches)
+        return selected, "live", 0, scanned, len(matches), None
     except urllib.error.HTTPError as exc:
         if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
             rows = cached[1]
             scanned = int(rows[0].get("_cin_scanned_universe", 0)) if rows else 0
-            return rows, "stale_cache", exc.code, scanned, (int(rows[0].get("_cin_match_count", len(rows))) if rows else 0)
+            return rows, "stale_cache", exc.code, scanned, (int(rows[0].get("_cin_match_count", len(rows))) if rows else 0), {
+                "primary_provider": "CoinPaprika", "primary_error": "http_error",
+                "primary_http_status": exc.code,
+            }
+        raise
+    except (urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
+        if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
+            rows = cached[1]
+            scanned = int(rows[0].get("_cin_scanned_universe", 0)) if rows else 0
+            error_kind = _failure_kind(exc)[0]
+            return rows, "stale_cache", 0, scanned, (int(rows[0].get("_cin_match_count", len(rows))) if rows else 0), {
+                "primary_provider": "CoinPaprika", "primary_error": error_kind,
+                "primary_http_status": None,
+            }
         raise
 
 def _score(coin: dict[str, Any]) -> dict[str, Any]:
@@ -406,8 +419,7 @@ async def coin_screening(
     commodity_scan: dict[str, Any] | None = None
     try:
         if asset_type == "commodity_backed":
-            raw, data_mode, provider_error_code, scanned_count, matched_count = await asyncio.to_thread(_fetch_commodity_markets, currency, per_page)
-            provider_error_details = None
+            raw, data_mode, provider_error_code, scanned_count, matched_count, provider_error_details = await asyncio.to_thread(_fetch_commodity_markets, currency, per_page)
             commodity_scan = {
                 "provider": "CoinPaprika",
                 "scanned_universe_count": scanned_count,
