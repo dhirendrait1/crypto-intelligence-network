@@ -57,6 +57,8 @@ def assess_growth_fundamentals(
     max_age_days: int = 90,
 ) -> dict[str, Any]:
     """Assess evidence coverage across growth fundamentals; never infer missing facts."""
+    threshold_valid = isinstance(max_age_days, int) and not isinstance(max_age_days, bool) and max_age_days >= 0
+    max_age_days = max_age_days if threshold_valid else 90
     current = now or datetime.now(timezone.utc)
     if current.tzinfo is None:
         current = current.replace(tzinfo=timezone.utc)
@@ -131,10 +133,19 @@ def assess_growth_fundamentals(
             status = "unavailable"
         else:
             status = "unverified"
+        identities = {
+            (
+                row.get("category"),
+                str(row.get("source_url") or "").strip().rstrip("/").lower(),
+                row.get("published_at"),
+            )
+            for row in rows
+        }
         coverage[category] = {
             "description": description,
             "status": status,
-            "evidence_count": len(rows),
+            "evidence_count": len(identities),
+            "duplicate_record_count": max(0, len(rows) - len(identities)),
             "conflict_detected": status == "conflicting",
         }
 
@@ -170,6 +181,8 @@ def assess_growth_fundamentals(
         "unrecognized_category_count": unrecognized_category_count,
         "invalid_evidence_record_count": invalid_record_count,
         "input_evidence_list_valid": isinstance(evidence, (list, type(None))),
+        "freshness_threshold_valid": threshold_valid,
+        "freshness_threshold_days": max_age_days,
         "not_an_investment_recommendation": True,
         "cin_independently_verified_claims": False,
         "limitations": [
