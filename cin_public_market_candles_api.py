@@ -25,6 +25,8 @@ router = APIRouter(tags=["public-market-candles"])
 BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines"
 KRAKEN_OHLC_URL = "https://api.kraken.com/0/public/OHLC"
 MAX_PROVIDER_RESPONSE_BYTES = 2 * 1024 * 1024
+# Largest millisecond Unix timestamp representable by Python datetime (year 9999).
+MAX_TIMESTAMP_MS = 253402300799999
 TIMEFRAMES = {"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M"}
 KRAKEN_INTERVALS = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440, "1w": 10080}
 KRAKEN_SYMBOLS = {"BTC": "XBT"}
@@ -61,7 +63,8 @@ def _is_valid_candle(candle: dict[str, Any]) -> bool:
         and high >= max(open_price, close)
         and low <= min(open_price, close)
         and high >= low
-        and open_time >= 0 and close_time >= open_time
+        and 0 <= open_time <= MAX_TIMESTAMP_MS
+        and open_time <= close_time <= MAX_TIMESTAMP_MS
     )
 
 
