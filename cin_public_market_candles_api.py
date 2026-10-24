@@ -239,7 +239,14 @@ def _validate(symbol: str, interval: str, limit: int) -> str:
     return normalized
 
 
-@router.get("/market-candles")
+@router.get(
+    "/market-candles",
+    responses={
+        400: {"description": "Invalid symbol or unsupported interval."},
+        502: {"description": "Public market-data provider or response is invalid."},
+        503: {"description": "Public market-data provider is temporarily unavailable."},
+    },
+)
 async def get_market_candles(
     symbol: str = Query(default="BTCUSDT", min_length=5, max_length=20, pattern="^[A-Za-z0-9]+$"),
     interval: str = Query(default="1h"),
@@ -280,7 +287,15 @@ async def get_market_candles(
     }
 
 
-@router.get("/technical-analysis/market")
+@router.get(
+    "/technical-analysis/market",
+    responses={
+        400: {"description": "Invalid symbol or unsupported interval."},
+        422: {"description": "Insufficient completed candles for analysis."},
+        502: {"description": "Public market-data provider or technical analysis failed."},
+        503: {"description": "Public market-data provider is temporarily unavailable."},
+    },
+)
 async def analyze_public_market(
     symbol: str = Query(default="BTCUSDT", min_length=5, max_length=20, pattern="^[A-Za-z0-9]+$"),
     interval: str = Query(default="1h"),
