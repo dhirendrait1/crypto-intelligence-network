@@ -38,6 +38,7 @@ MODULES = (
     "cin_technical_analysis_api.py",
     "cin_public_market_candles_api.py",
     "cin_derivatives_market_data_api.py",
+    "cin_public_news_sentiment_api.py",
 )
 for module_name in MODULES:
     source_module = ROOT / module_name
@@ -99,6 +100,12 @@ registrations = [
         "\n# CIN: read-only public derivatives market snapshot; no trading operations\n"
         "from app.cin_derivatives_market_data_api import router as cin_derivatives_market_data_router\n"
         "app.include_router(cin_derivatives_market_data_router)\n",
+    ),
+    (
+        "cin_public_news_sentiment_router",
+        "\n# CIN: public news search with explicitly heuristic headline sentiment (read-only)\n"
+        "from app.cin_public_news_sentiment_api import router as cin_public_news_sentiment_router\n"
+        "app.include_router(cin_public_news_sentiment_router)\n",
     ),
 ]
 for marker, registration in registrations:
