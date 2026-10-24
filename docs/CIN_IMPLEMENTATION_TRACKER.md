@@ -347,3 +347,11 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] All four workflows passed on code/test/CI commit `d8571d3010dca26a0058f07676aaaa637d6fadc1`: CIN Automated Tests (`40124885343`), CIN Technical Analysis Tests (`40124885412`), CIN screening checks (`40124885344`), and CIN evidence ingestion API checks (`40124885349`). Both new technical-analysis request contract tests and existing public-candle contract tests passed in the automated suite.
 - **Boundary:** offline tests only; no live provider or production endpoint was contacted. PR remains open, Draft, and unmerged.
 
+## Derivatives order-book data-quality transparency (2026-10-25)
+
+- [x] Added explicit counts for malformed, non-finite, or non-positive order-book levels rejected from bid/ask calculations; counts are returned as `bid_levels_rejected` and `ask_levels_rejected` within `order_book`.
+- [x] Added a data-quality limitation explaining that rejected levels are excluded and counted, so partially malformed depth does not appear fully clean.
+- [x] Added regressions for mixed valid/invalid depth levels and empty open-interest history; history-derived values and timestamps remain null when no history is available.
+- [x] All four workflows passed on code/test commit `1596de175210a952c3e6f74da9b8b6111f754e1e`: CIN Automated Tests (run `40125108093`), CIN screening checks (run `40125108087`), CIN Technical Analysis Tests (run `40125108135`), and CIN evidence ingestion API checks (run `40125108083`). The derivatives regression step passed in the automated workflow.
+- **Boundary:** tests use mocked provider payloads; they do not establish live Binance availability or production endpoint health. PR #8 remains Draft and unmerged.
+
