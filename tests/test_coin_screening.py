@@ -44,6 +44,33 @@ class FiniteNumericValidationTests(unittest.TestCase):
                 self.assertIsNone(scored["price"])
                 self.assertEqual(scored["screen_score"], 0)
 
+class ScreeningDataQualityPropagationTests(unittest.TestCase):
+    def test_stale_or_unknown_timestamps_hold_candidate_signal(self):
+        for timestamp, expected in (("2020-01-01T00:00:00Z", "stale"), (None, "unknown"), ("bad-time", "unknown")):
+            with self.subTest(timestamp=timestamp):
+                result = MODULE._score({
+                    "id": "example", "symbol": "ABC", "name": "Example",
+                    "current_price": 1.0, "market_cap": 500_000_000,
+                    "total_volume": 20_000_000, "fully_diluted_valuation": 600_000_000,
+                    "circulating_supply": 80_000_000, "total_supply": 100_000_000,
+                    "price_change_percentage_24h": 2.0, "last_updated": timestamp,
+                })
+                self.assertEqual(result["freshness_status"], expected)
+                self.assertFalse(result["analysis_eligible"])
+                self.assertEqual(result["screen_band"], "data_quality_hold")
+                self.assertFalse(result["screening_eligible"] if "screening_eligible" in result else False)
+                self.assertTrue(any("candidate signal held" in warning for warning in result["warnings"]))
+
+    def test_fresh_positive_price_is_analysis_eligible(self):
+        timestamp = MODULE.datetime.now(MODULE.timezone.utc).isoformat().replace("+00:00", "Z")
+        result = MODULE._score({
+            "id": "example", "symbol": "ABC", "name": "Example",
+            "current_price": 1.0, "last_updated": timestamp,
+        })
+        self.assertEqual(result["freshness_status"], "fresh")
+        self.assertTrue(result["analysis_eligible"])
+        self.assertNotEqual(result["screen_band"], "data_quality_hold")
+
 class AssetClassificationTests(unittest.TestCase):
     def test_known_stablecoin_symbol_is_classified(self):
         kind, note = MODULE._asset_type({"symbol": "USDC", "name": "USD Coin", "id": "usd-coin"})
