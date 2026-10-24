@@ -25,6 +25,11 @@ class FakeResponse:
         return json.dumps(self.payload).encode("utf-8")
 
 
+class InvalidUtf8Response(FakeResponse):
+    def read(self, limit=-1):
+        return bytes([255, 254])
+
+
 class EvidenceIngestionTests(unittest.TestCase):
     @patch("cin_evidence_ingestion.urlopen")
     def test_normalizes_allowlisted_repo_and_never_verifies_claim(self, mocked):
@@ -46,6 +51,13 @@ class EvidenceIngestionTests(unittest.TestCase):
         self.assertFalse(result["independently_verified"])
         self.assertIn("retrieved_at", result)
         self.assertIn("published_at", result)
+
+
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_invalid_utf8_response_is_controlled_source_error(self, mocked):
+        mocked.return_value = InvalidUtf8Response({})
+        with self.assertRaisesRegex(EvidenceSourceError, "UnicodeDecodeError"):
+            fetch_github_repository_evidence()
 
     def test_rejects_arbitrary_repository(self):
         with self.assertRaises(ValueError):
