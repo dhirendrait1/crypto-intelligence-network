@@ -19,6 +19,7 @@ ALLOWED_REPOSITORIES = (
 )
 GITHUB_API_ROOT = "https://api.github.com/repos/"
 TIMEOUT_SECONDS = 8
+MAX_RESPONSE_BYTES = 1_000_000
 FRESHNESS_WINDOW_SECONDS = 7 * 24 * 60 * 60
 
 
@@ -116,7 +117,10 @@ def fetch_github_repository_evidence(
         with urlopen(request, timeout=timeout) as response:
             if response.status != 200:
                 raise EvidenceSourceError(f"GitHub returned HTTP {response.status}")
-            payload = json.loads(response.read(1_000_000).decode("utf-8"))
+            response_bytes = response.read(MAX_RESPONSE_BYTES + 1)
+            if len(response_bytes) > MAX_RESPONSE_BYTES:
+                raise EvidenceSourceError("GitHub response exceeded the 1 MB size limit")
+            payload = json.loads(response_bytes.decode("utf-8"))
     except HTTPError as exc:
         raise EvidenceSourceError(f"GitHub returned HTTP {exc.code}") from exc
     except (URLError, TimeoutError, OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
