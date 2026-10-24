@@ -98,6 +98,28 @@ class GrowthFundamentalsValidationTests(unittest.TestCase):
         self.assertEqual(coverage["evidence_count"], 1)
         self.assertEqual(coverage["duplicate_record_count"], 1)
 
+    def test_duplicate_identity_normalizes_host_port_fragment_and_timestamp_offsets(self):
+        first = self.record(
+            source_url="https://EXAMPLE.com:443/report#section",
+            published_at="2026-10-01T00:00:00Z",
+        )
+        duplicate = self.record(
+            source_url="HTTPS://example.COM/report/",
+            published_at="2026-10-01T05:30:00+05:30",
+        )
+        result = assess_growth_fundamentals("ETH", [first, duplicate], now=self.now)
+        coverage = result["coverage"]["usage_and_adoption"]
+        self.assertEqual(coverage["evidence_count"], 1)
+        self.assertEqual(coverage["duplicate_record_count"], 1)
+
+    def test_duplicate_identity_does_not_collapse_case_sensitive_paths(self):
+        first = self.record(source_url="https://example.com/Report")
+        second = self.record(source_url="https://example.com/report")
+        result = assess_growth_fundamentals("ETH", [first, second], now=self.now)
+        coverage = result["coverage"]["usage_and_adoption"]
+        self.assertEqual(coverage["evidence_count"], 2)
+        self.assertEqual(coverage["duplicate_record_count"], 0)
+
     def test_invalid_freshness_threshold_falls_back_safely(self):
         result = assess_growth_fundamentals(
             "ETH", [self.record()], now=self.now, max_age_days=-1
