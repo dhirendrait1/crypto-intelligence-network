@@ -33,9 +33,23 @@ _INTERVAL_MS = {
     "1w": 604_800_000, "1M": 2_678_400_000,
 }
 
+def _interval_duration_ms(interval: str, open_time_ms: int | None = None) -> int:
+    """Return interval duration; monthly candles use calendar-month boundaries."""
+    if interval != "1M" or open_time_ms is None:
+        return _INTERVAL_MS[interval]
+    start = datetime.fromtimestamp(open_time_ms / 1000, timezone.utc)
+    if start.month == 12:
+        next_month = datetime(start.year + 1, 1, 1, tzinfo=timezone.utc)
+    else:
+        next_month = datetime(start.year, start.month + 1, 1, tzinfo=timezone.utc)
+    return int(next_month.timestamp() * 1000) - open_time_ms
+
+
 def _freshness_metadata(rows: list[dict[str, Any]], interval: str, now_ms: int) -> dict[str, Any]:
     closed_rows = [row for row in rows if row["close_time"] < now_ms]
-    threshold_seconds = _INTERVAL_MS[interval] * 2 / 1000
+    latest = max(closed_rows, key=lambda row: row["close_time"]) if closed_rows else None
+    duration_ms = _interval_duration_ms(interval, latest["open_time"] if latest else None)
+    threshold_seconds = duration_ms * 2 / 1000
     if not closed_rows:
         return {
             "latest_closed_candle_close_time_utc": None,
@@ -43,7 +57,6 @@ def _freshness_metadata(rows: list[dict[str, Any]], interval: str, now_ms: int) 
             "stale_data_warning": "No completed candle is available; do not treat a forming candle as closed data.",
             "stale_threshold_seconds": threshold_seconds,
         }
-    latest = max(closed_rows, key=lambda row: row["close_time"])
     age_seconds = max(0.0, (now_ms - latest["close_time"]) / 1000)
     warning = f"Latest completed candle is older than the {interval} freshness threshold." if age_seconds > threshold_seconds else None
     return {
