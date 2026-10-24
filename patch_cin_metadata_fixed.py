@@ -34,24 +34,6 @@ if missing_modules:
         "Required CIN module(s) not found: " + ", ".join(str(path) for path in missing_modules)
     )
 
-changed = 0
-found = False
-for path in APP_DIR.rglob("*.py"):
-    text = path.read_text(encoding="utf-8")
-    if OLD in text:
-        text = text.replace(OLD, NEW)
-        path.write_text(text, encoding="utf-8")
-        changed += 1
-        found = True
-    if NEW in text:
-        found = True
-
-if not found:
-    raise SystemExit("Could not find a CIN application title to validate")
-
-for module_name in MODULES:
-    shutil.copyfile(ROOT / module_name, APP_DIR / module_name)
-
 main_text = main_path.read_text(encoding="utf-8")
 
 registrations = [
@@ -122,6 +104,25 @@ for marker, registration in registrations:
     else:
         main_text = main_text.rstrip() + registration
     changed += 1
+
+changed = 0
+found = False
+for path in APP_DIR.rglob("*.py"):
+    text = path.read_text(encoding="utf-8")
+    if OLD in text:
+        text = text.replace(OLD, NEW)
+        path.write_text(text, encoding="utf-8")
+        changed += 1
+        found = True
+    if NEW in text:
+        found = True
+
+if not found:
+    raise SystemExit("Could not find a CIN application title to validate")
+
+for module_name in MODULES:
+    shutil.copyfile(ROOT / module_name, APP_DIR / module_name)
+
 
 main_path.write_text(main_text, encoding="utf-8")
 
