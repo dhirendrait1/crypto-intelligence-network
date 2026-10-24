@@ -99,6 +99,22 @@ def _normalize_provider_timestamp(value: Any) -> tuple[str | None, str]:
         return None, "invalid"
 
 
+def _article_url_identity(value: str) -> str:
+    """Canonicalize URL components used for duplicate detection, not display."""
+    parsed = urlsplit(value)
+    scheme = parsed.scheme.lower()
+    hostname = (parsed.hostname or "").lower()
+    if ":" in hostname and not hostname.startswith("["):
+        hostname = f"[{hostname}]"
+    port = parsed.port
+    if port is not None and not (
+        (scheme == "http" and port == 80) or (scheme == "https" and port == 443)
+    ):
+        hostname = f"{hostname}:{port}"
+    path = parsed.path.rstrip("/") or "/"
+    return urllib.parse.urlunsplit((scheme, hostname, path, parsed.query, ""))
+
+
 def _parse_articles(payload: Any, max_records: int) -> list[dict[str, Any]]:
     if not isinstance(payload, dict) or not isinstance(payload.get("articles"), list):
         raise ValueError("Unexpected GDELT article-search response")
@@ -111,9 +127,10 @@ def _parse_articles(payload: Any, max_records: int) -> list[dict[str, Any]]:
         url = row.get("url")
         if not isinstance(title, str) or not title.strip() or not _is_http_url(url):
             continue
-        if url in seen:
+        identity = _article_url_identity(url)
+        if identity in seen:
             continue
-        seen.add(url)
+        seen.add(identity)
         provider_timestamp = row.get("seendate")
         normalized_timestamp, timestamp_status = _normalize_provider_timestamp(provider_timestamp)
         articles.append({
