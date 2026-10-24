@@ -612,3 +612,12 @@ This checkpoint validates configured offline automation only. It does not establ
 - Code commit: `5cea6dc6d143b265439f36c1edc01ecec61e7cdf`.
 - Test commit: `697501bc2e257ea8489bb9230b8aafbd68e4391f`.
 - CI verification pending on the latest tracker commit.
+
+
+## Kraken pair-key type validation (2026-10-25)
+
+- The parser now explicitly rejects non-string trading-pair keys before normalization, producing a clear validation failure rather than relying on an incidental attribute error.
+- Added a malformed result-key regression case to the controlled fallback test matrix.
+- Code commit: `2ff41eb63615b24eff3402e00b4635405c029191`.
+- Test commit: `3761aa86b59388c3ac2f2c6956cd55fbe65e34bb`.
+- CI verification pending on the latest tracker commit.
