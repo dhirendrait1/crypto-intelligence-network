@@ -121,7 +121,19 @@ def _snapshot(symbol: str) -> dict[str, Any]:
     previous_oi_value = _finite_number(previous_history.get("sumOpenInterestValue")) if previous_history else None
     change_pct = None
     if previous_oi_value is not None and previous_oi_value > 0 and latest_oi_value is not None:
-        change_pct = round((latest_oi_value - previous_oi_value) / previous_oi_value * 100, 6)
+        change_pct = (latest_oi_value - previous_oi_value) / previous_oi_value * 100
+
+    spread = best_ask - best_bid
+    spread_percent = spread / midpoint * 100
+    funding_rate_percent = funding_rate * 100
+    derived_values = [spread, spread_percent, funding_rate_percent]
+    if change_pct is not None:
+        derived_values.append(change_pct)
+    if not all(math.isfinite(value) for value in derived_values):
+        raise ValueError("Derived derivatives metrics exceeded finite numeric limits")
+
+    if change_pct is not None:
+        change_pct = round(change_pct, 6)
     retrieved_at = datetime.now(timezone.utc).isoformat()
 
     return {
@@ -143,8 +155,8 @@ def _snapshot(symbol: str) -> dict[str, Any]:
             "ask_levels_used": len(asks),
             "best_bid": best_bid,
             "best_ask": best_ask,
-            "spread": round(best_ask - best_bid, 10),
-            "spread_percent": round((best_ask - best_bid) / midpoint * 100, 8) if midpoint > 0 else None,
+            "spread": round(spread, 10),
+            "spread_percent": round(spread_percent, 8),
             "bid_notional_quote_approx": round(bid_notional, 4),
             "ask_notional_quote_approx": round(ask_notional, 4),
             "bid_ask_notional_imbalance": round(depth_imbalance, 8) if depth_imbalance is not None else None,
@@ -155,7 +167,7 @@ def _snapshot(symbol: str) -> dict[str, Any]:
             "open_interest_value_quote_approx": latest_oi_value,
             "open_interest_value_change_4h_percent": change_pct,
             "funding_rate": funding_rate,
-            "funding_rate_percent_per_interval": round(funding_rate * 100, 8),
+            "funding_rate_percent_per_interval": round(funding_rate_percent, 8),
             "funding_rate_unit_note": "Percentage per current funding interval, not an annualized rate",
             "mark_price": mark_price,
             "index_price": index_price,
