@@ -218,7 +218,7 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
     def test_provider_rejected_request_is_reported_as_client_error(self, mocked):
         mocked.side_effect = urllib.error.HTTPError("https://api.coingecko.com", 400, "Bad Request", {}, None)
         with self.assertRaises(Exception) as raised:
-            asyncio.run(get_public_market_data("bitcoin", "notacurrency"))
+            asyncio.run(get_public_market_data("bitcoin", "xyz"))
         self.assertEqual(getattr(raised.exception, "status_code", None), 400)
         self.assertIn("not supported", str(raised.exception.detail))
 
