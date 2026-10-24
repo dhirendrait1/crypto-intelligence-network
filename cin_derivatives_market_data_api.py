@@ -65,7 +65,10 @@ def _snapshot(symbol: str) -> dict[str, Any]:
         "/futures/data/openInterestHist",
         {"symbol": symbol, "period": "4h", "limit": "2"},
     )
+    depth = _get_json("/fapi/v1/depth", {"symbol": symbol, "limit": "20"})
     _validate_payloads(open_interest, premium, history, symbol)
+    if not isinstance(depth, dict) or not isinstance(depth.get("bids"), list) or not isinstance(depth.get("asks"), list):
+        raise ValueError("Unexpected order-book depth provider payload")
 
     oi_contracts = _finite_number(open_interest.get("openInterest"))
     funding_rate = _finite_number(premium.get("lastFundingRate"))
@@ -75,6 +78,22 @@ def _snapshot(symbol: str) -> dict[str, Any]:
         raise ValueError("Provider returned missing or invalid open-interest/funding values")
     if mark_price is None or mark_price < 0:
         raise ValueError("Provider returned missing or invalid mark price")
+
+    bids = [(_finite_number(level[0]), _finite_number(level[1])) for level in depth["bids"] if isinstance(level, (list, tuple)) and len(level) >= 2]
+    asks = [(_finite_number(level[0]), _finite_number(level[1])) for level in depth["asks"] if isinstance(level, (list, tuple)) and len(level) >= 2]
+    bids = [(price, qty) for price, qty in bids if price is not None and price > 0 and qty is not None and qty > 0]
+    asks = [(price, qty) for price, qty in asks if price is not None and price > 0 and qty is not None and qty > 0]
+    if not bids or not asks:
+        raise ValueError("Provider returned no valid bid/ask levels")
+    best_bid = max(price for price, _ in bids)
+    best_ask = min(price for price, _ in asks)
+    if best_ask < best_bid:
+        raise ValueError("Order-book best ask is below best bid")
+    midpoint = (best_bid + best_ask) / 2
+    bid_notional = sum(price * qty for price, qty in bids)
+    ask_notional = sum(price * qty for price, qty in asks)
+    total_notional = bid_notional + ask_notional
+    depth_imbalance = (bid_notional - ask_notional) / total_notional if total_notional > 0 else None
 
     history_rows = sorted(
         history,
@@ -99,6 +118,18 @@ def _snapshot(symbol: str) -> dict[str, Any]:
             "open_interest": _iso_from_ms(open_interest.get("time")),
             "mark_price_and_funding": _iso_from_ms(premium.get("time")),
             "open_interest_history_latest": _iso_from_ms(latest_history.get("timestamp")) if latest_history else None,
+        },
+        "order_book": {
+            "source": "Binance USDⓈ-M Futures public depth endpoint",
+            "levels_per_side_returned": min(len(bids), len(asks)),
+            "best_bid": best_bid,
+            "best_ask": best_ask,
+            "spread": round(best_ask - best_bid, 10),
+            "spread_percent": round((best_ask - best_bid) / midpoint * 100, 8) if midpoint > 0 else None,
+            "bid_notional_usd_approx": round(bid_notional, 4),
+            "ask_notional_usd_approx": round(ask_notional, 4),
+            "bid_ask_notional_imbalance": round(depth_imbalance, 8) if depth_imbalance is not None else None,
+            "note": "Snapshot only; depth changes rapidly and excludes retail price-improvement orders not exposed by this endpoint.",
         },
         "data": {
             "open_interest_contracts": oi_contracts,
