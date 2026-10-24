@@ -100,3 +100,5 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Add regression tests for malformed symbols, boolean thresholds, zero-day thresholds, and oversized growth-evidence batches.
 - [ ] Confirm the new request-boundary regression tests and all four CI workflows pass on the resulting branch revision.
 - **Boundary:** these checks validate API request shape. Evidence publication timestamps remain strings at the request boundary so malformed or unverifiable source metadata can be retained as unverified audit evidence rather than being mistaken for verified claims.
+
+- News endpoint hardening: reject a whitespace-only query after normalization with HTTP 422 before provider access; regression test added.
