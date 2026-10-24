@@ -35,6 +35,8 @@ def test_endpoint_normalizes_supplied_evidence_and_preserves_caveats():
     )
     assert result["symbol"] == "XAUT"
     assert result["evidence"][0]["status"] == "verified"
+    assert result["assessment_clock_valid"] is True
+    assert result["evidence"][0]["assessment_clock_valid"] is True
     assert result["evidence_coverage"]["reserve_attestation"]["status"] == "verified"
     assert result["evidence_coverage"]["redemption_terms"]["status"] == "unverified"
     assert result["not_a_reserve_certification"] is True
