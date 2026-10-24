@@ -274,24 +274,34 @@ def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict
         for row in payload:
             if not isinstance(row, dict):
                 continue
-            quotes = row.get("quotes") or {}
-            quote = quotes.get(vs_currency.upper()) or {}
-            price = quote.get("price")
-            market_cap = quote.get("market_cap")
-            total_supply = row.get("total_supply")
-            max_supply = row.get("max_supply")
+            quotes = row.get("quotes")
+            if not isinstance(quotes, dict):
+                continue
+            quote = quotes.get(vs_currency.upper())
+            if not isinstance(quote, dict):
+                continue
+            def nonnegative(value: Any) -> float | None:
+                number = _number(value)
+                return number if number is not None and number >= 0 else None
+            price = nonnegative(quote.get("price"))
+            market_cap = nonnegative(quote.get("market_cap"))
+            volume = nonnegative(quote.get("volume_24h"))
+            circulating = nonnegative(row.get("circulating_supply"))
+            total_supply = nonnegative(row.get("total_supply"))
+            max_supply = nonnegative(row.get("max_supply"))
             # Unknown max supply means FDV is unknown; total supply is not a safe substitute.
-            fdv = price * max_supply if (
-                isinstance(price, (int, float)) and not isinstance(price, bool)
-                and isinstance(max_supply, (int, float)) and not isinstance(max_supply, bool)
-                and max_supply > 0
-            ) else None
+            fdv = None
+            if price is not None and max_supply is not None and max_supply > 0:
+                candidate_fdv = price * max_supply
+                if math.isfinite(candidate_fdv):
+                    fdv = candidate_fdv
+            change = _number(quote.get("percent_change_24h"))
             mapped.append({
                 "id": row.get("id"), "symbol": row.get("symbol"), "name": row.get("name"),
                 "current_price": price, "market_cap": market_cap,
-                "total_volume": quote.get("volume_24h"), "fully_diluted_valuation": fdv,
-                "circulating_supply": row.get("circulating_supply"), "total_supply": total_supply,
-                "price_change_percentage_24h": quote.get("percent_change_24h"),
+                "total_volume": volume, "fully_diluted_valuation": fdv,
+                "circulating_supply": circulating, "total_supply": total_supply,
+                "price_change_percentage_24h": change,
                 "last_updated": row.get("last_updated"), "_cin_provider": "CoinPaprika",
             })
         fetched_at = time.time()
@@ -299,7 +309,7 @@ def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict
             row["_cin_retrieved_at"] = fetched_at
         scanned = len(mapped)
         matches = [row for row in mapped if _asset_type(row)[0] == "commodity_backed"]
-        matches.sort(key=lambda item: item.get("market_cap") or 0, reverse=True)
+        matches.sort(key=lambda item: item["market_cap"] if item["market_cap"] is not None else -1, reverse=True)
         selected = matches[:per_page]
         for row in selected:
             row["_cin_scanned_universe"] = scanned
