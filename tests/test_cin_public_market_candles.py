@@ -127,6 +127,16 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(symbol["schema"]["pattern"], "^[A-Za-z0-9]+$")
 
 
+    def test_binance_rejects_more_candles_than_requested_limit(self):
+        payload = [
+            [1700000000000 + i * 3600000, "100", "105", "98", "102", "12.5",
+             1700003599999 + i * 3600000]
+            for i in range(6)
+        ]
+        with patch.object(api, "_request_json", return_value=payload):
+            with self.assertRaisesRegex(ValueError, "more candles than the requested limit"):
+                api._fetch_binance("BTCUSDT", "1h", 5)
+
     def test_kraken_fallback_parses_alternate_xbt_usd_pair_key(self):
         payload = {
             "error": [],
