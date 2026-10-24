@@ -645,3 +645,12 @@ This checkpoint validates configured offline automation only. It does not establ
 - This verifies that extreme timestamp values are contained by the controlled fallback error path and cannot escape as an unhandled parser failure or expose provider details.
 - Test commit: `48f589a64fd7956d67e020ee2afed2464add915c`.
 - CI verification pending on the latest tracker commit.
+
+
+## Kraken unrepresentably large integer timestamp guard (2026-10-25)
+
+- Hardened timestamp validation so an integer too large to convert to a float is rejected as a malformed row rather than escaping the parser's numeric checks.
+- Expanded the regression payload to use a 1,001-digit timestamp, covering the overflow path directly.
+- Code commit: `c3b51db8fdd5d7cc8a1e9bc567b1a97854ff1905`.
+- Test commit: `1cd3a8a32f0da6ca4ace87b25c08fe39dd6d9954`.
+- CI verification pending on the latest tracker commit.
