@@ -95,3 +95,19 @@ def test_endpoint_rejects_whitespace_only_query_before_provider_call(monkeypatch
     with pytest.raises(HTTPException) as caught:
         asyncio.run(api.news_sentiment(query="   ", max_records=5))
     assert caught.value.status_code == 422
+
+
+
+@pytest.mark.parametrize("failure", [RuntimeError("unexpected provider response"), TypeError("unexpected provider payload")])
+def test_endpoint_sanitizes_unexpected_provider_response_errors(monkeypatch, failure):
+    def fail(_query, _limit):
+        raise failure
+
+    monkeypatch.setattr(api, "_search", fail)
+    with pytest.raises(HTTPException) as caught:
+        asyncio.run(api.news_sentiment(query="bitcoin", max_records=5))
+
+    assert caught.value.status_code == 502
+    assert caught.value.detail["error"] == "invalid_response"
+    assert caught.value.detail["message"] == "Public news provider response was invalid."
+    assert "unexpected provider response" not in str(caught.value.detail)
