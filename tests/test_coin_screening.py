@@ -179,5 +179,18 @@ class ScreeningFreshnessTests(unittest.TestCase):
 
 
 
+class ProviderFailureClassificationTests(unittest.TestCase):
+    def test_http_failure_classification_keeps_status_code(self):
+        error = MODULE.urllib.error.HTTPError("provider", 429, "limited", {}, None)
+        self.assertEqual(MODULE._failure_kind(error), ("http_error", 429))
+
+    def test_network_failure_classification_has_no_http_status(self):
+        error = MODULE.urllib.error.URLError("offline")
+        self.assertEqual(MODULE._failure_kind(error), ("network_error", None))
+
+    def test_invalid_response_classification_has_no_http_status(self):
+        self.assertEqual(MODULE._failure_kind(ValueError("invalid")), ("invalid_response", None))
+
+
 if __name__ == "__main__":
     unittest.main()
