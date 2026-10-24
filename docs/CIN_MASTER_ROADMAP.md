@@ -119,3 +119,13 @@ All four configured workflows passed on code/documentation checkpoint `2c1f816d5
 - Fixed-interval epoch alignment is not assumed without provider-specific evidence, 3-day anchoring remains provider-specific, and Kraken enforcement is deferred pending a compatibility pass.
 - Code commits: `56b9578bba9df3b77168acf7051445ec924bfb15`, `0cb4e6efb60f4228142ceca005279afca54f3f39`; tests: `46e14b24f6c1ad98bb567bb4967242b41dd29f73`; tracker: `fd0f9c1b93c8f431ef679dc455df7d5e9b943366`.
 - Latest-head CI is pending; live-provider and deployment checks remain outstanding.
+
+## Latest-head CI and interval matrix verification (2026-10-25)
+
+- Verified all four configured workflows passed on current Draft PR head `6367afc875e2084dbf25053aed8a0d23badc4227`:
+  - CIN Technical Analysis Tests: [40143588595](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40143588595)
+  - CIN evidence ingestion API checks: [40143588598](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40143588598)
+  - CIN Automated Tests: [40143588591](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40143588591)
+  - CIN screening checks: [40143588616](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40143588616)
+- This head includes deterministic weekly Monday-UTC boundary tests and 3-day candle duration tests that intentionally avoid an unsupported epoch anchor assumption.
+- These results establish offline CI only. Kraken boundary enforcement/compatibility, live provider behavior, and deployed service health remain unverified. PR #8 remains Draft and unmerged; no deployment or trading execution was performed.
