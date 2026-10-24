@@ -104,6 +104,20 @@ class PublicEvidenceIngestionApiTests(unittest.TestCase):
         self.assertNotIn("sensitive provider internals", raised.exception.detail)
         fetch.assert_called_once_with("ethereum/go-ethereum")
 
+    def test_request_rejects_malformed_symbol_format(self):
+        from pydantic import ValidationError
+
+        for symbol in (" ETH", "ETH ", "ETH/USDT", "ETH\n"):
+            with self.assertRaises(ValidationError):
+                PublicEvidenceRequest(symbol=symbol)
+
+    def test_request_rejects_malformed_repository_path(self):
+        from pydantic import ValidationError
+
+        for repository in ("ethereum//go-ethereum", "/go-ethereum", "ethereum/go-ethereum/extra", "ethereum/go ethereum"):
+            with self.assertRaises(ValidationError):
+                PublicEvidenceRequest(repository=repository)
+
 
 if __name__ == "__main__":
     unittest.main()
