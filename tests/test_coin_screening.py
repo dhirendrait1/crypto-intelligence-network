@@ -196,7 +196,7 @@ class ProviderFallbackMappingTests(unittest.TestCase):
         response = MagicMock()
         response.__enter__.return_value.read.return_value = json.dumps(payload).encode("utf-8")
         with patch.object(MODULE.urllib.request, "urlopen", return_value=response):
-            rows, mode, error_code, scanned, matches, details = MODULE._fetch_commodity_markets("usd", 5)
+            rows, mode, error_code, scanned, matches, details, retrieved_at = MODULE._fetch_commodity_markets("usd", 5)
         self.assertEqual(mode, "live")
         self.assertEqual(error_code, 0)
         self.assertEqual(scanned, 1)
@@ -429,7 +429,7 @@ class ScreeningResponseMetadataTests(unittest.IsolatedAsyncioTestCase):
         }
 
         async def fake_to_thread(func, *args, **kwargs):
-            return ([row], "stale_cache", 0, 500, 2, details)
+            return ([row], "stale_cache", 0, 500, 2, details, row["_cin_retrieved_at"])
 
         with patch.object(MODULE.asyncio, "to_thread", side_effect=fake_to_thread):
             response = await MODULE.coin_screening(
