@@ -34,6 +34,8 @@ def test_parse_articles_deduplicates_and_skips_invalid_urls():
     assert len(rows) == 2
     assert rows[0]["headline_sentiment"]["label"] == "positive"
     assert rows[0]["published_at"] == "20261024T000000Z"
+    assert rows[0]["published_at_utc"] == "2026-10-24T00:00:00Z"
+    assert rows[0]["published_at_validation_status"] == "valid"
     assert rows[1]["headline_sentiment"]["label"] == "negative"
 
 
@@ -151,3 +153,23 @@ def test_parse_articles_accepts_valid_http_and_https_urls():
         "http://news.example/a",
         "https://news.example/b",
     ]
+
+
+def test_article_timestamp_validation_preserves_raw_provider_value():
+    rows = api._parse_articles(
+        {
+            "articles": [
+                {"title": "Malformed time", "url": "https://news.example/a", "seendate": "not-a-date"},
+                {"title": "Naive time", "url": "https://news.example/b", "seendate": "2026-10-24T00:00:00"},
+                {"title": "Missing time", "url": "https://news.example/c"},
+            ]
+        },
+        10,
+    )
+    assert rows[0]["published_at"] == "not-a-date"
+    assert rows[0]["published_at_utc"] is None
+    assert rows[0]["published_at_validation_status"] == "invalid"
+    assert rows[1]["published_at_utc"] is None
+    assert rows[1]["published_at_validation_status"] == "invalid_timezone"
+    assert rows[2]["published_at"] is None
+    assert rows[2]["published_at_validation_status"] == "missing"
