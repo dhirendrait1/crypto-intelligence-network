@@ -118,10 +118,6 @@ class PublicEvidenceIngestionApiTests(unittest.TestCase):
             with self.assertRaises(ValidationError):
                 PublicEvidenceRequest(repository=repository)
 
-
-if __name__ == "__main__":
-    unittest.main()
-
     def test_request_rejects_unknown_fields(self):
         from pydantic import ValidationError
 
@@ -131,4 +127,8 @@ if __name__ == "__main__":
                 repository="ethereum/go-ethereum",
                 repo="ethereum/go-ethereum",
             )
+
+
+if __name__ == "__main__":
+    unittest.main()
 
