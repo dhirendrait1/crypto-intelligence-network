@@ -21,6 +21,7 @@ def test_snapshot_preserves_source_times_and_never_invents_liquidations(monkeypa
             {"symbol": "BTCUSDT", "sumOpenInterestValue": "1000000", "timestamp": 1_799_985_600_000},
             {"symbol": "BTCUSDT", "sumOpenInterestValue": "1020000", "timestamp": 1_800_000_000_000},
         ],
+        {"bids": [["65000", "2"], ["64990", "3"]], "asks": [["65010", "1"], ["65020", "4"]]},
     ]
     calls = []
 
@@ -39,7 +40,12 @@ def test_snapshot_preserves_source_times_and_never_invents_liquidations(monkeypa
     assert result["provider_timestamps"]["open_interest"] is not None
     assert result["retrieved_at"]
     assert result["liquidations"]["status"] == "not_available"
-    assert len(calls) == 3
+    assert result["order_book"]["best_bid"] == 65000.0
+    assert result["order_book"]["best_ask"] == 65010.0
+    assert result["order_book"]["spread"] == 10.0
+    assert result["order_book"]["spread_percent"] > 0
+    assert result["order_book"]["bid_ask_notional_imbalance"] is not None
+    assert len(calls) == 4
     assert all("order" not in params and "side" not in params for _, params in calls)
 
 
