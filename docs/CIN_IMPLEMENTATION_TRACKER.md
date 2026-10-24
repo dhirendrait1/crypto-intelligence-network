@@ -123,3 +123,8 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Screening, evidence-ingestion API, and technical-analysis workflows passed on revision f789b282be76d59598778b4e891b61efb34475b3.
 - [x] All four workflows subsequently confirmed on that exact revision: CIN Automated Tests, screening checks, technical-analysis tests, and evidence-ingestion API checks all passed.
 - Boundary: offline/mocked validation only; no live provider or deployment verification.
+
+## News provider boundary tests
+- [x] Sanitized unexpected provider runtime/type/UTF-8 errors as HTTP 502; mocked regression tests added.
+- [x] Four workflows passed on commit 6826048f92e825a33e3503d33628d913df10507d.
+- Boundary: offline tests only; live GDELT and production behavior remain unverified.
