@@ -91,3 +91,12 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Report duplicate evidence rows and count normalized source/timestamp identities once in category coverage; raw rows remain available for audit and differing statuses still surface as conflicts.
 - [x] Align growth URL validation with commodity validation by rejecting embedded URL credentials; add offline regression tests.
 - [ ] Add source-aware conflict resolution and independent source retrieval; current conflict detection compares supplied statuses and does not establish which source is authoritative.
+
+
+## Assessment API boundary validation (2026-10-24)
+
+- [x] Restrict commodity-backed and growth-fundamentals request symbols to bounded alphanumeric identifiers with only `.`, `_`, or `-` after the first character; reject whitespace and pair-style separators.
+- [x] Require `max_age_days` to be a strict integer in the documented 0–3650 range; booleans are not accepted as integers, and a zero-day freshness window is valid.
+- [x] Add regression tests for malformed symbols, boolean thresholds, zero-day thresholds, and oversized growth-evidence batches.
+- [ ] Confirm the new request-boundary regression tests and all four CI workflows pass on the resulting branch revision.
+- **Boundary:** these checks validate API request shape. Evidence publication timestamps remain strings at the request boundary so malformed or unverifiable source metadata can be retained as unverified audit evidence rather than being mistaken for verified claims.
