@@ -16,6 +16,44 @@ SAMPLE = [
 
 
 class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
+    def test_request_json_accepts_provider_response_within_size_limit(self):
+        import json
+
+        class Response:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self, size=-1):
+                return json.dumps({"ok": True}).encode("utf-8")
+
+        with patch.object(api.urllib.request, "urlopen", return_value=Response()):
+            self.assertEqual(api._request_json("https://provider.example/data"), {"ok": True})
+
+    def test_request_json_rejects_oversized_provider_response_before_json_parse(self):
+        class Response:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self, size=-1):
+                self.requested_size = size
+                return b"x" * size
+
+        response = Response()
+        with patch.object(api.urllib.request, "urlopen", return_value=response):
+            with self.assertRaisesRegex(ValueError, "exceeded the configured size limit"):
+                api._request_json("https://provider.example/data")
+        self.assertEqual(response.requested_size, api._MAX_PROVIDER_RESPONSE_BYTES + 1)
+
     async def test_candle_endpoint_returns_provenance_and_timestamps(self):
         with patch.object(api, "_load", return_value=SAMPLE):
             result = await api.get_market_candles("BTCUSDT", "1h", 50)
