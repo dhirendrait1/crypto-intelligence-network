@@ -670,3 +670,29 @@ class ScreeningArithmeticSafetyTests(unittest.TestCase):
             value is None or (not isinstance(value, float) or MODULE.math.isfinite(value))
             for value in result.values()
         ))
+
+
+class MarketIdentityDeterminismTests(unittest.TestCase):
+    def test_identity_less_rows_are_discarded_and_duplicate_ids_keep_first_row(self):
+        rows = [
+            {"id": "bitcoin", "symbol": "BTC", "current_price": 100},
+            {"id": "BITCOIN", "symbol": "BTC", "current_price": 101},
+            {"id": "  ", "symbol": "BAD"},
+            {"symbol": "NOID"},
+            {"id": "ethereum", "symbol": "ETH"},
+        ]
+        accepted, quality = MODULE._canonical_market_rows(rows)
+        self.assertEqual([row["id"] for row in accepted], ["bitcoin", "ethereum"])
+        self.assertEqual(accepted[0]["current_price"], 100)
+        self.assertEqual(quality, {
+            "input_row_count": 5,
+            "invalid_identity_count": 2,
+            "duplicate_id_count": 1,
+            "unique_identity_count": 2,
+        })
+
+    def test_empty_input_returns_empty_rows_and_zero_counts(self):
+        self.assertEqual(MODULE._canonical_market_rows([]), ([], {
+            "input_row_count": 0, "invalid_identity_count": 0,
+            "duplicate_id_count": 0, "unique_identity_count": 0,
+        }))
