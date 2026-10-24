@@ -105,6 +105,8 @@ for marker, registration in registrations:
         main_text = main_text.rstrip() + registration
     changed += 1
 
+main_path.write_text(main_text, encoding="utf-8")
+
 changed = 0
 found = False
 for path in APP_DIR.rglob("*.py"):
@@ -123,7 +125,5 @@ if not found:
 for module_name in MODULES:
     shutil.copyfile(ROOT / module_name, APP_DIR / module_name)
 
-
-main_path.write_text(main_text, encoding="utf-8")
 
 print(f"CIN metadata verified; read-only market data, screening, assessment, evidence, and technical-analysis and public market-candle routers installed; files updated: {changed}")
