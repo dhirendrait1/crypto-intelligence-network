@@ -168,13 +168,13 @@ def _request_markets(vs_currency: str, per_page: int) -> list[dict[str, Any]]:
             ) from fallback_error
 
 
-def _fetch_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]], str, int]:
+def _fetch_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]], str, int, dict[str, Any] | None]:
     key = (vs_currency, per_page)
     now = time.time()
     with _CACHE_LOCK:
         cached = _CACHE.get(key)
     if cached and now - cached[0] <= _CACHE_TTL_SECONDS:
-        return cached[1], "cache", 0
+        return cached[1], "cache", 0, None
     try:
         rows = _request_markets(vs_currency, per_page)
         fetched_at = time.time()
@@ -182,19 +182,19 @@ def _fetch_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]
             row["_cin_retrieved_at"] = fetched_at
         with _CACHE_LOCK:
             _CACHE[key] = (fetched_at, rows)
-        return rows, "live", 0
+        return rows, "live", 0, None
     except MarketDataProviderFailure as exc:
         if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
             # Preserve an HTTP status when either provider supplied one; 0 means no HTTP status.
-            return cached[1], "stale_cache", exc.fallback_status or exc.primary_status or 0
+            return cached[1], "stale_cache", exc.fallback_status or exc.primary_status or 0, {\n                "primary_provider": "CoinGecko", "primary_error": exc.primary_kind,\n                "primary_http_status": exc.primary_status, "fallback_provider": "CoinPaprika",\n                "fallback_error": exc.fallback_kind, "fallback_http_status": exc.fallback_status,\n            }
         raise
     except urllib.error.HTTPError as exc:
         if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
-            return cached[1], "stale_cache", exc.code
+            return cached[1], "stale_cache", exc.code, {\n                "primary_provider": "CoinGecko", "primary_error": "http_error",\n                "primary_http_status": exc.code, "fallback_provider": "CoinPaprika",\n                "fallback_error": "not_usable", "fallback_http_status": None,\n            }
         raise
     except (urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError):
         if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
-            return cached[1], "stale_cache", 0
+            return cached[1], "stale_cache", 0, {\n                "primary_provider": "CoinGecko", "primary_error": "network_or_response_error",\n                "primary_http_status": None, "fallback_provider": "CoinPaprika",\n                "fallback_error": "not_usable", "fallback_http_status": None,\n            }
         raise
 
 
@@ -394,7 +394,7 @@ async def coin_screening(
     commodity_scan: dict[str, Any] | None = None
     try:
         if asset_type == "commodity_backed":
-            raw, data_mode, provider_error_code, scanned_count, matched_count = await asyncio.to_thread(_fetch_commodity_markets, currency, per_page)
+            raw, data_mode, provider_error_code, scanned_count, matched_count = await asyncio.to_thread(_fetch_commodity_markets, currency, per_page)\n            provider_error_details = None
             commodity_scan = {
                 "provider": "CoinPaprika",
                 "scanned_universe_count": scanned_count,
@@ -404,7 +404,7 @@ async def coin_screening(
                 "status": "matches_found" if matched_count else "no_matches_in_scanned_universe",
             }
         else:
-            raw, data_mode, provider_error_code = await asyncio.to_thread(_fetch_markets, currency, per_page)
+            raw, data_mode, provider_error_code, provider_error_details = await asyncio.to_thread(_fetch_markets, currency, per_page)
     except MarketDataProviderFailure as exc:
         status_code = 503 if (
             exc.primary_status == 429 or exc.fallback_status == 429
@@ -464,7 +464,7 @@ async def coin_screening(
         "mode": "read_only",
         "data_mode": data_mode,
         "stale_data_warning": ("Primary provider was unavailable; results use cached market data and may be up to 15 minutes old." if data_mode == "stale_cache" else None),
-        "provider_error_code": provider_error_code or None,
+        "provider_error_code": provider_error_code or None,\n        "provider_error_details": provider_error_details,
         "methodology": "Preliminary transparent heuristic; not financial advice or a safety rating",
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
         "cache_age_seconds": (
