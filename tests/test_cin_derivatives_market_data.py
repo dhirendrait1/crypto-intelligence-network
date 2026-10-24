@@ -140,6 +140,30 @@ def test_snapshot_rejects_non_finite_derived_funding_percent(monkeypatch):
         api._snapshot("BTCUSDT")
 
 
+@pytest.mark.parametrize(
+    "field, value, message",
+    [
+        ("open_interest_time", "invalid", "open-interest provider payload contained an invalid timestamp"),
+        ("premium_time", 10**400, "premium-index provider payload contained an invalid timestamp"),
+        ("history_time", 10**400, "open-interest history contained an invalid timestamp"),
+    ],
+)
+def test_snapshot_rejects_unrepresentable_provider_timestamps(monkeypatch, field, value, message):
+    open_interest = {"symbol": "BTCUSDT", "openInterest": "1000", "time": 1_800_000_000_000}
+    premium = {"symbol": "BTCUSDT", "markPrice": "65000", "indexPrice": "64990", "lastFundingRate": "0.0001", "time": 1_800_000_000_000}
+    history = [{"symbol": "BTCUSDT", "sumOpenInterestValue": "1000000", "timestamp": 1_800_000_000_000}]
+    if field == "open_interest_time":
+        open_interest["time"] = value
+    elif field == "premium_time":
+        premium["time"] = value
+    else:
+        history[0]["timestamp"] = value
+    payloads = [open_interest, premium, history, {"bids": [["65000", "2"]], "asks": [["65010", "1"]]}]
+    monkeypatch.setattr(api, "_get_json", lambda _path, _params: payloads.pop(0))
+    with pytest.raises(ValueError, match=message):
+        api._snapshot("BTCUSDT")
+
+
 def test_snapshot_rejects_crossed_order_book(monkeypatch):
     payloads = [
         {"symbol": "BTCUSDT", "openInterest": "1000", "time": 1_800_000_000_000},
