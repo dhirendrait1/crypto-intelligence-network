@@ -110,6 +110,8 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 
 - [x] Keep injected-clock validity consistent at assessment and evidence-row level for commodity and growth assessments; add regression coverage for timezone-naive clocks. All four workflows passed on commit `5d1539492ef93dff081af807463b696a9da4cedb` (CIN Automated Tests, screening, technical analysis, evidence-ingestion API). Tests are offline/mocked; no live provider or production validation is implied.
 
+- [ ] Follow-up on 2026-10-24: an intermediate commodity clock propagation commit (`a1a9e2b`) failed screening tests because `current`/`assessment_clock_valid` were not scoped in `assess_commodity_asset`. The current branch source now defines and validates the assessment clock in the assessment function and propagates it to evidence rows; keep this item open until fresh CI runs confirm the corrected branch snapshot.
+
 ## Public candle provider boundary hardening (2026-10-24)
 
 - [x] Audit public candle provider parsing and error translation for unexpected provider response exceptions.
