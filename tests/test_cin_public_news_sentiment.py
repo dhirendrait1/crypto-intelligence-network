@@ -124,6 +124,8 @@ def test_endpoint_sanitizes_unexpected_provider_response_errors(monkeypatch, fai
         "https://news.example/report\ttab",
         "https://news.example/report\x7fdel",
         "ftp://news.example/article",
+        "https://news.example:notaport/article",
+        "https://news.example:99999/article",
         "javascript:alert(1)",
     ],
 )
