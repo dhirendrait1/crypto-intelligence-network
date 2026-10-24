@@ -98,11 +98,19 @@ def _valid_candle(row: dict[str, Any]) -> bool:
 
 
 def _clean_candles(candles: list[dict[str, Any]], provider: str) -> list[dict[str, Any]]:
-    """Keep valid, unique candles in chronological order."""
-    by_open_time = {}
+    """Keep valid, unique candles; reject conflicting evidence for one open time."""
+    by_open_time: dict[int, dict[str, Any]] = {}
+    comparable_fields = ("open_time", "close_time", "open", "high", "low", "close", "volume")
     for row in candles:
-        if _valid_candle(row):
-            by_open_time[row["open_time"]] = row
+        if not _valid_candle(row):
+            continue
+        open_time = row["open_time"]
+        previous = by_open_time.get(open_time)
+        if previous is not None:
+            if any(previous.get(field) != row.get(field) for field in comparable_fields):
+                raise ValueError(f"{provider} returned conflicting candles for the same open timestamp")
+            continue
+        by_open_time[open_time] = row
     cleaned = [by_open_time[key] for key in sorted(by_open_time)]
     if not cleaned:
         raise ValueError(f"{provider} returned no valid candles")
