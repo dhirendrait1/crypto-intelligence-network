@@ -21,8 +21,8 @@ REQUIRED_EVIDENCE_FIELDS = (
 )
 
 
-def _parse_timestamp(value: str | None) -> datetime | None:
-    if not value:
+def _parse_timestamp(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
         return None
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
