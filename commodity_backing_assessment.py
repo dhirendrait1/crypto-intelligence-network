@@ -176,6 +176,8 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
         normalize_evidence(item, now=current, max_age_days=max_age_days)
         for item in source_records
     ]
+    for row in normalized:
+        row["assessment_clock_valid"] = assessment_clock_valid
     by_type: dict[str, list[dict[str, Any]]] = {kind: [] for kind in required_types}
     for item in normalized:
         kind = item.get("evidence_type")
