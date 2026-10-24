@@ -4,7 +4,7 @@ import json
 import urllib.error
 
 import pytest
-from fastapi import HTTPException
+from fastapi import FastAPI, HTTPException
 
 import cin_derivatives_market_data_api as api
 
@@ -147,3 +147,13 @@ def test_endpoint_sanitizes_unexpected_provider_response_errors(monkeypatch, fai
     assert caught.value.detail["error"] == "invalid_response"
     assert caught.value.detail["message"] == "Derivatives provider response was invalid or incomplete."
     assert "unexpected provider response" not in str(caught.value.detail)
+
+
+def test_derivatives_route_documents_strict_alphanumeric_symbol_contract():
+    app = FastAPI()
+    app.include_router(api.router)
+    parameters = app.openapi()["paths"]["/derivatives/market-snapshot"]["get"]["parameters"]
+    symbol = next(parameter for parameter in parameters if parameter["name"] == "symbol")
+    assert symbol["schema"]["pattern"] == "^[A-Za-z0-9]+$"
+    assert symbol["schema"]["minLength"] == 5
+    assert symbol["schema"]["maxLength"] == 30
