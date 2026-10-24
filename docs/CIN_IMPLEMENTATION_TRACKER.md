@@ -144,5 +144,5 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 
 - [x] Commodity and growth evidence URL validators now reject raw whitespace and control characters before URL parsing, in addition to requiring HTTP(S), a hostname, and no embedded credentials.
 - [x] Added regression tests for newline, tab, and raw-space URL inputs; growth assessments now expose explicit `source_url_valid` metadata for audit consistency.
-- [ ] Confirm all four CI workflows pass on the final regression revision; previous intermediate runs exposed an incorrectly escaped test string, which has been corrected.
+- [x] All four workflows passed on final code/test commit `bdfce86b7608b2207693b50d59aeccf92796794c` (automated tests, screening checks, technical-analysis tests, evidence-ingestion API checks). An intermediate test-string escaping issue was corrected before this successful run.
 - **Boundary:** syntactic URL validation does not fetch the URL, verify source ownership, or certify evidence claims.
