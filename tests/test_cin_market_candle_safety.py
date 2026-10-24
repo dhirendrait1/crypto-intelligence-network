@@ -63,6 +63,7 @@ def test_market_candles_reports_pair_and_closed_status(monkeypatch):
 
     response = asyncio.run(api.get_market_candles("BTCUSDT", "1h", 10))
 
+    assert response["mode"] == "read_only"
     assert response["provider_pair_key"] == "XXBTZUSD"
     assert response["provider_quote_currency"] == "USD"
     assert [c["candle_status"] for c in response["data"]] == [
@@ -120,3 +121,29 @@ def test_market_analysis_rejects_fewer_than_five_closed_candles(monkeypatch):
 
     assert exc.value.status_code == 422
     assert "completed candles" in exc.value.detail
+
+
+@pytest.mark.parametrize("interval, kraken_minutes", sorted(api.KRAKEN_INTERVALS.items()))
+def test_each_declared_kraken_fallback_interval_is_mapped(interval, kraken_minutes, monkeypatch):
+    import urllib.parse
+
+    captured = {}
+
+    def fake_request(url):
+        captured.update(urllib.parse.parse_qs(urllib.parse.urlparse(url).query))
+        now_seconds = int(datetime.now(timezone.utc).timestamp()) - 7200
+        return {
+            "error": [],
+            "result": {
+                "XXBTZUSD": [
+                    [now_seconds, "100", "102", "98", "101", "100", "4", 10],
+                ],
+                "last": 123,
+            },
+        }
+
+    monkeypatch.setattr(api, "_request_json", fake_request)
+    rows = api._fetch_kraken("BTCUSD", interval, 5)
+
+    assert rows
+    assert captured["interval"] == [str(kraken_minutes)]
