@@ -17,6 +17,7 @@ class OHLCBar(BaseModel):
     high: float = Field(gt=0, allow_inf_nan=False)
     low: float = Field(gt=0, allow_inf_nan=False)
     close: float = Field(gt=0, allow_inf_nan=False)
+    volume: float | None = Field(default=None, ge=0, allow_inf_nan=False)
 
 
 class TechnicalAnalysisRequest(BaseModel):
