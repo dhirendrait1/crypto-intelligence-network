@@ -189,6 +189,11 @@ def _search(query: str, max_records: int) -> dict[str, Any]:
     counts = {label: labels.count(label) for label in ("positive", "neutral", "negative")}
     total = len(labels)
     score = round((counts["positive"] - counts["negative"]) / total, 4) if total else None
+    timestamp_statuses = [row["provider_seen_at_validation_status"] for row in articles]
+    timestamp_quality_counts = {
+        status: timestamp_statuses.count(status)
+        for status in ("valid", "missing", "invalid_timezone", "invalid", "future_dated")
+    }
     return {
         "service": "cin",
         "endpoint": "/news-sentiment",
@@ -212,7 +217,10 @@ def _search(query: str, max_records: int) -> dict[str, Any]:
                 "published_at": "Retained for compatibility; mirrors GDELT seendate and must not be interpreted as a verified publication timestamp."
             },
             "future_dated_provider_timestamps_are_flagged": True,
+            "provider_timestamp_quality_counts": timestamp_quality_counts,
+            "sentiment_aggregate_includes_all_accepted_headlines_regardless_of_timestamp_status": True,
             "limitations": [
+                "Provider timestamp quality counts describe GDELT seen/indexing times, not verified original publication times.",
                 "Public news search coverage and timestamps depend on GDELT indexing.",
                 "Headline sentiment uses a small transparent keyword lexicon and can miss context, negation, sarcasm, and asset-specific meaning.",
                 "This endpoint does not ingest X, Reddit, Telegram, or other social platforms.",
