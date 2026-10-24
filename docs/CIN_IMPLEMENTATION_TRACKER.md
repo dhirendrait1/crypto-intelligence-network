@@ -496,3 +496,14 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - It distinguishes implemented/offline-tested work from partial acceptance work, pending capabilities, and release-blocked steps.
 - This count is a working baseline, not a guarantee that no future requirements will be added. Do not calculate a single completion percentage from mixed-status steps.
 - The roadmap creation commit is `9f42395b1775cd5bd1add8f9dd4a8afa275b2fa8`. CI on the new roadmap/tracker head must be checked before treating the documentation milestone as verified.
+
+
+## Latest CI verification — 2026-10-25
+
+- Verified all four configured workflows completed successfully on commit `1b847b843c14e0929f9ec972fbc36af14b70a356`:
+  - CIN Automated Tests — run `40142830679`
+  - CIN screening checks — run `40142830668`
+  - CIN Technical Analysis Tests — run `40142830721`
+  - CIN evidence ingestion API checks — run `40142830681`
+- This verifies CI at the documentation/roadmap checkpoint. It does not constitute a live-provider smoke test or production deployment validation.
+- The prior provider-hardening entries above were marked pending at the time they were written; the successful workflow runs now confirm the configured automated CI suite passed on a later head containing those changes.
