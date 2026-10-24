@@ -678,3 +678,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Together, the tests cover both sides of the transport's size boundary without external network access.
 - Test commit: `a322c7770703919281d407487090652081be7846`.
 - CI verification pending on the latest tracker commit.
+
+
+## Oversized provider body API error contract (2026-10-25)
+
+- Added an end-to-end offline regression for an oversized Binance-style provider body.
+- Confirms the transport rejection is translated into the established sanitized HTTP 502 response; the internal size-limit exception is not exposed to API clients.
+- Test commit: `0c69500179e763126d3d41e10d3a4fe4fd435392`.
+- CI verification pending on the latest tracker commit.
