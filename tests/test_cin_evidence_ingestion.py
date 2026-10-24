@@ -128,6 +128,50 @@ class EvidenceIngestionTests(unittest.TestCase):
             fetch_github_repository_evidence()
 
     @patch("cin_evidence_ingestion.urlopen")
+    def test_non_object_json_payloads_raise_source_error(self, mocked):
+        for payload in ([], "unexpected", 42, None):
+            with self.subTest(payload=payload):
+                mocked.return_value = FakeResponse(payload)
+                with self.assertRaisesRegex(EvidenceSourceError, "JSON object"):
+                    fetch_github_repository_evidence()
+
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_null_optional_metadata_is_reported_as_partial(self, mocked):
+        mocked.return_value = FakeResponse({
+            "full_name": "ethereum/go-ethereum",
+            "default_branch": None,
+            "pushed_at": None,
+            "updated_at": None,
+            "stargazers_count": None,
+            "forks_count": None,
+            "open_issues_count": None,
+            "archived": None,
+        })
+        result = fetch_github_repository_evidence()
+        self.assertEqual(result["metadata_completeness"], "partial")
+        self.assertEqual(result["metadata_missing_fields"], [
+            "default_branch", "pushed_at", "updated_at", "stargazers_count",
+            "forks_count", "open_issues_count", "archived",
+        ])
+        self.assertEqual(result["freshness_status"], "unknown")
+        self.assertIsNone(result["source_timestamp_field"])
+        self.assertEqual(result["claim_verification_status"], "unverified")
+        self.assertFalse(result["independently_verified"])
+
+    def test_freshness_uses_updated_at_when_pushed_at_is_missing(self):
+        from datetime import datetime, timezone
+
+        now = datetime(2026, 10, 25, 12, 0, tzinfo=timezone.utc)
+        self.assertEqual(
+            _freshness_status({"updated_at": "2026-10-24T12:00:00Z"}, now=now),
+            "fresh",
+        )
+        self.assertEqual(
+            _freshness_status({"updated_at": "2026-10-01T12:00:00Z"}, now=now),
+            "stale",
+        )
+
+    @patch("cin_evidence_ingestion.urlopen")
     def test_malformed_repository_identity_raises_source_error(self, mocked):
         for full_name in (None, 42, [], {}):
             with self.subTest(full_name=full_name):
