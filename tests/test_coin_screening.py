@@ -225,5 +225,40 @@ class ProviderFailureClassificationTests(unittest.TestCase):
         self.assertIsNone(failure.fallback_status)
 
 
+    def test_stale_cache_is_used_after_both_providers_fail_and_timestamp_survives(self):
+        MODULE._CACHE.clear()
+        now = 1_800_000_000.0
+        cached_rows = [{
+            "id": "cached-coin", "symbol": "CACH", "name": "Cached Coin",
+            "_cin_retrieved_at": now - 120,
+        }]
+        MODULE._CACHE[("usd", 5)] = (now - 120, cached_rows)
+        failure = MODULE.MarketDataProviderFailure(
+            primary_kind="http_error", primary_status=429,
+            fallback_kind="http_error", fallback_status=503,
+        )
+        with patch.object(MODULE.time, "time", return_value=now), patch.object(
+            MODULE, "_request_markets", side_effect=failure
+        ):
+            rows, mode, error_code = MODULE._fetch_markets("usd", 5)
+        self.assertEqual(mode, "stale_cache")
+        self.assertEqual(error_code, 503)
+        self.assertEqual(rows[0]["_cin_retrieved_at"], now - 120)
+        MODULE._CACHE.clear()
+
+    def test_both_provider_failure_without_cache_propagates_structured_error(self):
+        MODULE._CACHE.clear()
+        failure = MODULE.MarketDataProviderFailure(
+            primary_kind="http_error", primary_status=429,
+            fallback_kind="http_error", fallback_status=503,
+        )
+        with patch.object(MODULE, "_request_markets", side_effect=failure):
+            with self.assertRaises(MODULE.MarketDataProviderFailure) as caught:
+                MODULE._fetch_markets("usd", 5)
+        self.assertEqual(caught.exception.primary_status, 429)
+        self.assertEqual(caught.exception.fallback_status, 503)
+        MODULE._CACHE.clear()
+
+
 if __name__ == "__main__":
     unittest.main()
