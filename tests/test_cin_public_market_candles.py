@@ -38,6 +38,19 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["close"], 101.0)
 
+    async def test_kraken_fills_limit_from_valid_rows_when_tail_row_is_invalid(self):
+        rows = [
+            [1700000000 + i * 3600, "100", "102", "99", "101", "100.5", "10", 4]
+            for i in range(6)
+        ]
+        # The newest provider row is malformed; earlier valid rows should fill the limit.
+        rows[-1] = [1700018000, "100", "99", "101", "100", "100", "10", 4]
+        payload = {"error": [], "result": {"XBTUSDT": rows, "last": 1700018000}}
+        with patch.object(api, "_request_json", return_value=payload):
+            candles = api._fetch_kraken("BTCUSDT", "1h", 5)
+        self.assertEqual(len(candles), 5)
+        self.assertEqual(candles[-1]["open_time"], 1700014400000)
+
     async def test_binance_rejects_more_rows_than_requested(self):
         payload = [
             [1700000000000 + i * 3600000, "100", "102", "99", "101", "10",
