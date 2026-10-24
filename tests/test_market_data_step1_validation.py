@@ -60,6 +60,32 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         self.assertEqual(_fetch_market_data(["bitcoin"], "usd"), [])
 
     @patch("market_data_step1.urllib.request.urlopen")
+    def test_numeric_fields_are_normalized_to_floats(self, mocked):
+        mocked.return_value = FakeResponse([row(
+            current_price=100, market_cap=1000, total_volume=50,
+            price_change_percentage_24h=2,
+        )])
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        for field in ("price", "market_cap", "total_volume_24h", "price_change_percentage_24h"):
+            self.assertIsInstance(result[field], float)
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_zero_and_missing_liquidity_metrics_are_not_overstated(self, mocked):
+        mocked.return_value = FakeResponse([row(market_cap=0, total_volume=0)])
+        zero = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertEqual(zero["market_cap_status"], "zero")
+        self.assertEqual(zero["volume_24h_status"], "zero")
+        self.assertIn("zero_market_cap_not_liquidity_evidence", zero["data_quality_warnings"])
+        self.assertIn("zero_volume_not_liquidity_evidence", zero["data_quality_warnings"])
+
+        mocked.return_value = FakeResponse([row(market_cap=None, total_volume=None)])
+        missing = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertEqual(missing["market_cap_status"], "missing")
+        self.assertEqual(missing["volume_24h_status"], "missing")
+        self.assertIn("market_cap_unavailable", missing["data_quality_warnings"])
+        self.assertIn("volume_24h_unavailable", missing["data_quality_warnings"])
+
+    @patch("market_data_step1.urllib.request.urlopen")
     def test_invalid_optional_metrics_are_null_and_warned(self, mocked):
         mocked.return_value = FakeResponse([row(
             market_cap=-1,
