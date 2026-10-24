@@ -10,6 +10,30 @@ NEW = "Crypto Intelligence Network (CIN)"
 if not APP_DIR.is_dir():
     raise SystemExit(f"Expected application directory not found: {APP_DIR}")
 
+MODULES = (
+    "market_data_step1.py",
+    "coin_screening_step2.py",
+    "commodity_backing_assessment.py",
+    "commodity_backing_api.py",
+    "growth_fundamentals_assessment.py",
+    "growth_fundamentals_api.py",
+    "cin_evidence_ingestion.py",
+    "cin_evidence_ingestion_api.py",
+    "cin_technical_analysis.py",
+    "cin_technical_analysis_api.py",
+    "cin_public_market_candles_api.py",
+)
+main_path = APP_DIR / "main.py"
+if not main_path.is_file():
+    raise SystemExit(f"Expected FastAPI entry point not found: {main_path}")
+
+# Validate every required input before changing any scaffold file.
+missing_modules = [ROOT / name for name in MODULES if not (ROOT / name).is_file()]
+if missing_modules:
+    raise SystemExit(
+        "Required CIN module(s) not found: " + ", ".join(str(path) for path in missing_modules)
+    )
+
 changed = 0
 found = False
 for path in APP_DIR.rglob("*.py"):
@@ -25,29 +49,9 @@ for path in APP_DIR.rglob("*.py"):
 if not found:
     raise SystemExit("Could not find a CIN application title to validate")
 
-MODULES = (
-    "market_data_step1.py",
-    "coin_screening_step2.py",
-    "commodity_backing_assessment.py",
-    "commodity_backing_api.py",
-    "growth_fundamentals_assessment.py",
-    "growth_fundamentals_api.py",
-    "cin_evidence_ingestion.py",
-    "cin_evidence_ingestion_api.py",
-    "cin_technical_analysis.py",
-    "cin_technical_analysis_api.py",
-    "cin_public_market_candles_api.py",
-)
 for module_name in MODULES:
-    source_module = ROOT / module_name
-    target_module = APP_DIR / module_name
-    if not source_module.is_file():
-        raise SystemExit(f"Required CIN module not found: {source_module}")
-    shutil.copyfile(source_module, target_module)
+    shutil.copyfile(ROOT / module_name, APP_DIR / module_name)
 
-main_path = APP_DIR / "main.py"
-if not main_path.is_file():
-    raise SystemExit(f"Expected FastAPI entry point not found: {main_path}")
 main_text = main_path.read_text(encoding="utf-8")
 
 registrations = [
