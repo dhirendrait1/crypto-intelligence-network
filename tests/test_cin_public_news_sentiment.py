@@ -98,7 +98,7 @@ def test_endpoint_rejects_whitespace_only_query_before_provider_call(monkeypatch
 
 
 
-@pytest.mark.parametrize("failure", [RuntimeError("unexpected provider response"), TypeError("unexpected provider payload")])
+@pytest.mark.parametrize("failure", [RuntimeError("unexpected provider response"), TypeError("unexpected provider payload"), AttributeError("unexpected parser state"), Exception("unexpected generic provider failure")])
 def test_endpoint_sanitizes_unexpected_provider_response_errors(monkeypatch, failure):
     def fail(_query, _limit):
         raise failure
