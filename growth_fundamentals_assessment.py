@@ -57,19 +57,21 @@ def _canonical_source_url(value: Any) -> str:
     """Normalize URL identity without changing case-sensitive path/query content."""
     if not isinstance(value, str):
         return ""
+    if not _is_http_url(value):
+        return value.strip()
     try:
         parsed = urlsplit(value.strip())
-        if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname:
-            return value.strip()
+        scheme = parsed.scheme.lower()
         port = parsed.port
-        host = parsed.hostname.lower()
+        hostname = parsed.hostname.lower()
+        host = f"[{hostname}]" if ":" in hostname else hostname
         if port is not None and not (
-            (parsed.scheme.lower() == "https" and port == 443)
-            or (parsed.scheme.lower() == "http" and port == 80)
+            (scheme == "https" and port == 443)
+            or (scheme == "http" and port == 80)
         ):
             host = f"{host}:{port}"
         path = parsed.path.rstrip("/") or "/"
-        return parsed.scheme.lower() + "://" + host + path + (f"?{parsed.query}" if parsed.query else "")
+        return scheme + "://" + host + path + (f"?{parsed.query}" if parsed.query else "")
     except ValueError:
         return value.strip()
 
