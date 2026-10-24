@@ -56,6 +56,15 @@ def _validate_payloads(open_interest: Any, premium: Any, history: Any, symbol: s
         raise ValueError("Unexpected premium-index provider payload")
     if not isinstance(history, list) or any(not isinstance(row, dict) for row in history):
         raise ValueError("Unexpected open-interest history provider payload")
+    for row in history:
+        if row.get("symbol") != symbol:
+            raise ValueError("Open-interest history symbol did not match the requested symbol")
+        history_value = _finite_number(row.get("sumOpenInterestValue"))
+        history_timestamp = _finite_number(row.get("timestamp"))
+        if history_value is None or history_value < 0:
+            raise ValueError("Open-interest history contained an invalid notional value")
+        if history_timestamp is None or history_timestamp < 0:
+            raise ValueError("Open-interest history contained an invalid timestamp")
 
 
 def _snapshot(symbol: str) -> dict[str, Any]:
