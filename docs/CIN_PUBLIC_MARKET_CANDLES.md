@@ -20,7 +20,7 @@ This fetches public OHLCV candles and passes **completed candles only** to CIN's
 
 ## Request validation and provider errors
 
-- Malformed symbols, unsupported intervals, and limits outside 5–500 are rejected with HTTP 400 by the endpoint's explicit validation.
+- Request-schema violations are rejected by FastAPI with HTTP 422, including symbols outside the declared length/pattern and limits outside 5–500. Symbols that pass schema validation but fail the endpoint's explicit semantic check, and unsupported intervals, return HTTP 400. Fewer than five completed candles for market-backed analysis returns HTTP 422.
 - Binance HTTP 418/429 rate limits return HTTP 503; other Binance HTTP errors return a controlled gateway error.
 - Kraken fallback is attempted only after Binance HTTP 451. If fallback fails or the pair/timeframe is unsupported, the API returns HTTP 503 rather than claiming stale data is live.
 - Network/provider unavailability returns a controlled 503; malformed provider responses return a controlled 502.
