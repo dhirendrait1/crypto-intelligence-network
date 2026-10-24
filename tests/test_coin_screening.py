@@ -639,3 +639,34 @@ class CacheFreshnessContractTests(unittest.TestCase):
         self.assertFalse(result["analysis_eligible"])
         self.assertFalse(result["screening_eligible"])
         self.assertEqual(response["data_mode"], "stale_cache")
+
+
+class ScreeningArithmeticSafetyTests(unittest.TestCase):
+    def test_negative_financial_magnitudes_are_missing_evidence(self):
+        result = MODULE._score({
+            "id": "negative", "symbol": "NEG", "name": "Negative Metrics",
+            "current_price": 1.0, "last_updated": MODULE.datetime.now(MODULE.timezone.utc).isoformat(),
+            "market_cap": -100.0, "total_volume": -50.0,
+            "fully_diluted_valuation": -200.0, "circulating_supply": -10.0,
+            "total_supply": -20.0,
+        })
+        for field in ("market_cap", "total_volume_24h", "fully_diluted_valuation", "circulating_supply_ratio", "volume_to_market_cap", "fdv_gap_ratio"):
+            with self.subTest(field=field):
+                self.assertIsNone(result[field])
+        self.assertTrue(any("Market-cap data missing" in warning for warning in result["warnings"]))
+
+    def test_overflowing_volume_and_supply_ratios_are_not_emitted(self):
+        result = MODULE._score({
+            "id": "overflow", "symbol": "OVR", "name": "Overflow Metrics",
+            "current_price": 1.0, "last_updated": MODULE.datetime.now(MODULE.timezone.utc).isoformat(),
+            "market_cap": 1e-308, "total_volume": 1e308,
+            "fully_diluted_valuation": 1e308, "circulating_supply": 1e308,
+            "total_supply": 1e-308,
+        })
+        self.assertIsNone(result["volume_to_market_cap"])
+        self.assertIsNone(result["circulating_supply_ratio"])
+        self.assertTrue(any("non-finite" in warning for warning in result["warnings"]))
+        self.assertTrue(all(
+            value is None or (not isinstance(value, float) or MODULE.math.isfinite(value))
+            for value in result.values()
+        ))
