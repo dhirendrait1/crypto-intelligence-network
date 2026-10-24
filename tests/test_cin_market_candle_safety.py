@@ -352,6 +352,8 @@ def test_malformed_kraken_payload_returns_sanitized_503(monkeypatch, payload):
     assert caught.value.status_code == 503
     assert caught.value.detail.startswith("Kraken fallback unavailable or pair/timeframe unsupported")
     assert "not-a-row-list" not in caught.value.detail
+    assert "EQuery:Invalid pair" not in caught.value.detail
+    assert "malformed-error-field" not in caught.value.detail
 
 
 def test_kraken_fallback_unexpected_response_returns_controlled_503(monkeypatch):
