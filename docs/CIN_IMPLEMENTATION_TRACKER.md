@@ -114,6 +114,7 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Follow-up on 2026-10-24: an intermediate commodity clock propagation commit (`a1a9e2b`) failed screening tests because `current`/`assessment_clock_valid` were not scoped in `assess_commodity_asset`. The corrected branch snapshot defines and validates the assessment clock in the assessment function and propagates it to evidence rows. All four workflows passed on test commit `87e37bb1bee73628bc2b47f80f903cec27ddf55b`; this is offline/mocked validation, not live-provider or production verification.
 
 ## Public candle provider boundary hardening (2026-10-24)
+- [x] Added catch-all handling for unforeseen Binance parser/provider exceptions and Kraken fallback exceptions; these return controlled 502/503 responses rather than uncaught 500s. Added `AttributeError` and generic `Exception` regression cases; all four workflows passed on commit `546b5d4b34941a0567c1869fb83baa3ad86feb54`. Offline/mocked validation only.
 
 - [x] Audit public candle provider parsing and error translation for unexpected provider response exceptions.
 - [x] Convert unexpected provider runtime/type/shape and invalid UTF-8 failures into a sanitized HTTP 502 instead of leaking an uncaught exception to the API boundary.
