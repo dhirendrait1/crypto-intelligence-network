@@ -131,6 +131,8 @@ def test_snapshot_rejects_malformed_order_book_payload(monkeypatch):
         RuntimeError("unexpected provider response"),
         UnicodeDecodeError("utf-8", b"\\xff", 0, 1, "invalid start byte"),
         TypeError("unexpected provider payload"),
+        AttributeError("unexpected parser state"),
+        Exception("unexpected generic provider failure"),
     ],
 )
 def test_endpoint_sanitizes_unexpected_provider_response_errors(monkeypatch, failure):
