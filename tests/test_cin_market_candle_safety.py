@@ -333,3 +333,14 @@ def test_clean_candles_rejects_unrepresentable_timestamps(timestamp):
     row = _row(timestamp, timestamp + 1)
     with pytest.raises(ValueError, match="returned no valid candles"):
         api._clean_candles([row], "Test provider")
+
+def test_clean_candles_rejects_os_error_from_timestamp_conversion(monkeypatch):
+    class TimestampConversionFailure:
+        @staticmethod
+        def fromtimestamp(*_args, **_kwargs):
+            raise OSError("timestamp is outside platform range")
+
+    monkeypatch.setattr(api, "datetime", TimestampConversionFailure)
+    row = _row(1_000, 1_999)
+    with pytest.raises(ValueError, match="returned no valid candles"):
+        api._clean_candles([row], "Test provider")
