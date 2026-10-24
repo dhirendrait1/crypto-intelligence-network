@@ -594,3 +594,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Each malformed/failing fallback response must surface as a sanitized HTTP 503 through CIN's provider loader, without leaking parser details or payload contents.
 - Test commit: `1840cabb0cf17eba0c98ef5b41d501051becdf23`.
 - Awaiting all four CI workflows on the latest branch head.
+
+
+## Malformed Kraken error-field regression coverage (2026-10-25)
+
+- Extended the controlled-fallback regression matrix to include malformed `error` fields (integer, string, and object-list entries), alongside malformed result containers and candle rows.
+- Expected outcome remains a sanitized HTTP 503; raw provider payloads and parser details must not appear in the API response.
+- Test commit: `f52a2ed1a7b4e6062e2561d04079894b0f3dd26d`.
+- CI verification pending on the latest tracker commit.
