@@ -154,3 +154,10 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Added offline tests for whitespace/separator-bearing symbols and malformed repository paths.
 - [x] All four workflows passed on code/test commit `ce511118dd4416fd74d25440266a76b01d785b4c`: CIN Automated Tests, screening checks, technical-analysis tests, and evidence-ingestion API checks. Tests are offline/mocked.
 - **Boundary:** the repository allowlist remains authoritative; syntactic path validation does not permit arbitrary repository fetches.
+
+
+## News URL control-character parity (2026-10-24)
+
+- [x] Extended GDELT article URL validation to reject DEL (ASCII 127) as well as whitespace and lower control characters; added newline, tab, and DEL regression cases.
+- [ ] Confirm all four CI workflows on the final news URL validation revision.
+- **Boundary:** this validates article-link syntax only. It does not prove the publisher is trustworthy or validate the article's claims.
