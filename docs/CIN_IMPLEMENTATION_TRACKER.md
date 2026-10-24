@@ -251,4 +251,5 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Prevent an assessment with all three required commodity evidence types marked verified from returning `evidence_coverage_complete` when additional malformed rows or unrecognized evidence types are present.
 - [x] Expose `unrecognized_evidence_type_count` and retain `invalid_evidence_record_count`; invalid inputs now produce `evidence_invalid_or_incomplete` unless a status conflict takes precedence.
 - [x] Add offline regression tests for unknown evidence types and malformed extra rows alongside otherwise complete evidence.
-- **Validation status:** CI for the final code/test revision is pending. No merge or production deployment was performed.
+- [x] Updated the pre-existing non-list-input regression expectation to match the stricter `evidence_invalid_or_incomplete` result; fix commit `5773934e0d5937cd1b2fa8e78de41ce1e11db398`.
+- **Validation status:** CI for the corrected code/test revision is pending. The preceding run exposed only the stale assertion described above; other three workflows passed. No merge or production deployment was performed.
