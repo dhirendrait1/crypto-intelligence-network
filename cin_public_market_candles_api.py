@@ -231,7 +231,7 @@ async def get_market_candles(
 
 @router.get("/technical-analysis/market")
 async def analyze_public_market(
-    symbol: str = Query(default="BTCUSDT", min_length=5, max_length=20, pattern="^[A-Za-z0-9]+$"),
+    symbol: str = Query(default="BTCUSDT", min_length=5, max_length=20, pattern=r"^[A-Za-z0-9]+\z"),
     interval: str = Query(default="1h"),
     limit: int = Query(default=100, ge=5, le=500),
 ) -> dict[str, Any]:
