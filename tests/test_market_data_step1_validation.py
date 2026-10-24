@@ -120,5 +120,27 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         self.assertEqual(_fetch_market_data(["bitcoin"], "usd"), [])
 
 
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_unrequested_provider_coin_is_excluded(self, mocked):
+        mocked.return_value = FakeResponse([row(id="ethereum")])
+        self.assertEqual(_fetch_market_data(["bitcoin"], "usd"), [])
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_malformed_name_and_symbol_are_omitted_with_warnings(self, mocked):
+        mocked.return_value = FakeResponse([row(name={"unexpected": "object"}, symbol=123)])
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertIsNone(result["name"])
+        self.assertIsNone(result["symbol"])
+        self.assertIn("invalid_name_omitted", result["data_quality_warnings"])
+        self.assertIn("invalid_symbol_omitted", result["data_quality_warnings"])
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_control_characters_in_name_and_symbol_are_omitted(self, mocked):
+        mocked.return_value = FakeResponse([row(name="Bit\x00coin", symbol="BT\x7fC")])
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertIsNone(result["name"])
+        self.assertIsNone(result["symbol"])
+
+
 if __name__ == "__main__":
     unittest.main()
