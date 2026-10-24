@@ -41,3 +41,8 @@ The response keeps the original provider timestamps in `provider_timestamps` and
 - `data_quality.freshness_status` is `warning` if any source timestamp is stale, future-dated, or invalid; `freshness_warnings` names the affected sources. The endpoint retains the snapshot but callers should not treat a warned snapshot as fully fresh.
 
 These thresholds are CIN heuristics, not exchange guarantees. Automated tests use fixed timestamps and mocked payloads; live provider clock behavior remains unverified.
+
+
+### Analysis eligibility when timestamp evidence is incomplete
+
+`data_quality.freshness_status` is `warning` if any timestamp-quality component is stale, future-dated, invalid, or unavailable. The response also exposes `data_quality.analysis_eligibility`: `eligible` only when all tracked timestamp checks are acceptable, otherwise `not_recommended`, with a reason. This is a conservative consumer-facing warning, not a hard endpoint failure; the raw snapshot remains available for inspection. In particular, empty open-interest history leaves history-derived metrics null and must not be interpreted as a clean freshness result. Offline tests do not establish live provider availability.
