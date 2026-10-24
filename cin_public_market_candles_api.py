@@ -270,7 +270,13 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
         # and fractional seconds instead of silently coercing/truncating them.
         if isinstance(row[0], bool) or not isinstance(row[0], (int, float)):
             continue
-        if not math.isfinite(row[0]) or not float(row[0]).is_integer():
+        try:
+            timestamp_is_finite = math.isfinite(row[0])
+            timestamp_is_integral = float(row[0]).is_integer()
+        except (OverflowError, TypeError, ValueError):
+            # Extremely large JSON integers may not be representable as floats.
+            continue
+        if not timestamp_is_finite or not timestamp_is_integral:
             continue
         # Kraken OHLC and volume fields must not be JSON booleans either.
         if any(isinstance(row[index], bool) for index in (1, 2, 3, 4, 6)):
