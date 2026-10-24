@@ -57,17 +57,21 @@ class PublicEvidenceIngestionApiTests(unittest.TestCase):
         self.assertEqual(raised.exception.status_code, 502)
         self.assertIn("Public GitHub metadata retrieval failed", raised.exception.detail)
 
-    def test_connector_value_error_maps_to_bad_request(self):
+    def test_unexpected_value_error_maps_to_sanitized_bad_gateway(self):
         request = api.PublicEvidenceRequest()
         with patch.object(
             api, "fetch_github_repository_evidence",
-            side_effect=ValueError("timeout must be between 1 and 15 seconds"),
+            side_effect=ValueError("internal validation details"),
         ):
             with self.assertRaises(HTTPException) as raised:
                 api.public_evidence_ingestion(request)
 
-        self.assertEqual(raised.exception.status_code, 400)
-        self.assertIn("timeout must be between", raised.exception.detail)
+        self.assertEqual(raised.exception.status_code, 502)
+        self.assertEqual(
+            raised.exception.detail,
+            "Public evidence provider returned an unexpected response",
+        )
+        self.assertNotIn("internal validation details", raised.exception.detail)
 
 
     def test_unexpected_provider_error_is_sanitized(self):
