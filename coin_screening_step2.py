@@ -186,15 +186,27 @@ def _fetch_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]
     except MarketDataProviderFailure as exc:
         if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
             # Preserve an HTTP status when either provider supplied one; 0 means no HTTP status.
-            return cached[1], "stale_cache", exc.fallback_status or exc.primary_status or 0, {\n                "primary_provider": "CoinGecko", "primary_error": exc.primary_kind,\n                "primary_http_status": exc.primary_status, "fallback_provider": "CoinPaprika",\n                "fallback_error": exc.fallback_kind, "fallback_http_status": exc.fallback_status,\n            }
+            return cached[1], "stale_cache", exc.fallback_status or exc.primary_status or 0, {
+                "primary_provider": "CoinGecko", "primary_error": exc.primary_kind,
+                "primary_http_status": exc.primary_status, "fallback_provider": "CoinPaprika",
+                "fallback_error": exc.fallback_kind, "fallback_http_status": exc.fallback_status,
+            }
         raise
     except urllib.error.HTTPError as exc:
         if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
-            return cached[1], "stale_cache", exc.code, {\n                "primary_provider": "CoinGecko", "primary_error": "http_error",\n                "primary_http_status": exc.code, "fallback_provider": "CoinPaprika",\n                "fallback_error": "not_usable", "fallback_http_status": None,\n            }
+            return cached[1], "stale_cache", exc.code, {
+                "primary_provider": "CoinGecko", "primary_error": "http_error",
+                "primary_http_status": exc.code, "fallback_provider": "CoinPaprika",
+                "fallback_error": "not_usable", "fallback_http_status": None,
+            }
         raise
     except (urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError):
         if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
-            return cached[1], "stale_cache", 0, {\n                "primary_provider": "CoinGecko", "primary_error": "network_or_response_error",\n                "primary_http_status": None, "fallback_provider": "CoinPaprika",\n                "fallback_error": "not_usable", "fallback_http_status": None,\n            }
+            return cached[1], "stale_cache", 0, {
+                "primary_provider": "CoinGecko", "primary_error": "network_or_response_error",
+                "primary_http_status": None, "fallback_provider": "CoinPaprika",
+                "fallback_error": "not_usable", "fallback_http_status": None,
+            }
         raise
 
 
