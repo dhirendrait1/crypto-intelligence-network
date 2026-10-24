@@ -603,3 +603,39 @@ class ScreeningResponseMetadataTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CacheFreshnessContractTests(unittest.TestCase):
+    def setUp(self):
+        MODULE._CACHE.clear()
+
+    def tearDown(self):
+        MODULE._CACHE.clear()
+
+    def test_stale_cache_state_does_not_overwrite_provider_timestamp_quality(self):
+        import asyncio
+        provider_time = MODULE.datetime.now(MODULE.timezone.utc).isoformat().replace("+00:00", "Z")
+        retrieved_at = MODULE.time.time() - 120
+        row = {
+            "id": "example", "symbol": "ABC", "name": "Example",
+            "current_price": 1.0, "market_cap": 500_000_000,
+            "total_volume": 20_000_000, "fully_diluted_valuation": 600_000_000,
+            "circulating_supply": 80_000_000, "total_supply": 100_000_000,
+            "price_change_percentage_24h": 2.0, "last_updated": provider_time,
+            "_cin_provider": "CoinGecko", "_cin_quote_currency": "USD",
+            "_cin_retrieved_at": retrieved_at,
+        }
+        with patch.object(MODULE, "_fetch_markets", return_value=([row], "stale_cache", 0, {
+            "primary_provider": "CoinGecko", "primary_error": "network_error",
+            "primary_http_status": None, "fallback_provider": "CoinPaprika",
+            "fallback_error": "network_error", "fallback_http_status": None,
+        })):
+            response = asyncio.run(MODULE.coin_screening(vs_currency="usd", per_page=1, min_score=0, asset_type="all"))
+
+        result = response["data"][0]
+        self.assertEqual(result["freshness_status"], "stale_cache")
+        self.assertEqual(result["provider_timestamp_status"], "fresh")
+        self.assertIsNotNone(result["provider_timestamp_age_seconds"])
+        self.assertFalse(result["analysis_eligible"])
+        self.assertFalse(result["screening_eligible"])
+        self.assertEqual(response["data_mode"], "stale_cache")
