@@ -336,6 +336,6 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 
 - [x] Corrected `docs/CIN_PUBLIC_MARKET_CANDLES.md` to describe Binance as primary and Kraken fallback only after HTTP 451, controlled provider errors, completed-candle analysis, provenance, and freshness metadata.
 - [x] Added a regression test confirming `/market-candles` marks all-forming rows as forming and reports that no completed candle is available.
-- [x] CI code/test commit `ed28e5f877847f5b0f1ae3eea17c46dc14b8fc6e`: screening checks, technical-analysis tests, and evidence-ingestion API checks passed; the public candle test step passed in CIN Automated Tests. Final run completion status is being checked before this milestone is marked fully green.
+- [x] All four CI workflows passed on code/test commit `ed28e5f877847f5b0f1ae3eea17c46dc14b8fc6e`: CIN Automated Tests (`40124689165`), CIN screening checks (`40124689259`), CIN Technical Analysis Tests (`40124689273`), and CIN evidence ingestion API checks (`40124689601`). The public candle test step passed within CIN Automated Tests.
 - **Boundary:** all checks use mocked/offline provider responses. No live exchange or deployed API health was verified.
 
