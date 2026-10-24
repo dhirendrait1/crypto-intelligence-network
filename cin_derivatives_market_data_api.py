@@ -106,6 +106,7 @@ def _snapshot(symbol: str) -> dict[str, Any]:
     change_pct = None
     if previous_oi_value is not None and previous_oi_value > 0 and latest_oi_value is not None:
         change_pct = round((latest_oi_value - previous_oi_value) / previous_oi_value * 100, 6)
+    retrieved_at = datetime.now(timezone.utc).isoformat()
 
     return {
         "service": "cin",
@@ -113,7 +114,7 @@ def _snapshot(symbol: str) -> dict[str, Any]:
         "mode": "read_only",
         "source": "Binance USDⓈ-M Futures public market-data API",
         "symbol": symbol,
-        "retrieved_at": datetime.now(timezone.utc).isoformat(),
+        "retrieved_at": retrieved_at,
         "provider_timestamps": {
             "open_interest": _iso_from_ms(open_interest.get("time")),
             "mark_price_and_funding": _iso_from_ms(premium.get("time")),
@@ -121,6 +122,7 @@ def _snapshot(symbol: str) -> dict[str, Any]:
         },
         "order_book": {
             "source": "Binance USDⓈ-M Futures public depth endpoint",
+            "retrieved_at": retrieved_at,
             "bid_levels_used": len(bids),
             "ask_levels_used": len(asks),
             "best_bid": best_bid,
