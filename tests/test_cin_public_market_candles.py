@@ -127,6 +127,23 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(symbol["schema"]["pattern"], "^[A-Za-z0-9]+$")
 
 
+    def test_binance_skips_rows_with_boolean_timestamps(self):
+        valid = [1700000000000, "100", "105", "98", "102", "12.5", 1700003599999]
+        malformed = [True, "100", "105", "98", "102", "12.5", 1700003599999]
+        with patch.object(api, "_request_json", return_value=[malformed, valid]):
+            rows = api._fetch_binance("BTCUSDT", "1h", 5)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["open_time"], valid[0])
+
+    def test_kraken_skips_rows_with_boolean_timestamps(self):
+        valid = [1700000000, "100", "105", "98", "102", "101", "12.5", 7]
+        malformed = [True, "100", "105", "98", "102", "101", "12.5", 7]
+        payload = {"error": [], "result": {"XXBTZUSD": [malformed, valid], "last": 1700000000}}
+        with patch.object(api, "_request_json", return_value=payload):
+            rows = api._fetch_kraken("BTCUSD", "1h", 5)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["open_time"], valid[0] * 1000)
+
     def test_binance_rejects_more_candles_than_requested_limit(self):
         payload = [
             [1700000000000 + i * 3600000, "100", "105", "98", "102", "12.5",
