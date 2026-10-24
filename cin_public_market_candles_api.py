@@ -135,6 +135,10 @@ def _fetch_binance(symbol: str, interval: str, limit: int) -> list[dict[str, Any
         # JSON booleans are Python integers; do not coerce them into timestamps.
         if isinstance(row[0], bool) or isinstance(row[6], bool):
             continue
+        # Reject booleans in numeric OHLCV fields before float() turns True/False
+        # into plausible prices or volume values.
+        if any(isinstance(row[index], bool) for index in (1, 2, 3, 4, 5)):
+            continue
         try:
             # Binance timestamps are integer milliseconds. Reject fractional or
             # string-coercible timestamps instead of truncating malformed data.
@@ -211,6 +215,9 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
         if isinstance(row[0], bool) or not isinstance(row[0], (int, float)):
             continue
         if not math.isfinite(row[0]) or not float(row[0]).is_integer():
+            continue
+        # Kraken OHLC and volume fields must not be JSON booleans either.
+        if any(isinstance(row[index], bool) for index in (1, 2, 3, 4, 6)):
             continue
         try:
             start = int(row[0] * 1000)
