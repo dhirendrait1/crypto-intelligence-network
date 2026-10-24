@@ -25,3 +25,8 @@ Provider failures return structured HTTP/network/invalid-response errors. Tests 
 GDELT's `seendate` is the provider's seen/indexing time and is **not guaranteed to be the article's original publication time**. New consumers should use `provider_seen_at`, `provider_seen_at_utc`, and `provider_seen_at_validation_status`. The older `published_at*` fields remain as compatibility aliases and mirror the same values; they must not be treated as verified publication timestamps.
 
 Timestamps more than 60 seconds ahead of CIN's UTC clock are labeled `future_dated` while preserving the normalized value for diagnosis. Invalid, timezone-naive, and missing values remain separately classified. These checks validate timestamp format and obvious future skew; they do not verify the publisher's actual publication time.
+
+
+## Aggregate timestamp-quality metadata
+
+The response exposes `data_quality.provider_timestamp_quality_counts` with counts for `valid`, `missing`, `invalid_timezone`, `invalid`, and `future_dated` provider seen times. These counts refer to GDELT indexing/seen times and do not verify original publication time. For backward-compatible behavior, the headline sentiment aggregate still includes every accepted article regardless of timestamp status; consumers must inspect the quality counts before using timestamps for time-sensitive evidence.
