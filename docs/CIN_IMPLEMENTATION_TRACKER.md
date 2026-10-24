@@ -332,3 +332,10 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Inspected the automated workflow job: the newly added `Run public candle API contract regression tests` step completed successfully.
 - **Boundary:** these tests mock the provider loader and verify API behavior only. They do not validate live exchange data or the deployed Render revision.
 
+## Public candle API documentation and freshness contract (2026-10-25)
+
+- [x] Corrected `docs/CIN_PUBLIC_MARKET_CANDLES.md` to describe Binance as primary and Kraken fallback only after HTTP 451, controlled provider errors, completed-candle analysis, provenance, and freshness metadata.
+- [x] Added a regression test confirming `/market-candles` marks all-forming rows as forming and reports that no completed candle is available.
+- [x] CI code/test commit `ed28e5f877847f5b0f1ae3eea17c46dc14b8fc6e`: screening checks, technical-analysis tests, and evidence-ingestion API checks passed; the public candle test step passed in CIN Automated Tests. Final run completion status is being checked before this milestone is marked fully green.
+- **Boundary:** all checks use mocked/offline provider responses. No live exchange or deployed API health was verified.
+
