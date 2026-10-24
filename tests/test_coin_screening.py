@@ -149,6 +149,34 @@ class ProviderFallbackMappingTests(unittest.TestCase):
         self.assertIsNone(rows[0]["fully_diluted_valuation"])
 
 
+class ScreeningFreshnessTests(unittest.TestCase):
+    def setUp(self):
+        MODULE._CACHE.clear()
+
+    def tearDown(self):
+        MODULE._CACHE.clear()
+
+    def test_provider_retrieval_timestamp_is_preserved_and_cache_age_is_measurable(self):
+        fixture = [{
+            "id": "fresh-coin", "symbol": "FRSH", "name": "Fresh Coin",
+            "current_price": 2.0, "market_cap": 100.0, "total_volume": 10.0,
+            "fully_diluted_valuation": 120.0, "circulating_supply": 40.0,
+            "total_supply": 50.0, "price_change_percentage_24h": 1.0,
+            "last_updated": "2026-10-24T00:00:00Z",
+        }]
+        with patch.object(MODULE, "_request_markets", return_value=fixture):
+            rows, mode, error_code = MODULE._fetch_markets("usd", 1)
+        self.assertEqual(mode, "live")
+        self.assertEqual(error_code, 0)
+        self.assertIsInstance(rows[0].get("_cin_retrieved_at"), (int, float))
+        output = MODULE._score(rows[0])
+        self.assertIsNotNone(output["provider_retrieved_at"])
+        rows_cached, cached_mode, cached_error = MODULE._fetch_markets("usd", 1)
+        self.assertEqual(cached_mode, "cache")
+        self.assertEqual(cached_error, 0)
+        self.assertEqual(rows_cached[0]["_cin_retrieved_at"], rows[0]["_cin_retrieved_at"])
+
+
 
 
 if __name__ == "__main__":
