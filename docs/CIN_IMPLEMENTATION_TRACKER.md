@@ -106,6 +106,7 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Hardened injected assessment clocks in commodity and growth evidence assessment functions: naive/non-datetime clocks are rejected and safely replaced with current UTC; future publication dates return no misleading nonnegative age and growth rows expose timestamp errors. Regression coverage is present in both assessment test suites.
 - [x] Re-ran all four workflows on commit `6455ca486d0883914150cf1c1d518dad19c058d7`; screening, evidence-ingestion API, automated scaffold tests, and technical-analysis workflows all passed. An earlier intermediate revision failed because the commodity clock-validation edits had not yet landed together; the later clean run passed. These remain offline/mocked checks, not live-provider validation.
 
+- [x] Keep injected-clock validity consistent at assessment and evidence-row level for commodity and growth assessments; add regression coverage for timezone-naive clocks. All four workflows passed on commit `5d1539492ef93dff081af807463b696a9da4cedb` (CIN Automated Tests, screening, technical analysis, evidence-ingestion API). Tests are offline/mocked; no live provider or production validation is implied.
 
 ## Public candle provider boundary hardening (2026-10-24)
 
