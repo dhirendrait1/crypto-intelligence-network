@@ -327,6 +327,9 @@ def test_market_provider_shape_failures_return_sanitized_502(monkeypatch, failur
         {"error": [], "result": {"last": 123}},
         {"error": [], "result": {"XXBTZUSD": "not-a-row-list", "last": 123}},
         {"error": ["EQuery:Invalid pair"], "result": {"last": 123}},
+        {"error": 7, "result": {"XXBTZUSD": [], "last": 123}},
+        {"error": "malformed-error-field", "result": {"XXBTZUSD": [], "last": 123}},
+        {"error": [{"code": "EQuery:Invalid pair"}], "result": {"XXBTZUSD": [], "last": 123}},
     ],
 )
 def test_malformed_kraken_payload_returns_sanitized_503(monkeypatch, payload):
