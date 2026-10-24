@@ -13,7 +13,7 @@ try:
 except ModuleNotFoundError as exc:
     # Fall back only when the optional scaffold package itself is unavailable.
     # Do not hide missing dependencies imported from inside the app module.
-    if exc.name is None or not (exc.name == "app" or exc.name.startswith("app.")):
+    if not (exc.name == "app" or (isinstance(exc.name, str) and exc.name.startswith("app."))):
         raise
     from cin_evidence_ingestion import (
         ALLOWED_REPOSITORIES,
