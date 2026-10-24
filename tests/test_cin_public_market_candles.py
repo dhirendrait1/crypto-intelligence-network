@@ -210,6 +210,11 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(limit["schema"]["minimum"], 5)
             self.assertEqual(limit["schema"]["maximum"], 500)
             self.assertIn("422", paths[route]["get"]["responses"])
+            self.assertEqual(
+                paths[route]["get"]["responses"]["400"]["description"],
+                "Unsupported interval or semantic parameter validation failure.",
+            )
+            self.assertTrue(paths[route]["get"]["responses"]["422"]["description"])
 
         # Semantic validation inside the handler intentionally uses HTTP 400.
         with self.assertRaises(HTTPException) as ctx:
