@@ -58,6 +58,10 @@ def normalize_evidence(item: Any, *, now: datetime | None = None,
     Future timestamps and impossible publication/check ordering downgrade the
     supplied status. This is metadata validation, not an independent audit.
     """
+    threshold_valid = isinstance(max_age_days, int) and not isinstance(max_age_days, bool) and max_age_days >= 0
+    max_age_days = max_age_days if threshold_valid else 90
+    threshold_valid = isinstance(max_age_days, int) and not isinstance(max_age_days, bool) and max_age_days >= 0
+    max_age_days = max_age_days if threshold_valid else 90
     current = now or datetime.now(timezone.utc)
     if current.tzinfo is None:
         current = current.replace(tzinfo=timezone.utc)
@@ -170,9 +174,19 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
             state = "unavailable"
         else:
             state = "unverified"
+        identities = {
+            (
+                record.get("evidence_type"),
+                str(record.get("source_url") or "").strip().rstrip("/").lower(),
+                record.get("published_at"),
+                record.get("checked_at"),
+            )
+            for record in records
+        }
         coverage[kind] = {
             "status": state,
-            "evidence_count": len(records),
+            "evidence_count": len(identities),
+            "duplicate_record_count": max(0, len(records) - len(identities)),
             "conflict_detected": state == "conflicting",
         }
 
@@ -198,6 +212,8 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
         "evidence": normalized,
         "invalid_evidence_record_count": sum(1 for item in normalized if item.get("invalid_record")),
         "input_evidence_list_valid": isinstance(evidence, list),
+        "freshness_threshold_valid": threshold_valid,
+        "freshness_threshold_days": max_age_days,
         "limitations": [
             "CIN records evidence metadata; it does not itself audit reserves or certify issuer claims.",
             "A source publication or attestation is not a guarantee of solvency, custody, redemption, or future backing.",
