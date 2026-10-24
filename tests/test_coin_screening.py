@@ -46,7 +46,7 @@ class AssetClassificationTests(unittest.TestCase):
         response = MagicMock()
         response.__enter__.return_value.read.return_value = json.dumps(payload).encode("utf-8")
         with patch.object(MODULE.urllib.request, "urlopen", return_value=response):
-            rows, mode, error_code, scanned, matches = MODULE._fetch_commodity_markets("usd", 1)
+            rows, mode, error_code, scanned, matches, details = MODULE._fetch_commodity_markets("usd", 1)
         self.assertEqual(mode, "live")
         self.assertEqual(error_code, 0)
         self.assertEqual(scanned, 3)
@@ -54,6 +54,34 @@ class AssetClassificationTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["symbol"], "XAUT")
         self.assertEqual(rows[0]["_cin_scanned_universe"], 3)
+
+
+class CommodityStaleCacheTests(unittest.TestCase):
+    def setUp(self):
+        MODULE._CACHE.clear()
+
+    def tearDown(self):
+        MODULE._CACHE.clear()
+
+    def test_network_failure_uses_stale_cache_with_structured_provenance(self):
+        old_time = MODULE.time.time() - 120
+        cached_row = {
+            "id": "tether-gold", "symbol": "XAUT", "name": "Tether Gold",
+            "_cin_provider": "CoinPaprika", "_cin_retrieved_at": old_time,
+            "_cin_scanned_universe": 500, "_cin_match_count": 2,
+        }
+        MODULE._CACHE[("commodity:usd", 5)] = (old_time, [cached_row])
+        with patch.object(MODULE.urllib.request, "urlopen", side_effect=MODULE.urllib.error.URLError("offline")):
+            rows, mode, error_code, scanned, matches, details = MODULE._fetch_commodity_markets("usd", 5)
+
+        self.assertEqual(mode, "stale_cache")
+        self.assertEqual(error_code, 0)
+        self.assertEqual(scanned, 500)
+        self.assertEqual(matches, 2)
+        self.assertEqual(rows[0]["_cin_retrieved_at"], old_time)
+        self.assertEqual(details["primary_provider"], "CoinPaprika")
+        self.assertEqual(details["primary_error"], "network_error")
+        self.assertIsNone(details["primary_http_status"])
 
 
 class ScoreTests(unittest.TestCase):
@@ -141,7 +169,7 @@ class ProviderFallbackMappingTests(unittest.TestCase):
         response = MagicMock()
         response.__enter__.return_value.read.return_value = json.dumps(payload).encode("utf-8")
         with patch.object(MODULE.urllib.request, "urlopen", return_value=response):
-            rows, mode, error_code, scanned, matches = MODULE._fetch_commodity_markets("usd", 5)
+            rows, mode, error_code, scanned, matches, details = MODULE._fetch_commodity_markets("usd", 5)
         self.assertEqual(mode, "live")
         self.assertEqual(error_code, 0)
         self.assertEqual(scanned, 1)
