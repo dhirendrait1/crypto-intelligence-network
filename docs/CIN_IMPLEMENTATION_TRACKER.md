@@ -431,3 +431,11 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Corrected derivatives documentation: unavailable open-interest-history timestamps are included in freshness warnings, so empty history yields `freshness_status: warning` and `analysis_eligibility: not_recommended`; history-derived values remain null.
 - [x] Confirmed all four CI workflows passed on the candle-contract documentation commit `da718a35a2bd3bd1829024d201d85198ed3b6588`: Automated Tests (`40141730746`), screening checks (`40141730799`), Technical Analysis Tests (`40141730768`), and evidence ingestion API checks (`40141730771`). The subsequent derivatives-doc and tracker commits have no reported workflow runs; this does **not** certify the final documentation head.
 - **Boundary:** documentation-only edits; no runtime code, production configuration, or deployment changed. CI and live provider behavior remain unverified for these latest documentation commits.
+
+
+## Public candle OpenAPI contract — 2026-10-25
+
+- [x] Added explicit OpenAPI response documentation for HTTP 400 semantic validation, HTTP 422 request-schema/insufficient-closed-candle validation, HTTP 502 provider/analysis failures, and HTTP 503 temporary provider failures on both public candle routes.
+- [x] Added regression tests for the generated OpenAPI response status set and actual HTTP behavior: malformed symbol request schema returns 422; unsupported interval semantic validation returns 400.
+- [ ] Verify CI on this exact code-and-test head `7af77e83e3ba069005f1157593f3c34abbbbfe1b`.
+- **Boundary:** local execution is not claimed; CI results were not available when this tracker entry was written. No live provider smoke test, production configuration change, or deployment was performed. PR #8 remains Draft and unmerged.
