@@ -143,18 +143,27 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
 
     coverage = {}
     for kind, records in by_type.items():
-        if any(record["status"] == "verified" for record in records):
+        distinct_statuses = {record["status"] for record in records}
+        if len(distinct_statuses) > 1:
+            state = "conflicting"
+        elif distinct_statuses == {"verified"}:
             state = "verified"
-        elif any(record["status"] == "stale" for record in records):
+        elif distinct_statuses == {"stale"}:
             state = "stale"
-        elif any(record["status"] == "unavailable" for record in records):
+        elif distinct_statuses == {"unavailable"}:
             state = "unavailable"
         else:
             state = "unverified"
-        coverage[kind] = {"status": state, "evidence_count": len(records)}
+        coverage[kind] = {
+            "status": state,
+            "evidence_count": len(records),
+            "conflict_detected": state == "conflicting",
+        }
 
     statuses = [value["status"] for value in coverage.values()]
-    if all(status == "verified" for status in statuses):
+    if "conflicting" in statuses:
+        overall = "evidence_conflicting_or_incomplete"
+    elif all(status == "verified" for status in statuses):
         overall = "evidence_coverage_complete"
     elif "stale" in statuses:
         overall = "evidence_stale_or_incomplete"
