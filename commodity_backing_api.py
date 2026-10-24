@@ -23,9 +23,9 @@ class EvidenceRecord(BaseModel):
 
 
 class CommodityBackingAssessmentRequest(BaseModel):
-    symbol: str = Field(min_length=1, max_length=20)
+    symbol: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
     evidence: list[EvidenceRecord] = Field(default_factory=list, max_length=100)
-    max_age_days: int = Field(default=90, ge=1, le=3650)
+    max_age_days: int = Field(default=90, strict=True, ge=0, le=3650)
 
 
 @router.post("/commodity-backing-assessment")
