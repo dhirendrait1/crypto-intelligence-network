@@ -93,7 +93,7 @@ def _valid_candle(row: dict[str, Any]) -> bool:
         if not math.isfinite(volume) or volume < 0:
             return False
         return True
-    except (KeyError, TypeError, ValueError, OverflowError):
+    except (KeyError, TypeError, ValueError, OverflowError, OSError):
         return False
 
 
