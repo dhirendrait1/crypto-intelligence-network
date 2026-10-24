@@ -65,10 +65,13 @@ def _failure_kind(error: Exception) -> tuple[str, int | None]:
 
 
 def _number(value: Any) -> float | None:
-    """Return finite numeric provider data only; NaN/Infinity are missing evidence."""
+    """Return finite numeric provider data only; malformed magnitudes are missing evidence."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
-    number = float(value)
+    try:
+        number = float(value)
+    except (OverflowError, TypeError, ValueError):
+        return None
     return number if math.isfinite(number) else None
 
 
