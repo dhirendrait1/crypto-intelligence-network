@@ -78,13 +78,29 @@ def _fetch_market_data(ids: list[str], vs_currency: str) -> list[dict[str, Any]]
         raise ValueError("Provider response was not a list")
 
     normalized = []
+    requested_ids = set(ids)
     for coin in payload:
         if not isinstance(coin, dict):
+            continue
+        coin_id = coin.get("id")
+        if not isinstance(coin_id, str) or not coin_id or len(coin_id) > 100 or coin_id not in requested_ids:
             continue
         price = coin.get("current_price")
         if not _finite_number(price, minimum=0):
             continue
         warnings = []
+        symbol = coin.get("symbol")
+        if not isinstance(symbol, str) or not symbol.strip() or len(symbol) > 32 or any(ord(char) < 32 or ord(char) == 127 for char in symbol):
+            symbol = None
+            warnings.append("invalid_symbol_omitted")
+        else:
+            symbol = symbol.strip().upper()
+        name = coin.get("name")
+        if not isinstance(name, str) or not name.strip() or len(name) > 200 or any(ord(char) < 32 or ord(char) == 127 for char in name):
+            name = None
+            warnings.append("invalid_name_omitted")
+        else:
+            name = name.strip()
         market_cap = coin.get("market_cap")
         if market_cap is not None and not _finite_number(market_cap, minimum=0):
             market_cap = None
@@ -104,9 +120,9 @@ def _fetch_market_data(ids: list[str], vs_currency: str) -> list[dict[str, Any]]
         if freshness_status == "stale":
             warnings.append("market_data_older_than_15_minutes")
         normalized.append({
-            "id": coin.get("id"),
-            "symbol": str(coin.get("symbol", "")).upper(),
-            "name": coin.get("name"),
+            "id": coin_id,
+            "symbol": symbol,
+            "name": name,
             "currency": vs_currency.upper(),
             "price": price,
             "market_cap": market_cap,
