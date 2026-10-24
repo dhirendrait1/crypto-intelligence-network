@@ -46,7 +46,7 @@ class AssetClassificationTests(unittest.TestCase):
         response = MagicMock()
         response.__enter__.return_value.read.return_value = json.dumps(payload).encode("utf-8")
         with patch.object(MODULE.urllib.request, "urlopen", return_value=response):
-            rows, mode, error_code, scanned, matches, details = MODULE._fetch_commodity_markets("usd", 1)
+            rows, mode, error_code, scanned, matches, details, retrieved_at = MODULE._fetch_commodity_markets("usd", 1)
         self.assertEqual(mode, "live")
         self.assertEqual(error_code, 0)
         self.assertEqual(scanned, 3)
@@ -59,9 +59,36 @@ class AssetClassificationTests(unittest.TestCase):
 class CommodityStaleCacheTests(unittest.TestCase):
     def setUp(self):
         MODULE._CACHE.clear()
+        MODULE._COMMODITY_SCAN_META.clear()
 
     def tearDown(self):
         MODULE._CACHE.clear()
+        MODULE._COMMODITY_SCAN_META.clear()
+
+    def test_empty_scan_is_cached_with_timestamp_and_universe_counts(self):
+        payload = [
+            {"id": "btc-bitcoin", "symbol": "BTC", "name": "Bitcoin",
+             "quotes": {"USD": {"price": 100, "market_cap": 1000, "volume_24h": 10}}},
+            {"id": "eth-ethereum", "symbol": "ETH", "name": "Ethereum",
+             "quotes": {"USD": {"price": 10, "market_cap": 500, "volume_24h": 5}}},
+        ]
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = json.dumps(payload).encode("utf-8")
+        with patch.object(MODULE.urllib.request, "urlopen", return_value=response):
+            rows, mode, _, scanned, matches, _, retrieved_at = MODULE._fetch_commodity_markets("usd", 2)
+        self.assertEqual(rows, [])
+        self.assertEqual(mode, "live")
+        self.assertEqual(scanned, 2)
+        self.assertEqual(matches, 0)
+        self.assertIsInstance(retrieved_at, (int, float))
+
+        with patch.object(MODULE.urllib.request, "urlopen", side_effect=AssertionError("cache should be used")):
+            cached, cached_mode, _, cached_scanned, cached_matches, _, cached_at = MODULE._fetch_commodity_markets("usd", 2)
+        self.assertEqual(cached, [])
+        self.assertEqual(cached_mode, "cache")
+        self.assertEqual(cached_scanned, 2)
+        self.assertEqual(cached_matches, 0)
+        self.assertEqual(cached_at, retrieved_at)
 
     def test_network_failure_uses_stale_cache_with_structured_provenance(self):
         old_time = MODULE.time.time() - 120
@@ -72,7 +99,7 @@ class CommodityStaleCacheTests(unittest.TestCase):
         }
         MODULE._CACHE[("commodity:usd", 5)] = (old_time, [cached_row])
         with patch.object(MODULE.urllib.request, "urlopen", side_effect=MODULE.urllib.error.URLError("offline")):
-            rows, mode, error_code, scanned, matches, details = MODULE._fetch_commodity_markets("usd", 5)
+            rows, mode, error_code, scanned, matches, details, retrieved_at = MODULE._fetch_commodity_markets("usd", 5)
 
         self.assertEqual(mode, "stale_cache")
         self.assertEqual(error_code, 0)
