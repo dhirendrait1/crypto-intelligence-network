@@ -283,9 +283,6 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
         except (TypeError, ValueError, OverflowError):
             continue
     cleaned = _clean_candles(candles, "Kraken")
-    cleaned = [row for row in cleaned if _candle_time_consistent(row, interval)]
-    if not cleaned:
-        raise ValueError("Kraken returned no candles with consistent interval boundaries")
     return cleaned[-limit:]
 
 
