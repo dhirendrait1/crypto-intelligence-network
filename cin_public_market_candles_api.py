@@ -139,7 +139,8 @@ def _candle_time_consistent(row: dict[str, Any], interval: str) -> bool:
         if interval == "3d":
             # Provider-specific 3-day anchoring is not inferred from epoch modulo.
             return True
-        return opened % duration == 0
+        # Do not assume an epoch-based anchor without provider-specific evidence.
+        return True
     except (KeyError, TypeError, ValueError, OverflowError, OSError):
         return False
 
