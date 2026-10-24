@@ -38,6 +38,16 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["close"], 101.0)
 
+    async def test_binance_rejects_more_rows_than_requested(self):
+        payload = [
+            [1700000000000 + i * 3600000, "100", "102", "99", "101", "10",
+             1700003599999 + i * 3600000]
+            for i in range(6)
+        ]
+        with patch.object(api, "_request_json", return_value=payload):
+            with self.assertRaisesRegex(ValueError, "more candles than requested"):
+                api._fetch_binance("BTCUSDT", "1h", 5)
+
     async def test_binance_fails_when_all_candles_are_invalid(self):
         payload = [[1700000000000, "100", "99", "101", "100", "10", 1700003599999]]
         with patch.object(api, "_request_json", return_value=payload):
