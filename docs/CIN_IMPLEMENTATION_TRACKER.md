@@ -169,3 +169,11 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Extended GDELT article URL validation to reject DEL (ASCII 127) as well as whitespace and lower control characters; added newline, tab, and DEL regression cases.
 - [x] All four workflows passed on code/test commit `4fd998d23fa1f8cc0b9c78765933a2775a9cf7bd` (automated tests, screening, technical analysis, evidence-ingestion API checks). Validation is offline/mocked.
 - **Boundary:** this validates article-link syntax only. It does not prove the publisher is trustworthy or validate the article's claims.
+
+## Strict API payload contracts (2026-10-24)
+
+- [x] Reject unknown top-level fields and nested evidence fields in commodity-backed and growth-fundamentals assessment requests.
+- [x] Reject unknown fields in public evidence ingestion requests instead of silently ignoring misspellings or unsupported keys.
+- [x] Add offline regression tests for unknown fields at each API boundary.
+- [x] All four workflows passed on test commit `da7d1fd2b0b1928fdc90f6396ce3c02e10d70ed7`: CIN Automated Tests, screening checks, technical-analysis tests, and evidence-ingestion API checks.
+- **Boundary:** these checks validate request shape only. They do not authenticate submitters, fetch caller-provided evidence URLs, or independently verify claims. CI is offline/mocked and does not certify live providers or production deployment.
