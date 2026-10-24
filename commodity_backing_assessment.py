@@ -53,6 +53,32 @@ def _is_http_url(value: Any) -> bool:
         return False
 
 
+def _canonical_source_url(value: Any) -> str:
+    """Normalize URL identity without changing case-sensitive path/query content."""
+    if not isinstance(value, str):
+        return ""
+    try:
+        parsed = urlsplit(value.strip())
+        if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname:
+            return value.strip()
+        port = parsed.port
+        host = parsed.hostname.lower()
+        if port is not None and not (
+            (parsed.scheme.lower() == "https" and port == 443)
+            or (parsed.scheme.lower() == "http" and port == 80)
+        ):
+            host = f"{host}:{port}"
+        path = parsed.path.rstrip("/") or "/"
+        return parsed.scheme.lower() + "://" + host + path + (f"?{parsed.query}" if parsed.query else "")
+    except ValueError:
+        return value.strip()
+
+
+def _timestamp_identity(value: Any) -> str | None:
+    parsed = _parse_timestamp(value)
+    return parsed.isoformat() if parsed is not None else None
+
+
 def normalize_evidence(item: Any, *, now: datetime | None = None,
                        max_age_days: int = 90) -> dict[str, Any]:
     """Validate one evidence record and derive freshness without inventing proof.
@@ -204,9 +230,9 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
         identities = {
             (
                 record.get("evidence_type"),
-                str(record.get("source_url") or "").strip().rstrip("/").lower(),
-                record.get("published_at"),
-                record.get("checked_at"),
+                _canonical_source_url(record.get("source_url")),
+                _timestamp_identity(record.get("published_at")),
+                _timestamp_identity(record.get("checked_at")),
             )
             for record in records
         }
