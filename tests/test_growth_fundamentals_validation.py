@@ -60,6 +60,36 @@ class GrowthFundamentalsValidationTests(unittest.TestCase):
         self.assertEqual(result["overall_status"], "evidence_conflicting_or_incomplete")
         self.assertEqual(result["evidence_coverage_score"], 0)
 
+    def test_non_object_record_is_retained_and_reported(self):
+        result = assess_growth_fundamentals("ETH", ["not-a-record"], now=self.now)
+        self.assertEqual(result["invalid_evidence_record_count"], 1)
+        self.assertEqual(result["unrecognized_category_count"], 1)
+        self.assertEqual(result["overall_status"], "evidence_invalid_or_incomplete")
+        self.assertEqual(result["evidence"][0]["status"], "unverified")
+
+    def test_unknown_category_prevents_complete_overall_status(self):
+        records = [
+            self.record(category=category)
+            for category in (
+                "usage_and_adoption", "fees_and_revenue", "token_utility",
+                "tokenomics_and_unlocks", "security_and_audits",
+                "developer_activity", "holder_concentration",
+                "ecosystem_and_competition",
+            )
+        ]
+        records.append(self.record(category="unrecognized_category"))
+        result = assess_growth_fundamentals("ETH", records, now=self.now)
+        self.assertEqual(result["verified_category_count"], 8)
+        self.assertEqual(result["unrecognized_category_count"], 1)
+        self.assertEqual(result["overall_status"], "evidence_invalid_or_incomplete")
+
+    def test_credentials_in_source_url_do_not_support_verified_status(self):
+        result = assess_growth_fundamentals(
+            "ETH", [self.record(source_url="https://user:pass@example.com/report")], now=self.now
+        )
+        self.assertEqual(result["evidence"][0]["status"], "unverified")
+        self.assertIn("source_url", result["evidence"][0]["missing_fields"])
+
     def test_valid_http_url_is_accepted_as_metadata(self):
         result = assess_growth_fundamentals("ETH", [self.record(source_url="http://example.com/report")], now=self.now)
         self.assertEqual(result["evidence"][0]["status"], "verified")
