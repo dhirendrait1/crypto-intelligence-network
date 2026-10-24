@@ -578,3 +578,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Added an offline regression test that supplies one completed hourly candle and one current-hour candle, then verifies the fallback preserves both and derives the current candle's close boundary. This protects the provider contract while technical-analysis endpoints separately exclude candles not yet closed.
 - Test commit: `43de485f250079dc0d8af7ecbabb536fef249b7a`.
 - This does not enable stricter Kraken boundary enforcement or establish live exchange health. Verify all CI workflows on the latest branch head before marking the test as passed.
+
+
+## Kraken pair-identity negative tests (2026-10-25)
+
+- Added parameterized offline regression coverage proving that a Kraken response for a different base asset (ETH/USD when BTC/USD was requested) or a different quote (BTC/USDT when BTC/USD was requested) is rejected instead of being exposed as the requested market.
+- This tests the existing fail-closed pair validation; production behavior is unchanged.
+- Test commit: `753031ec49d61a9a161cf3b1c0223068fb5bc5e6`.
+- Awaiting all four GitHub Actions workflows on the latest branch head.
