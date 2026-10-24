@@ -155,6 +155,20 @@ def test_invalid_freshness_threshold_falls_back_safely():
     assert result["freshness_threshold_days"] == 90
 
 
+def test_future_publication_has_no_nonnegative_age_claim():
+    result = normalize_evidence(
+        valid_item(published_at="2026-10-25T00:00:00Z", checked_at="2026-10-25T01:00:00Z"),
+        now=NOW,
+    )
+    assert result["publication_age_days"] is None
+
+
+def test_invalid_assessment_clock_falls_back_and_is_reported():
+    result = assess_commodity_asset("PAXG", [valid_item()], now="not-a-datetime")
+    assert result["assessment_clock_valid"] is False
+    assert result["evidence"][0]["status"] == "unverified"
+
+
 def test_valid_http_url_and_timestamp_metadata_remain_accepted():
     result = normalize_evidence(valid_item(source_url="http://example.com/report"), now=NOW)
     assert result["status"] == "verified"
