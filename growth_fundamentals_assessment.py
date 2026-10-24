@@ -40,7 +40,12 @@ def _is_http_url(value: Any) -> bool:
         return False
     try:
         parsed = urlsplit(value.strip())
-        return parsed.scheme.lower() in {"http", "https"} and bool(parsed.hostname)
+        return (
+            parsed.scheme.lower() in {"http", "https"}
+            and bool(parsed.hostname)
+            and parsed.username is None
+            and parsed.password is None
+        )
     except ValueError:
         return False
 
@@ -58,7 +63,23 @@ def assess_growth_fundamentals(
     current = current.astimezone(timezone.utc)
 
     normalized: list[dict[str, Any]] = []
-    for item in evidence or []:
+    source_records = evidence if isinstance(evidence, list) else []
+    for item in source_records:
+        if not isinstance(item, dict):
+            normalized.append({
+                "category": "",
+                "category_description": "Unknown category",
+                "source_name": None,
+                "source_url": None,
+                "published_at": None,
+                "publication_age_days": None,
+                "status": "unverified",
+                "missing_fields": ["record_object", "recognized_category", "source_name", "source_url", "published_at"],
+                "notes": None,
+                "cin_independently_verified": False,
+                "invalid_record": True,
+            })
+            continue
         kind = str(item.get("category", "")).strip()
         status = str(item.get("status", "unverified")).lower()
         if status not in VALID_STATUSES:
@@ -93,6 +114,7 @@ def assess_growth_fundamentals(
             "missing_fields": missing,
             "notes": str(item.get("notes", "")).strip() or None,
             "cin_independently_verified": False,
+            "invalid_record": False,
         })
 
     coverage = {}
@@ -118,8 +140,14 @@ def assess_growth_fundamentals(
 
     verified_count = sum(1 for item in coverage.values() if item["status"] == "verified")
     coverage_score = round(100 * verified_count / len(CATEGORIES))
+    unrecognized_category_count = sum(
+        1 for row in normalized if row["category"] not in CATEGORIES
+    )
+    invalid_record_count = sum(1 for row in normalized if row.get("invalid_record"))
     if any(item["status"] == "conflicting" for item in coverage.values()):
         overall = "evidence_conflicting_or_incomplete"
+    elif unrecognized_category_count or not isinstance(evidence, (list, type(None))):
+        overall = "evidence_invalid_or_incomplete"
     elif verified_count == len(CATEGORIES):
         overall = "evidence_coverage_complete"
     elif any(item["status"] == "stale" for item in coverage.values()):
@@ -130,7 +158,7 @@ def assess_growth_fundamentals(
         overall = "evidence_unverified_or_incomplete"
 
     return {
-        "symbol": symbol.strip().upper(),
+        "symbol": str(symbol or "").strip().upper(),
         "assessment_type": "growth_fundamentals_evidence_review",
         "mode": "read_only",
         "overall_status": overall,
@@ -139,6 +167,9 @@ def assess_growth_fundamentals(
         "total_category_count": len(CATEGORIES),
         "coverage": coverage,
         "evidence": normalized,
+        "unrecognized_category_count": unrecognized_category_count,
+        "invalid_evidence_record_count": invalid_record_count,
+        "input_evidence_list_valid": isinstance(evidence, (list, type(None))),
         "not_an_investment_recommendation": True,
         "cin_independently_verified_claims": False,
         "limitations": [
