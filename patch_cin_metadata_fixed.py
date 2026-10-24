@@ -103,6 +103,12 @@ registrations = [
     ),
     (
         "cin_public_news_sentiment_router",
+        "\n# CIN: read-only public news search with explicitly low-confidence headline sentiment\n"
+        "from app.cin_public_news_sentiment_api import router as cin_public_news_sentiment_router\n"
+        "app.include_router(cin_public_news_sentiment_router)\n",
+    ),
+    (
+        "cin_public_news_sentiment_router",
         "\n# CIN: public news search with explicitly heuristic headline sentiment (read-only)\n"
         "from app.cin_public_news_sentiment_api import router as cin_public_news_sentiment_router\n"
         "app.include_router(cin_public_news_sentiment_router)\n",
@@ -114,4 +120,4 @@ for marker, registration in registrations:
         changed += 1
 main_path.write_text(main_text, encoding="utf-8")
 
-print(f"CIN metadata verified; read-only market data, screening, assessment, evidence, and technical-analysis and public market-candle routers installed; files updated: {changed}")
+print(f"CIN metadata verified; read-only market data, screening, assessment, evidence, technical-analysis, public market-candle, derivatives, and news-sentiment routers installed; files updated: {changed}")
