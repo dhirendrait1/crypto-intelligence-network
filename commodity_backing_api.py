@@ -13,13 +13,13 @@ router = APIRouter(tags=["commodity backing evidence"])
 
 
 class EvidenceRecord(BaseModel):
-    evidence_type: str
-    source_name: str | None = None
-    source_url: str | None = None
-    published_at: str | None = None
-    checked_at: str | None = None
-    status: str = "unverified"
-    notes: str | None = None
+    evidence_type: str = Field(min_length=1, max_length=80)
+    source_name: str | None = Field(default=None, max_length=200)
+    source_url: str | None = Field(default=None, max_length=2048)
+    published_at: str | None = Field(default=None, max_length=64)
+    checked_at: str | None = Field(default=None, max_length=64)
+    status: str = Field(default="unverified", max_length=32)
+    notes: str | None = Field(default=None, max_length=2000)
 
 
 class CommodityBackingAssessmentRequest(BaseModel):
