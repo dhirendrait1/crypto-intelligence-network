@@ -289,3 +289,10 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Reviewed the earlier screening workflow failure on revision `a1a9e2bfa7fe1ffb6a006c6cddda0b7a7cd80b41`: the commodity assessment code at that revision referenced the assessment clock before defining it. The current feature-branch file has a shared `_assessment_clock` helper, initializes the clock before normalization, and propagates clock validity to the summary and evidence rows.
 - [ ] CI confirmation for current PR head `9124da9a6a38b39bef272d5be66fde57fd20d148` remains pending: the workflow lookup returned no runs for that SHA. Do not treat the historical failed run as a passing check.
 - **Boundary:** these are metadata sanity checks, not independent verification of the underlying evidence claims. No merge or production deployment was performed.
+
+## Assessment evidence status enum validation (2026-10-24)
+
+- [x] Tightened both commodity-backing and growth-fundamentals API request models so caller-supplied evidence status must be one of `verified`, `unverified`, `stale`, or `unavailable`; unsupported status strings now fail request validation instead of being silently normalized.
+- [x] Added offline regression tests for unsupported status values in both request models.
+- **Boundary:** accepted `verified` remains caller-supplied metadata, not CIN's independent verification of evidence claims. This change only makes the public request contract stricter.
+- [ ] CI status for the newest request-contract tests must be checked before this batch is marked validated.
