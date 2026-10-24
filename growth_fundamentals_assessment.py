@@ -85,6 +85,7 @@ def assess_growth_fundamentals(
                 "missing_fields": ["record_object", "recognized_category", "source_name", "source_url", "published_at"],
                 "notes": None,
                 "cin_independently_verified": False,
+                "assessment_clock_valid": assessment_clock_valid,
                 "invalid_record": True,
             })
             continue
@@ -121,6 +122,7 @@ def assess_growth_fundamentals(
             "published_at": item.get("published_at"),
             "publication_age_days": age,
             "timestamp_validation_errors": timestamp_validation_errors,
+            "assessment_clock_valid": assessment_clock_valid,
             "status": status,
             "missing_fields": missing,
             "notes": str(item.get("notes", "")).strip() or None,
