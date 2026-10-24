@@ -527,3 +527,11 @@ All four configured workflows completed successfully on commit `2c1f816d59bc4fa6
 - CIN evidence ingestion API checks — run [40143004608](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40143004608)
 
 This checkpoint validates configured offline automation only. It does not establish live exchange availability, interval alignment for every timeframe, rate-limit resilience under live conditions, or deployed service health. In particular, monthly candles must use calendar-month boundaries rather than the existing approximate 31-day duration when validating boundaries or calculating interval-derived freshness thresholds.
+
+
+## Monthly candle freshness correction (2026-10-25)
+
+- Replaced the fixed 31-day monthly duration in freshness threshold calculation with calendar-month duration derived from the latest closed candle open timestamp; leap years and year rollover are covered.
+- Added deterministic tests for 28-, 29-, 30-, and 31-day months and the monthly freshness threshold.
+- Code commit: `5259bc9500068d577cba6bc617b9083ae92fdbc3`; test commit: `b4d55897b08dc788e848b9273e4277dc31550702`.
+- CI for the new code/test head is pending. This does not yet validate candle open-time alignment, close-time consistency, live provider behavior, or deployed service health.
