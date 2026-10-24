@@ -70,5 +70,22 @@ class PublicEvidenceIngestionApiTests(unittest.TestCase):
         fetch.assert_called_once_with("ethereum/go-ethereum")
 
 
+    @patch(
+        "cin_evidence_ingestion_api.fetch_github_repository_evidence",
+        side_effect=AttributeError("provider payload had an unexpected shape"),
+    )
+    def test_unexpected_provider_shape_becomes_generic_bad_gateway(self, fetch):
+        with self.assertRaises(HTTPException) as raised:
+            public_evidence_ingestion(
+                PublicEvidenceRequest(symbol="ETH", repository="ethereum/go-ethereum")
+            )
+        self.assertEqual(raised.exception.status_code, 502)
+        self.assertEqual(
+            raised.exception.detail,
+            "Public evidence provider returned an unexpected response",
+        )
+        fetch.assert_called_once_with("ethereum/go-ethereum")
+
+
 if __name__ == "__main__":
     unittest.main()
