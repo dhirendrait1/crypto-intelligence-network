@@ -138,3 +138,11 @@ These are timestamp sanity checks on caller-supplied metadata, not independent s
 - [x] Added offline regression tests for over-limit fields in both assessment request models; existing symbol, evidence-batch, and strict freshness-threshold bounds remain in place.
 - [x] All four CI workflows passed on code/test commit `1f42a825530d60752c2294fd8c6d298faa68932d` (CIN Automated Tests, screening checks, technical-analysis tests, and evidence-ingestion API checks). Validation is offline/mocked, not live-provider or production verification.
 - **Boundary:** validation constrains request size/shape only. It does not authenticate source URLs, prove source content, or independently verify the underlying evidence claims.
+
+
+## Evidence URL syntax hardening (2026-10-24)
+
+- [x] Commodity and growth evidence URL validators now reject raw whitespace and control characters before URL parsing, in addition to requiring HTTP(S), a hostname, and no embedded credentials.
+- [x] Added regression tests for newline, tab, and raw-space URL inputs; growth assessments now expose explicit `source_url_valid` metadata for audit consistency.
+- [ ] Confirm all four CI workflows pass on the final regression revision; previous intermediate runs exposed an incorrectly escaped test string, which has been corrected.
+- **Boundary:** syntactic URL validation does not fetch the URL, verify source ownership, or certify evidence claims.
