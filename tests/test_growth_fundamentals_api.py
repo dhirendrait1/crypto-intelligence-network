@@ -21,6 +21,12 @@ def test_request_rejects_boolean_freshness_threshold():
         GrowthFundamentalsRequest(symbol="ETH", max_age_days=True)
 
 
+@pytest.mark.parametrize("threshold", [30.0, "30", -1, 3651])
+def test_request_rejects_non_integer_or_out_of_range_freshness_threshold(threshold):
+    with pytest.raises(ValidationError):
+        GrowthFundamentalsRequest(symbol="ETH", max_age_days=threshold)
+
+
 def test_request_rejects_excessive_evidence_batch():
     with pytest.raises(ValidationError):
         GrowthFundamentalsRequest(
