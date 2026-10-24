@@ -381,3 +381,14 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+def test_binance_filters_materially_future_dated_candles():
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    valid_open = now_ms - (now_ms % 3_600_000) - 3_600_000
+    future_open = now_ms + 120_000
+    valid = [valid_open, "100", "105", "98", "102", "12.5", valid_open + 3_600_000 - 1]
+    future = [future_open, "100", "105", "98", "102", "12.5", future_open + 3_600_000 - 1]
+    with patch.object(api, "_request_json", return_value=[valid, future]):
+        rows = api._fetch_binance("BTCUSDT", "1h", 5)
+    assert len(rows) == 1
+    assert rows[0]["open_time"] == valid_open
