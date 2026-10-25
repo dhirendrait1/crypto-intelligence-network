@@ -772,3 +772,10 @@ This checkpoint validates configured offline automation only. It does not establ
 - The parser must discard malformed rows while preserving valid candles from the same response.
 - Test commit: `5f1f822775b65899be6132a7132c8ef5dd921f9d`.
 - CI verification pending on the latest tracker commit.
+
+
+## Binance response-limit enforcement regression (2026-10-25)
+
+- Added a regression test proving the Binance parser rejects a response containing more valid candles than requested, rather than silently returning an oversized result.
+- Test commit: `e71327c96daceb4e5ab3cfc0de4b0ebbd7f206a4`.
+- CI verification pending on the latest tracker commit.
