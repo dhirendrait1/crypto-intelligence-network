@@ -806,3 +806,12 @@ This checkpoint validates configured offline automation only. It does not establ
 - Added rejection coverage for unsupported intervals and limits outside 5–500. These tests exercise CIN's internal request validator directly; they do not make live provider requests.
 - Test commit: `ab8fe0479422787e08e46d00cfca373d931e679e`.
 - CI verification for this test and the tracker update must pass before this increment is marked verified.
+
+## CoinGecko unexpected-provider failure containment (2026-10-25)
+
+- [x] Added a final sanitized exception boundary to the read-only public market-data endpoint so unexpected provider/parser shape or runtime errors return HTTP 502 with a stable generic message instead of an uncaught server error.
+- [x] Added offline API regression tests for unexpected AttributeError and RuntimeError failures; tests assert the internal exception text is not returned to clients.
+- Implementation commit: c7f098840e4773c087031fa9b63b5ff936e2c006.
+- Test commit: 40d673f71aa85b6c178534cfc8ef2be04424d7c3.
+- CI verification is pending on the latest branch head. These are mocked/offline tests; live CoinGecko behavior and deployed service health remain unverified.
+
