@@ -28,6 +28,41 @@ def test_snapshot_rejects_non_finite_order_book_arithmetic(monkeypatch, bids, as
         api._snapshot("BTCUSDT")
 
 
+def test_get_json_bounds_provider_response_size(monkeypatch):
+    class OversizedResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self, size):
+            assert size == api._MAX_PROVIDER_RESPONSE_BYTES + 1
+            return b"x" * size
+
+    monkeypatch.setattr(api.urllib.request, "urlopen", lambda *_args, **_kwargs: OversizedResponse())
+    with pytest.raises(ValueError, match="exceeded the configured size limit"):
+        api._get_json("/fapi/v1/depth", {"symbol": "BTCUSDT", "limit": "20"})
+
+
+def test_get_json_accepts_response_at_size_limit(monkeypatch):
+    body = b"{}" + b" " * (api._MAX_PROVIDER_RESPONSE_BYTES - 2)
+
+    class BoundaryResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self, size):
+            assert size == api._MAX_PROVIDER_RESPONSE_BYTES + 1
+            return body
+
+    monkeypatch.setattr(api.urllib.request, "urlopen", lambda *_args, **_kwargs: BoundaryResponse())
+    assert api._get_json("/fapi/v1/depth", {"symbol": "BTCUSDT", "limit": "20"}) == {}
+
+
 def test_snapshot_preserves_source_times_and_never_invents_liquidations(monkeypatch):
     payloads = [
         {"symbol": "BTCUSDT", "openInterest": "1000.0", "time": 1_800_000_000_000},
