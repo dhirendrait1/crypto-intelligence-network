@@ -85,7 +85,12 @@ def fetch_github_repository_evidence(
         value = payload.get(field)
         if value is None:
             missing_fields.append(field)
-        elif not isinstance(value, str) or not value.strip():
+        elif (
+            not isinstance(value, str)
+            or not value.strip()
+            or len(value) > 255
+            or any(ord(char) < 32 or ord(char) == 127 for char in value)
+        ):
             invalid_fields.append(field)
 
     for field in timestamp_fields:
@@ -93,7 +98,11 @@ def fetch_github_repository_evidence(
         if value is None:
             missing_fields.append(field)
             continue
-        if not isinstance(value, str):
+        if (
+            not isinstance(value, str)
+            or len(value) > 64
+            or any(ord(char) < 32 or ord(char) == 127 for char in value)
+        ):
             invalid_fields.append(field)
             continue
         try:
