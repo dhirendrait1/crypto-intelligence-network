@@ -1,6 +1,6 @@
 """Regression tests for read-only public market candle provenance and closure."""
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import pytest
 
@@ -211,6 +211,30 @@ def test_clean_candles_fails_when_provider_returns_only_invalid_rows():
     invalid = _row(1_000, 999)
     with pytest.raises(ValueError, match="returned no valid candles"):
         api._clean_candles([invalid], "Test provider")
+
+
+def test_kraken_weekly_parser_discards_non_monday_candle(monkeypatch):
+    now = datetime.now(timezone.utc)
+    this_monday = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    this_monday = this_monday - timedelta(days=this_monday.weekday())
+    valid_open = int((this_monday - timedelta(days=14)).timestamp())
+    invalid_open = valid_open + 86400
+    payload = {
+        "error": [],
+        "result": {
+            "XXBTZUSD": [
+                [valid_open, "100", "102", "98", "101", "100", "4", 10],
+                [invalid_open, "101", "103", "100", "102", "101", "2", 4],
+            ],
+            "last": invalid_open,
+        },
+    }
+    monkeypatch.setattr(api, "_request_json", lambda _url: payload)
+
+    rows = api._fetch_kraken("BTCUSD", "1w", 5)
+
+    assert len(rows) == 1
+    assert rows[0]["open_time"] == valid_open * 1000
 
 
 def test_kraken_parser_discards_materially_future_candle(monkeypatch):
