@@ -732,3 +732,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Confirms all invalid payload forms produce the same sanitized HTTP 502 contract at the API boundary.
 - Test commit: `74cbf9a487a96d8dc74cc719c8274774e4ccbc89`.
 - CI verification pending on the latest tracker commit.
+
+
+## Invalid UTF-8 fixture precision correction (2026-10-25)
+
+- Follow-up source inspection found the invalid UTF-8 case still encoded two literal backslashes, so it was not actually testing a malformed UTF-8 byte sequence.
+- Corrected the fixture to contain the single byte `0xFF`; CI must pass on this exact commit before the malformed-body matrix is considered fully verified.
+- Test fix: `10b8a9b20f3d34fd75ef9d0bf9be6d27ce3411af`.
+- CI verification pending.
