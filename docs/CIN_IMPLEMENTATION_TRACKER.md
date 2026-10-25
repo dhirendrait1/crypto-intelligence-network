@@ -832,3 +832,12 @@ This checkpoint validates configured offline automation only. It does not establ
 - Added offline regression coverage for object-valued and oversized timestamps and the unchanged missing-value behavior.
 - Source commit: `41a1fe45ee5341ccc9ef71c17ce142aa872044cd`; test commit: `2537cbbac45e8fcf0b1088798558565a663f8285`.
 - CI verification pending on the latest branch head. Live GDELT and deployment behavior remain unverified.
+
+
+## Evidence-ingestion response size enforcement (2026-10-25)
+
+- Audit finding: the allowlisted GitHub evidence connector called `read(1_000_000)` but did not read one extra byte or explicitly reject oversized responses. This bounded memory use but could silently accept a valid JSON prefix followed by truncated trailing whitespace instead of enforcing a clear provider response-size contract.
+- Added a 1,000,000-byte cap, reads at most cap + 1 byte, and raises controlled `EvidenceSourceError` before JSON parsing when the body exceeds the cap.
+- Added offline regression coverage asserting the extra-byte read and controlled rejection.
+- Source commit: `ac8e119267271a4ac8deaa5beb1b088c94ccc030`; test commit: `164fd679b0c70a20e4a112e7cd52eb5114c316a4`.
+- CI pending on the latest head. No live GitHub API call or deployment was performed.
