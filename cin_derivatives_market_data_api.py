@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Query
 router = APIRouter(tags=["derivatives-market-data"])
 _BASE = "https://fapi.binance.com"
 _USER_AGENT = "CIN-Research-API/0.4.0"
+_MAX_PROVIDER_RESPONSE_BYTES = 1_000_000
 
 
 def _get_json(path: str, params: dict[str, str]) -> Any:
@@ -25,7 +26,10 @@ def _get_json(path: str, params: dict[str, str]) -> Any:
         method="GET",
     )
     with urllib.request.urlopen(request, timeout=10) as response:
-        payload = json.loads(response.read().decode("utf-8"))
+        raw = response.read(_MAX_PROVIDER_RESPONSE_BYTES + 1)
+    if len(raw) > _MAX_PROVIDER_RESPONSE_BYTES:
+        raise ValueError("Derivatives provider response exceeded the configured size limit")
+    payload = json.loads(raw.decode("utf-8"))
     return payload
 
 
