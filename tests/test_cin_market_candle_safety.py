@@ -92,7 +92,7 @@ def test_oversized_provider_body_maps_to_sanitized_api_error(monkeypatch):
     "body",
     [
         b'{"provider_detail":"sensitive-malformed-json"',
-        b"\\xff",
+        b"\xff",
         b"",
         b"null",
         b'{"provider_detail":"unexpected-object-shape"}',
