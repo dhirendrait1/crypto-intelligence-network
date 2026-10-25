@@ -581,6 +581,11 @@ def test_each_declared_kraken_fallback_interval_is_mapped(interval, kraken_minut
     def fake_request(url):
         captured.update(urllib.parse.parse_qs(urllib.parse.urlparse(url).query))
         now_seconds = int(datetime.now(timezone.utc).timestamp()) - 7200
+        if interval == "1w":
+            week_start = datetime.fromtimestamp(now_seconds, timezone.utc).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            now_seconds = int(week_start.timestamp()) - week_start.weekday() * 86400 - 7 * 86400
         return {
             "error": [],
             "result": {
