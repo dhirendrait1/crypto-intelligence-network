@@ -721,3 +721,6 @@ This checkpoint validates configured offline automation only. It does not establ
 - Both cases must produce the controlled HTTP 502 response without exposing provider payload details.
 - Test commit: `8c1ffa344872df4088c03dda57b36b09da22e97d`.
 - CI verification pending on the latest tracker commit.
+
+
+- CI follow-up: source inspection caught a misplaced existing transport-error parametrization decorator adjacent to the new malformed-body test. Corrected decorator placement and ensured the invalid UTF-8 fixture uses an actual invalid byte in commit `125a32237192d6dd9d1e15e40dd8b52298484faa`. CI re-verification pending.
