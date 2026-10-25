@@ -132,7 +132,14 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
         if not isinstance(row, list) or len(row) < 7:
             continue
         try:
-            start = int(float(row[0]) * 1000)
+            # Kraken timestamps are seconds. Reject booleans, non-finite values,
+            # and fractional seconds rather than silently truncating source data.
+            if isinstance(row[0], bool):
+                continue
+            start_seconds = float(row[0])
+            if not math.isfinite(start_seconds) or not start_seconds.is_integer():
+                continue
+            start = int(start_seconds * 1000)
             # Kraken returns OHLC, VWAP, volume, trade count; derive candle end
             # from the selected timeframe so the output schema matches Binance.
             duration_ms = KRAKEN_INTERVALS[interval] * 60_000
