@@ -710,3 +710,6 @@ This checkpoint validates configured offline automation only. It does not establ
 - Confirms these failures return controlled HTTP 502 responses, do not invoke Kraken fallback (reserved for Binance HTTP 451), and do not leak provider response-body details.
 - Test commit: `4e3a2deed38b2c707711f9d5a7d4a92baaba66d3`.
 - CI verification pending on the latest tracker commit.
+
+
+- CI follow-up: the first run exposed a duplicate pytest parametrization introduced during test insertion. Corrected the decorator placement in commit `9302545d4df96f86525c3b932c524cb64d0cc6d3`; re-verification is pending.
