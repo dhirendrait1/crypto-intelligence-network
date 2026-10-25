@@ -279,6 +279,24 @@ def test_clean_candles_rejects_conflicting_duplicate_open_times(field, conflicti
     with pytest.raises(ValueError, match="conflicting candles for the same open timestamp"):
         api._clean_candles([first, second], "Test provider")
 
+def test_binance_parser_rejects_more_valid_candles_than_requested_limit(monkeypatch):
+    # Even if a provider ignores its requested limit, CIN must not silently
+    # return a larger response than the API contract permits.
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    latest_open = (now_ms // 3_600_000 - 10) * 3_600_000
+    rows = []
+    for index in range(6):
+        opened = latest_open - (5 - index) * 3_600_000
+        rows.append([
+            opened, "100", "102", "98", "101", "12.5",
+            opened + 3_600_000 - 1,
+        ])
+    monkeypatch.setattr(api, "_request_json", lambda _url: rows)
+
+    with pytest.raises(ValueError, match="more candles than the requested limit"):
+        api._fetch_binance("BTCUSDT", "1h", 5)
+
+
 def test_kraken_fallback_reports_actual_pair_key_and_quote(monkeypatch):
     now_seconds = int(datetime.now(timezone.utc).timestamp()) - 600
     payload = {
