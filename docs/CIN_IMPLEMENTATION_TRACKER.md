@@ -713,3 +713,11 @@ This checkpoint validates configured offline automation only. It does not establ
 
 
 - CI follow-up: the first run exposed a duplicate pytest parametrization introduced during test insertion. Corrected the decorator placement in commit `9302545d4df96f86525c3b932c524cb64d0cc6d3`; re-verification is pending.
+
+
+## Malformed provider JSON body regression (2026-10-25)
+
+- Added offline API-level tests for syntactically truncated JSON and invalid UTF-8 returned with HTTP 200 by the public market-data transport.
+- Both cases must produce the controlled HTTP 502 response without exposing provider payload details.
+- Test commit: `8c1ffa344872df4088c03dda57b36b09da22e97d`.
+- CI verification pending on the latest tracker commit.
