@@ -420,3 +420,23 @@ def test_derivatives_route_rejects_symbol_with_trailing_newline():
         asyncio.run(api.derivatives_market_snapshot(symbol="BTCUSDT\n"))
     assert caught.value.status_code == 400
     assert caught.value.detail["error"] == "invalid_symbol"
+
+
+def test_validate_payloads_rejects_more_history_rows_than_requested():
+    open_interest = {"symbol": "BTCUSDT", "openInterest": "10", "time": 1_800_000_000_000}
+    premium = {"symbol": "BTCUSDT", "markPrice": "65000", "indexPrice": "65000", "lastFundingRate": "0.001", "time": 1_800_000_000_000}
+    row = {"symbol": "BTCUSDT", "sumOpenInterestValue": "100", "timestamp": 1_800_000_000_000}
+    with pytest.raises(ValueError, match="Unexpected open-interest history"):
+        api._validate_payloads(open_interest, premium, [row, row, row], "BTCUSDT")
+
+
+def test_snapshot_rejects_order_book_levels_beyond_requested_limit(monkeypatch):
+    payloads = [
+        {"symbol": "BTCUSDT", "openInterest": "1000", "time": 1_800_000_000_000},
+        {"symbol": "BTCUSDT", "markPrice": "65000", "indexPrice": "65000", "lastFundingRate": "0.0001", "time": 1_800_000_000_000},
+        [],
+        {"bids": [["65000", "1"]] * 21, "asks": [["65010", "1"]]},
+    ]
+    monkeypatch.setattr(api, "_get_json", lambda _path, _params: payloads.pop(0))
+    with pytest.raises(ValueError, match="exceeded the requested level limit"):
+        api._snapshot("BTCUSDT")
