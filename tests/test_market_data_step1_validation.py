@@ -266,5 +266,30 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         self.assertEqual(result["missing_coins"], [])
 
 
+    @patch("market_data_step1._fetch_market_data", side_effect=AttributeError("unexpected provider shape"))
+    def test_unexpected_provider_shape_is_sanitized(self, mocked):
+        with self.assertRaises(Exception) as raised:
+            asyncio.run(get_public_market_data("bitcoin", "usd"))
+        self.assertEqual(getattr(raised.exception, "status_code", None), 502)
+        self.assertEqual(
+            raised.exception.detail,
+            "Market-data provider returned an unexpected response.",
+        )
+        self.assertNotIn("unexpected provider shape", raised.exception.detail)
+        mocked.assert_called_once_with(["bitcoin"], "usd")
+
+    @patch("market_data_step1._fetch_market_data", side_effect=RuntimeError("sensitive provider internals"))
+    def test_unexpected_provider_runtime_error_is_sanitized(self, mocked):
+        with self.assertRaises(Exception) as raised:
+            asyncio.run(get_public_market_data("bitcoin", "usd"))
+        self.assertEqual(getattr(raised.exception, "status_code", None), 502)
+        self.assertEqual(
+            raised.exception.detail,
+            "Market-data provider returned an unexpected response.",
+        )
+        self.assertNotIn("sensitive provider internals", raised.exception.detail)
+        mocked.assert_called_once_with(["bitcoin"], "usd")
+
+
 if __name__ == "__main__":
     unittest.main()
