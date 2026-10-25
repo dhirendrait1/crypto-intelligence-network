@@ -798,3 +798,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Confirms the fallback discards the non-Monday row while preserving the valid weekly candle; production code is unchanged in this test-only increment.
 - Test commit: `cba964107dcd2a78432d0d165e5c5a4fa614b55c`.
 - CI verification for this test and the latest tracker update must pass before this increment is marked verified.
+
+
+## Public candle request-validation boundary regression (2026-10-25)
+
+- Added deterministic tests for supported lower/upper limit boundaries, accepted intervals, case-normalization of symbols, and rejection of whitespace or punctuation in symbols.
+- Added rejection coverage for unsupported intervals and limits outside 5–500. These tests exercise CIN's internal request validator directly; they do not make live provider requests.
+- Test commit: `ab8fe0479422787e08e46d00cfca373d931e679e`.
+- CI verification for this test and the tracker update must pass before this increment is marked verified.
