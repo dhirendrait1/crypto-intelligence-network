@@ -129,3 +129,15 @@ All four configured workflows passed on code/documentation checkpoint `2c1f816d5
   - CIN screening checks: [40143588616](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40143588616)
 - This head includes deterministic weekly Monday-UTC boundary tests and 3-day candle duration tests that intentionally avoid an unsupported epoch anchor assumption.
 - These results establish offline CI only. Kraken boundary enforcement/compatibility, live provider behavior, and deployed service health remain unverified. PR #8 remains Draft and unmerged; no deployment or trading execution was performed.
+
+
+## Latest-head verification refresh (2026-10-25)
+
+- All four configured PR workflows passed on code/documentation head `540c886ef6b7dd2b07c4ff27cf8500070b4d58b7`:
+  - CIN screening checks: [40146915587](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40146915587)
+  - CIN Automated Tests: [40146915579](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40146915579)
+  - CIN Technical Analysis Tests: [40146915637](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40146915637)
+  - CIN evidence ingestion API checks: [40146915576](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40146915576)
+- The head includes CoinGecko unexpected provider/parser failure containment and offline API regression tests.
+- This verification is for the exact listed head only. It does not establish live-provider correctness or Render health. Any subsequent commit requires a fresh latest-head CI check.
+- PR #8 remains Draft and unmerged. No Render configuration or deployment was changed.
