@@ -440,3 +440,12 @@ def test_snapshot_rejects_order_book_levels_beyond_requested_limit(monkeypatch):
     monkeypatch.setattr(api, "_get_json", lambda _path, _params: payloads.pop(0))
     with pytest.raises(ValueError, match="exceeded the requested level limit"):
         api._snapshot("BTCUSDT")
+
+
+def test_validate_payloads_rejects_duplicate_history_timestamps():
+    open_interest = {"symbol": "BTCUSDT", "openInterest": "10", "time": 1_800_000_000_000}
+    premium = {"symbol": "BTCUSDT", "markPrice": "65000", "indexPrice": "65000", "lastFundingRate": "0.001", "time": 1_800_000_000_000}
+    row_a = {"symbol": "BTCUSDT", "sumOpenInterestValue": "100", "timestamp": 1_800_000_000_000}
+    row_b = {"symbol": "BTCUSDT", "sumOpenInterestValue": "110", "timestamp": 1_800_000_000_000}
+    with pytest.raises(ValueError, match="duplicate timestamps"):
+        api._validate_payloads(open_interest, premium, [row_a, row_b], "BTCUSDT")
