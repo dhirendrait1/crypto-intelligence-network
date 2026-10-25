@@ -779,3 +779,14 @@ This checkpoint validates configured offline automation only. It does not establ
 - Added a regression test proving the Binance parser rejects a response containing more valid candles than requested, rather than silently returning an oversized result.
 - Test commit: `e71327c96daceb4e5ab3cfc0de4b0ebbd7f206a4`.
 - CI verification pending on the latest tracker commit.
+
+
+## Kraken candle-boundary enforcement and future-candle regression (2026-10-25)
+
+- Applied the same interval-boundary and materially-future-open-time validation to Kraken fallback candles that is used for Binance data.
+- Added an offline regression proving a materially future Kraken candle is discarded while a valid historical candle from the same response is retained.
+- The stricter validation exposed an existing weekly test fixture that did not start at Monday 00:00 UTC; corrected the fixture rather than weakening the production validator.
+- Implementation commit: `c0da02824adc691f3edd8b96d90423b62502b33b`.
+- Regression test commit: `6c2a1b1ca4410d20a04ffcf81e7d66cefd495feb`.
+- Weekly fixture correction: `a224b6901667b1597deb696c746c9c867bfd2ee5`.
+- All four CI workflows passed on `a224b69`.
