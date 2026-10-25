@@ -740,3 +740,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Corrected the fixture to contain the single byte `0xFF`; CI must pass on this exact commit before the malformed-body matrix is considered fully verified.
 - Test fix: `10b8a9b20f3d34fd75ef9d0bf9be6d27ce3411af`.
 - CI verification pending.
+
+
+## Conflicting duplicate candle evidence (2026-10-25)
+
+- Added regression cases proving duplicate rows with the same open timestamp are rejected when close price, volume, or close time conflicts.
+- Exact duplicates remain safely deduplicated; contradictory provider rows must not silently select one version of the same candle.
+- Test commit: `d2914ed9594b7cc1bfcf3ba3a67fe74aedcc979c`.
+- CI verification pending on the latest tracker commit.
