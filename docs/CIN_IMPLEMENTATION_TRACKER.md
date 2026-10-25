@@ -857,3 +857,12 @@ This checkpoint validates configured offline automation only. It does not establ
 - The first CI attempt correctly exposed a test-fixture mistake: the intended tab/newline controls were represented as literal backslash sequences, so the branch-name control-character assertion did not exercise a control character.
 - Corrected the Python test literals to produce actual control characters at runtime. This is a test-only correction; the production validator already rejects ASCII control characters.
 - Corrected test commit: `b7c71261b0b1f1f06042c3e488d35c11e3165200`. CI is being rerun on the updated head.
+
+
+## Derivatives provider collection bounds (2026-10-25)
+
+- Audit finding: the derivatives snapshot requests only two open-interest history rows and twenty order-book levels per side, but previously accepted larger provider collections without checking the requested response shape.
+- Enforced a maximum of two history rows and twenty bid/ask levels per side; unexpected oversized collections now fail closed as controlled invalid-provider responses.
+- Added offline tests for excessive history rows and depth levels.
+- Source commit: `e8dd13b44910bf7dd4aabe8467b2ba161420cb97`; tests commit: `3315294ac6273165d9bb99eb3aa753b8836863e2`.
+- CI pending on latest head. No order execution, account access, or deployment was performed.
