@@ -95,6 +95,36 @@ def test_oversized_provider_body_maps_to_sanitized_api_error(monkeypatch):
         TimeoutError("sensitive-provider-timeout-detail"),
     ],
 )
+@pytest.mark.parametrize(
+    "body",
+    [
+        b'{"provider_detail":"sensitive-malformed-json"',
+        b"\\xff",
+    ],
+)
+def test_malformed_provider_json_body_returns_sanitized_502(monkeypatch, body):
+    class MalformedResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self, size):
+            return body
+
+    monkeypatch.setattr(api.urllib.request, "urlopen", lambda *_args, **_kwargs: MalformedResponse())
+
+    with pytest.raises(api.HTTPException) as caught:
+        asyncio.run(api._load("BTCUSDT", "1h", 10))
+
+    assert caught.value.status_code == 502
+    assert caught.value.detail == "Public market-data provider returned an invalid response."
+    assert "sensitive-malformed-json" not in caught.value.detail
+
+
 def test_provider_transport_failures_return_sanitized_503(monkeypatch, transport_error):
     def fail(*_args, **_kwargs):
         raise transport_error
