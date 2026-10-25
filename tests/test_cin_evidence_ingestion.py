@@ -208,3 +208,17 @@ class EvidenceIngestionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_oversized_provider_response_is_rejected_before_json_parse(self, mocked):
+        class OversizedResponse(FakeResponse):
+            def read(self, limit=-1):
+                self.requested_limit = limit
+                return b"x" * limit
+
+        response = OversizedResponse({})
+        mocked.return_value = response
+        with self.assertRaisesRegex(EvidenceSourceError, "exceeded the configured size limit"):
+            fetch_github_repository_evidence()
+        self.assertEqual(response.requested_limit, 1_000_001)
