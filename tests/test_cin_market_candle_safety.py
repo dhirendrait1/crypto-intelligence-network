@@ -109,7 +109,6 @@ def test_provider_transport_failures_return_sanitized_503(monkeypatch, transport
     assert "sensitive-provider" not in caught.value.detail
 
 
-@pytest.mark.parametrize("status_code", [418, 429])
 @pytest.mark.parametrize("status_code", [400, 500, 502])
 def test_non_rate_limit_provider_http_errors_return_sanitized_502(monkeypatch, status_code):
     def fail(*_args, **_kwargs):
@@ -135,6 +134,7 @@ def test_non_rate_limit_provider_http_errors_return_sanitized_502(monkeypatch, s
     assert "sensitive-provider" not in caught.value.detail
 
 
+@pytest.mark.parametrize("status_code", [418, 429])
 def test_provider_rate_limit_http_errors_return_retryable_503(monkeypatch, status_code):
     def fail(*_args, **_kwargs):
         raise api.urllib.error.HTTPError(
