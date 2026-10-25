@@ -724,3 +724,11 @@ This checkpoint validates configured offline automation only. It does not establ
 
 
 - CI follow-up: source inspection caught a misplaced existing transport-error parametrization decorator adjacent to the new malformed-body test. Corrected decorator placement and ensured the invalid UTF-8 fixture uses an actual invalid byte in commit `125a32237192d6dd9d1e15e40dd8b52298484faa`. CI re-verification pending.
+
+
+## Empty and schema-invalid provider body regression (2026-10-25)
+
+- Expanded the offline malformed-body test matrix to cover an empty response body, valid JSON `null`, and an unexpected JSON object in addition to truncated JSON and invalid UTF-8.
+- Confirms all invalid payload forms produce the same sanitized HTTP 502 contract at the API boundary.
+- Test commit: `74cbf9a487a96d8dc74cc719c8274774e4ccbc89`.
+- CI verification pending on the latest tracker commit.
