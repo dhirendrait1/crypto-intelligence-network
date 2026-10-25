@@ -299,3 +299,24 @@ def test_news_provider_response_size_is_bounded(monkeypatch):
     monkeypatch.setattr(api.urllib.request, "urlopen", lambda *_args, **_kwargs: OversizedResponse())
     with pytest.raises(ValueError, match="exceeded the configured size limit"):
         api._get_json("bitcoin", 10)
+
+
+def test_article_timestamp_rejects_non_string_and_bounds_raw_provider_value():
+    oversized_timestamp = "x" * 65
+    rows = api._parse_articles(
+        {
+            "articles": [
+                {"title": "Object timestamp", "url": "https://news.example/a", "seendate": {"raw": "payload"}},
+                {"title": "Oversized timestamp", "url": "https://news.example/b", "seendate": oversized_timestamp},
+                {"title": "Missing timestamp", "url": "https://news.example/c"},
+            ]
+        },
+        10,
+    )
+    assert rows[0]["provider_seen_at"] is None
+    assert rows[0]["provider_seen_at_validation_status"] == "invalid"
+    assert rows[0]["published_at"] is None
+    assert rows[1]["provider_seen_at"] is None
+    assert rows[1]["provider_seen_at_validation_status"] == "invalid"
+    assert rows[2]["provider_seen_at"] is None
+    assert rows[2]["provider_seen_at_validation_status"] == "missing"
