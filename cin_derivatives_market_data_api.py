@@ -16,6 +16,8 @@ router = APIRouter(tags=["derivatives-market-data"])
 _BASE = "https://fapi.binance.com"
 _USER_AGENT = "CIN-Research-API/0.4.0"
 _MAX_PROVIDER_RESPONSE_BYTES = 1_000_000
+_MAX_OPEN_INTEREST_HISTORY_ROWS = 2
+_MAX_ORDER_BOOK_LEVELS_PER_SIDE = 20
 
 
 def _get_json(path: str, params: dict[str, str]) -> Any:
@@ -85,7 +87,11 @@ def _validate_payloads(open_interest: Any, premium: Any, history: Any, symbol: s
         raise ValueError("Open-interest provider payload contained an invalid timestamp")
     if _iso_from_ms(premium.get("time")) is None:
         raise ValueError("Premium-index provider payload contained an invalid timestamp")
-    if not isinstance(history, list) or any(not isinstance(row, dict) for row in history):
+    if (
+        not isinstance(history, list)
+        or len(history) > _MAX_OPEN_INTEREST_HISTORY_ROWS
+        or any(not isinstance(row, dict) for row in history)
+    ):
         raise ValueError("Unexpected open-interest history provider payload")
     for row in history:
         if row.get("symbol") != symbol:
@@ -110,6 +116,11 @@ def _snapshot(symbol: str) -> dict[str, Any]:
     _validate_payloads(open_interest, premium, history, symbol)
     if not isinstance(depth, dict) or not isinstance(depth.get("bids"), list) or not isinstance(depth.get("asks"), list):
         raise ValueError("Unexpected order-book depth provider payload")
+    if (
+        len(depth["bids"]) > _MAX_ORDER_BOOK_LEVELS_PER_SIDE
+        or len(depth["asks"]) > _MAX_ORDER_BOOK_LEVELS_PER_SIDE
+    ):
+        raise ValueError("Order-book depth exceeded the requested level limit")
 
     oi_contracts = _finite_number(open_interest.get("openInterest"))
     funding_rate = _finite_number(premium.get("lastFundingRate"))
