@@ -89,13 +89,6 @@ def test_oversized_provider_body_maps_to_sanitized_api_error(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "transport_error",
-    [
-        api.urllib.error.URLError("sensitive-provider-network-detail"),
-        TimeoutError("sensitive-provider-timeout-detail"),
-    ],
-)
-@pytest.mark.parametrize(
     "body",
     [
         b'{"provider_detail":"sensitive-malformed-json"',
@@ -125,6 +118,13 @@ def test_malformed_provider_json_body_returns_sanitized_502(monkeypatch, body):
     assert "sensitive-malformed-json" not in caught.value.detail
 
 
+@pytest.mark.parametrize(
+    "transport_error",
+    [
+        api.urllib.error.URLError("sensitive-provider-network-detail"),
+        TimeoutError("sensitive-provider-timeout-detail"),
+    ],
+)
 def test_provider_transport_failures_return_sanitized_503(monkeypatch, transport_error):
     def fail(*_args, **_kwargs):
         raise transport_error
