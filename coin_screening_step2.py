@@ -18,6 +18,7 @@ router = APIRouter(tags=["coin-screening"])
 URL = "https://api.coingecko.com/api/v3/coins/markets"
 _CACHE_TTL_SECONDS = 90
 _STALE_CACHE_MAX_SECONDS = 900
+_MAX_MARKET_PROVIDER_RESPONSE_BYTES = 5_000_000
 _CACHE: dict[tuple[str, int], tuple[float, list[dict[str, Any]]]] = {}
 _COMMODITY_SCAN_META: dict[tuple[str, int], tuple[float, int, int]] = {}
 _CACHE_LOCK = threading.Lock()
@@ -158,7 +159,10 @@ def _request_markets(vs_currency: str, per_page: int) -> list[dict[str, Any]]:
     )
     try:
         with urllib.request.urlopen(req, timeout=12) as response:
-            payload = json.loads(response.read().decode("utf-8"))
+            raw = response.read(_MAX_MARKET_PROVIDER_RESPONSE_BYTES + 1)
+        if len(raw) > _MAX_MARKET_PROVIDER_RESPONSE_BYTES:
+            raise ValueError("CoinGecko response exceeded the configured size limit")
+        payload = json.loads(raw.decode("utf-8"))
         if not isinstance(payload, list):
             raise ValueError("Unexpected CoinGecko market-data response")
         rows = [row for row in payload if isinstance(row, dict)]
@@ -178,7 +182,10 @@ def _request_markets(vs_currency: str, per_page: int) -> list[dict[str, Any]]:
         )
         try:
             with urllib.request.urlopen(fallback_req, timeout=12) as response:
-                fallback_payload = json.loads(response.read().decode("utf-8"))
+                fallback_raw = response.read(_MAX_MARKET_PROVIDER_RESPONSE_BYTES + 1)
+            if len(fallback_raw) > _MAX_MARKET_PROVIDER_RESPONSE_BYTES:
+                raise ValueError("CoinPaprika response exceeded the configured size limit")
+            fallback_payload = json.loads(fallback_raw.decode("utf-8"))
             if not isinstance(fallback_payload, list):
                 raise ValueError("Unexpected CoinPaprika ticker response")
             quote_key = vs_currency.upper()
