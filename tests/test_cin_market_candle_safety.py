@@ -212,6 +212,23 @@ def test_clean_candles_fails_when_provider_returns_only_invalid_rows():
     with pytest.raises(ValueError, match="returned no valid candles"):
         api._clean_candles([invalid], "Test provider")
 
+
+@pytest.mark.parametrize(
+    "field, conflicting_value",
+    [
+        ("close", 101.0),
+        ("volume", 13.5),
+        ("close_time", 2_000),
+    ],
+)
+def test_clean_candles_rejects_conflicting_duplicate_open_times(field, conflicting_value):
+    first = _row(1_000, 1_999)
+    second = _row(1_000, 1_999)
+    second[field] = conflicting_value
+
+    with pytest.raises(ValueError, match="conflicting candles for the same open timestamp"):
+        api._clean_candles([first, second], "Test provider")
+
 def test_kraken_fallback_reports_actual_pair_key_and_quote(monkeypatch):
     now_seconds = int(datetime.now(timezone.utc).timestamp()) - 600
     payload = {
