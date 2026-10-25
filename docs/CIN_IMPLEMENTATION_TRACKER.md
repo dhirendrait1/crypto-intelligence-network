@@ -748,3 +748,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Exact duplicates remain safely deduplicated; contradictory provider rows must not silently select one version of the same candle.
 - Test commit: `d2914ed9594b7cc1bfcf3ba3a67fe74aedcc979c`.
 - CI verification pending on the latest tracker commit.
+
+
+## Binance candle parser type-safety regression (2026-10-25)
+
+- Added parameterized tests that feed malformed Binance rows with boolean timestamp/OHLCV fields and a fractional timestamp.
+- These values must not be coerced into valid-looking numeric data; when no valid rows remain, parsing must fail closed.
+- Test commit: `700120fccc8c16f351d3da8ec651fbe42944b82a`.
+- CI verification pending on the latest tracker commit.
