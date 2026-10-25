@@ -722,3 +722,28 @@ class MarketCacheProvenanceTests(unittest.TestCase):
         self.assertEqual(euro[0]["_cin_quote_currency"], "EUR")
         self.assertEqual(request.call_count, 2)
 
+
+
+class MarketProviderResponseSizeTests(unittest.TestCase):
+    def test_primary_and_fallback_provider_bodies_are_bounded(self):
+        class OversizedResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self, size=-1):
+                self.requested_size = size
+                return b"x" * size
+
+        primary = OversizedResponse()
+        fallback = OversizedResponse()
+        with patch.object(MODULE.urllib.request, "urlopen", side_effect=[primary, fallback]):
+            with self.assertRaises(MODULE.MarketDataProviderFailure) as caught:
+                MODULE._request_markets("usd", 5)
+
+        self.assertEqual(primary.requested_size, MODULE._MAX_MARKET_PROVIDER_RESPONSE_BYTES + 1)
+        self.assertEqual(fallback.requested_size, MODULE._MAX_MARKET_PROVIDER_RESPONSE_BYTES + 1)
+        self.assertEqual(caught.exception.primary_kind, "invalid_response")
+        self.assertEqual(caught.exception.fallback_kind, "invalid_response")
