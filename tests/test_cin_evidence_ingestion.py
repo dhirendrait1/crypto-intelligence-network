@@ -250,7 +250,7 @@ class EvidenceIngestionTests(unittest.TestCase):
             "open_issues_count": 1,
             "archived": False,
         }
-        for bad_branch in ("x" * 256, "main\\tbranch"):
+        for bad_branch in ("x" * 256, "main\tbranch"):
             with self.subTest(branch_length=len(bad_branch)):
                 mocked.return_value = FakeResponse(dict(base, default_branch=bad_branch))
                 with self.assertRaisesRegex(EvidenceSourceError, "default_branch"):
