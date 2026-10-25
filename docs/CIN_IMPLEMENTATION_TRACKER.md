@@ -875,3 +875,12 @@ This checkpoint validates configured offline automation only. It does not establ
 - Added duplicate timestamp rejection and an offline regression test using conflicting values at the same timestamp.
 - Source commit: `86098293beb23811ca5fdc734b603f8c51e99998`; test commit: `959ee4ade6c56c09a70733f45723219baba1439f`.
 - CI for this follow-up is pending. Read-only scope remains unchanged.
+
+
+## Coin-screening provider response bounds (2026-10-25)
+
+- Audit finding: CoinGecko and CoinPaprika market-screening responses were decoded with an unbounded `read()`, unlike the bounded provider clients in other CIN endpoints.
+- Both primary and fallback response bodies now read at most 5,000,001 bytes and reject responses over the 5 MB cap before JSON parsing.
+- Added an offline test that verifies both providers are bounded and their oversized bodies become structured invalid-response failures.
+- Source commit: `92e6277f04d1f83cf59ebbefee2c80afc31fd78f`; test commit: `b8017ae026cd7758108590a81a3fa68f95935eef`.
+- CI for current head is pending. CIN remains read-only; no deployment changes.
