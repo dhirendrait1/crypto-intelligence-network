@@ -194,6 +194,12 @@ async def get_public_market_data(
         raise HTTPException(status_code=503, detail="Market-data provider is temporarily unavailable.") from None
     except (ValueError, json.JSONDecodeError):
         raise HTTPException(status_code=502, detail="Market-data provider returned an invalid response.") from None
+    except Exception:
+        # Keep unexpected provider/parser failures inside CIN's stable public API contract.
+        raise HTTPException(
+            status_code=502,
+            detail="Market-data provider returned an unexpected response.",
+        ) from None
 
     if not rows:
         raise HTTPException(status_code=502, detail="No valid market data was returned for the requested coin IDs.")
