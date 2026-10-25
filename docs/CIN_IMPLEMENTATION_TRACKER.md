@@ -841,3 +841,12 @@ This checkpoint validates configured offline automation only. It does not establ
 - Added offline regression coverage asserting the extra-byte read and controlled rejection.
 - Source commit: `ac8e119267271a4ac8deaa5beb1b088c94ccc030`; test commit: `164fd679b0c70a20e4a112e7cd52eb5114c316a4`.
 - CI pending on the latest head. No live GitHub API call or deployment was performed.
+
+
+## Evidence-ingestion metadata string bounds (2026-10-25)
+
+- Audit finding: although the GitHub provider body is now size-capped, individual metadata strings were still echoed in the normalized evidence response without field-specific limits. A long timestamp or branch name could therefore consume a disproportionate part of the response, and control characters could flow into downstream logs or clients.
+- `default_branch` is now limited to 255 characters and rejects ASCII control characters; `pushed_at` and `updated_at` are limited to 64 characters and reject ASCII control characters before parsing.
+- Added regression cases for oversized and control-character-bearing timestamp and branch values. Also corrected the oversized-response regression test placement so it is inside the unittest class and discoverable.
+- Source commit: `a8c6a288e9404b91086e18f91907e5881b515dfd`; tests commit: `781a5fcd9d0995d2bb3972c8add6eab468d1959f`.
+- CI for the new head is pending; no pass claim is made until all workflows complete.
