@@ -238,6 +238,32 @@ def test_binance_parser_rejects_boolean_or_noninteger_timestamps(field_index, in
 
 
 @pytest.mark.parametrize(
+    "field_index, invalid_value",
+    [
+        (1, "nan"),
+        (2, "inf"),
+        (3, "-inf"),
+        (4, "not-a-price"),
+        (5, "-1"),
+        (2, "99"),  # high below open/close
+        (3, "103"), # low above open/close
+    ],
+)
+def test_binance_parser_discards_invalid_numeric_candle_without_losing_valid_rows(
+    field_index, invalid_value, monkeypatch
+):
+    valid = [1_700_000_000_000, "100", "102", "98", "101", "12.5", 1_700_003_599_999]
+    invalid = [1_700_003_600_000, "100", "102", "98", "101", "12.5", 1_700_007_199_999]
+    invalid[field_index] = invalid_value
+    monkeypatch.setattr(api, "_request_json", lambda _url: [valid, invalid])
+
+    rows = api._fetch_binance("BTCUSDT", "1h", 5)
+
+    assert len(rows) == 1
+    assert rows[0]["open_time"] == valid[0]
+
+
+@pytest.mark.parametrize(
     "field, conflicting_value",
     [
         ("close", 101.0),
