@@ -213,6 +213,28 @@ def test_clean_candles_fails_when_provider_returns_only_invalid_rows():
         api._clean_candles([invalid], "Test provider")
 
 
+def test_kraken_parser_discards_materially_future_candle(monkeypatch):
+    now_seconds = int(datetime.now(timezone.utc).timestamp())
+    valid_open = now_seconds - (now_seconds % 3600) - 7200
+    future_open = now_seconds + 7200
+    payload = {
+        "error": [],
+        "result": {
+            "XXBTZUSD": [
+                [valid_open, "100", "102", "98", "101", "100", "4", 10],
+                [future_open, "101", "103", "100", "102", "101", "2", 4],
+            ],
+            "last": future_open,
+        },
+    }
+    monkeypatch.setattr(api, "_request_json", lambda _url: payload)
+
+    rows = api._fetch_kraken("BTCUSD", "1h", 5)
+
+    assert len(rows) == 1
+    assert rows[0]["open_time"] == valid_open * 1000
+
+
 @pytest.mark.parametrize(
     "field_index, invalid_value",
     [
