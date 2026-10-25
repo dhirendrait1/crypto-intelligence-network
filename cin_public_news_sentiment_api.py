@@ -90,7 +90,11 @@ def _is_http_url(value: Any) -> bool:
 
 def _normalize_provider_timestamp(value: Any, now: datetime | None = None) -> tuple[str | None, str]:
     """Validate GDELT's seen time; it is not necessarily the article's publication time."""
-    if not isinstance(value, str) or not value.strip():
+    if value is None:
+        return None, "missing"
+    if not isinstance(value, str):
+        return None, "invalid"
+    if not value.strip():
         return None, "missing"
     raw = value.strip()
     try:
@@ -160,8 +164,17 @@ def _parse_articles(payload: Any, max_records: int) -> list[dict[str, Any]]:
         if identity in seen:
             continue
         seen.add(identity)
-        provider_timestamp = row.get("seendate")
-        normalized_timestamp, timestamp_status = _normalize_provider_timestamp(provider_timestamp)
+        raw_provider_timestamp = row.get("seendate")
+        normalized_timestamp, timestamp_status = _normalize_provider_timestamp(raw_provider_timestamp)
+        # Preserve short raw strings for auditability, but never echo arbitrary
+        # nested provider values or unbounded timestamp strings into the API response.
+        provider_timestamp = (
+            raw_provider_timestamp
+            if isinstance(raw_provider_timestamp, str)
+            and len(raw_provider_timestamp) <= 64
+            and not any(ord(char) < 32 or ord(char) == 127 for char in raw_provider_timestamp)
+            else None
+        )
         articles.append({
             "title": title.strip(),
             "url": url,
