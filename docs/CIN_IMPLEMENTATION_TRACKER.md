@@ -756,3 +756,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - These values must not be coerced into valid-looking numeric data; when no valid rows remain, parsing must fail closed.
 - Test commit: `700120fccc8c16f351d3da8ec651fbe42944b82a`.
 - CI verification pending on the latest tracker commit.
+
+
+## Binance numeric candle validation and valid-row preservation (2026-10-25)
+
+- Added cases for NaN/infinite price strings, nonnumeric prices, negative volume, and impossible OHLC relationships.
+- Each malformed row is discarded while a separate valid candle in the same provider response is preserved.
+- Test commit: `5e65b82b544ce5472b60a91cdac5f00e796a0579`.
+- CI verification pending on the latest tracker commit.
