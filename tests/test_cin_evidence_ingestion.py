@@ -206,10 +206,6 @@ class EvidenceIngestionTests(unittest.TestCase):
             fetch_github_repository_evidence()
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
     @patch("cin_evidence_ingestion.urlopen")
     def test_oversized_provider_response_is_rejected_before_json_parse(self, mocked):
         class OversizedResponse(FakeResponse):
@@ -222,3 +218,43 @@ if __name__ == "__main__":
         with self.assertRaisesRegex(EvidenceSourceError, "exceeded the configured size limit"):
             fetch_github_repository_evidence()
         self.assertEqual(response.requested_limit, 1_000_001)
+
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_provider_timestamp_strings_are_bounded_and_control_free(self, mocked):
+        base = {
+            "full_name": "ethereum/go-ethereum",
+            "default_branch": "main",
+            "pushed_at": "2026-10-23T10:00:00Z",
+            "updated_at": "2026-10-23T10:00:00Z",
+            "stargazers_count": 50,
+            "forks_count": 20,
+            "open_issues_count": 1,
+            "archived": False,
+        }
+        for bad_timestamp in ("x" * 65, "2026-10-23T10:00:00Z\\n"):
+            with self.subTest(timestamp_length=len(bad_timestamp)):
+                payload = dict(base, pushed_at=bad_timestamp)
+                mocked.return_value = FakeResponse(payload)
+                with self.assertRaisesRegex(EvidenceSourceError, "pushed_at"):
+                    fetch_github_repository_evidence()
+
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_default_branch_metadata_is_bounded_and_control_free(self, mocked):
+        base = {
+            "full_name": "ethereum/go-ethereum",
+            "default_branch": "main",
+            "pushed_at": "2026-10-23T10:00:00Z",
+            "updated_at": "2026-10-23T10:00:00Z",
+            "stargazers_count": 50,
+            "forks_count": 20,
+            "open_issues_count": 1,
+            "archived": False,
+        }
+        for bad_branch in ("x" * 256, "main\\tbranch"):
+            with self.subTest(branch_length=len(bad_branch)):
+                mocked.return_value = FakeResponse(dict(base, default_branch=bad_branch))
+                with self.assertRaisesRegex(EvidenceSourceError, "default_branch"):
+                    fetch_github_repository_evidence()
+
+if __name__ == "__main__":
+    unittest.main()
