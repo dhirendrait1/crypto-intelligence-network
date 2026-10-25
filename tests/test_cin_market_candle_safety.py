@@ -449,6 +449,38 @@ def test_kraken_fallback_rejects_unsupported_interval_without_network(monkeypatc
         api._fetch_kraken("BTCUSDT", "2h", 10)
 
 
+@pytest.mark.parametrize(
+    "symbol, interval, limit, expected",
+    [
+        ("btcusdt", "1h", 100, "BTCUSDT"),
+        ("BTCUSD", "1M", 5, "BTCUSD"),
+        ("ETHUSDT", "1m", 500, "ETHUSDT"),
+    ],
+)
+def test_request_validation_accepts_supported_boundaries_and_normalizes_symbol(
+    symbol, interval, limit, expected
+):
+    assert api._validate(symbol, interval, limit) == expected
+
+
+@pytest.mark.parametrize(
+    "symbol, interval, limit",
+    [
+        (" BTCUSDT", "1h", 100),
+        ("BTCUSDT ", "1h", 100),
+        ("BTC-USDT", "1h", 100),
+        ("", "1h", 100),
+        ("BTCUSDT", "2w", 100),
+        ("BTCUSDT", "1h", 4),
+        ("BTCUSDT", "1h", 501),
+    ],
+)
+def test_request_validation_rejects_malformed_symbol_interval_or_limit(symbol, interval, limit):
+    with pytest.raises(api.HTTPException) as caught:
+        api._validate(symbol, interval, limit)
+    assert caught.value.status_code == 400
+
+
 def test_candle_routes_document_strict_symbol_format():
     from fastapi import FastAPI
 
