@@ -214,6 +214,30 @@ def test_clean_candles_fails_when_provider_returns_only_invalid_rows():
 
 
 @pytest.mark.parametrize(
+    "field_index, invalid_value",
+    [
+        (0, True),
+        (0, 1_700_000_000_000.5),
+        (1, True),
+        (2, False),
+        (3, True),
+        (4, False),
+        (5, True),
+        (6, True),
+    ],
+)
+def test_binance_parser_rejects_boolean_or_noninteger_timestamps(field_index, invalid_value, monkeypatch):
+    # Binance timestamps are integer milliseconds; booleans must never be
+    # coerced to integers or plausible numeric OHLCV values.
+    row = [1_700_000_000_000, "100", "102", "98", "101", "12.5", 1_700_000_003_999]
+    row[field_index] = invalid_value
+    monkeypatch.setattr(api, "_request_json", lambda _url: [row])
+
+    with pytest.raises(ValueError, match="returned no valid candles"):
+        api._fetch_binance("BTCUSDT", "1h", 5)
+
+
+@pytest.mark.parametrize(
     "field, conflicting_value",
     [
         ("close", 101.0),
