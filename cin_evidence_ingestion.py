@@ -21,6 +21,7 @@ GITHUB_API_ROOT = "https://api.github.com/repos/"
 TIMEOUT_SECONDS = 8
 FRESHNESS_MAX_AGE = timedelta(days=7)
 FUTURE_TIMESTAMP_TOLERANCE = timedelta(minutes=5)
+_MAX_PROVIDER_RESPONSE_BYTES = 1_000_000
 
 
 class EvidenceSourceError(RuntimeError):
@@ -56,7 +57,10 @@ def fetch_github_repository_evidence(
         with urlopen(request, timeout=timeout) as response:
             if response.status != 200:
                 raise EvidenceSourceError(f"GitHub returned HTTP {response.status}")
-            payload = json.loads(response.read(1_000_000).decode("utf-8"))
+            raw = response.read(_MAX_PROVIDER_RESPONSE_BYTES + 1)
+            if len(raw) > _MAX_PROVIDER_RESPONSE_BYTES:
+                raise EvidenceSourceError("GitHub metadata response exceeded the configured size limit")
+            payload = json.loads(raw.decode("utf-8"))
     except HTTPError as exc:
         raise EvidenceSourceError(f"GitHub returned HTTP {exc.code}") from exc
     except (URLError, TimeoutError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
