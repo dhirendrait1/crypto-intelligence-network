@@ -866,3 +866,12 @@ This checkpoint validates configured offline automation only. It does not establ
 - Added offline tests for excessive history rows and depth levels.
 - Source commit: `e8dd13b44910bf7dd4aabe8467b2ba161420cb97`; tests commit: `3315294ac6273165d9bb99eb3aa753b8836863e2`.
 - CI pending on latest head. No order execution, account access, or deployment was performed.
+
+
+## Derivatives history integrity follow-up (2026-10-25)
+
+- Verification: all four CI workflows passed on collection-bounds tracker head `4dd04eed18aa219c1ade1e0b5684f29d8deb7a9e`.
+- Follow-up finding: duplicate timestamps in the provider's open-interest history could be treated as two separate observations and yield a misleading zero or invalid change calculation.
+- Added duplicate timestamp rejection and an offline regression test using conflicting values at the same timestamp.
+- Source commit: `86098293beb23811ca5fdc734b603f8c51e99998`; test commit: `959ee4ade6c56c09a70733f45723219baba1439f`.
+- CI for this follow-up is pending. Read-only scope remains unchanged.
