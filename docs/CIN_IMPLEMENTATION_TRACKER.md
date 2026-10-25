@@ -702,3 +702,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Confirms both statuses map to the documented retryable HTTP 503 response and provider-specific error text is not leaked.
 - Test commit: `73c1a50c76416e9d3697bcdd061ebb4edbe0132e`.
 - CI verification pending on the latest tracker commit.
+
+
+## Non-rate-limit provider HTTP error contract regression (2026-10-25)
+
+- Added offline regression cases for Binance HTTP 400, 500, and 502 responses.
+- Confirms these failures return controlled HTTP 502 responses, do not invoke Kraken fallback (reserved for Binance HTTP 451), and do not leak provider response-body details.
+- Test commit: `4e3a2deed38b2c707711f9d5a7d4a92baaba66d3`.
+- CI verification pending on the latest tracker commit.
