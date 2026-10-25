@@ -764,3 +764,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Each malformed row is discarded while a separate valid candle in the same provider response is preserved.
 - Test commit: `5e65b82b544ce5472b60a91cdac5f00e796a0579`.
 - CI verification pending on the latest tracker commit.
+
+
+## Kraken numeric candle validation and valid-row preservation (2026-10-25)
+
+- Added regression cases for boolean and fractional timestamps, boolean OHLC values, and boolean volume.
+- The parser must discard malformed rows while preserving valid candles from the same response.
+- Test commit: `5f1f822775b65899be6132a7132c8ef5dd921f9d`.
+- CI verification pending on the latest tracker commit.
