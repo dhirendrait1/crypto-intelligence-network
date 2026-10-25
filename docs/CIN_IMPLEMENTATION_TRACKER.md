@@ -790,3 +790,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Regression test commit: `6c2a1b1ca4410d20a04ffcf81e7d66cefd495feb`.
 - Weekly fixture correction: `a224b6901667b1597deb696c746c9c867bfd2ee5`.
 - All four CI workflows passed on `a224b69`.
+
+
+## Kraken weekly-boundary negative regression (2026-10-25)
+
+- Added an offline regression that gives Kraken one correctly aligned Monday-UTC weekly candle and one Tuesday-open candle.
+- Confirms the fallback discards the non-Monday row while preserving the valid weekly candle; production code is unchanged in this test-only increment.
+- Test commit: `cba964107dcd2a78432d0d165e5c5a4fa614b55c`.
+- CI verification for this test and the latest tracker update must pass before this increment is marked verified.
