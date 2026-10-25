@@ -343,6 +343,39 @@ def test_kraken_fallback_rejects_returned_pair_or_quote_mismatch(returned_pair, 
         api._fetch_kraken("BTCUSD", "1h", 5)
 
 
+@pytest.mark.parametrize(
+    "field_index, invalid_value",
+    [
+        (0, True),
+        (0, 1_700_000_000.5),
+        (1, True),
+        (2, False),
+        (3, True),
+        (4, False),
+        (6, True),
+    ],
+)
+def test_kraken_parser_discards_boolean_or_fractional_market_fields(
+    field_index, invalid_value, monkeypatch
+):
+    # Kraken timestamps are integral epoch seconds; OHLC and volume must not
+    # accept booleans through Python's bool-is-an-int relationship.
+    now_seconds = int(datetime.now(timezone.utc).timestamp()) - 7200
+    valid = [now_seconds, "100", "102", "98", "101", "100", "4", 10]
+    invalid = [now_seconds + 3600, "100", "102", "98", "101", "100", "4", 10]
+    invalid[field_index] = invalid_value
+    payload = {
+        "error": [],
+        "result": {"XXBTZUSD": [valid, invalid], "last": now_seconds + 3600},
+    }
+    monkeypatch.setattr(api, "_request_json", lambda _url: payload)
+
+    rows = api._fetch_kraken("BTCUSD", "1h", 5)
+
+    assert len(rows) == 1
+    assert rows[0]["open_time"] == now_seconds * 1000
+
+
 def test_kraken_fallback_rejects_unsupported_interval_without_network(monkeypatch):
     def unexpected_request(_url):
         raise AssertionError("unsupported interval must be rejected before network access")
