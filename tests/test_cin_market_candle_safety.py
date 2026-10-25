@@ -110,6 +110,31 @@ def test_provider_transport_failures_return_sanitized_503(monkeypatch, transport
 
 
 @pytest.mark.parametrize("status_code", [418, 429])
+@pytest.mark.parametrize("status_code", [400, 500, 502])
+def test_non_rate_limit_provider_http_errors_return_sanitized_502(monkeypatch, status_code):
+    def fail(*_args, **_kwargs):
+        raise api.urllib.error.HTTPError(
+            api.BINANCE_KLINES_URL,
+            status_code,
+            "sensitive-provider-response-body",
+            {},
+            None,
+        )
+
+    def unexpected_fallback(*_args, **_kwargs):
+        raise AssertionError("Kraken fallback must only run after Binance HTTP 451")
+
+    monkeypatch.setattr(api, "_fetch_binance", fail)
+    monkeypatch.setattr(api, "_fetch_kraken", unexpected_fallback)
+
+    with pytest.raises(api.HTTPException) as caught:
+        asyncio.run(api._load("BTCUSDT", "1h", 10))
+
+    assert caught.value.status_code == 502
+    assert caught.value.detail == f"Binance public market-data provider returned HTTP {status_code}."
+    assert "sensitive-provider" not in caught.value.detail
+
+
 def test_provider_rate_limit_http_errors_return_retryable_503(monkeypatch, status_code):
     def fail(*_args, **_kwargs):
         raise api.urllib.error.HTTPError(
