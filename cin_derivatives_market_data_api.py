@@ -93,6 +93,7 @@ def _validate_payloads(open_interest: Any, premium: Any, history: Any, symbol: s
         or any(not isinstance(row, dict) for row in history)
     ):
         raise ValueError("Unexpected open-interest history provider payload")
+    seen_history_timestamps: set[float] = set()
     for row in history:
         if row.get("symbol") != symbol:
             raise ValueError("Open-interest history symbol did not match the requested symbol")
@@ -102,6 +103,9 @@ def _validate_payloads(open_interest: Any, premium: Any, history: Any, symbol: s
             raise ValueError("Open-interest history contained an invalid notional value")
         if history_timestamp is None or history_timestamp < 0 or _iso_from_ms(history_timestamp) is None:
             raise ValueError("Open-interest history contained an invalid timestamp")
+        if history_timestamp in seen_history_timestamps:
+            raise ValueError("Open-interest history contained duplicate timestamps")
+        seen_history_timestamps.add(history_timestamp)
 
 
 def _snapshot(symbol: str) -> dict[str, Any]:
