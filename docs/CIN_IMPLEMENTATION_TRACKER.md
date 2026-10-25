@@ -823,3 +823,12 @@ This checkpoint validates configured offline automation only. It does not establ
 - The verified code includes a sanitized fallback boundary for unexpected CoinGecko provider/parser errors and offline regression coverage for unexpected `AttributeError` and `RuntimeError` cases.
 - The tracker/roadmap update itself creates a newer commit; CI must be checked again on that final head before the documentation increment is considered verified.
 - Live CoinGecko behavior, production health, and Render deployment remain unverified. PR #8 stays Draft/unmerged; no deployment changes were made.
+
+
+## Public-news provider timestamp bounds (2026-10-25)
+
+- Audit finding: GDELT `seendate` was echoed into both the current and compatibility timestamp fields without checking its JSON type or length. A malformed object/array or oversized string could therefore inflate the API response and violate the timestamp-field contract despite normalization reporting it invalid.
+- Updated parsing so missing timestamps remain `missing`, non-string values are `invalid`, and only bounded (at most 64 characters), control-character-free raw strings are preserved for auditability. Oversized or malformed-type values are not echoed to clients.
+- Added offline regression coverage for object-valued and oversized timestamps and the unchanged missing-value behavior.
+- Source commit: `41a1fe45ee5341ccc9ef71c17ce142aa872044cd`; test commit: `2537cbbac45e8fcf0b1088798558565a663f8285`.
+- CI verification pending on the latest branch head. Live GDELT and deployment behavior remain unverified.
