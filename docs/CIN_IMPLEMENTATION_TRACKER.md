@@ -850,3 +850,10 @@ This checkpoint validates configured offline automation only. It does not establ
 - Added regression cases for oversized and control-character-bearing timestamp and branch values. Also corrected the oversized-response regression test placement so it is inside the unittest class and discoverable.
 - Source commit: `a8c6a288e9404b91086e18f91907e5881b515dfd`; tests commit: `781a5fcd9d0995d2bb3972c8add6eab468d1959f`.
 - CI for the new head is pending; no pass claim is made until all workflows complete.
+
+
+### Evidence metadata regression-test correction (2026-10-25)
+
+- The first CI attempt correctly exposed a test-fixture mistake: the intended tab/newline controls were represented as literal backslash sequences, so the branch-name control-character assertion did not exercise a control character.
+- Corrected the Python test literals to produce actual control characters at runtime. This is a test-only correction; the production validator already rejects ASCII control characters.
+- Corrected test commit: `b7c71261b0b1f1f06042c3e488d35c11e3165200`. CI is being rerun on the updated head.
