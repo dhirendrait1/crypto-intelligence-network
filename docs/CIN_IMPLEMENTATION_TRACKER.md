@@ -815,3 +815,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Test commit: 40d673f71aa85b6c178534cfc8ef2be04424d7c3.
 - CI verification is pending on the latest branch head. These are mocked/offline tests; live CoinGecko behavior and deployed service health remain unverified.
 
+
+
+## Latest-head CI verification — CoinGecko failure containment (2026-10-25)
+
+- All four configured workflows passed on head `540c886ef6b7dd2b07c4ff27cf8500070b4d58b7` before this tracker update: CIN Automated Tests (`40146915579`), CIN screening checks (`40146915587`), CIN Technical Analysis Tests (`40146915637`), and CIN evidence ingestion API checks (`40146915576`).
+- The verified code includes a sanitized fallback boundary for unexpected CoinGecko provider/parser errors and offline regression coverage for unexpected `AttributeError` and `RuntimeError` cases.
+- The tracker/roadmap update itself creates a newer commit; CI must be checked again on that final head before the documentation increment is considered verified.
+- Live CoinGecko behavior, production health, and Render deployment remain unverified. PR #8 stays Draft/unmerged; no deployment changes were made.
