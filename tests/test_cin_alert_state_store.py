@@ -102,8 +102,19 @@ def test_invalid_event_is_not_persisted(tmp_path):
     path = tmp_path / "alerts.sqlite3"
     with pytest.raises(ValueError, match="finite number"):
         evaluate_and_record(path, RULE, {**OBS, "value": float("nan")}, now=NOW)
-    with sqlite3.connect(path) as db:
-        assert db.execute("SELECT COUNT(*) FROM alert_evaluation_events").fetchone()[0] == 0
+    if path.exists():
+        with sqlite3.connect(path) as db:
+            tables = {
+                row[0] for row in db.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            }
+            # Validation may reject the payload before initializing the schema.
+            # If the schema exists, no evaluation or delivery row may have been written.
+            if "alert_evaluation_events" in tables:
+                assert db.execute("SELECT COUNT(*) FROM alert_evaluation_events").fetchone()[0] == 0
+            if "alert_delivery_outbox" in tables:
+                assert db.execute("SELECT COUNT(*) FROM alert_delivery_outbox").fetchone()[0] == 0
 
 
 def test_concurrent_duplicate_event_triggers_once(tmp_path):
