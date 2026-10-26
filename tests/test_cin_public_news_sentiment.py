@@ -427,3 +427,52 @@ def test_rss_fallback_does_not_request_google_news_when_publisher_feed_matches(m
     assert source.startswith("Test publisher RSS")
     assert len(requested) == 1
     assert "news.google.com" not in requested[0]
+
+
+
+def test_rss_falls_back_to_google_news_when_publisher_feed_has_no_relevant_headline(monkeypatch):
+    from urllib.parse import parse_qs, urlsplit
+
+    publisher_xml = b"""<?xml version="1.0" encoding="UTF-8"?>
+    <rss><channel><item>
+      <title>Weather forecast for tomorrow</title>
+      <link>https://example.test/weather</link>
+      <description>Local weather update</description>
+    </item></channel></rss>"""
+    google_xml = b"""<?xml version="1.0" encoding="UTF-8"?>
+    <rss><channel><item>
+      <title>Binance announces a platform update</title>
+      <link>https://news.google.com/rss/articles/example</link>
+      <description>Binance update for users</description>
+    </item></channel></rss>"""
+
+    class Response:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self, _limit):
+            return self.payload
+
+    requested = []
+    payloads = [publisher_xml, google_xml]
+
+    def fake_urlopen(request, **_kwargs):
+        requested.append(request.full_url)
+        return Response(payloads.pop(0))
+
+    monkeypatch.setattr(api, "_RSS_FEEDS", (("Test publisher RSS", "https://example.test/rss"),))
+    monkeypatch.setattr(api.urllib.request, "urlopen", fake_urlopen)
+
+    rows, source = api._get_rss_articles("Binance", 10)
+
+    assert len(rows) == 1
+    assert "Binance" in rows[0]["title"]
+    assert "Google News public RSS search" in source
+    assert len(requested) == 2
+    assert parse_qs(urlsplit(requested[1]).query)["q"] == ["Binance"]
