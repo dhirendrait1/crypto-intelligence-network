@@ -23,6 +23,20 @@ CREATE TABLE IF NOT EXISTS alert_evaluation_events (
     result_json TEXT NOT NULL,
     PRIMARY KEY (rule_id, observation_id)
 );
+CREATE TABLE IF NOT EXISTS alert_notification_outbox (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    idempotency_key TEXT NOT NULL UNIQUE,
+    payload_json TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'sending', 'sent', 'failed')),
+    attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    next_attempt_at TEXT NOT NULL,
+    sent_at TEXT,
+    last_error TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_alert_outbox_due
+ON alert_notification_outbox(status, next_attempt_at, id);
 """
 
 
@@ -43,11 +57,14 @@ def evaluate_and_record(
     observation: Mapping[str, Any],
     *,
     now: datetime | str,
+    notification_payload: Mapping[str, Any] | None = None,
+    notification_channel: str = "default",
 ) -> dict[str, Any]:
-    """Atomically evaluate and record a unique rule/observation pair.
+    """Atomically evaluate, persist decision state, and optionally queue delivery.
 
-    The caller invokes this function when an observation is available. This
-    function does not poll sources, schedule work, or deliver notifications.
+    If notification_payload is provided and the rule triggers, the evaluation,
+    cooldown state, audit event, and outbox row commit in one SQLite transaction.
+    The caller still owns scheduling and the external delivery adapter.
     """
     if not isinstance(rule, Mapping) or not isinstance(observation, Mapping):
         raise ValueError("rule and observation must be mappings")
@@ -56,6 +73,17 @@ def evaluate_and_record(
         raise ValueError("rule.id must be a non-empty string")
     if not isinstance(observation_id, str) or not observation_id.strip():
         raise ValueError("observation.id must be a non-empty string")
+    if notification_payload is not None:
+        if not isinstance(notification_payload, Mapping):
+            raise ValueError("notification_payload must be a mapping")
+        if not isinstance(notification_channel, str) or not notification_channel.strip() or len(notification_channel) > 80:
+            raise ValueError("notification_channel must be a non-empty string of at most 80 characters")
+        try:
+            notification_json = json.dumps(dict(notification_payload), sort_keys=True, separators=(",", ":"), allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("notification_payload must be JSON-serializable and contain no non-finite numbers") from exc
+    else:
+        notification_json = None
     evaluated_at = _utc_iso(now)
     path = str(database_path)
     if path != ":memory:":
@@ -94,6 +122,20 @@ def evaluate_and_record(
                        ON CONFLICT(rule_id) DO UPDATE SET last_triggered_at = excluded.last_triggered_at""",
                     (rule_id, evaluated_at),
                 )
+                if notification_json is not None:
+                    idempotency_key = f"{rule_id}:{observation_id}:{notification_channel}"
+                    connection.execute(
+                        """INSERT INTO alert_notification_outbox
+                           (idempotency_key, payload_json, status, attempts, created_at, updated_at, next_attempt_at)
+                           VALUES (?, ?, 'pending', 0, ?, ?, ?)
+                           ON CONFLICT(idempotency_key) DO NOTHING""",
+                        (idempotency_key, notification_json, evaluated_at, evaluated_at, evaluated_at),
+                    )
+                    outbox_row = connection.execute(
+                        "SELECT id FROM alert_notification_outbox WHERE idempotency_key = ?",
+                        (idempotency_key,),
+                    ).fetchone()
+                    result = {**result, "notification_enqueued": True, "notification_outbox_id": outbox_row[0]}
             connection.execute(
                 """INSERT INTO alert_evaluation_events
                    (rule_id, observation_id, evaluated_at, status, result_json)
