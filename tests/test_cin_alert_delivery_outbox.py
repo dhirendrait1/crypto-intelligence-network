@@ -79,3 +79,29 @@ def test_invalid_time_and_retry_limits_are_rejected(tmp_path):
         enqueue_alert_delivery(path, rule_id="r1", observation_id="e1", payload={}, now="2026-10-27T12:00:00")
     with pytest.raises(ValueError, match="limit"):
         claim_due_alerts(path, now=NOW, limit=True)
+
+
+def test_abandoned_worker_lease_is_reclaimed(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    item = enqueue_alert_delivery(path, rule_id="r1", observation_id="stuck", payload={"v": 1}, now=NOW)
+    first = claim_due_alerts(path, now=NOW)[0]
+    assert first["attempts"] == 1
+    assert claim_due_alerts(path, now=NOW + timedelta(seconds=299)) == []
+    recovered = claim_due_alerts(path, now=NOW + timedelta(seconds=300))
+    assert len(recovered) == 1
+    assert recovered[0]["idempotency_key"] == item["idempotency_key"]
+    assert recovered[0]["attempts"] == 2
+
+
+def test_expired_lease_at_attempt_limit_moves_to_dead_letter(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    enqueue_alert_delivery(path, rule_id="r1", observation_id="stuck", payload={}, now=NOW)
+    claim_due_alerts(path, now=NOW, max_attempts=1)
+    assert claim_due_alerts(path, now=NOW + timedelta(seconds=300), max_attempts=1) == []
+    with __import__("sqlite3").connect(path) as db:
+        assert db.execute("SELECT status FROM alert_delivery_outbox").fetchone()[0] == "dead"
+
+
+def test_in_memory_path_rejected(tmp_path):
+    with pytest.raises(ValueError, match="persistent SQLite file path"):
+        enqueue_alert_delivery(":memory:", rule_id="r1", observation_id="e1", payload={}, now=NOW)
