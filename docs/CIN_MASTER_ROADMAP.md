@@ -59,9 +59,9 @@
 
 ## Stage 5 — Alerts, monitoring, and forecast evaluation
 
-24. **[Pending]** Define user-configurable alert rules and threshold semantics.
-25. **[Pending]** Implement deduplication, cooldowns, delivery-state tracking, and retry/error handling.
-26. **[Pending]** Add an authorized alert delivery channel and keep credentials out of source control.
+24. **[Partial]** Threshold semantics (`above` / `below`) and a deterministic evaluator are implemented with offline tests; user-configurable rule CRUD, ownership, and API integration remain pending.
+25. **[Partial]** SQLite event deduplication, per-rule cooldown state, and a transport-neutral outbox with claims, bounded retry backoff, and terminal dead-letter state are implemented offline; abandoned-worker recovery and integrated delivery transaction remain pending.
+26. **[Pending]** Add an authorized alert delivery adapter/channel and keep credentials out of source control; no provider is connected and no notifications are sent yet.
 27. **[Pending]** Persist forecast timestamp, asset, price source, horizon, and target/invalidating conditions.
 28. **[Pending]** Evaluate forecast outcomes and calibration with reproducible metrics and survivorship/look-ahead safeguards.
 29. **[Partial]** Define monitoring health, freshness, provider outage, and stale-data warning states across services.
@@ -141,3 +141,10 @@ All four configured workflows passed on code/documentation checkpoint `2c1f816d5
 - The head includes CoinGecko unexpected provider/parser failure containment and offline API regression tests.
 - This verification is for the exact listed head only. It does not establish live-provider correctness or Render health. Any subsequent commit requires a fresh latest-head CI check.
 - PR #8 remains Draft and unmerged. No Render configuration or deployment was changed.
+
+
+## Alert milestone refresh (2026-10-27)
+
+- PR #16 contains the alert evaluator, SQLite state store, durable outbox, retry state machine, and offline regression tests. Latest checked PR head `498b77bfba506bfab829942cc7a39865c31e156f` passed all four configured workflows.
+- PR #15 was closed as a duplicate of PR #16. PR #16 remains open/unmerged; no deployment has been initiated.
+- This advances steps 24 and 25 to **Partial**, not complete. Steps 26 (authorized delivery), 27–28 (forecast outcome tracking/calibration), and release gate 35 remain unfinished. No live provider, notification, or Render checks are inferred from offline CI.
