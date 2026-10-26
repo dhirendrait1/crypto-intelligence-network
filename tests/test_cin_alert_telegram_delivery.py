@@ -1,5 +1,7 @@
 import json
 import os
+import tempfile
+from pathlib import Path
 import urllib.error
 import unittest
 from datetime import datetime, timezone
@@ -100,7 +102,8 @@ class TelegramDeliveryTests(unittest.TestCase):
         mocked.assert_not_called()
 
     @patch("cin_alert_telegram_delivery.urllib.request.urlopen")
-    def test_worker_marks_successful_delivery_sent(self, mocked, tmp_path):
+    def test_worker_marks_successful_delivery_sent(self, mocked):
+        tmp_path = Path(tempfile.mkdtemp())
         mocked.return_value = FakeResponse({"ok": True, "result": {"message_id": 5}})
         path = tmp_path / "alerts.sqlite3"
         enqueue_alert_delivery(
@@ -112,7 +115,8 @@ class TelegramDeliveryTests(unittest.TestCase):
         self.assertEqual(result["results"][0]["status"], "sent")
 
     @patch("cin_alert_telegram_delivery.urllib.request.urlopen", side_effect=urllib.error.URLError("offline"))
-    def test_worker_schedules_retry_without_leaking_provider_detail(self, mocked, tmp_path):
+    def test_worker_schedules_retry_without_leaking_provider_detail(self, mocked):
+        tmp_path = Path(tempfile.mkdtemp())
         path = tmp_path / "alerts.sqlite3"
         enqueue_alert_delivery(
             path, rule_id="r1", observation_id="e1",
@@ -123,7 +127,8 @@ class TelegramDeliveryTests(unittest.TestCase):
         self.assertEqual(result["results"][0]["error_code"], "telegram_network_error")
 
     @patch.dict(os.environ, {"CIN_TELEGRAM_BOT_TOKEN": "", "CIN_TELEGRAM_CHAT_ID": ""})
-    def test_worker_does_not_claim_items_without_configuration(self, tmp_path):
+    def test_worker_does_not_claim_items_without_configuration(self):
+        tmp_path = Path(tempfile.mkdtemp())
         path = tmp_path / "alerts.sqlite3"
         enqueue_alert_delivery(
             path, rule_id="r1", observation_id="e1",
