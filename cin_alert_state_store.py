@@ -23,20 +23,20 @@ CREATE TABLE IF NOT EXISTS alert_evaluation_events (
     result_json TEXT NOT NULL,
     PRIMARY KEY (rule_id, observation_id)
 );
-CREATE TABLE IF NOT EXISTS alert_notification_outbox (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    idempotency_key TEXT NOT NULL UNIQUE,
+CREATE TABLE IF NOT EXISTS alert_delivery_outbox (
+    idempotency_key TEXT PRIMARY KEY,
+    rule_id TEXT NOT NULL,
+    observation_id TEXT NOT NULL,
     payload_json TEXT NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('pending', 'sending', 'sent', 'failed')),
+    status TEXT NOT NULL CHECK(status IN ('pending','sending','sent','failed','dead')),
     attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    next_attempt_at TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    next_attempt_at TEXT NOT NULL,
-    sent_at TEXT,
-    last_error TEXT
+    last_error_code TEXT
 );
-CREATE INDEX IF NOT EXISTS idx_alert_outbox_due
-ON alert_notification_outbox(status, next_attempt_at, id);
+CREATE INDEX IF NOT EXISTS idx_alert_delivery_outbox_due
+ON alert_delivery_outbox(status, next_attempt_at);
 """
 
 
@@ -123,19 +123,21 @@ def evaluate_and_record(
                     (rule_id, evaluated_at),
                 )
                 if notification_json is not None:
-                    idempotency_key = f"{rule_id}:{observation_id}:{notification_channel}"
+                    idempotency_key = f"{rule_id}:{observation_id}"
                     connection.execute(
-                        """INSERT INTO alert_notification_outbox
-                           (idempotency_key, payload_json, status, attempts, created_at, updated_at, next_attempt_at)
-                           VALUES (?, ?, 'pending', 0, ?, ?, ?)
+                        """INSERT INTO alert_delivery_outbox
+                           (idempotency_key, rule_id, observation_id, payload_json, status, attempts,
+                            next_attempt_at, created_at, updated_at, last_error_code)
+                           VALUES (?, ?, ?, ?, 'pending', 0, ?, ?, ?, NULL)
                            ON CONFLICT(idempotency_key) DO NOTHING""",
-                        (idempotency_key, notification_json, evaluated_at, evaluated_at, evaluated_at),
+                        (idempotency_key, rule_id, observation_id, notification_json,
+                         evaluated_at, evaluated_at, evaluated_at),
                     )
-                    outbox_row = connection.execute(
-                        "SELECT id FROM alert_notification_outbox WHERE idempotency_key = ?",
-                        (idempotency_key,),
-                    ).fetchone()
-                    result = {**result, "notification_enqueued": True, "notification_outbox_id": outbox_row[0]}
+                    result = {
+                        **result,
+                        "notification_enqueued": True,
+                        "notification_idempotency_key": idempotency_key,
+                    }
             connection.execute(
                 """INSERT INTO alert_evaluation_events
                    (rule_id, observation_id, evaluated_at, status, result_json)
