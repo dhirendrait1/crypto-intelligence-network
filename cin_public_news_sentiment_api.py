@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
+from email.utils import parsedate_to_datetime
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlsplit
@@ -14,6 +17,10 @@ from fastapi import APIRouter, HTTPException, Query
 
 router = APIRouter(tags=["public-news-sentiment"])
 _GDELT_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
+_RSS_FEEDS = (
+    ("CoinDesk public RSS", "https://www.coindesk.com/arc/outboundfeeds/rss/"),
+    ("Cointelegraph public RSS", "https://cointelegraph.com/rss"),
+)
 _USER_AGENT = "CIN-Research-API/0.4.0"
 _MAX_PROVIDER_RESPONSE_BYTES = 2_000_000
 _MAX_ARTICLE_TITLE_LENGTH = 1_000
@@ -48,6 +55,71 @@ def _get_json(query: str, max_records: int) -> Any:
     if len(raw) > _MAX_PROVIDER_RESPONSE_BYTES:
         raise ValueError("GDELT response exceeded the configured size limit")
     return json.loads(raw.decode("utf-8"))
+
+
+
+def _rss_query_terms(query: str) -> set[str]:
+    """Build a small, explicit relevance filter for RSS fallback headlines."""
+    terms = {term.lower() for term in re.findall(r"[a-zA-Z0-9]+", query) if len(term) > 2}
+    if terms <= {"cryptocurrency", "cryptocurrencies", "crypto", "news"}:
+        return {"crypto", "cryptocurrency", "bitcoin", "ethereum", "blockchain", "token", "defi", "web3", "digital asset"}
+    return terms
+
+
+def _get_rss_articles(query: str, max_records: int) -> tuple[list[dict[str, Any]], str]:
+    """Use public crypto-news RSS feeds only when GDELT cannot be reached."""
+    terms = _rss_query_terms(query)
+    rows: list[dict[str, Any]] = []
+    providers: list[str] = []
+    for provider, url in _RSS_FEEDS:
+        request = urllib.request.Request(
+            url,
+            headers={"accept": "application/rss+xml, application/xml, text/xml", "user-agent": _USER_AGENT},
+            method="GET",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=8) as response:
+                raw = response.read(_MAX_PROVIDER_RESPONSE_BYTES + 1)
+            if len(raw) > _MAX_PROVIDER_RESPONSE_BYTES:
+                raise ValueError("RSS response exceeded the configured size limit")
+            root = ET.fromstring(raw)
+            providers.append(provider)
+            for item in root.iter():
+                if item.tag.rsplit("}", 1)[-1].lower() not in {"item", "entry"}:
+                    continue
+                fields = {}
+                for child in list(item):
+                    fields[child.tag.rsplit("}", 1)[-1].lower()] = (child.text or "").strip()
+                title = fields.get("title", "")
+                link = fields.get("link", "")
+                if not link:
+                    link_element = next((child for child in list(item) if child.tag.rsplit("}", 1)[-1].lower() == "link"), None)
+                    if link_element is not None:
+                        link = link_element.attrib.get("href", "")
+                searchable = f"{title} {fields.get('description', '')} {fields.get('summary', '')}".lower()
+                if title and link and any(term in searchable for term in terms):
+                    date_raw = fields.get("pubdate") or fields.get("published") or fields.get("updated")
+                    seen_at = None
+                    if date_raw:
+                        try:
+                            parsed_date = parsedate_to_datetime(date_raw)
+                            if parsed_date.tzinfo is not None:
+                                seen_at = parsed_date.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+                            else:
+                                seen_at = parsed_date.replace(tzinfo=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+                        except (TypeError, ValueError, OverflowError):
+                            seen_at = None
+                    rows.append({"title": title, "url": link, "seendate": seen_at, "domain": urlsplit(link).hostname})
+                    if len(rows) >= max_records:
+                        break
+            if len(rows) >= max_records:
+                break
+        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ET.ParseError, ValueError):
+            continue
+    if not providers:
+        raise urllib.error.URLError("GDELT and public RSS fallback feeds were unreachable")
+    parsed = _parse_articles({"articles": rows}, max_records)
+    return parsed, " + ".join(providers) + " (public RSS fallback; query-filtered)"
 
 
 def _headline_sentiment(title: str) -> dict[str, Any]:
@@ -196,8 +268,14 @@ def _parse_articles(payload: Any, max_records: int) -> list[dict[str, Any]]:
 
 
 def _search(query: str, max_records: int) -> dict[str, Any]:
-    payload = _get_json(query, max_records)
-    articles = _parse_articles(payload, max_records)
+    try:
+        payload = _get_json(query, max_records)
+        articles = _parse_articles(payload, max_records)
+        source = "GDELT DOC 2.0 public article search"
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError):
+        # GDELT has failed at the network/provider layer; use a bounded,
+        # query-filtered RSS fallback rather than returning a fabricated score.
+        articles, source = _get_rss_articles(query, max_records)
     labels = [row["headline_sentiment"]["label"] for row in articles]
     counts = {label: labels.count(label) for label in ("positive", "neutral", "negative")}
     total = len(labels)
@@ -211,7 +289,7 @@ def _search(query: str, max_records: int) -> dict[str, Any]:
         "service": "cin",
         "endpoint": "/news-sentiment",
         "mode": "read_only",
-        "source": "GDELT DOC 2.0 public article search",
+        "source": source,
         "query": query,
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
         "count": total,
@@ -233,8 +311,9 @@ def _search(query: str, max_records: int) -> dict[str, Any]:
             "provider_timestamp_quality_counts": timestamp_quality_counts,
             "sentiment_aggregate_includes_all_accepted_headlines_regardless_of_timestamp_status": True,
             "limitations": [
-                "Provider timestamp quality counts describe GDELT seen/indexing times, not verified original publication times.",
-                "Public news search coverage and timestamps depend on GDELT indexing.",
+                "Provider timestamp quality counts describe provider indexing/publication metadata, not independently verified original publication times.",
+                "GDELT is primary; public RSS feeds are used only when GDELT fails. RSS fallback applies a headline/summary keyword relevance filter.",
+                "Public news search coverage and timestamps depend on provider indexing and feed metadata.",
                 "Headline sentiment uses a small transparent keyword lexicon and can miss context, negation, sarcasm, and asset-specific meaning.",
                 "This endpoint does not ingest X, Reddit, Telegram, or other social platforms.",
                 "An empty result means no articles were returned for this query, not that news or sentiment is absent globally.",
@@ -257,14 +336,14 @@ async def news_sentiment(
     except urllib.error.HTTPError as exc:
         status = 503 if exc.code == 429 or exc.code >= 500 else 502
         raise HTTPException(status_code=status, detail={
-            "message": "Public news provider returned an HTTP error.",
-            "provider": "GDELT DOC 2.0",
+            "message": "GDELT or public RSS fallback provider returned an HTTP error.",
+            "provider": "GDELT DOC 2.0 and public RSS fallback",
             "error": "http_error",
             "http_status": exc.code,
         }) from exc
     except (urllib.error.URLError, TimeoutError) as exc:
         raise HTTPException(status_code=503, detail={
-            "message": "Public news provider could not be reached.",
+            "message": "GDELT and public RSS fallback providers could not be reached.",
             "provider": "GDELT DOC 2.0",
             "error": "network_error",
         }) from exc
