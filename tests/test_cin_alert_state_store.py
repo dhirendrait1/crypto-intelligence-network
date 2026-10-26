@@ -170,9 +170,20 @@ def test_invalid_notification_payload_fails_before_state_is_changed(tmp_path):
     path = tmp_path / "alerts.sqlite3"
     with pytest.raises(ValueError, match="JSON-serializable"):
         evaluate_and_record(path, RULE, OBS, now=NOW, notification_payload={"bad": float("nan")})
-    with sqlite3.connect(path) as db:
-        assert db.execute("SELECT COUNT(*) FROM alert_evaluation_events").fetchone()[0] == 0
-        assert db.execute("SELECT COUNT(*) FROM alert_rule_state").fetchone()[0] == 0
+    if path.exists():
+        with sqlite3.connect(path) as db:
+            tables = {
+                row[0] for row in db.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            }
+            # Payload validation happens before opening the transaction/schema.
+            if "alert_evaluation_events" in tables:
+                assert db.execute("SELECT COUNT(*) FROM alert_evaluation_events").fetchone()[0] == 0
+            if "alert_rule_state" in tables:
+                assert db.execute("SELECT COUNT(*) FROM alert_rule_state").fetchone()[0] == 0
+            if "alert_delivery_outbox" in tables:
+                assert db.execute("SELECT COUNT(*) FROM alert_delivery_outbox").fetchone()[0] == 0
 
 
 def test_durable_state_rejects_in_memory_database(tmp_path):
