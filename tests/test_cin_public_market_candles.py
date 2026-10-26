@@ -79,7 +79,7 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(HTTPException) as ctx:
                 await api._load("BTCUSDT", "1h", 5)
         self.assertEqual(ctx.exception.status_code, 503)
-        self.assertIn("Kraken fallback", ctx.exception.detail)
+        self.assertIn("fallbacks unavailable", ctx.exception.detail)
 
     async def test_rejects_bad_symbol(self):
         with self.assertRaises(HTTPException) as ctx:
