@@ -354,3 +354,40 @@ def test_rss_query_terms_are_specific_for_asset_queries():
     assert api._rss_query_terms("bitcoin") == {"bitcoin"}
     assert "ethereum" in api._rss_query_terms("cryptocurrency")
     assert "bitcoin" in api._rss_query_terms("cryptocurrency")
+
+
+def test_rss_fallback_queries_google_news_when_publisher_feeds_have_no_results(monkeypatch):
+    from urllib.parse import parse_qs, urlsplit
+
+    requested = []
+    xml = b"""<?xml version="1.0" encoding="UTF-8"?>
+    <rss><channel><item>
+      <title>Binance announces a new platform update</title>
+      <link>https://news.google.com/rss/articles/example</link>
+      <description>Binance shared an update for users.</description>
+      <pubDate>Mon, 26 Oct 2026 18:00:00 GMT</pubDate>
+    </item></channel></rss>"""
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self, _limit):
+            return xml
+
+    monkeypatch.setattr(api, "_RSS_FEEDS", ())
+    monkeypatch.setattr(
+        api.urllib.request,
+        "urlopen",
+        lambda request, **_kwargs: (requested.append(request.full_url) or Response()),
+    )
+
+    rows, source = api._get_rss_articles("Binance", 10)
+
+    assert len(rows) == 1
+    assert "Binance" in rows[0]["title"]
+    assert "Google News public RSS search" in source
+    assert parse_qs(urlsplit(requested[0]).query)["q"] == ["Binance"]
