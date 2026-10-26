@@ -60,7 +60,7 @@
 ## Stage 5 — Alerts, monitoring, and forecast evaluation
 
 24. **[Partial]** Threshold semantics (`above` / `below`) and a deterministic evaluator are implemented with offline tests; user-configurable rule CRUD, ownership, and API integration remain pending.
-25. **[Partial]** SQLite event deduplication, per-rule cooldown state, and a transport-neutral outbox with claims, bounded retry backoff, and terminal dead-letter state are implemented offline; abandoned-worker recovery remains pending; the state store can atomically enqueue a supplied notification payload with a trigger, but external delivery remains unconnected.
+25. **[Partial]** SQLite event deduplication, per-rule cooldown state, and a transport-neutral outbox with atomic claims, bounded retry backoff, terminal dead-letter state, and lease-based recovery for abandoned workers are implemented offline; the state store atomically enqueues a supplied notification payload with the trigger decision, but external delivery remains unconnected.
 26. **[Pending]** Add an authorized alert delivery adapter/channel and keep credentials out of source control; no provider is connected and no notifications are sent yet.
 27. **[Pending]** Persist forecast timestamp, asset, price source, horizon, and target/invalidating conditions.
 28. **[Pending]** Evaluate forecast outcomes and calibration with reproducible metrics and survivorship/look-ahead safeguards.
@@ -148,3 +148,13 @@ All four configured workflows passed on code/documentation checkpoint `2c1f816d5
 - PR #16 contains the alert evaluator, SQLite state store, durable outbox, retry state machine, and offline regression tests. Latest checked PR head `498b77bfba506bfab829942cc7a39865c31e156f` passed all four configured workflows.
 - PR #15 was closed as a duplicate of PR #16. PR #16 remains open/unmerged; no deployment has been initiated.
 - This advances steps 24 and 25 to **Partial**, not complete. Steps 26 (authorized delivery), 27–28 (forecast outcome tracking/calibration), and release gate 35 remain unfinished. No live provider, notification, or Render checks are inferred from offline CI.
+
+
+## Alert implementation refresh (2026-10-27)
+
+- PR #16 latest checked head: `444efee19a201bad091191148608f00168cd7f8a`.
+- All four configured GitHub workflows passed on this exact head: Render deployment scaffold validation, offline API safety tests, offline technical-analysis tests, and screening tests.
+- The alert state store and canonical delivery outbox now share one SQLite schema. A triggered decision, cooldown state, audit event, and notification intent are written in one transaction.
+- The canonical outbox supports idempotent enqueue, atomic claims, bounded exponential retry, terminal dead-letter state, and lease-based recovery for abandoned worker claims.
+- Step 24 remains **Partial** because user-configurable rules, ownership/authentication, and scheduler/API integration are pending. Step 25 remains **Partial** because no authorized provider adapter is connected and delivery is not live-tested.
+- PR #16 remains open/unmerged. No Render or Cloudflare changes and no deployment were performed.
