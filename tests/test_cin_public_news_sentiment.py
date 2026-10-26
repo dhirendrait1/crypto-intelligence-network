@@ -391,3 +391,39 @@ def test_rss_fallback_queries_google_news_when_publisher_feeds_have_no_results(m
     assert "Binance" in rows[0]["title"]
     assert "Google News public RSS search" in source
     assert parse_qs(urlsplit(requested[0]).query)["q"] == ["Binance"]
+
+
+
+def test_rss_fallback_does_not_request_google_news_when_publisher_feed_matches(monkeypatch):
+    xml = b"""<?xml version="1.0" encoding="UTF-8"?>
+    <rss><channel><item>
+      <title>Binance publishes a platform update</title>
+      <link>https://coindesk.com/example</link>
+      <description>Binance update</description>
+      <pubDate>Mon, 26 Oct 2026 18:00:00 GMT</pubDate>
+    </item></channel></rss>"""
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self, _limit):
+            return xml
+
+    requested = []
+    monkeypatch.setattr(api, "_RSS_FEEDS", (("Test publisher RSS", "https://example.test/rss"),))
+    monkeypatch.setattr(
+        api.urllib.request,
+        "urlopen",
+        lambda request, **_kwargs: (requested.append(request.full_url) or Response()),
+    )
+
+    rows, source = api._get_rss_articles("Binance", 10)
+
+    assert len(rows) == 1
+    assert source.startswith("Test publisher RSS")
+    assert len(requested) == 1
+    assert "news.google.com" not in requested[0]
