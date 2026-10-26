@@ -31,7 +31,7 @@
 | Exchange flows / whale attribution | No complete end-to-end capability established | Not established | Define verifiable sources and attribution limitations; avoid unsupported whale claims |
 | Public news search and headline sentiment | `cin_public_news_sentiment_api.py`; GDELT DOC public article search; URL deduplication, provider article-time preservation, explicit low-confidence keyword sentiment, structured provider failures, scaffold route registration and offline regression tests | Partial / offline-tested | Live source validation; improve multilingual/context handling; this is news, not X/Reddit/Telegram sentiment |
 | Social-platform sentiment (X, Reddit, Telegram, etc.) | No complete end-to-end capability established; news headlines are not social sentiment | Not established | Identify public/authorized sources, respect access limits, deduplicate posts, preserve timestamps and uncertainty; no unsupported social claims |
-| Alerts and monitoring | No complete end-to-end capability established | Not established | Rules, delivery channels, deduplication, cooldowns, delivery-state tracking |
+| Alerts and monitoring | `cin_alert_rules.py`, `cin_alert_state_store.py`, `cin_alert_delivery_outbox.py`; offline tests for threshold semantics, persistent cooldown, duplicate prevention, concurrent enqueue, retry backoff, and terminal dead letters | Partial / offline-tested | Scheduler and live observation source; user rule CRUD/authentication; delivery adapter and credentials; abandoned `sending` recovery; cross-module transaction; live delivery smoke test |
 | Forecast outcome tracking | No complete end-to-end capability established | Not established | Store forecast timestamp, horizon, price source, outcome calculation and calibration metrics |
 | Dashboard / Android-friendly UX | No complete end-to-end capability established by the source inventory | Not established | Define user flows, API integration, accessibility, loading/error/stale states |
 | Production release validation | Current Render revision has not been confirmed against feature-branch code; public smoke check was inaccessible from the current web access path | Release-blocked | Explicit release authorization, then controlled deployment and health/readiness/live smoke validation |
@@ -884,3 +884,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Added an offline test that verifies both providers are bounded and their oversized bodies become structured invalid-response failures.
 - Source commit: `92e6277f04d1f83cf59ebbefee2c80afc31fd78f`; test commit: `b8017ae026cd7758108590a81a3fa68f95935eef`.
 - CI for current head is pending. CIN remains read-only; no deployment changes.
+
+
+## Alert milestone refresh (2026-10-27)
+
+- PR #16 adds deterministic threshold evaluation, durable per-rule cooldown/event state, and a transport-neutral SQLite delivery outbox with idempotent enqueue, worker claims, bounded retry backoff, and terminal dead-letter state.
+- Offline regression tests and all four configured GitHub workflows passed on the latest checked PR head `498b77bfba506bfab829942cc7a39865c31e156f`. The scaffold CI runs the offline test suite; this is not live-provider or delivery verification.
+- Alert work remains **partial**, not production complete: there is no scheduler, user-facing rule API/authentication, notification provider adapter, recovery for abandoned `sending` rows, or cross-module transaction. SQLite requires durable single-host storage or an explicit shared/single-writer strategy.
+- PR #15 was closed as superseded by PR #16 to prevent duplicate overlapping alert implementations. PR #16 remains open and unmerged; no deployment was initiated.
