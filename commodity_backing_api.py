@@ -1,8 +1,9 @@
 """Read-only API router for CIN commodity-backed evidence review."""
-from typing import Any
+import re
+from typing import Any, Literal
 
 from fastapi import APIRouter
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 try:
     from app.commodity_backing_assessment import assess_commodity_asset
@@ -13,19 +14,28 @@ router = APIRouter(tags=["commodity backing evidence"])
 
 
 class EvidenceRecord(BaseModel):
-    evidence_type: str
-    source_name: str | None = None
-    source_url: str | None = None
-    published_at: str | None = None
-    checked_at: str | None = None
-    status: str = "unverified"
-    notes: str | None = None
+    model_config = ConfigDict(extra="forbid")
+    evidence_type: str = Field(min_length=1, max_length=80)
+    source_name: str | None = Field(default=None, max_length=200)
+    source_url: str | None = Field(default=None, max_length=2048)
+    published_at: str | None = Field(default=None, max_length=64)
+    checked_at: str | None = Field(default=None, max_length=64)
+    status: Literal["verified", "unverified", "stale", "unavailable"] = "unverified"
+    notes: str | None = Field(default=None, max_length=2000)
 
 
 class CommodityBackingAssessmentRequest(BaseModel):
-    symbol: str = Field(min_length=1, max_length=20)
+    model_config = ConfigDict(extra="forbid")
+    symbol: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
     evidence: list[EvidenceRecord] = Field(default_factory=list, max_length=100)
-    max_age_days: int = Field(default=90, ge=1, le=3650)
+    max_age_days: int = Field(default=90, strict=True, ge=0, le=3650)
+
+    @field_validator("symbol")
+    @classmethod
+    def symbol_must_match_full_string(cls, value: str) -> str:
+        if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", value) is None:
+            raise ValueError("symbol must contain only supported ticker characters")
+        return value
 
 
 @router.post("/commodity-backing-assessment")

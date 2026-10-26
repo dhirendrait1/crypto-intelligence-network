@@ -1,8 +1,9 @@
 """Read-only API for allowlisted public evidence ingestion."""
+import re
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 try:
     from app.cin_evidence_ingestion import (
@@ -11,8 +12,6 @@ try:
         fetch_github_repository_evidence,
     )
 except ModuleNotFoundError as exc:
-    # Fall back only when the optional scaffold package itself is unavailable.
-    # Do not hide missing dependencies imported from inside the app module.
     if exc.name not in {"app", "app.cin_evidence_ingestion"}:
         raise
     from cin_evidence_ingestion import (
@@ -25,8 +24,23 @@ router = APIRouter(tags=["public evidence ingestion"])
 
 
 class PublicEvidenceRequest(BaseModel):
-    symbol: str = Field(default="ETH", min_length=1, max_length=10)
-    repository: str = Field(default="ethereum/go-ethereum", min_length=1, max_length=100)
+    model_config = ConfigDict(extra="forbid")
+    symbol: str = Field(default="ETH", min_length=1, max_length=10, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+    repository: str = Field(default="ethereum/go-ethereum", min_length=1, max_length=100, pattern=r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+
+    @field_validator("symbol")
+    @classmethod
+    def symbol_must_match_full_string(cls, value: str) -> str:
+        if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", value) is None:
+            raise ValueError("symbol must contain only supported ticker characters")
+        return value
+
+    @field_validator("repository")
+    @classmethod
+    def repository_must_match_full_string(cls, value: str) -> str:
+        if re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", value) is None:
+            raise ValueError("repository must use owner/repository syntax")
+        return value
 
 
 @router.post("/public-evidence-ingestion")
@@ -40,9 +54,6 @@ def public_evidence_ingestion(request: PublicEvidenceRequest) -> dict[str, Any]:
         return fetch_github_repository_evidence(request.repository)
     except EvidenceSourceError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    except Exception:
-        # Do not expose unexpected provider/library internals to API clients.
-        raise HTTPException(
-            status_code=502,
-            detail="Public evidence provider returned an unexpected response",
-        ) from None
+    except Exception as exc:
+        # Keep unexpected provider failures from leaking internals to API clients.
+        raise HTTPException(status_code=502, detail="Public evidence provider returned an unexpected response") from exc

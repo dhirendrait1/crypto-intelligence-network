@@ -67,6 +67,8 @@ jobs:
               "/public-evidence-ingestion",
               "/commodity-backing-assessment",
               "/growth-fundamentals-assessment",
+              "/derivatives/market-snapshot",
+              "/news-sentiment",
           }
           missing = sorted(required - paths)
           print("Registered CIN routes:")

@@ -22,6 +22,8 @@ MODULES = (
     "cin_technical_analysis.py",
     "cin_technical_analysis_api.py",
     "cin_public_market_candles_api.py",
+    "cin_derivatives_market_data_api.py",
+    "cin_public_news_sentiment_api.py",
 )
 main_path = APP_DIR / "main.py"
 if not main_path.is_file():
@@ -78,6 +80,18 @@ registrations = [
         "\n# CIN: public timestamped OHLCV and market-backed analysis (read-only)\n"
         "from app.cin_public_market_candles_api import router as cin_public_market_candles_router\n"
         "app.include_router(cin_public_market_candles_router)\n",
+    ),
+    (
+        "cin_derivatives_market_data_router",
+        "\n# CIN: read-only public derivatives snapshot; no trading operations\n"
+        "from app.cin_derivatives_market_data_api import router as cin_derivatives_market_data_router\n"
+        "app.include_router(cin_derivatives_market_data_router)\n",
+    ),
+    (
+        "cin_public_news_sentiment_router",
+        "\n# CIN: read-only public news and heuristic headline sentiment\n"
+        "from app.cin_public_news_sentiment_api import router as cin_public_news_sentiment_router\n"
+        "app.include_router(cin_public_news_sentiment_router)\n",
     ),
 ]
 # Insert registrations before a direct-execution guard so routes are ready
