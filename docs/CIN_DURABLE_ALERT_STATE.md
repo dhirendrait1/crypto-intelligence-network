@@ -8,6 +8,7 @@
 - Validate finite values, metric identity, timezone-aware timestamps, and cooldown configuration.
 - Persist the last trigger time per rule and one evaluation result per `(rule_id, observation_id)`.
 - Use a SQLite write transaction to serialize concurrent evaluations and avoid duplicate trigger decisions for the same observation.
+- Optionally enqueue a notification payload in the same transaction as the trigger decision, cooldown state, and audit event.
 - Preserve cooldown state across process restarts.
 
 ## Not yet implemented
@@ -15,7 +16,7 @@
 - Scheduler/poller and live market-data subscription.
 - Rule CRUD API, authentication, authorization, or user ownership.
 - Notification delivery (Telegram/email/push), delivery receipts, retries, or outbox.
-- Exactly-once external notification delivery. A crash after recording a trigger but before delivery requires a later durable outbox with idempotency keys.
+- Exactly-once external notification delivery. The outbox is a durable intent queue, not proof of provider delivery; provider-side idempotency and delivery receipts are still required.
 - Live market-provider verification or production deployment.
 
 ## Storage requirements
