@@ -45,14 +45,41 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rows[0]["_source"], "Kraken public OHLC API (fallback after Binance HTTP 451)")
         self.assertEqual(rows[0]["_source_endpoint"], api.KRAKEN_OHLC_URL)
 
+    async def test_451_uses_coinbase_when_kraken_fails(self):
+        with patch.object(api, "_fetch_binance", side_effect=urllib.error.HTTPError(
+            api.BINANCE_KLINES_URL, 451, "unavailable for legal reasons", {}, None
+        )), patch.object(api, "_fetch_kraken", side_effect=ValueError("pair unavailable")), patch.object(
+            api, "_fetch_coinbase", return_value=[dict(SAMPLE[0])]
+        ):
+            rows = await api._load("BTCUSDT", "1h", 5)
+        self.assertEqual(rows[0]["_source"], "Coinbase Exchange public candles API (fallback after Binance HTTP 451)")
+        self.assertEqual(rows[0]["_source_endpoint"], api.COINBASE_CANDLES_URL)
+
+    def test_coinbase_candle_rows_are_normalized_and_sorted(self):
+        payload = [
+            [1700003600, "99", "103", "101", "102", "12.5"],
+            [1700000000, "98", "102", "100", "101", "10.5"],
+        ]
+        with patch.object(api, "_request_json", return_value=payload):
+            rows = api._fetch_coinbase("BTCUSDT", "1h", 5)
+        self.assertEqual(len(rows), 2)
+        self.assertLess(rows[0]["open_time"], rows[1]["open_time"])
+        self.assertEqual(rows[0]["open"], 100.0)
+        self.assertEqual(rows[0]["high"], 102.0)
+        self.assertEqual(rows[0]["low"], 98.0)
+        self.assertEqual(rows[0]["close"], 101.0)
+        self.assertEqual(rows[0]["volume"], 10.5)
+
     async def test_451_and_fallback_failure_returns_clear_503(self):
         with patch.object(api, "_fetch_binance", side_effect=urllib.error.HTTPError(
             api.BINANCE_KLINES_URL, 451, "unavailable for legal reasons", {}, None
-        )), patch.object(api, "_fetch_kraken", side_effect=ValueError("unsupported pair")):
+        )), patch.object(api, "_fetch_kraken", side_effect=ValueError("unsupported pair")), patch.object(
+            api, "_fetch_coinbase", side_effect=ValueError("unsupported product")
+        ):
             with self.assertRaises(HTTPException) as ctx:
                 await api._load("BTCUSDT", "1h", 5)
         self.assertEqual(ctx.exception.status_code, 503)
-        self.assertIn("Kraken fallback", ctx.exception.detail)
+        self.assertIn("fallbacks unavailable", ctx.exception.detail)
 
     async def test_rejects_bad_symbol(self):
         with self.assertRaises(HTTPException) as ctx:
