@@ -320,3 +320,37 @@ def test_article_timestamp_rejects_non_string_and_bounds_raw_provider_value():
     assert rows[1]["provider_seen_at_validation_status"] == "invalid"
     assert rows[2]["provider_seen_at"] is None
     assert rows[2]["provider_seen_at_validation_status"] == "missing"
+
+
+def test_search_uses_rss_fallback_when_gdelt_network_fails(monkeypatch):
+    fallback_rows = [{
+        "title": "Bitcoin adoption gains after new launch",
+        "url": "https://news.example/bitcoin",
+        "provider_seen_at": None,
+        "provider_seen_at_utc": None,
+        "provider_seen_at_validation_status": "missing",
+        "published_at": None,
+        "published_at_utc": None,
+        "published_at_validation_status": "missing",
+        "domain": "news.example",
+        "language": None,
+        "source_country": None,
+        "headline_sentiment": api._headline_sentiment("Bitcoin adoption gains after new launch"),
+    }]
+    def gdelt_down(_query, _limit):
+        raise urllib.error.URLError("offline")
+    monkeypatch.setattr(api, "_get_json", gdelt_down)
+    monkeypatch.setattr(api, "_get_rss_articles", lambda query, limit: (fallback_rows, "CoinDesk public RSS (fallback)"))
+
+    result = api._search("bitcoin", 5)
+
+    assert result["source"] == "CoinDesk public RSS (fallback)"
+    assert result["count"] == 1
+    assert result["articles"][0]["title"].startswith("Bitcoin")
+    assert result["sentiment_summary"]["label"] == "positive"
+
+
+def test_rss_query_terms_are_specific_for_asset_queries():
+    assert api._rss_query_terms("bitcoin") == {"bitcoin"}
+    assert "ethereum" in api._rss_query_terms("cryptocurrency")
+    assert "bitcoin" in api._rss_query_terms("cryptocurrency")
