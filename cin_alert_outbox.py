@@ -43,8 +43,9 @@ def _utc(value: datetime | str, field: str = "now") -> datetime:
 
 def _connect(path: str | Path) -> sqlite3.Connection:
     value = str(path)
-    if value != ":memory:":
-        Path(value).parent.mkdir(parents=True, exist_ok=True)
+    if value == ":memory:":
+        raise ValueError("a persistent SQLite file path is required; separate outbox calls open separate connections")
+    Path(value).parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(value, timeout=10, isolation_level=None)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA busy_timeout = 10000")
@@ -98,19 +99,25 @@ def claim_due_notifications(
     *,
     now: datetime | str,
     limit: int = 10,
+    lease_seconds: int = 300,
 ) -> list[dict[str, Any]]:
-    """Atomically claim due pending/retryable rows for one worker."""
-    timestamp = _utc(now).isoformat()
+    """Claim due rows and reclaim stale worker leases after a crash."""
+    current = _utc(now)
+    timestamp = current.isoformat()
+    stale_before = (current - timedelta(seconds=lease_seconds)).isoformat()
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
         raise ValueError("limit must be an integer from 1 through 100")
+    if isinstance(lease_seconds, bool) or not isinstance(lease_seconds, int) or not 30 <= lease_seconds <= 3600:
+        raise ValueError("lease_seconds must be an integer from 30 through 3600")
     connection = _connect(database_path)
     try:
         connection.execute("BEGIN IMMEDIATE")
         rows = connection.execute(
             """SELECT id FROM alert_notification_outbox
-               WHERE status = 'pending' AND next_attempt_at <= ?
+               WHERE (status = 'pending' AND next_attempt_at <= ?)
+                  OR (status = 'sending' AND updated_at <= ?)
                ORDER BY next_attempt_at, id LIMIT ?""",
-            (timestamp, limit),
+            (timestamp, stale_before, limit),
         ).fetchall()
         ids = [row["id"] for row in rows]
         if ids:
@@ -118,8 +125,9 @@ def claim_due_notifications(
             connection.execute(
                 f"""UPDATE alert_notification_outbox
                     SET status = 'sending', attempts = attempts + 1, updated_at = ?
-                    WHERE id IN ({placeholders}) AND status = 'pending'""",
-                (timestamp, *ids),
+                    WHERE id IN ({placeholders}) AND
+                      (status = 'pending' OR (status = 'sending' AND updated_at <= ?))""",
+                (timestamp, *ids, stale_before),
             )
         claimed = []
         for row_id in ids:
