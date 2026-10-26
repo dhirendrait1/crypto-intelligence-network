@@ -128,11 +128,11 @@ def test_trigger_and_notification_enqueue_are_atomic_and_idempotent(tmp_path):
     )
     assert result["status"] == "triggered"
     assert result["notification_enqueued"] is True
-    assert result["notification_outbox_id"] > 0
+    assert result["notification_idempotency_key"] == f'{RULE["id"]}:{OBS["id"]}'
     with sqlite3.connect(path) as db:
         events = db.execute("SELECT COUNT(*) FROM alert_evaluation_events").fetchone()[0]
-        queued = db.execute("SELECT COUNT(*) FROM alert_notification_outbox").fetchone()[0]
-        status = db.execute("SELECT status FROM alert_notification_outbox").fetchone()[0]
+        queued = db.execute("SELECT COUNT(*) FROM alert_delivery_outbox").fetchone()[0]
+        status = db.execute("SELECT status FROM alert_delivery_outbox").fetchone()[0]
     assert (events, queued, status) == (1, 1, "pending")
     duplicate = evaluate_and_record(
         path, RULE, OBS, now=NOW,
@@ -141,7 +141,7 @@ def test_trigger_and_notification_enqueue_are_atomic_and_idempotent(tmp_path):
     )
     assert duplicate["status"] == "deduplicated"
     with sqlite3.connect(path) as db:
-        assert db.execute("SELECT COUNT(*) FROM alert_notification_outbox").fetchone()[0] == 1
+        assert db.execute("SELECT COUNT(*) FROM alert_delivery_outbox").fetchone()[0] == 1
 
 
 def test_nonmatching_rule_does_not_enqueue_notification(tmp_path):
@@ -152,7 +152,7 @@ def test_nonmatching_rule_does_not_enqueue_notification(tmp_path):
     )
     assert result["status"] == "not_triggered"
     with sqlite3.connect(path) as db:
-        assert db.execute("SELECT COUNT(*) FROM alert_notification_outbox").fetchone()[0] == 0
+        assert db.execute("SELECT COUNT(*) FROM alert_delivery_outbox").fetchone()[0] == 0
 
 
 def test_invalid_notification_payload_fails_before_state_is_changed(tmp_path):
