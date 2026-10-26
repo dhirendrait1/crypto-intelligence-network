@@ -892,3 +892,13 @@ This checkpoint validates configured offline automation only. It does not establ
 - Offline regression tests and all four configured GitHub workflows passed on the latest checked PR head `498b77bfba506bfab829942cc7a39865c31e156f`. The scaffold CI runs the offline test suite; this is not live-provider or delivery verification.
 - Alert work remains **partial**, not production complete: there is no scheduler, user-facing rule API/authentication, notification provider adapter, or recovery for abandoned `sending` rows. The state store can atomically queue a supplied notification payload with a triggered decision, but no external delivery is performed. SQLite requires durable single-host storage or an explicit shared/single-writer strategy.
 - PR #15 was closed as superseded by PR #16 to prevent duplicate overlapping alert implementations. PR #16 remains open and unmerged; no deployment was initiated.
+
+
+## Alert implementation and verification refresh (2026-10-27)
+
+- Latest checked PR #16 head: `444efee19a201bad091191148608f00168cd7f8a`; all four configured GitHub workflows passed on this exact commit.
+- Alert threshold evaluation validates rule identity, metric identity, finite numeric values, and timezone-aware timestamps. SQLite state persists observation decisions and per-rule cooldowns with duplicate-event protection.
+- The canonical `cin_alert_delivery_outbox.py` is integrated with the state store: a trigger decision, cooldown state, audit event, and notification intent are committed in one transaction.
+- The outbox has idempotent enqueue, atomic worker claims, bounded exponential retries, terminal dead-letter state, and lease-based recovery for abandoned `sending` work.
+- This remains **partial**: no scheduler/live polling, rule CRUD API, user ownership/authentication, or notification provider adapter is connected. A queued message is not a delivered message. External delivery and Render deployment remain unverified.
+- PR #16 remains open and unmerged. No Render/Cloudflare changes were made; no trade/order execution, wallet access, private keys, or fund movement were introduced.
