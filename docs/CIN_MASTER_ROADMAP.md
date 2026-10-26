@@ -61,7 +61,7 @@
 
 24. **[Partial]** Threshold semantics (`above` / `below`) and a deterministic evaluator are implemented with offline tests; user-configurable rule CRUD, ownership, and API integration remain pending.
 25. **[Partial]** SQLite event deduplication, per-rule cooldown state, and a transport-neutral outbox with atomic claims, bounded retry backoff, terminal dead-letter state, and lease-based recovery for abandoned workers are implemented offline; the state store atomically enqueues a supplied notification payload with the trigger decision, but external delivery remains unconnected.
-26. **[Pending]** Add an authorized alert delivery adapter/channel and keep credentials out of source control; no provider is connected and no notifications are sent yet.
+26. **[Partial]** Add an optional Telegram Bot API adapter and explicit outbox worker using runtime-only `CIN_TELEGRAM_BOT_TOKEN` / `CIN_TELEGRAM_CHAT_ID`; scheduler, authorized destination setup, and live delivery verification remain pending.
 27. **[Pending]** Persist forecast timestamp, asset, price source, horizon, and target/invalidating conditions.
 28. **[Pending]** Evaluate forecast outcomes and calibration with reproducible metrics and survivorship/look-ahead safeguards.
 29. **[Partial]** Define monitoring health, freshness, provider outage, and stale-data warning states across services.
@@ -158,3 +158,11 @@ All four configured workflows passed on code/documentation checkpoint `2c1f816d5
 - The canonical outbox supports idempotent enqueue, atomic claims, bounded exponential retry, terminal dead-letter state, and lease-based recovery for abandoned worker claims.
 - Step 24 remains **Partial** because user-configurable rules, ownership/authentication, and scheduler/API integration are pending. Step 25 remains **Partial** because no authorized provider adapter is connected and delivery is not live-tested.
 - PR #16 remains open/unmerged. No Render or Cloudflare changes and no deployment were performed.
+
+
+## Telegram adapter implementation refresh (2026-10-27)
+
+- Added `cin_alert_telegram_delivery.py` with an explicit worker entry point that claims due outbox items, sends plain-text messages only to the configured Telegram destination, and records success or sanitized failure/retry state.
+- Credentials are read from runtime environment variables only; no token or chat ID was committed. Tests mock provider responses and never send real messages.
+- All four configured workflows passed on code head `6165d1687b474ea4095f06a89bceefeec17a9a89`. Documentation changes after that code checkpoint require a fresh latest-head CI run.
+- Step 26 is **Partial**: there is no scheduler, no configured production credential/destination, and no live Telegram delivery smoke test. Do not configure secrets or deploy automatically.
