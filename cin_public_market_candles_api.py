@@ -104,6 +104,65 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     return candles
 
 
+
+COINBASE_CANDLES_URL = "https://api.exchange.coinbase.com/products/{product_id}/candles"
+COINBASE_GRANULARITY = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "6h": 21600, "1d": 86400}
+
+
+def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
+    """Fetch public Coinbase Exchange candles when primary providers are blocked."""
+    if interval not in COINBASE_GRANULARITY:
+        raise ValueError(f"Coinbase fallback does not support interval {interval}")
+    pair = re.fullmatch(r"([A-Z0-9]+)(USDT|USD)", symbol)
+    if not pair:
+        raise ValueError(f"Coinbase fallback cannot map symbol {symbol}")
+    base, quote = pair.groups()
+    # Coinbase Exchange spot products are quoted with a hyphen; USDT requests
+    # are mapped to the equivalent USD spot market, and the actual product is reported.
+    product_id = f"{base}-USD"
+    duration = COINBASE_GRANULARITY[interval]
+    now = int(datetime.now(timezone.utc).timestamp())
+    start = now - limit * duration
+    rows_by_time: dict[int, list[Any]] = {}
+    # Coinbase caps each response at 300 candles; fetch bounded adjacent windows.
+    cursor = start
+    while cursor < now:
+        chunk_end = min(now, cursor + 300 * duration)
+        query = urllib.parse.urlencode({
+            "granularity": duration,
+            "start": datetime.fromtimestamp(cursor, timezone.utc).isoformat(),
+            "end": datetime.fromtimestamp(chunk_end, timezone.utc).isoformat(),
+        })
+        url = COINBASE_CANDLES_URL.format(product_id=urllib.parse.quote(product_id, safe="")) + "?" + query
+        payload = _request_json(url)
+        if not isinstance(payload, list):
+            raise ValueError("Coinbase response was not a list")
+        for row in payload:
+            if not isinstance(row, list) or len(row) < 6:
+                continue
+            try:
+                rows_by_time[int(row[0])] = row
+            except (TypeError, ValueError, OverflowError):
+                continue
+        cursor = chunk_end
+    candles = []
+    for row in sorted(rows_by_time.values(), key=lambda item: int(item[0]))[-limit:]:
+        try:
+            start_ms = int(row[0]) * 1000
+            duration_ms = duration * 1000
+            # Coinbase rows are [time, low, high, open, close, volume].
+            candles.append({
+                "open_time": start_ms, "open": float(row[3]), "high": float(row[2]),
+                "low": float(row[1]), "close": float(row[4]), "volume": float(row[5]),
+                "close_time": start_ms + duration_ms - 1,
+            })
+        except (TypeError, ValueError, OverflowError):
+            continue
+    if not candles:
+        raise ValueError("Coinbase returned no valid candles")
+    return candles
+
+
 def _fetch_klines(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
     """Compatibility wrapper retained for existing tests and integrations."""
     return _fetch_binance(symbol, interval, limit)
@@ -121,12 +180,16 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
         try:
             rows = await asyncio.to_thread(_fetch_kraken, symbol, interval, limit)
             source, endpoint = "Kraken public OHLC API (fallback after Binance HTTP 451)", KRAKEN_OHLC_URL
-        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as fallback_exc:
-            # Do not disguise fallback failure or return stale/empty data as live.
-            reason = "Kraken fallback unavailable or pair/timeframe unsupported"
-            if isinstance(fallback_exc, urllib.error.HTTPError):
-                reason += f" (HTTP {fallback_exc.code})"
-            raise HTTPException(status_code=503, detail=reason + "; Binance returned HTTP 451.") from None
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
+            try:
+                rows = await asyncio.to_thread(_fetch_coinbase, symbol, interval, limit)
+                source, endpoint = "Coinbase Exchange public candles API (fallback after Binance HTTP 451)", COINBASE_CANDLES_URL
+            except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as coinbase_exc:
+                # Do not disguise provider failure or return stale/empty data as live.
+                reason = "Kraken and Coinbase fallbacks unavailable or pair/timeframe unsupported"
+                if isinstance(coinbase_exc, urllib.error.HTTPError):
+                    reason += f" (Coinbase HTTP {coinbase_exc.code})"
+                raise HTTPException(status_code=503, detail=reason + "; Binance returned HTTP 451.") from None
     except (urllib.error.URLError, TimeoutError, OSError):
         raise HTTPException(status_code=503, detail="Binance public market-data provider is temporarily unavailable.") from None
     except (ValueError, json.JSONDecodeError):
