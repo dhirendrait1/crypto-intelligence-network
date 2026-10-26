@@ -902,3 +902,12 @@ This checkpoint validates configured offline automation only. It does not establ
 - The outbox has idempotent enqueue, atomic worker claims, bounded exponential retries, terminal dead-letter state, and lease-based recovery for abandoned `sending` work.
 - This remains **partial**: no scheduler/live polling, rule CRUD API, user ownership/authentication, or notification provider adapter is connected. A queued message is not a delivered message. External delivery and Render deployment remain unverified.
 - PR #16 remains open and unmerged. No Render/Cloudflare changes were made; no trade/order execution, wallet access, private keys, or fund movement were introduced.
+
+
+## Telegram delivery adapter refresh (2026-10-27)
+
+- Added `cin_alert_telegram_delivery.py`: optional Telegram Bot API adapter plus explicit batch worker using the canonical durable outbox.
+- The adapter reads `CIN_TELEGRAM_BOT_TOKEN` and `CIN_TELEGRAM_CHAT_ID` from runtime environment variables, never from payload-controlled destination fields. Error codes are sanitized so provider exception text does not expose the token.
+- Added mocked/offline tests for successful acceptance, missing configuration, malformed messages, provider rejection, HTTP/network errors, and outbox success/retry transitions. Tests do not call Telegram or send real messages.
+- All four configured workflows passed on code checkpoint `6165d1687b474ea4095f06a89bceefeec17a9a89`. Subsequent documentation-only commits require refreshed latest-head CI before the milestone is called fully verified.
+- Step 26 is **Partial**: credentials/destination are not configured, no scheduler is installed, and live delivery is unverified. Do not deploy or configure secrets without the user's explicit Render/hosting action.
