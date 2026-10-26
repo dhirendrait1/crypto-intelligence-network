@@ -44,8 +44,9 @@ def _timestamp(value: datetime | str, field: str) -> datetime:
 
 def _connect(path: str | Path) -> sqlite3.Connection:
     target = str(path)
-    if target != ":memory:":
-        Path(target).parent.mkdir(parents=True, exist_ok=True)
+    if target == ":memory:":
+        raise ValueError("a persistent SQLite file path is required; separate outbox calls open separate connections")
+    Path(target).parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(target, timeout=10, isolation_level=None)
     connection.execute("PRAGMA busy_timeout = 10000")
     connection.executescript(_SCHEMA)
@@ -107,30 +108,53 @@ def claim_due_alerts(
     *,
     now: datetime | str,
     limit: int = 10,
+    lease_seconds: int = 300,
+    max_attempts: int = 5,
 ) -> list[dict[str, Any]]:
-    """Atomically claim due pending/failed items for a single worker invocation."""
-    current = _timestamp(now, "now").isoformat()
+    """Claim due work and recover abandoned sending leases after worker crashes."""
+    current_dt = _timestamp(now, "now")
+    current = current_dt.isoformat()
+    stale_before = (current_dt - timedelta(seconds=lease_seconds)).isoformat()
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
         raise ValueError("limit must be an integer from 1 through 100")
+    if isinstance(lease_seconds, bool) or not isinstance(lease_seconds, int) or not 30 <= lease_seconds <= 3600:
+        raise ValueError("lease_seconds must be an integer from 30 through 3600")
+    if isinstance(max_attempts, bool) or not isinstance(max_attempts, int) or not 1 <= max_attempts <= 20:
+        raise ValueError("max_attempts must be an integer from 1 through 20")
     with _connect(database_path) as db:
         db.execute("BEGIN IMMEDIATE")
         try:
+            db.execute(
+                """UPDATE alert_delivery_outbox
+                SET status='dead',updated_at=?,last_error_code=COALESCE(last_error_code,'worker_lease_expired_max_attempts')
+                WHERE status='sending' AND updated_at <= ? AND attempts >= ?""",
+                (current, stale_before, max_attempts),
+            )
             rows = db.execute(
                 """SELECT idempotency_key,rule_id,observation_id,payload_json,status,
                 attempts,next_attempt_at,created_at,updated_at,last_error_code
                 FROM alert_delivery_outbox
-                WHERE status IN ('pending','failed') AND next_attempt_at <= ?
+                WHERE (status IN ('pending','failed') AND next_attempt_at <= ?)
+                   OR (status='sending' AND updated_at <= ? AND attempts < ?)
                 ORDER BY created_at,idempotency_key LIMIT ?""",
-                (current, limit),
+                (current, stale_before, max_attempts, limit),
             ).fetchall()
             claimed = []
             for row in rows:
                 db.execute(
-                    """UPDATE alert_delivery_outbox SET status='sending',updated_at=?
-                    WHERE idempotency_key=? AND status IN ('pending','failed')""",
-                    (current, row[0]),
+                    """UPDATE alert_delivery_outbox SET status='sending',attempts=attempts+1,updated_at=?
+                    WHERE idempotency_key=? AND
+                      ((status IN ('pending','failed') AND next_attempt_at <= ?)
+                       OR (status='sending' AND updated_at <= ? AND attempts < ?))""",
+                    (current, row[0], current, stale_before, max_attempts),
                 )
-                claimed.append(_row((*row[:4], "sending", *row[5:])))
+                updated = db.execute(
+                    """SELECT idempotency_key,rule_id,observation_id,payload_json,status,
+                    attempts,next_attempt_at,created_at,updated_at,last_error_code
+                    FROM alert_delivery_outbox WHERE idempotency_key=?""",
+                    (row[0],),
+                ).fetchone()
+                claimed.append(_row(updated))
             db.execute("COMMIT")
             return claimed
         except Exception:
@@ -145,7 +169,7 @@ def mark_alert_sent(database_path: str | Path, idempotency_key: str, *, now: dat
         db.execute("BEGIN IMMEDIATE")
         try:
             changed = db.execute(
-                """UPDATE alert_delivery_outbox SET status='sent',attempts=attempts+1,
+                """UPDATE alert_delivery_outbox SET status='sent',
                 updated_at=?,last_error_code=NULL WHERE idempotency_key=? AND status='sending'""",
                 (current, idempotency_key),
             ).rowcount
@@ -192,10 +216,10 @@ def mark_alert_failed(
             ).fetchone()
             if not row or row[1] != "sending":
                 raise ValueError("outbox item must exist and be in sending state")
-            attempts = row[0] + 1
-            # 'dead' is terminal and never retried; it must not imply delivery succeeded.
+            attempts = row[0]
+            # Attempts are counted when work is claimed, including recovered leases.
             status = "failed" if attempts < max_attempts else "dead"
-            delay = min(retry_delay_seconds * (2 ** (attempts - 1)), 86400)
+            delay = min(retry_delay_seconds * (2 ** max(0, attempts - 1)), 86400)
             next_attempt = (current_dt + timedelta(seconds=delay)).isoformat()
             db.execute(
                 """UPDATE alert_delivery_outbox SET status=?,attempts=?,next_attempt_at=?,
