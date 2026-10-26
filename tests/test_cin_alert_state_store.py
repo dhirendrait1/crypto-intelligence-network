@@ -173,3 +173,8 @@ def test_invalid_notification_payload_fails_before_state_is_changed(tmp_path):
     with sqlite3.connect(path) as db:
         assert db.execute("SELECT COUNT(*) FROM alert_evaluation_events").fetchone()[0] == 0
         assert db.execute("SELECT COUNT(*) FROM alert_rule_state").fetchone()[0] == 0
+
+
+def test_durable_state_rejects_in_memory_database(tmp_path):
+    with pytest.raises(ValueError, match="persistent SQLite file path"):
+        evaluate_and_record(":memory:", RULE, OBS, now=NOW)
