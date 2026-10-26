@@ -10,21 +10,6 @@ NEW = "Crypto Intelligence Network (CIN)"
 if not APP_DIR.is_dir():
     raise SystemExit(f"Expected application directory not found: {APP_DIR}")
 
-changed = 0
-found = False
-for path in APP_DIR.rglob("*.py"):
-    text = path.read_text(encoding="utf-8")
-    if OLD in text:
-        text = text.replace(OLD, NEW)
-        path.write_text(text, encoding="utf-8")
-        changed += 1
-        found = True
-    if NEW in text:
-        found = True
-
-if not found:
-    raise SystemExit("Could not find a CIN application title to validate")
-
 MODULES = (
     "market_data_step1.py",
     "coin_screening_step2.py",
@@ -38,16 +23,17 @@ MODULES = (
     "cin_technical_analysis_api.py",
     "cin_public_market_candles_api.py",
 )
-for module_name in MODULES:
-    source_module = ROOT / module_name
-    target_module = APP_DIR / module_name
-    if not source_module.is_file():
-        raise SystemExit(f"Required CIN module not found: {source_module}")
-    shutil.copyfile(source_module, target_module)
-
 main_path = APP_DIR / "main.py"
 if not main_path.is_file():
     raise SystemExit(f"Expected FastAPI entry point not found: {main_path}")
+
+# Validate every required input before changing any scaffold file.
+missing_modules = [ROOT / name for name in MODULES if not (ROOT / name).is_file()]
+if missing_modules:
+    raise SystemExit(
+        "Required CIN module(s) not found: " + ", ".join(str(path) for path in missing_modules)
+    )
+
 main_text = main_path.read_text(encoding="utf-8")
 
 registrations = [
@@ -94,10 +80,59 @@ registrations = [
         "app.include_router(cin_public_market_candles_router)\n",
     ),
 ]
+# Insert registrations before a direct-execution guard so routes are ready
+# even when the module is run as a script, not only imported by Uvicorn.
+main_guard = 'if __name__ == "__main__":'
+registrations_added = 0
 for marker, registration in registrations:
-    if marker not in main_text:
+    lines = [line for line in registration.splitlines() if line.strip()]
+    import_line = next((line for line in lines if line.startswith("from app.")), None)
+    include_line = next((line for line in lines if line.startswith("app.include_router(")), None)
+    if import_line is None or include_line is None:
+        raise SystemExit(f"Invalid router registration definition for {marker}")
+
+    has_import = import_line in main_text
+    has_include = include_line in main_text
+    if has_import and has_include:
+        continue
+    if marker in main_text or has_import or has_include:
+        raise SystemExit(
+            f"Partial router registration detected for {marker}; refusing to patch ambiguously"
+        )
+
+    if main_guard in main_text:
+        main_text = main_text.replace(main_guard, registration + "\n" + main_guard, 1)
+    else:
         main_text = main_text.rstrip() + registration
-        changed += 1
-main_path.write_text(main_text, encoding="utf-8")
+    registrations_added += 1
+
+# Preflight branding metadata across the full app before writing any scaffold file.
+branding_files = list(APP_DIR.rglob("*.py"))
+branding_text = {path: path.read_text(encoding="utf-8") for path in branding_files}
+if not any(OLD in content or NEW in content for content in branding_text.values()):
+    raise SystemExit("Could not find a CIN application title to validate")
+
+# Build every updated file in memory first. Use the route-patched main_text as
+# the source for main.py so branding normalization cannot restore stale content
+# and silently discard newly inserted router registrations.
+original_branding_text = branding_text.copy()
+branding_text[main_path] = main_text
+updated_text = {
+    path: content.replace(OLD, NEW)
+    for path, content in branding_text.items()
+}
+changed = sum(
+    1 for path, content in updated_text.items()
+    if OLD in original_branding_text[path] and content != original_branding_text[path]
+)
+
+# All input validation and transformations complete before the first write.
+for path, content in updated_text.items():
+    if content != original_branding_text[path]:
+        path.write_text(content, encoding="utf-8")
+
+for module_name in MODULES:
+    shutil.copyfile(ROOT / module_name, APP_DIR / module_name)
+
 
 print(f"CIN metadata verified; read-only market data, screening, assessment, evidence, and technical-analysis and public market-candle routers installed; files updated: {changed}")

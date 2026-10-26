@@ -2,7 +2,7 @@ name: CIN Automated Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/deploy-scaffold-ci-alignment]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   test:
-    name: Validate CIN scaffold
+    name: Validate Render deployment scaffold
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -25,17 +25,53 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Extract scaffold archive
+      - name: Extract the same scaffold used by Render
         run: |
-          unzip -q cin_step203_bootable_scaffold.zip
-          test -d cin
+          python -m zipfile -e cin_step203_scaffold_fixed.zip .
+          test -d cin/app
+          test -f cin/app/main.py
           test -f cin/requirements.txt
-          test -d cin/tests
 
-      - name: Install dependencies
-        working-directory: cin
-        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt pytest
+      - name: Apply the Render router and metadata patch
+        run: python patch_cin_metadata_fixed.py
 
-      - name: Run automated tests
-        working-directory: cin
-        run: python -m pytest -v
+      - name: Install runtime and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r cin/requirements.txt pytest httpx
+
+      - name: Compile CIN modules and tests
+        run: |
+          python -m compileall -q cin
+          python -m compileall -q tests
+
+      - name: Run offline test suite
+        run: python -m pytest -q tests
+
+      - name: Assert deployment routes are registered
+        run: |
+          python - <<'PY'
+          import sys
+          sys.path.insert(0, "cin")
+          from app.main import app
+
+          paths = {route.path for route in app.routes}
+          required = {
+              "/health",
+              "/ready",
+              "/market-data",
+              "/coin-screening",
+              "/market-candles",
+              "/technical-analysis/market",
+              "/technical-analysis",
+              "/public-evidence-ingestion",
+              "/commodity-backing-assessment",
+              "/growth-fundamentals-assessment",
+          }
+          missing = sorted(required - paths)
+          print("Registered CIN routes:")
+          for path in sorted(paths):
+              print(f"  {path}")
+          if missing:
+              raise SystemExit(f"Missing required routes: {missing}")
+          PY

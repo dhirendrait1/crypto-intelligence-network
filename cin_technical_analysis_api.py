@@ -5,7 +5,10 @@ from pydantic import BaseModel, Field, ConfigDict
 
 try:
     from app.cin_technical_analysis import analyze_ohlc
-except ModuleNotFoundError:
+except ModuleNotFoundError as exc:
+    # Fall back only when the scaffold package/module itself is unavailable.
+    if exc.name not in {"app", "app.cin_technical_analysis"}:
+        raise
     from cin_technical_analysis import analyze_ohlc
 
 router = APIRouter(tags=["technical-analysis"])

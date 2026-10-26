@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import re
 import urllib.error
 import urllib.parse
@@ -14,12 +15,18 @@ from fastapi import APIRouter, HTTPException, Query
 
 try:
     from app.cin_technical_analysis import analyze_ohlc
-except ModuleNotFoundError:
+except ModuleNotFoundError as exc:
+    # Do not mask missing dependencies imported by the analysis module itself.
+    if exc.name not in {"app", "app.cin_technical_analysis"}:
+        raise
     from cin_technical_analysis import analyze_ohlc
 
 router = APIRouter(tags=["public-market-candles"])
 BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines"
 KRAKEN_OHLC_URL = "https://api.kraken.com/0/public/OHLC"
+MAX_PROVIDER_RESPONSE_BYTES = 2 * 1024 * 1024
+# Largest millisecond Unix timestamp representable by Python datetime (year 9999).
+MAX_TIMESTAMP_MS = 253402300799999
 TIMEFRAMES = {"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M"}
 KRAKEN_INTERVALS = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440, "1w": 10080}
 KRAKEN_SYMBOLS = {"BTC": "XBT"}
@@ -34,7 +41,31 @@ def _request_json(url: str) -> Any:
     with urllib.request.urlopen(request, timeout=15) as response:
         if response.status != 200:
             raise RuntimeError(f"Provider returned HTTP {response.status}")
-        return json.loads(response.read().decode("utf-8"))
+        body = response.read(MAX_PROVIDER_RESPONSE_BYTES + 1)
+        if len(body) > MAX_PROVIDER_RESPONSE_BYTES:
+            raise ValueError("Provider response exceeded the configured size limit")
+        return json.loads(body.decode("utf-8"))
+
+
+def _is_valid_candle(candle: dict[str, Any]) -> bool:
+    """Reject non-finite values, impossible OHLC ranges, and invalid timestamps."""
+    try:
+        prices = [float(candle[key]) for key in ("open", "high", "low", "close")]
+        volume = float(candle["volume"])
+        open_time = int(candle["open_time"])
+        close_time = int(candle["close_time"])
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return False
+    open_price, high, low, close = prices
+    return (
+        all(math.isfinite(value) and value > 0 for value in prices)
+        and math.isfinite(volume) and volume >= 0
+        and high >= max(open_price, close)
+        and low <= min(open_price, close)
+        and high >= low
+        and 0 <= open_time <= MAX_TIMESTAMP_MS
+        and open_time <= close_time <= MAX_TIMESTAMP_MS
+    )
 
 
 def _fetch_binance(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
@@ -42,16 +73,27 @@ def _fetch_binance(symbol: str, interval: str, limit: int) -> list[dict[str, Any
     payload = _request_json(f"{BINANCE_KLINES_URL}?{query}")
     if not isinstance(payload, list):
         raise ValueError("Binance response was not a list")
+    if len(payload) > limit:
+        raise ValueError("Binance returned more candles than requested")
     candles = []
     for row in payload:
         if not isinstance(row, list) or len(row) < 7:
             continue
         try:
-            candles.append({
-                "open_time": int(row[0]), "open": float(row[1]), "high": float(row[2]),
+            # Binance timestamps are integer milliseconds. Do not silently truncate
+            # fractional values or accept booleans as numeric timestamps.
+            if isinstance(row[0], bool) or isinstance(row[6], bool):
+                continue
+            open_time_value, close_time_value = float(row[0]), float(row[6])
+            if not open_time_value.is_integer() or not close_time_value.is_integer():
+                continue
+            candle = {
+                "open_time": int(open_time_value), "open": float(row[1]), "high": float(row[2]),
                 "low": float(row[3]), "close": float(row[4]), "volume": float(row[5]),
-                "close_time": int(row[6]),
-            })
+                "close_time": int(close_time_value),
+            }
+            if _is_valid_candle(candle):
+                candles.append(candle)
         except (TypeError, ValueError, OverflowError):
             continue
     if not candles:
@@ -84,24 +126,44 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     if not isinstance(rows, list):
         raise ValueError("Kraken returned no candle rows")
     candles = []
-    for row in rows[-limit:]:
+    # Validate rows before applying the requested limit so malformed tail rows
+    # do not unnecessarily reduce the number of usable recent candles.
+    for row in rows:
         if not isinstance(row, list) or len(row) < 7:
             continue
         try:
-            start = int(float(row[0]) * 1000)
+            # Kraken timestamps are seconds. Reject booleans, non-finite values,
+            # and fractional seconds rather than silently truncating source data.
+            if isinstance(row[0], bool):
+                continue
+            start_seconds = float(row[0])
+            if not math.isfinite(start_seconds) or not start_seconds.is_integer():
+                continue
+            start = int(start_seconds * 1000)
             # Kraken returns OHLC, VWAP, volume, trade count; derive candle end
             # from the selected timeframe so the output schema matches Binance.
             duration_ms = KRAKEN_INTERVALS[interval] * 60_000
-            candles.append({
+            candle = {
                 "open_time": start, "open": float(row[1]), "high": float(row[2]),
                 "low": float(row[3]), "close": float(row[4]), "volume": float(row[6]),
                 "close_time": start + duration_ms - 1,
-            })
+            }
+            if _is_valid_candle(candle):
+                candles.append(candle)
         except (TypeError, ValueError, OverflowError):
             continue
     if not candles:
         raise ValueError("Kraken returned no valid candles")
-    return candles
+    return candles[-limit:]
+
+
+def _normalize_candle_sequence(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return candles in chronological order and reject ambiguous duplicate timestamps."""
+    ordered = sorted(rows, key=lambda row: row["open_time"])
+    for previous, current in zip(ordered, ordered[1:]):
+        if current["open_time"] == previous["open_time"]:
+            raise ValueError("Provider returned duplicate candle open timestamps")
+    return ordered
 
 
 
@@ -194,6 +256,10 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
         raise HTTPException(status_code=503, detail="Binance public market-data provider is temporarily unavailable.") from None
     except (ValueError, json.JSONDecodeError):
         raise HTTPException(status_code=502, detail="Binance public market-data provider returned an invalid response.") from None
+    try:
+        rows = _normalize_candle_sequence(rows)
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(status_code=502, detail="Public market-data provider returned an ambiguous candle sequence.") from None
     for row in rows:
         row["_source"] = source
         row["_source_endpoint"] = endpoint

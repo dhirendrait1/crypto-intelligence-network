@@ -10,7 +10,11 @@ try:
         EvidenceSourceError,
         fetch_github_repository_evidence,
     )
-except ModuleNotFoundError:
+except ModuleNotFoundError as exc:
+    # Fall back only when the optional scaffold package itself is unavailable.
+    # Do not hide missing dependencies imported from inside the app module.
+    if exc.name not in {"app", "app.cin_evidence_ingestion"}:
+        raise
     from cin_evidence_ingestion import (
         ALLOWED_REPOSITORIES,
         EvidenceSourceError,
@@ -34,7 +38,11 @@ def public_evidence_ingestion(request: PublicEvidenceRequest) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="Repository is not on the public-source allowlist")
     try:
         return fetch_github_repository_evidence(request.repository)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except EvidenceSourceError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except Exception:
+        # Do not expose unexpected provider/library internals to API clients.
+        raise HTTPException(
+            status_code=502,
+            detail="Public evidence provider returned an unexpected response",
+        ) from None
