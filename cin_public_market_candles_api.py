@@ -30,6 +30,50 @@ MAX_TIMESTAMP_MS = 253402300799999
 TIMEFRAMES = {"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M"}
 KRAKEN_INTERVALS = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440, "1w": 10080}
 KRAKEN_SYMBOLS = {"BTC": "XBT"}
+_INTERVAL_MS = {
+    "1m": 60_000, "3m": 180_000, "5m": 300_000, "15m": 900_000,
+    "30m": 1_800_000, "1h": 3_600_000, "2h": 7_200_000,
+    "4h": 14_400_000, "6h": 21_600_000, "8h": 28_800_000,
+    "12h": 43_200_000, "1d": 86_400_000, "3d": 259_200_000,
+    "1w": 604_800_000, "1M": 2_678_400_000,
+}
+
+
+def _interval_duration_ms(interval: str, open_time_ms: int | None = None) -> int:
+    """Return interval duration; monthly candles use calendar-month boundaries."""
+    if interval != "1M" or open_time_ms is None:
+        return _INTERVAL_MS[interval]
+    start = datetime.fromtimestamp(open_time_ms / 1000, timezone.utc)
+    if start.month == 12:
+        next_month = datetime(start.year + 1, 1, 1, tzinfo=timezone.utc)
+    else:
+        next_month = datetime(start.year, start.month + 1, 1, tzinfo=timezone.utc)
+    return int(next_month.timestamp() * 1000) - open_time_ms
+
+
+def _freshness_metadata(rows: list[dict[str, Any]], interval: str, now_ms: int) -> dict[str, Any]:
+    """Report completed-candle freshness without implying provider verification."""
+    closed_rows = [row for row in rows if row["close_time"] < now_ms]
+    latest = max(closed_rows, key=lambda row: row["close_time"]) if closed_rows else None
+    duration_ms = _interval_duration_ms(interval, latest["open_time"] if latest else None)
+    threshold_seconds = duration_ms * 2 / 1000
+    if not closed_rows:
+        return {
+            "latest_closed_candle_close_time_utc": None,
+            "latest_closed_candle_age_seconds": None,
+            "stale_data_warning": "No completed candle is available; do not treat a forming candle as closed data.",
+            "stale_threshold_seconds": threshold_seconds,
+        }
+    age_seconds = max(0.0, (now_ms - latest["close_time"]) / 1000)
+    warning = f"Latest completed candle is older than the interval {interval} freshness threshold." if age_seconds > threshold_seconds else None
+    return {
+        "latest_closed_candle_close_time_utc": datetime.fromtimestamp(latest["close_time"] / 1000, timezone.utc).isoformat(),
+        "latest_closed_candle_age_seconds": round(age_seconds, 3),
+        "stale_data_warning": warning,
+        "stale_threshold_seconds": threshold_seconds,
+    }
+
+
 
 
 def _request_json(url: str) -> Any:
@@ -286,17 +330,21 @@ async def get_market_candles(
     """Retrieve timestamped public OHLCV candles with source provenance."""
     normalized = _validate(symbol, interval, limit)
     rows = await _load(normalized, interval, limit)
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    freshness = _freshness_metadata(rows, interval, now_ms)
     source = rows[0].get("_source", "Binance public market-data API")
     endpoint = rows[0].get("_source_endpoint", BINANCE_KLINES_URL)
     return {
         "service": "cin", "mode": "read_only", "source": source, "source_endpoint": endpoint,
         "retrieved_at": datetime.now(timezone.utc).isoformat(), "symbol": normalized,
         "timeframe": interval, "count": len(rows),
+        **freshness,
         "data": [
             {
                 **{key: value for key, value in row.items() if not key.startswith("_")},
                 "open_time_utc": datetime.fromtimestamp(row["open_time"] / 1000, timezone.utc).isoformat(),
                 "close_time_utc": datetime.fromtimestamp(row["close_time"] / 1000, timezone.utc).isoformat(),
+                "is_closed": row["close_time"] < now_ms,
             }
             for row in rows
         ],
@@ -318,22 +366,32 @@ async def analyze_public_market(
     """Fetch public OHLCV and run CIN's existing deterministic technical analysis."""
     normalized = _validate(symbol, interval, limit)
     rows = await _load(normalized, interval, limit)
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    closed_rows = [row for row in rows if row["close_time"] < now_ms]
+    if len(closed_rows) < 5:
+        raise HTTPException(status_code=422, detail="At least five completed candles are required for market technical analysis.")
+    freshness = _freshness_metadata(rows, interval, now_ms)
     source = rows[0].get("_source", "Binance public market-data API")
     endpoint = rows[0].get("_source_endpoint", BINANCE_KLINES_URL)
     try:
-        analysis = analyze_ohlc([{key: row[key] for key in ("open", "high", "low", "close")} for row in rows])
+        analysis = analyze_ohlc([{key: row[key] for key in ("open", "high", "low", "close")} for row in closed_rows])
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=f"Fetched candles failed analysis validation: {exc}") from exc
     analysis["input"].update({
         "symbol": normalized, "timeframe": interval, "source": source, "source_endpoint": endpoint,
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
-        "first_candle_open_time_utc": datetime.fromtimestamp(rows[0]["open_time"] / 1000, timezone.utc).isoformat(),
-        "last_candle_close_time_utc": datetime.fromtimestamp(rows[-1]["close_time"] / 1000, timezone.utc).isoformat(),
+        "requested_candle_count": len(rows),
+        "analysis_candle_count": len(closed_rows),
+        "forming_candle_excluded_count": len(rows) - len(closed_rows),
+        "candle_closure_policy": "technical analysis uses only candles whose close_time is earlier than retrieval time",
+        "first_candle_open_time_utc": datetime.fromtimestamp(closed_rows[0]["open_time"] / 1000, timezone.utc).isoformat(),
+        "last_candle_close_time_utc": datetime.fromtimestamp(closed_rows[-1]["close_time"] / 1000, timezone.utc).isoformat(),
         "volume_included_in_source_but_not_used_in_indicators": True,
+        **freshness,
     })
     analysis["limitations"].extend([
         "Public exchange data is not independently audited by CIN.",
-        "The last candle may still be forming; confirm closed-candle status before comparing snapshots.",
+        "The market-candles endpoint labels forming candles; the technical-analysis endpoint excludes them.",
         "Technical outputs and ATR scenarios are descriptive research, not investment advice or trade instructions.",
     ])
     return analysis

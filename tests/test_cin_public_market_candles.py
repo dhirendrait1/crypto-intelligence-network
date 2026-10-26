@@ -134,6 +134,57 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["input"]["candle_count"], 50)
         self.assertTrue(any("not independently audited" in item for item in result["limitations"]))
 
+    async def test_market_analysis_excludes_forming_candles_and_reports_freshness(self):
+        now_ms = int(api.datetime.now(api.timezone.utc).timestamp() * 1000)
+        rows = [
+            {
+                "open_time": now_ms - (index + 2) * 3_600_000,
+                "open": 100 + index,
+                "high": 103 + index,
+                "low": 99 + index,
+                "close": 102 + index,
+                "volume": 10.0,
+                "close_time": now_ms - (index + 1) * 3_600_000,
+            }
+            for index in range(5)
+        ]
+        rows.append({
+            "open_time": now_ms - 600_000,
+            "open": 105.0,
+            "high": 108.0,
+            "low": 104.0,
+            "close": 107.0,
+            "volume": 11.0,
+            "close_time": now_ms + 3_000_000,
+        })
+        with patch.object(api, "_load", return_value=rows):
+            result = await api.analyze_public_market("BTCUSDT", "1h", 6)
+        self.assertEqual(result["input"]["requested_candle_count"], 6)
+        self.assertEqual(result["input"]["analysis_candle_count"], 5)
+        self.assertEqual(result["input"]["forming_candle_excluded_count"], 1)
+        self.assertIn("earlier than retrieval time", result["input"]["candle_closure_policy"])
+        self.assertIn("latest_closed_candle_age_seconds", result["input"])
+
+    async def test_market_analysis_requires_five_completed_candles(self):
+        now_ms = int(api.datetime.now(api.timezone.utc).timestamp() * 1000)
+        rows = [
+            {
+                "open_time": now_ms - (index + 2) * 3_600_000,
+                "open": 100 + index,
+                "high": 103 + index,
+                "low": 99 + index,
+                "close": 102 + index,
+                "volume": 10.0,
+                "close_time": now_ms - (index + 1) * 3_600_000 if index < 3 else now_ms + 3_000_000,
+            }
+            for index in range(5)
+        ]
+        with patch.object(api, "_load", return_value=rows):
+            with self.assertRaises(HTTPException) as ctx:
+                await api.analyze_public_market("BTCUSDT", "1h", 5)
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertIn("five completed candles", ctx.exception.detail)
+
     async def test_451_falls_back_to_kraken_and_labels_source(self):
         import asyncio
         with patch.object(api, "_fetch_binance", side_effect=urllib.error.HTTPError(
