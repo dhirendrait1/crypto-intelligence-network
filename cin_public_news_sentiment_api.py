@@ -167,7 +167,7 @@ def _get_rss_articles(query: str, max_records: int) -> tuple[list[dict[str, Any]
                     fields.get("encoded", ""), fields.get("content", ""), fields.get("category", ""),
                 )).lower()
                 searchable = re.sub(r"<[^>]*>", " ", searchable)
-                searchable = re.sub(r"&(?:amp|lt|gt|quot|apos|#\\d+|#x[0-9a-fA-F]+);", " ", searchable)
+                searchable = re.sub(r"&(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);", " ", searchable)
                 if title and link and any(term in searchable for term in terms):
                     date_raw = fields.get("pubdate") or fields.get("published") or fields.get("updated")
                     seen_at = None
