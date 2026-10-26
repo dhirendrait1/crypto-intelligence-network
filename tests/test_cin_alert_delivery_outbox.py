@@ -1,0 +1,81 @@
+"""Offline tests for CIN's durable notification outbox state machine."""
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
+
+import pytest
+
+from cin_alert_delivery_outbox import (
+    claim_due_alerts,
+    enqueue_alert_delivery,
+    mark_alert_failed,
+    mark_alert_sent,
+)
+
+NOW = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
+
+
+def test_enqueue_is_idempotent_and_does_not_store_duplicate_payloads(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    first = enqueue_alert_delivery(path, rule_id="r1", observation_id="e1", payload={"metric": "btc", "value": 1}, now=NOW)
+    second = enqueue_alert_delivery(path, rule_id="r1", observation_id="e1", payload={"metric": "btc", "value": 2}, now=NOW)
+    assert first["status"] == "pending"
+    assert second["idempotency_key"] == first["idempotency_key"]
+    assert second["payload"] == first["payload"]
+
+
+def test_claim_and_successful_delivery_state_transitions(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    item = enqueue_alert_delivery(path, rule_id="r1", observation_id="e1", payload={"value": 1}, now=NOW)
+    claimed = claim_due_alerts(path, now=NOW)
+    assert len(claimed) == 1
+    assert claimed[0]["status"] == "sending"
+    assert claim_due_alerts(path, now=NOW) == []
+    sent = mark_alert_sent(path, item["idempotency_key"], now=NOW + timedelta(seconds=1))
+    assert sent["status"] == "sent"
+    assert sent["attempts"] == 1
+    assert claim_due_alerts(path, now=NOW + timedelta(days=1)) == []
+
+
+def test_failure_uses_bounded_exponential_backoff_and_can_retry(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    item = enqueue_alert_delivery(path, rule_id="r1", observation_id="e1", payload={"value": 1}, now=NOW)
+    claim_due_alerts(path, now=NOW)
+    failed = mark_alert_failed(path, item["idempotency_key"], now=NOW, error_code="provider_timeout", retry_delay_seconds=30)
+    assert failed["status"] == "failed"
+    assert failed["attempts"] == 1
+    assert failed["next_attempt_at"] == (NOW + timedelta(seconds=30)).isoformat()
+    assert claim_due_alerts(path, now=NOW + timedelta(seconds=29)) == []
+    assert claim_due_alerts(path, now=NOW + timedelta(seconds=30))[0]["status"] == "sending"
+
+
+def test_retry_exhaustion_moves_to_dead_letter_and_never_claims_again(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    item = enqueue_alert_delivery(path, rule_id="r1", observation_id="e1", payload={}, now=NOW)
+    claim_due_alerts(path, now=NOW)
+    dead = mark_alert_failed(path, item["idempotency_key"], now=NOW, error_code="timeout", max_attempts=1)
+    assert dead["status"] == "dead"
+    assert claim_due_alerts(path, now=NOW + timedelta(days=2)) == []
+
+
+def test_concurrent_enqueue_creates_one_idempotency_key(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    def add(_):
+        return enqueue_alert_delivery(path, rule_id="r1", observation_id="e1", payload={"value": 1}, now=NOW)
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        results = list(pool.map(add, range(6)))
+    assert {result["idempotency_key"] for result in results} == {"r1:e1"}
+    assert {result["status"] for result in results} == {"pending"}
+
+
+@pytest.mark.parametrize("bad_payload", [{"v": float("nan")}, {"v": float("inf")}])
+def test_non_json_finite_payloads_are_rejected(tmp_path, bad_payload):
+    with pytest.raises(ValueError):
+        enqueue_alert_delivery(tmp_path / "alerts.sqlite3", rule_id="r1", observation_id="e1", payload=bad_payload, now=NOW)
+
+
+def test_invalid_time_and_retry_limits_are_rejected(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    with pytest.raises(ValueError, match="explicit timezone"):
+        enqueue_alert_delivery(path, rule_id="r1", observation_id="e1", payload={}, now="2026-10-27T12:00:00")
+    with pytest.raises(ValueError, match="limit"):
+        claim_due_alerts(path, now=NOW, limit=True)
