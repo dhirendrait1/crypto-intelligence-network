@@ -71,7 +71,16 @@ def _get_rss_articles(query: str, max_records: int) -> tuple[list[dict[str, Any]
     terms = _rss_query_terms(query)
     rows: list[dict[str, Any]] = []
     providers: list[str] = []
-    for provider, url in _RSS_FEEDS:
+    # Public Google News RSS search broadens query coverage when publisher feeds
+    # do not contain a matching recent headline. It remains a read-only public feed.
+    google_news_url = "https://news.google.com/rss/search?" + urllib.parse.urlencode({
+        "q": query,
+        "hl": "en-US",
+        "gl": "US",
+        "ceid": "US:en",
+    })
+    feeds = (*_RSS_FEEDS, ("Google News public RSS search", google_news_url))
+    for provider, url in feeds:
         request = urllib.request.Request(
             url,
             headers={"accept": "application/rss+xml, application/xml, text/xml", "user-agent": _USER_AGENT},
@@ -96,7 +105,17 @@ def _get_rss_articles(query: str, max_records: int) -> tuple[list[dict[str, Any]
                     link_element = next((child for child in list(item) if child.tag.rsplit("}", 1)[-1].lower() == "link"), None)
                     if link_element is not None:
                         link = link_element.attrib.get("href", "")
-                searchable = f"{title} {fields.get('description', '')} {fields.get('summary', '')}".lower()
+                searchable = " ".join((
+                    title,
+                    fields.get("description", ""),
+                    fields.get("summary", ""),
+                    fields.get("encoded", ""),
+                    fields.get("content", ""),
+                    fields.get("category", ""),
+                )).lower()
+                # RSS descriptions may contain markup; remove tags/entities before matching.
+                searchable = re.sub(r"<[^>]*>", " ", searchable)
+                searchable = re.sub(r"&(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);", " ", searchable)
                 if title and link and any(term in searchable for term in terms):
                     date_raw = fields.get("pubdate") or fields.get("published") or fields.get("updated")
                     seen_at = None
