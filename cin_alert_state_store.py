@@ -86,8 +86,9 @@ def evaluate_and_record(
         notification_json = None
     evaluated_at = _utc_iso(now)
     path = str(database_path)
-    if path != ":memory:":
-        Path(path).parent.mkdir(parents=True, exist_ok=True)
+    if path == ":memory:":
+        raise ValueError("a persistent SQLite file path is required for durable alert state")
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
 
     with sqlite3.connect(path, timeout=10, isolation_level=None) as connection:
         connection.execute("PRAGMA busy_timeout = 10000")
