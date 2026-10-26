@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS alert_delivery_outbox (
     rule_id TEXT NOT NULL,
     observation_id TEXT NOT NULL,
     payload_json TEXT NOT NULL,
-    status TEXT NOT NULL CHECK(status IN ('pending','sending','sent','failed')),
+    status TEXT NOT NULL CHECK(status IN ('pending','sending','sent','failed','dead')),
     attempts INTEGER NOT NULL DEFAULT 0,
     next_attempt_at TEXT NOT NULL,
     created_at TEXT NOT NULL,
@@ -193,11 +193,8 @@ def mark_alert_failed(
             if not row or row[1] != "sending":
                 raise ValueError("outbox item must exist and be in sending state")
             attempts = row[0] + 1
-            status = "failed" if attempts < max_attempts else "sent"
-            # Exhausted items are terminal and never retried; status 'sent' is avoided
-            # because it would falsely imply successful delivery.
-            if attempts >= max_attempts:
-                status = "failed"
+            # 'dead' is terminal and never retried; it must not imply delivery succeeded.
+            status = "failed" if attempts < max_attempts else "dead"
             delay = min(retry_delay_seconds * (2 ** (attempts - 1)), 86400)
             next_attempt = (current_dt + timedelta(seconds=delay)).isoformat()
             db.execute(
