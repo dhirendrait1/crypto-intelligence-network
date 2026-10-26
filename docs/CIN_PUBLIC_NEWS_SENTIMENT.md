@@ -30,3 +30,11 @@ Timestamps more than 60 seconds ahead of CIN's UTC clock are labeled `future_dat
 ## Aggregate timestamp-quality metadata
 
 The response exposes `data_quality.provider_timestamp_quality_counts` with counts for `valid`, `missing`, `invalid_timezone`, `invalid`, and `future_dated` provider seen times. These counts refer to GDELT indexing/seen times and do not verify original publication time. For backward-compatible behavior, the headline sentiment aggregate still includes every accepted article regardless of timestamp status; consumers must inspect the quality counts before using timestamps for time-sensitive evidence.
+
+## RSS fallback behavior
+
+If GDELT fails, CIN tries the configured public publisher RSS feeds (CoinDesk and Cointelegraph). If those feeds do not produce any relevant articles for the requested query, CIN makes a query-specific public Google News RSS request as a coverage fallback. When publisher RSS already returns relevant articles, the Google News request is skipped to avoid unnecessary outbound calls. Relevance matching considers available title, description, summary, content, and category text after basic markup/entity cleanup.
+
+The RSS fallback remains best-effort public news retrieval: a zero-result response means the configured feeds did not return a matching item at that time, not that no relevant news exists. Feed availability, indexing delays, query relevance, and live behavior must be validated with a network-enabled smoke test. The automated regression tests use mocked responses and do not establish live provider availability.
+
+The Google News RSS fallback does not add a paid provider, API key, social-platform connector, or trade capability. Headline sentiment remains a low-confidence lexical heuristic.

@@ -71,7 +71,10 @@ def _get_rss_articles(query: str, max_records: int) -> tuple[list[dict[str, Any]
     terms = _rss_query_terms(query)
     rows: list[dict[str, Any]] = []
     providers: list[str] = []
-    for provider, url in _RSS_FEEDS:
+    # Query publisher feeds first. Use the query-specific Google News RSS search
+    # only when they yield no relevant rows, avoiding unnecessary outbound requests.
+    feeds = list(_RSS_FEEDS)
+    for provider, url in feeds:
         request = urllib.request.Request(
             url,
             headers={"accept": "application/rss+xml, application/xml, text/xml", "user-agent": _USER_AGENT},
@@ -96,7 +99,17 @@ def _get_rss_articles(query: str, max_records: int) -> tuple[list[dict[str, Any]
                     link_element = next((child for child in list(item) if child.tag.rsplit("}", 1)[-1].lower() == "link"), None)
                     if link_element is not None:
                         link = link_element.attrib.get("href", "")
-                searchable = f"{title} {fields.get('description', '')} {fields.get('summary', '')}".lower()
+                searchable = " ".join((
+                    title,
+                    fields.get("description", ""),
+                    fields.get("summary", ""),
+                    fields.get("encoded", ""),
+                    fields.get("content", ""),
+                    fields.get("category", ""),
+                )).lower()
+                # RSS descriptions may contain markup; remove tags/entities before matching.
+                searchable = re.sub(r"<[^>]*>", " ", searchable)
+                searchable = re.sub(r"&(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);", " ", searchable)
                 if title and link and any(term in searchable for term in terms):
                     date_raw = fields.get("pubdate") or fields.get("published") or fields.get("updated")
                     seen_at = None
@@ -116,6 +129,63 @@ def _get_rss_articles(query: str, max_records: int) -> tuple[list[dict[str, Any]
                 break
         except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ET.ParseError, ValueError):
             continue
+
+    if not rows:
+        google_news_url = "https://news.google.com/rss/search?" + urllib.parse.urlencode({
+            "q": query,
+            "hl": "en-US",
+            "gl": "US",
+            "ceid": "US:en",
+        })
+        request = urllib.request.Request(
+            google_news_url,
+            headers={"accept": "application/rss+xml, application/xml, text/xml", "user-agent": _USER_AGENT},
+            method="GET",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=8) as response:
+                raw = response.read(_MAX_PROVIDER_RESPONSE_BYTES + 1)
+            if len(raw) > _MAX_PROVIDER_RESPONSE_BYTES:
+                raise ValueError("RSS response exceeded the configured size limit")
+            root = ET.fromstring(raw)
+            providers.append("Google News public RSS search")
+            for item in root.iter():
+                if item.tag.rsplit("}", 1)[-1].lower() not in {"item", "entry"}:
+                    continue
+                fields = {
+                    child.tag.rsplit("}", 1)[-1].lower(): (child.text or "").strip()
+                    for child in list(item)
+                }
+                title = fields.get("title", "")
+                link = fields.get("link", "")
+                if not link:
+                    link_element = next((child for child in list(item) if child.tag.rsplit("}", 1)[-1].lower() == "link"), None)
+                    if link_element is not None:
+                        link = link_element.attrib.get("href", "")
+                searchable = " ".join((
+                    title, fields.get("description", ""), fields.get("summary", ""),
+                    fields.get("encoded", ""), fields.get("content", ""), fields.get("category", ""),
+                )).lower()
+                searchable = re.sub(r"<[^>]*>", " ", searchable)
+                searchable = re.sub(r"&(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);", " ", searchable)
+                if title and link and any(term in searchable for term in terms):
+                    date_raw = fields.get("pubdate") or fields.get("published") or fields.get("updated")
+                    seen_at = None
+                    if date_raw:
+                        try:
+                            parsed_date = parsedate_to_datetime(date_raw)
+                            if parsed_date.tzinfo is not None:
+                                seen_at = parsed_date.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+                            else:
+                                seen_at = parsed_date.replace(tzinfo=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+                        except (TypeError, ValueError, OverflowError):
+                            seen_at = None
+                    rows.append({"title": title, "url": link, "seendate": seen_at, "domain": urlsplit(link).hostname})
+                    if len(rows) >= max_records:
+                        break
+        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ET.ParseError, ValueError):
+            pass
+
     if not providers:
         raise urllib.error.URLError("GDELT and public RSS fallback feeds were unreachable")
     parsed = _parse_articles({"articles": rows}, max_records)
