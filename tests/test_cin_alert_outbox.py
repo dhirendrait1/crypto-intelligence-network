@@ -88,3 +88,28 @@ def test_timezone_required_and_error_is_bounded(tmp_path):
     item = claim_due_notifications(path, now=NOW)[0]
     failed = mark_notification_failed(path, notification_id=item["id"], error="x" * 2000, now=NOW)
     assert len(failed["last_error"]) == 1000
+
+
+def test_abandoned_sending_claim_is_recovered_after_lease(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    enqueue_notification(path, idempotency_key="event-stuck", payload={"a": 1}, now=NOW)
+    first = claim_due_notifications(path, now=NOW)[0]
+    assert first["attempts"] == 1
+    assert claim_due_notifications(path, now=NOW + timedelta(seconds=299)) == []
+    recovered = claim_due_notifications(path, now=NOW + timedelta(seconds=300))
+    assert len(recovered) == 1
+    assert recovered[0]["id"] == first["id"]
+    assert recovered[0]["attempts"] == 2
+
+
+def test_in_memory_path_rejected_because_state_must_survive_calls(tmp_path):
+    with pytest.raises(ValueError, match="persistent SQLite file path"):
+        enqueue_notification(":memory:", idempotency_key="event-1", payload={}, now=NOW)
+
+
+def test_invalid_claim_limits_rejected(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    with pytest.raises(ValueError, match="lease_seconds"):
+        claim_due_notifications(path, now=NOW, lease_seconds=5)
+    with pytest.raises(ValueError, match="limit"):
+        claim_due_notifications(path, now=NOW, limit=0)
