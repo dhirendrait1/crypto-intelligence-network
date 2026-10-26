@@ -73,7 +73,9 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
     async def test_451_and_fallback_failure_returns_clear_503(self):
         with patch.object(api, "_fetch_binance", side_effect=urllib.error.HTTPError(
             api.BINANCE_KLINES_URL, 451, "unavailable for legal reasons", {}, None
-        )), patch.object(api, "_fetch_kraken", side_effect=ValueError("unsupported pair")):
+        )), patch.object(api, "_fetch_kraken", side_effect=ValueError("unsupported pair")), patch.object(
+            api, "_fetch_coinbase", side_effect=ValueError("unsupported product")
+        ):
             with self.assertRaises(HTTPException) as ctx:
                 await api._load("BTCUSDT", "1h", 5)
         self.assertEqual(ctx.exception.status_code, 503)
