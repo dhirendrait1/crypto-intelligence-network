@@ -399,7 +399,7 @@ class ProviderFailureClassificationTests(unittest.TestCase):
             "Response", (), {
                 "__enter__": lambda self: self,
                 "__exit__": lambda self, *args: False,
-                "read": lambda self: b"{}",
+                "read": lambda self, limit=-1: b"{}"[:limit],
             }
         )()
         fallback = MODULE.urllib.error.URLError("offline")
