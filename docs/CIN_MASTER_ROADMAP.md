@@ -60,7 +60,7 @@
 ## Stage 5 — Alerts, monitoring, and forecast evaluation
 
 24. **[Partial]** Threshold semantics (`above` / `below`) and a deterministic evaluator are implemented with offline tests; user-configurable rule CRUD, ownership, and API integration remain pending.
-25. **[Partial]** SQLite event deduplication, per-rule cooldown state, and a transport-neutral outbox with claims, bounded retry backoff, and terminal dead-letter state are implemented offline; abandoned-worker recovery and integrated delivery transaction remain pending.
+25. **[Partial]** SQLite event deduplication, per-rule cooldown state, and a transport-neutral outbox with claims, bounded retry backoff, and terminal dead-letter state are implemented offline; abandoned-worker recovery remains pending; the state store can atomically enqueue a supplied notification payload with a trigger, but external delivery remains unconnected.
 26. **[Pending]** Add an authorized alert delivery adapter/channel and keep credentials out of source control; no provider is connected and no notifications are sent yet.
 27. **[Pending]** Persist forecast timestamp, asset, price source, horizon, and target/invalidating conditions.
 28. **[Pending]** Evaluate forecast outcomes and calibration with reproducible metrics and survivorship/look-ahead safeguards.
