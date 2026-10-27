@@ -25,6 +25,12 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Preserve PR-only screening contract test before scaffold extraction
+        run: |
+          test -f tests/test_coin_screening_adapter_contract.py
+          mkdir -p /tmp/cin-pr-contract-tests
+          cp tests/test_coin_screening_adapter_contract.py /tmp/cin-pr-contract-tests/
+
       - name: Extract the same scaffold used by Render
         run: |
           python -m zipfile -e cin_step203_scaffold_fixed.zip .
@@ -39,6 +45,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r cin/requirements.txt pytest httpx
+
+      - name: Restore PR-only screening contract test after scaffold extraction
+        run: |
+          mkdir -p tests
+          cp /tmp/cin-pr-contract-tests/test_coin_screening_adapter_contract.py tests/
 
       - name: Compile CIN modules and tests
         run: |
