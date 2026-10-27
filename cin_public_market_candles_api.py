@@ -352,10 +352,16 @@ async def get_market_candles(
                 "is_closed": row["close_time"] < now_ms,
                 "observation_metadata": candle_observation_metadata(
                     source_id=source_id,
-                    observed_at=datetime.fromtimestamp(row["close_time"] / 1000, timezone.utc).isoformat(),
+                    observed_at=datetime.fromtimestamp(
+                        (row["close_time"] if row["close_time"] < now_ms else row["open_time"]) / 1000,
+                        timezone.utc,
+                    ).isoformat(),
                     retrieved_at=retrieved_at,
                     interval=interval,
                     quote_currency=pair_metadata["quote_currency"],
+                    timestamp_semantics=(
+                        "candle_close_time" if row["close_time"] < now_ms else "candle_open_time"
+                    ),
                 ),
             }
             for row in rows
