@@ -17,6 +17,19 @@ class MonitoringSnapshot(BaseModel):
     observed_at: str | None = Field(default=None, max_length=64)
     warnings: list[str] = Field(default_factory=list, max_length=20)
 
+    @field_validator("warnings")
+    @classmethod
+    def normalize_warnings(cls, values: list[str]) -> list[str]:
+        normalized = []
+        for value in values:
+            warning = value.strip()
+            if not warning:
+                raise ValueError("warnings must not contain blank entries")
+            if len(warning) > 500:
+                raise ValueError("each warning must be at most 500 characters")
+            normalized.append(warning)
+        return normalized
+
     @field_validator("observed_at")
     @classmethod
     def observed_at_must_be_timezone_aware_iso8601(cls, value: str | None) -> str | None:
