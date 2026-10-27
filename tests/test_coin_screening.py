@@ -747,3 +747,23 @@ class MarketProviderResponseSizeTests(unittest.TestCase):
         self.assertEqual(fallback.requested_size, MODULE._MAX_MARKET_PROVIDER_RESPONSE_BYTES + 1)
         self.assertEqual(caught.exception.primary_kind, "invalid_response")
         self.assertEqual(caught.exception.fallback_kind, "invalid_response")
+
+class ProviderTimestampBoundaryRegressionTests(unittest.TestCase):
+    def test_freshness_threshold_and_future_clock_skew_boundaries(self):
+        now = MODULE.time.time()
+        cases = (
+            (MODULE.datetime.fromtimestamp(now - 900, MODULE.timezone.utc), "fresh"),
+            (MODULE.datetime.fromtimestamp(now - 901, MODULE.timezone.utc), "stale"),
+            (MODULE.datetime.fromtimestamp(now + 300, MODULE.timezone.utc), "fresh"),
+            (MODULE.datetime.fromtimestamp(now + 301, MODULE.timezone.utc), "unknown"),
+        )
+        for timestamp, expected in cases:
+            with self.subTest(timestamp=timestamp, expected=expected):
+                status, age = MODULE._market_freshness(timestamp.isoformat())
+                self.assertEqual(status, expected)
+                if expected == "unknown":
+                    self.assertIsNone(age)
+                else:
+                    self.assertIsNotNone(age)
+                    self.assertGreaterEqual(age, 0)
+
