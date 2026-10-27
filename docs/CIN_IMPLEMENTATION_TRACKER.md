@@ -884,3 +884,18 @@ This checkpoint validates configured offline automation only. It does not establ
 - Added an offline test that verifies both providers are bounded and their oversized bodies become structured invalid-response failures.
 - Source commit: `92e6277f04d1f83cf59ebbefee2c80afc31fd78f`; test commit: `b8017ae026cd7758108590a81a3fa68f95935eef`.
 - CI for current head is pending. CIN remains read-only; no deployment changes.
+
+
+## Provider-policy reconciliation (2026-10-27)
+
+- **Confirmed current-main mismatch:** `cin_public_market_candles_api.py` uses Binance public candles with Kraken fallback; `coin_screening_step2.py` uses CoinGecko first with CoinPaprika fallback.
+- **Previously established user preference:** Coinbase public market data first, and do not use CoinGecko unless the user explicitly changes that preference.
+- **Status: open / not yet reconciled.** This is a source-policy mismatch, not proof that any provider is unavailable. Coinbase candle endpoints and broad coin-screening datasets have different schemas and coverage; do not swap providers by assumption.
+- Issue #21 tracks the required inventory and acceptance criteria. Any provider migration must be implemented behind a PR with offline adapter tests for schema, asset/symbol mapping, timestamps, rate limits, cache/staleness, provenance, and sanitized errors.
+- No provider change has been made, no PR has been merged for this item, and no Render action is authorized. Because `render.yaml` enables auto-deploy from `main`, keep implementation changes unmerged until validated and deployment is explicitly authorized.
+
+## Additional open work verified 2026-10-27
+
+- PR #19 adds the simultaneous SQLite alert-claimer regression test; it remains unmerged and its four configured workflows were reported passing on its feature-branch head.
+- PR #20 adds malformed-URL isolation to the news RSS fallback and targets PR #14's branch to avoid duplicating the parent change. It remains unmerged; verify current-head CI before considering it validated.
+- Passing offline CI is not evidence of live provider access, durable production storage, a configured scheduler, real Telegram delivery, or the currently deployed Render revision.
