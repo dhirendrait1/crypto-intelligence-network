@@ -97,3 +97,35 @@ def test_invalid_quote_metadata_is_rejected_by_contract():
     result = validate_source_observation(observation, now=NOW)
     assert result["validity"] == "unknown"
     assert result["reason"] == "market_candle_quote_currency_required"
+
+
+def test_future_observation_timestamp_is_unknown_even_when_other_fields_exist():
+    observation = {
+        "source_id": "binance_public",
+        "subject": "BTCUSDT",
+        "observed_at": "2026-10-28T12:01:00Z",
+        "retrieved_at": "2026-10-28T12:00:00Z",
+        "timestamp_semantics": "candle_close_time",
+        "provenance": "public-candles-endpoint",
+        "quote_currency": "USDT",
+        "interval": "1h",
+    }
+    result = validate_source_observation(observation, now=NOW)
+    assert result["validity"] == "unknown"
+    assert result["reason"] == "observation_timestamp_in_future"
+
+
+def test_observation_after_retrieval_is_unknown_in_integration_contract():
+    observation = {
+        "source_id": "binance_public",
+        "subject": "BTCUSDT",
+        "observed_at": "2026-10-28T11:59:06Z",
+        "retrieved_at": "2026-10-28T11:59:05Z",
+        "timestamp_semantics": "candle_close_time",
+        "provenance": "public-candles-endpoint",
+        "quote_currency": "USDT",
+        "interval": "1h",
+    }
+    result = validate_source_observation(observation, now=NOW)
+    assert result["validity"] == "unknown"
+    assert result["reason"] == "observation_after_retrieval"
