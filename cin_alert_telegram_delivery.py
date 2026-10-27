@@ -138,10 +138,20 @@ def process_due_telegram_alerts(
                 "provider_message_id": sent.get("message_id"),
             })
         except TelegramDeliveryError as exc:
-            updated = mark_alert_failed(
-                database_path, item["idempotency_key"], now=now,
-                error_code=exc.code, max_attempts=max_attempts, claim_attempt=item["attempts"],
-            )
+            try:
+                updated = mark_alert_failed(
+                    database_path, item["idempotency_key"], now=now,
+                    error_code=exc.code, max_attempts=max_attempts, claim_attempt=item["attempts"],
+                )
+            except ValueError:
+                # Another worker may have reclaimed this lease. Never let a stale
+                # failure response overwrite the newer attempt's state.
+                results.append({
+                    "idempotency_key": item["idempotency_key"],
+                    "status": "state_update_failed",
+                    "error_code": exc.code,
+                })
+                continue
             results.append({
                 "idempotency_key": item["idempotency_key"],
                 "status": updated["status"] if updated else "state_update_failed",
