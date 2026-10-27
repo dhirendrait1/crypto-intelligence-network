@@ -55,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 2
-    except (OSError, ValueError, RuntimeError) as exc:
+    except Exception as exc:
         # Do not print exception text: it may contain filesystem or provider details.
         print(
             json.dumps({
