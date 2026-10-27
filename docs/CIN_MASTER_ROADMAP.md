@@ -59,7 +59,22 @@
 
 ## Stage 5 — Alerts, monitoring, and forecast evaluation
 
-24. **[Pending]** Define user-configurable alert rules and threshold semantics.
+24. **[Partial — rule contract specified; scheduler and delivery implementation pending]** Define user-configurable alert rules and threshold semantics.
+
+### Step 24 acceptance contract — read-only alerts
+
+- **Rule identity and lifecycle:** each rule has a stable ID, schema version, enabled/paused state, creation/update time, and explicit owner scope appropriate to the deployment. Disabled rules must not emit alerts.
+- **Target and metric:** define asset identity, metric key, provider/venue scope where applicable, quote currency/unit, and data interval. Reject ambiguous targets rather than guessing symbol mappings.
+- **Condition semantics:** support explicit operators (above, below, crosses above/below, changes by a configured amount/percentage, and data-quality state changes) with validated numeric bounds and units. Document whether each condition is level-triggered or edge-triggered.
+- **Evaluation inputs:** require a source timestamp, retrieval timestamp, freshness state, and valid typed value. Missing, stale, malformed, or conflicting observations must not silently satisfy a price/metric threshold; optionally support a separate alert for those data-quality states.
+- **Crossing semantics:** crossing rules require a previous eligible observation and a current eligible observation on a comparable metric/source basis. First observation establishes a baseline and does not invent a crossing. Out-of-order observations must be ignored or explicitly quarantined.
+- **Rate and repetition controls:** define a per-rule cooldown, deduplication key, maximum event rate, and behavior when a condition remains true. Do not rely on delivery retries to decide whether a condition is newly triggered.
+- **Event auditability:** an alert event records rule ID/version, evaluation time, source observation IDs, condition result, reason code, and deduplication key. Keep the event distinct from delivery attempts.
+- **Safety boundary:** alerts are informational only. No exchange order, transaction, wallet operation, or other financial action may be triggered by an alert.
+- **Regression acceptance:** test exact threshold equality, numeric boundaries, invalid units, missing/stale/conflicted data, first-observation baseline, repeat condition, cooldown expiry, duplicate and out-of-order observations, disabled rules, and deterministic event IDs.
+- **User-facing wording:** include metric/unit, threshold, observed value, source/freshness, and event time; avoid claims of certainty or investment advice.
+
+**Exit evidence required before marking implemented:** versioned rule schema, documented operator truth tables, deterministic evaluator and regression tests, repeat/cooldown policy, and clear separation of evaluation from delivery.
 25. **[Pending]** Implement deduplication, cooldowns, delivery-state tracking, and retry/error handling.
 26. **[Pending]** Add an authorized alert delivery channel and keep credentials out of source control.
 27. **[Pending]** Persist forecast timestamp, asset, price source, horizon, and target/invalidating conditions.
