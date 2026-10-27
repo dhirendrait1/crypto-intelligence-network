@@ -2,8 +2,8 @@
 
 **Scope:** Crypto Intelligence Network (CIN), read-only research, analysis, forecasting, monitoring, and alerts. This tracker records what is supported by repository evidence; it is not a claim that CIN is production-complete.
 
-**Branch:** `feat/cin-architecture-audit`  
-**Release controls (updated 2026-10-26):** PR #6 is merged and its deployment-aligned CI passes on main. PR #11 integrates additional read-only research modules and must pass all current-head workflows before merge. PR #7 and PR #8 remain unmerged audit branches; do not merge them wholesale because PR #8 predates the Coinbase fallback and conflicts with the current candle-provider module. `render.yaml` enables automatic deployment on main updates, so a merge may trigger Render deployment; confirm the deployed revision and live health/readiness/routes before calling the release complete. No order execution, wallet control, private keys, or fund movement.
+**Document status:** Evidence tracker for the current `main` branch; update this file whenever main changes materially.  
+**Release controls (updated 2026-10-27):** PR #6 and PR #11 are merged; do not describe PR #11 as awaiting merge. PR #14 (query-specific public news RSS fallback) and PR #16 (durable alert evaluation plus optional one-shot Telegram delivery) are open and their latest reported four-workflow suites passed, but neither is merged. Their offline tests do not prove live news-provider availability, persistent runtime storage, or real Telegram delivery. PR #7 and PR #8 remain unmerged audit branches; do not merge them wholesale because PR #8 predates the Coinbase fallback and conflicts with the current candle-provider module. `render.yaml` enables automatic deployment on main updates, so any merge can trigger a Render deployment; the user manages Render, and no deployment/configuration changes should be made without explicit approval. Verify deployed revision and live health/readiness/routes before calling release complete. No order execution, wallet control, private keys, or fund movement.
 
 ## Status definitions
 
