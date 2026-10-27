@@ -149,7 +149,7 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(HTTPException) as ctx:
                 await api._load("BTCUSDT", "1h", 5)
         self.assertEqual(ctx.exception.status_code, 502)
-        self.assertIn("ambiguous candle sequence", ctx.exception.detail)
+        self.assertIn("invalid candle timestamps, interval boundaries, or duplicate rows", ctx.exception.detail)
 
     async def test_candle_endpoint_returns_provenance_and_timestamps(self):
         with patch.object(api, "_load", return_value=SAMPLE):
