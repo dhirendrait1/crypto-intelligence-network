@@ -121,3 +121,8 @@ def test_warning_text_accepts_exact_500_character_boundary():
     snapshot = MonitoringSnapshot(warnings=[warning])
     assert snapshot.warnings == [warning]
 
+@pytest.mark.parametrize("warning", [123, True, None, {"message": "slow"}])
+def test_warning_text_rejects_non_string_entries(warning):
+    with pytest.raises(ValidationError):
+        MonitoringSnapshot(warnings=[warning])
+
