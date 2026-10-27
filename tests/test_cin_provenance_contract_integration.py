@@ -161,3 +161,19 @@ def test_timezone_naive_observation_timestamp_is_unknown():
     result = validate_source_observation(observation, now=NOW)
     assert result["validity"] == "unknown"
     assert result["reason"] == "invalid_or_timezone_naive_timestamp"
+
+
+def test_future_retrieval_timestamp_is_unknown_in_integration_contract():
+    observation = {
+        "source_id": "coinbase_public",
+        "subject": "BTCUSDT",
+        "observed_at": "2026-10-28T11:59:00Z",
+        "retrieved_at": "2026-10-28T12:01:00Z",
+        "timestamp_semantics": "candle_close_time",
+        "provenance": "public-candles-endpoint",
+        "quote_currency": "USD",
+        "interval": "1h",
+    }
+    result = validate_source_observation(observation, now=NOW)
+    assert result["validity"] == "unknown"
+    assert result["reason"] == "retrieval_timestamp_in_future"
