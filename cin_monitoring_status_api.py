@@ -1,7 +1,8 @@
 """Read-only API contract for caller-supplied CIN service monitoring snapshots."""
+from datetime import datetime
 from typing import Any
 from fastapi import APIRouter
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 router = APIRouter(tags=["monitoring"])
 
@@ -15,6 +16,19 @@ class MonitoringSnapshot(BaseModel):
     freshness: str = Field(default="unknown", pattern=r"^(fresh|stale|unknown)$")
     observed_at: str | None = Field(default=None, max_length=64)
     warnings: list[str] = Field(default_factory=list, max_length=20)
+
+    @field_validator("observed_at")
+    @classmethod
+    def observed_at_must_be_timezone_aware_iso8601(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError("observed_at must be an ISO 8601 timestamp") from exc
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            raise ValueError("observed_at must include a timezone offset")
+        return value
 
 
 @router.post("/monitoring/status")
