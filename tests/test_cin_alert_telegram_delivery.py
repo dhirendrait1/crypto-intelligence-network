@@ -114,6 +114,22 @@ class TelegramDeliveryTests(unittest.TestCase):
         self.assertEqual(result["claimed"], 1)
         self.assertEqual(result["results"][0]["status"], "sent")
 
+
+    @patch("cin_alert_telegram_delivery.mark_alert_sent", side_effect=ValueError("outbox item must exist and be in sending state"))
+    @patch("cin_alert_telegram_delivery.urllib.request.urlopen")
+    def test_provider_acceptance_with_stale_claim_reports_uncertain_state(self, mocked, mark_sent):
+        tmp_path = Path(tempfile.mkdtemp())
+        mocked.return_value = FakeResponse({"ok": True, "result": {"message_id": 88}})
+        path = tmp_path / "alerts.sqlite3"
+        enqueue_alert_delivery(
+            path, rule_id="r1", observation_id="stale-completion",
+            payload={"text": "BTC alert"}, now=NOW,
+        )
+        result = process_due_telegram_alerts(str(path), now=NOW)
+        self.assertEqual(result["results"][0]["status"], "state_update_failed")
+        self.assertEqual(result["results"][0]["provider_message_id"], 88)
+        mark_sent.assert_called_once()
+
     @patch("cin_alert_telegram_delivery.urllib.request.urlopen", side_effect=urllib.error.URLError("offline"))
     def test_worker_schedules_retry_without_leaking_provider_detail(self, mocked):
         tmp_path = Path(tempfile.mkdtemp())
