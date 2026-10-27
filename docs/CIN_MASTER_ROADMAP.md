@@ -43,7 +43,22 @@
 15. **[Implemented — offline-tested]** Maintain derivatives snapshot validation for open interest, funding, mark/index price, and provider timestamps.
 16. **[Partial]** Validate order-book depth quality, spread/imbalance methodology, and slippage-aware interpretation.
 17. **[Partial]** Expand indicator edge-case tests and make indicator limitations and signal uncertainty clear to consumers.
-18. **[Pending]** Add explicit cross-source conflict handling and evidence confidence rules where the same metric differs by source.
+18. **[Partial — contract specified; implementation and acceptance tests pending]** Add explicit cross-source conflict handling and evidence confidence rules where the same metric differs by source.
+
+### Step 18 acceptance contract — cross-source conflicts
+
+- **Compare like with like:** normalize asset identity, metric name, quote currency/unit, observation interval, market venue/scope, and observation timestamp before comparing values. Never compare USD with USDT, spot with derivatives, or different intervals as if they were equivalent.
+- **Preserve source observations:** retain each candidate value with provider/source ID, asset/metric identity, unit, venue/scope, observed-at timestamp (timezone-aware), retrieved-at timestamp, freshness state, and any transformation applied. Do not silently overwrite a source observation with another.
+- **Classify the outcome:** use `agreement`, `material_conflict`, `insufficient_comparable_data`, or `stale_or_unknown`. Missing values are not zero. A provider failure is not evidence that another source is correct.
+- **Use metric-specific tolerances:** define and test tolerances per metric and unit; do not apply one global percentage to prices, volumes, funding, open interest, and supply metrics. Make the threshold visible in the result metadata.
+- **Choose only by declared policy:** if one source is designated preferred for that exact metric and passes identity, freshness, schema, and quality checks, it may be selected with the selection reason exposed. Otherwise return the conflict and candidates without inventing a winner. Never average incompatible observations.
+- **Confidence is evidence quality, not probability:** explain confidence using source quality, freshness, completeness, comparability, and independent corroboration. Do not describe an uncalibrated score as a probability, verified fact, or investment recommendation.
+- **Keep outputs auditable:** include the rule/version used, candidate sources, conflict classification, and reason codes in API output or structured diagnostics; sanitize provider errors and exclude credentials.
+- **Fail safely:** material unresolved conflicts must lower confidence or block derived conclusions for that metric; downstream screening/analysis must not silently consume a conflicted value as confirmed.
+- **Regression acceptance:** test identical values; within-tolerance differences; beyond-tolerance conflict; mismatched asset/quote/unit/venue/interval; stale versus fresh observations; missing/invalid timestamps; duplicate source records; provider errors; deterministic ordering; and ensuring missing is not treated as zero.
+- **Scope:** read-only public data only. No order execution, wallet access, custody, fund movement, or private-key handling. Offline tests establish deterministic logic only; live provider behavior requires separate authorized smoke tests.
+
+**Exit evidence required before marking implemented:** a documented metric-specific policy, deterministic implementation, automated conflict/regression tests, API contract examples, and explicit separation between offline CI and live-source validation.
 
 **Exit gate:** outputs are reproducible, provenance-backed, and avoid presenting incomplete data as confirmed signals.
 
