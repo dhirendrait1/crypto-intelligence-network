@@ -10,7 +10,7 @@ import cin_public_market_candles_api as api
 SAMPLE = [
     {"open_time": 1699999200000 + i * 3600000, "open": 100 + i, "high": 102 + i,
      "low": 99 + i, "close": 101 + i, "volume": 10.0,
-     "close_time": 1700003599999 + i * 3600000}
+     "close_time": 1699999200000 + (i + 1) * 3600000 - 1}
     for i in range(50)
 ]
 
