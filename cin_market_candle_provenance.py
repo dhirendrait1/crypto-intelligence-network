@@ -34,13 +34,14 @@ def market_pair_metadata(symbol: str, source_id: str) -> dict[str, Any]:
 
 
 def candle_observation_metadata(*, source_id: str, observed_at: str, retrieved_at: str,
-                                interval: str, quote_currency: str | None) -> dict[str, Any]:
+                                interval: str, quote_currency: str | None,
+                                timestamp_semantics: str = "candle_close_time") -> dict[str, Any]:
     """Return metadata labels only; freshness and source authenticity stay unverified."""
     return {
         "source_id": source_id,
         "observed_at": observed_at,
         "retrieved_at": retrieved_at,
-        "timestamp_semantics": "candle_close_time",
+        "timestamp_semantics": timestamp_semantics,
         "interval": interval,
         "quote_currency": quote_currency,
         "freshness_assessed": False,
