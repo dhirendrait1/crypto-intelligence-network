@@ -141,6 +141,10 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["input"]["symbol"], "BTCUSDT")
         self.assertEqual(result["input"]["timeframe"], "1h")
         self.assertEqual(result["input"]["source"], "Binance public market-data API")
+        self.assertEqual(result["input"]["source_id"], "binance_public")
+        self.assertEqual(result["input"]["quote_currency"], "USDT")
+        self.assertEqual(result["input"]["requested_quote_currency"], "USDT")
+        self.assertEqual(result["input"]["pair_metadata_status"], "identified")
         self.assertEqual(result["input"]["candle_count"], 50)
         self.assertTrue(any("not independently audited" in item for item in result["limitations"]))
 
