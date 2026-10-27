@@ -476,3 +476,26 @@ def test_rss_falls_back_to_google_news_when_publisher_feed_has_no_relevant_headl
     assert "Google News public RSS search" in source
     assert len(requested) == 2
     assert parse_qs(urlsplit(requested[1]).query)["q"] == ["Binance"]
+
+
+def test_rss_malformed_url_does_not_hide_later_valid_article(monkeypatch):
+    xml = b'''<rss><channel>
+      <item><title>Binance malformed link</title><link>http://[bad</link><description>Binance update</description></item>
+      <item><title>Binance valid update</title><link>https://news.example/valid</link><description>Binance update</description></item>
+    </channel></rss>'''
+
+    class Response:
+        def __enter__(self):
+            return self
+        def __exit__(self, *_args):
+            return False
+        def read(self, _limit):
+            return xml
+
+    monkeypatch.setattr(api, '_RSS_FEEDS', (('Test publisher RSS', 'https://example.test/rss'),))
+    monkeypatch.setattr(api.urllib.request, 'urlopen', lambda *_args, **_kwargs: Response())
+    rows, source = api._get_rss_articles('Binance', 10)
+    assert len(rows) == 1
+    assert rows[0]['url'] == 'https://news.example/valid'
+    assert rows[0]['domain'] == 'news.example'
+    assert 'Test publisher RSS' in source
