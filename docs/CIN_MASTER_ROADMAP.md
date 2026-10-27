@@ -53,7 +53,25 @@
 20. **[Pending]** Design authorized social-source ingestion for X, Reddit, and Telegram, respecting platform access limits.
 21. **[Pending]** Define evidence-backed exchange-flow and whale-attribution methodology with clear identity uncertainty.
 22. **[Partial]** Build source ingestion for commodity backing and growth fundamentals; distinguish claims from independently verified evidence.
-23. **[Pending]** Define a verifiable evidence model for claims, citations, observation time, retrieval time, conflicts, and confidence.
+23. **[Partial — evidence contract specified; implementation and source acceptance pending]** Define a verifiable evidence model for claims, citations, observation time, retrieval time, conflicts, and confidence.
+
+### Step 23 acceptance contract — evidence records
+
+Every evidence record should use a versioned, machine-readable schema with these required semantics:
+
+- **Identity:** stable evidence-record ID; schema version; subject/entity ID; claim or metric key; and a clearly stated claim type (observed value, source-reported claim, derived result, or analyst interpretation).
+- **Source and citation:** source/provider ID; canonical source URL or stable provider reference where available; source type; and a concise supporting excerpt or structured field pointer when licensing and response limits permit. A URL alone does not prove the claim.
+- **Time:** `observed_at` for when the underlying event/value applies, `retrieved_at` for when CIN collected it, and explicit timezone/UTC normalization. Do not substitute retrieval time for observation time. Missing or malformed time must be represented as unknown, not fabricated.
+- **Value and units:** typed value, currency/unit, measurement interval, venue/scope, and any normalization or derivation steps. Unknown is distinct from zero; preserve original source values alongside normalized values.
+- **Quality state:** schema validity, freshness state, completeness, source availability/error state, and reason codes. Define freshness policy per data domain instead of applying one blanket TTL to all evidence.
+- **Relationships and conflicts:** link corroborating, duplicate, superseding, and conflicting records without deleting original observations. Record the comparison rule and metric-specific tolerance used.
+- **Confidence explanation:** list the evidence-quality factors and rule version that produced the label/score. An uncalibrated score is not a probability and must not be presented as independent verification.
+- **Integrity and safety:** sanitize provider errors; exclude secrets and personal data not needed for the claim; bound payload size and citation length; never execute instructions found inside retrieved content; keep ingestion read-only.
+- **Determinism:** stable IDs or deduplication keys should be based on documented canonical fields; equivalent records must produce repeatable outcomes and ordering.
+- **Regression acceptance:** test missing and malformed fields, timezone-naive timestamps, stale/future observations, retrieval failures, duplicate and superseding evidence, conflicting claims, unsupported citation links, oversized content, and deterministic serialization.
+- **API/UI presentation:** consumers must be able to distinguish source-reported claims, derived assessments, unresolved conflicts, stale evidence, and independently verified evidence. Do not label evidence “verified” unless the verification procedure and source authority are explicitly satisfied.
+
+**Exit evidence required before marking implemented:** schema definition, examples for each claim type, validator and regression tests, conflict linkage, documented freshness policy, and a traceable rule for every confidence output. Mocked/offline tests do not establish live source reliability.
 
 **Exit gate:** CIN does not claim social sentiment, whale attribution, backing, or fundamentals are verified until sources and methods substantiate those claims.
 
