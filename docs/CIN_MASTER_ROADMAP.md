@@ -166,3 +166,11 @@ All four configured workflows passed on code/documentation checkpoint `2c1f816d5
 - Credentials are read from runtime environment variables only; no token or chat ID was committed. Tests mock provider responses and never send real messages.
 - All four configured workflows passed on latest checked PR head `391954f525831b759ac74e0e744b321f4f6504a5`: deployment scaffold validation, offline API safety tests, offline technical-analysis tests, and screening tests. This is offline CI only, not live Render or Telegram verification.
 - Step 26 is **Partial**: there is no scheduler, no configured production credential/destination, and no live Telegram delivery smoke test. Do not configure secrets or deploy automatically.
+
+## One-shot worker CLI and latest-head CI (2026-10-27)
+
+- Added `cin_alert_telegram_worker.py`, an explicit one-shot CLI. It requires `--once`, a persistent SQLite path via `CIN_ALERT_DATABASE_PATH`, and runtime Telegram credentials; it never runs at import/startup and is not a scheduler.
+- Added offline CLI tests for explicit invocation, missing database configuration, bounded batch forwarding, and sanitized configuration failures. Added `docs/CIN_ALERT_WORKER_OPERATIONS.md` covering setup boundaries and release acceptance.
+- Latest PR #16 head `5cdd3f970c3f6051f6d8a6fbb29ef7edd4b35b56` passed all four configured GitHub workflows: Render deployment scaffold validation, offline API safety tests, offline technical-analysis tests, and screening checks.
+- This remains offline CI only. No real Telegram message was sent, no secrets were configured, no scheduler was enabled, and no Render/Cloudflare changes were made.
+- PR #16 remains open and unmerged. Release readiness is still blocked on persistent storage design, explicit destination setup, authorized live smoke tests, scheduler/monitoring decisions, and live deployment verification.
