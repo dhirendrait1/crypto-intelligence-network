@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
+from cin_market_candle_provenance import candle_observation_metadata, market_pair_metadata
 
 try:
     from app.cin_technical_analysis import analyze_ohlc
@@ -334,10 +335,14 @@ async def get_market_candles(
     freshness = _freshness_metadata(rows, interval, now_ms)
     source = rows[0].get("_source", "Binance public market-data API")
     endpoint = rows[0].get("_source_endpoint", BINANCE_KLINES_URL)
+    retrieved_at = datetime.now(timezone.utc).isoformat()
+    source_id = ("coinbase_public" if source.startswith("Coinbase") else
+                 "kraken_public" if source.startswith("Kraken") else "binance_public")
+    pair_metadata = market_pair_metadata(normalized, source_id)
     return {
-        "service": "cin", "mode": "read_only", "source": source, "source_endpoint": endpoint,
-        "retrieved_at": datetime.now(timezone.utc).isoformat(), "symbol": normalized,
-        "timeframe": interval, "count": len(rows),
+        "service": "cin", "mode": "read_only", "source": source, "source_id": source_id,
+        "source_endpoint": endpoint, "retrieved_at": retrieved_at, "symbol": normalized,
+        **pair_metadata, "timeframe": interval, "count": len(rows),
         **freshness,
         "data": [
             {
@@ -345,6 +350,13 @@ async def get_market_candles(
                 "open_time_utc": datetime.fromtimestamp(row["open_time"] / 1000, timezone.utc).isoformat(),
                 "close_time_utc": datetime.fromtimestamp(row["close_time"] / 1000, timezone.utc).isoformat(),
                 "is_closed": row["close_time"] < now_ms,
+                "observation_metadata": candle_observation_metadata(
+                    source_id=source_id,
+                    observed_at=datetime.fromtimestamp(row["close_time"] / 1000, timezone.utc).isoformat(),
+                    retrieved_at=retrieved_at,
+                    interval=interval,
+                    quote_currency=pair_metadata["quote_currency"],
+                ),
             }
             for row in rows
         ],
