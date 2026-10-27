@@ -48,8 +48,12 @@ def _timestamp_status(value: Any) -> tuple[str, int | None, str | None]:
     now = datetime.now(timezone.utc)
     if parsed > now + FUTURE_TIMESTAMP_TOLERANCE:
         return "unknown", None, "future_last_updated_timestamp"
-    age = max(0, int((now - parsed).total_seconds()))
-    return ("fresh" if age <= MARKET_DATA_MAX_AGE.total_seconds() else "stale"), age, None
+    precise_age_seconds = max(0.0, (now - parsed).total_seconds())
+    age = int(precise_age_seconds)
+    # Compare the unrounded age: truncating first can misclassify data that is
+    # fractionally older than the freshness limit as fresh.
+    status = "fresh" if precise_age_seconds <= MARKET_DATA_MAX_AGE.total_seconds() else "stale"
+    return status, age, None
 
 
 def _fetch_market_data(ids: list[str], vs_currency: str) -> list[dict[str, Any]]:
