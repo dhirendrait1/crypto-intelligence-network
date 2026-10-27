@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import Any
 from fastapi import APIRouter
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictStr, field_validator
 
 router = APIRouter(tags=["monitoring"])
 
@@ -15,7 +15,7 @@ class MonitoringSnapshot(BaseModel):
     provider_status: str = Field(default="unknown", pattern=r"^(healthy|degraded|unavailable|unknown)$")
     freshness: str = Field(default="unknown", pattern=r"^(fresh|stale|unknown)$")
     observed_at: str | None = Field(default=None, max_length=64)
-    warnings: list[str] = Field(default_factory=list, max_length=20)
+    warnings: list[StrictStr] = Field(default_factory=list, max_length=20)
 
     @field_validator("warnings")
     @classmethod
