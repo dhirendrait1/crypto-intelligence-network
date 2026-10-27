@@ -750,12 +750,12 @@ class MarketProviderResponseSizeTests(unittest.TestCase):
 
 class ProviderTimestampBoundaryRegressionTests(unittest.TestCase):
     def test_freshness_threshold_and_future_clock_skew_boundaries(self):
-        now = MODULE.datetime.now(MODULE.timezone.utc)
+        now = MODULE.time.time()
         cases = (
-            (now - MODULE.timedelta(seconds=900), "fresh"),
-            (now - MODULE.timedelta(seconds=901), "stale"),
-            (now + MODULE.timedelta(seconds=300), "fresh"),
-            (now + MODULE.timedelta(seconds=301), "unknown"),
+            (MODULE.datetime.fromtimestamp(now - 900, MODULE.timezone.utc), "fresh"),
+            (MODULE.datetime.fromtimestamp(now - 901, MODULE.timezone.utc), "stale"),
+            (MODULE.datetime.fromtimestamp(now + 300, MODULE.timezone.utc), "fresh"),
+            (MODULE.datetime.fromtimestamp(now + 301, MODULE.timezone.utc), "unknown"),
         )
         for timestamp, expected in cases:
             with self.subTest(timestamp=timestamp, expected=expected):
