@@ -21,13 +21,14 @@
 
 ## Ranking rules
 
-1. Primary ranking is descending provider-reported market cap only when market cap is a valid finite non-negative number.
-2. Rows with missing market cap must not be presented as if they have a valid market-cap rank. If included, label them as unranked or place them after ranked rows with an explicit reason.
-3. Do not synthesize market cap from price × supply unless a future contract explicitly introduces a separately labelled derived metric and validates the supply basis.
-4. Do not infer a complete market universe from a list of tradable Coinbase products or candles. A product list is an exchange-specific subset, not global market-cap coverage.
-5. Deduplicate only by stable provider asset identity. Never deduplicate by symbol alone.
-6. Keep quote currency, source provider, provider update time, retrieval time, and cache status visible in API metadata.
-7. On provider fallback, preserve primary and fallback error attribution in sanitized metadata. Do not silently mask a fallback as the primary provider.
+1. **Input universe:** the current provider request asks CoinGecko for market-cap-descending rows; CoinPaprika fallback rows are explicitly sorted by market cap before the per-page limit is applied. This defines the fetched candidate universe, not a verified global universe.
+2. **Final response order:** the current endpoint sorts returned rows by `screen_score` descending, then `market_cap` descending as a tie-breaker. Therefore, final output order is a heuristic research-priority order, **not** a market-cap ranking. Do not describe the response position as market-cap rank.
+3. Rows with missing market cap must not be presented as if they have a valid market-cap rank. Preserve missing values as null; if an explicit market-cap rank is later added, label rows without valid market cap as unranked.
+4. Do not synthesize market cap from price × supply unless a future contract explicitly introduces a separately labelled derived metric and validates the supply basis.
+5. Do not infer a complete market universe from a list of tradable Coinbase products or candles. A product list is an exchange-specific subset, not global market-cap coverage.
+6. Deduplicate only by stable provider asset identity. Never deduplicate by symbol alone; current canonicalization discards rows without a non-empty ID and keeps the first duplicate ID.
+7. Keep quote currency, source provider, provider update time, retrieval time, and cache status visible in API metadata.
+8. On provider fallback, preserve primary and fallback error attribution in sanitized metadata. Do not silently mask a fallback as the primary provider.
 
 ## Provider feasibility decision
 
@@ -36,7 +37,7 @@ Coinbase public spot candles provide OHLCV for individual products and supported
 ## Test gate before any adapter or default change
 
 - Mock provider payloads for missing/duplicate IDs, symbol collisions, malformed types, booleans masquerading as numbers, NaN/infinity, negative fields, missing quote currency, stale/invalid timestamps, and partial supply/FDV inputs.
-- Assert market-cap ranking and handling of unranked rows.
+- Assert provider market-cap ordering before the per-page cutoff, final score-first response ordering, and handling of missing-cap rows without implying market-cap rank.
 - Assert provider and quote provenance across primary, fallback, cache, and stale-cache paths.
 - Assert response-size bounds, timeouts, rate-limit failures, and sanitized error metadata.
 - Run offline tests in CI; do not call live providers from unit tests.
