@@ -8,7 +8,7 @@ from fastapi import HTTPException
 import cin_public_market_candles_api as api
 
 SAMPLE = [
-    {"open_time": 1700000000000 + i * 3600000, "open": 100 + i, "high": 102 + i,
+    {"open_time": 1699999200000 + i * 3600000, "open": 100 + i, "high": 102 + i,
      "low": 99 + i, "close": 101 + i, "volume": 10.0,
      "close_time": 1700003599999 + i * 3600000}
     for i in range(50)
@@ -99,6 +99,34 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(api, "_request_json", return_value=payload):
             with self.assertRaisesRegex(ValueError, "no valid candles"):
                 api._fetch_binance("BTCUSDT", "1h", 5)
+
+    def test_interval_boundary_validator_accepts_aligned_candles_and_gaps(self):
+        rows = [dict(SAMPLE[0]), dict(SAMPLE[2])]
+        api._validate_candle_boundaries(rows, "1h", 1800000000000)
+
+    def test_interval_boundary_validator_rejects_misaligned_open(self):
+        row = dict(SAMPLE[0])
+        row["open_time"] += 1
+        with self.assertRaisesRegex(ValueError, "interval-aligned"):
+            api._validate_candle_boundaries([row], "1h", 1800000000000)
+
+    def test_interval_boundary_validator_rejects_inconsistent_close(self):
+        row = dict(SAMPLE[0])
+        row["close_time"] -= 1
+        with self.assertRaisesRegex(ValueError, "close timestamp"):
+            api._validate_candle_boundaries([row], "1h", 1800000000000)
+
+    def test_interval_boundary_validator_rejects_future_open(self):
+        row = dict(SAMPLE[0])
+        row["open_time"] = 1800000000001
+        row["close_time"] = row["open_time"] + 3600000 - 1
+        with self.assertRaisesRegex(ValueError, "future open timestamp"):
+            api._validate_candle_boundaries([row], "1h", 1800000000000)
+
+    def test_weekly_boundary_requires_monday_utc(self):
+        row = {"open_time": 1700000000000, "close_time": 1700000000000 + 604800000 - 1}
+        with self.assertRaisesRegex(ValueError, "Monday UTC"):
+            api._validate_candle_boundaries([row], "1w", 1800000000000)
 
     async def test_load_sorts_out_of_order_candles_chronologically(self):
         reversed_rows = [dict(SAMPLE[2]), dict(SAMPLE[0]), dict(SAMPLE[1])]
