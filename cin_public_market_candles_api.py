@@ -166,8 +166,25 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     result = payload.get("result")
     if not isinstance(result, dict):
         raise ValueError("Kraken response had no result")
-    pair_key = next((key for key in result if key != "last"), None)
-    rows = result.get(pair_key) if pair_key else None
+    # Kraken may return canonical aliases (for example XXBTZUSD) rather than
+    # the submitted pair string. Accept only explicit aliases for the requested
+    # base/quote combination; never select an arbitrary result key.
+    result_keys = [key for key in result if key != "last"]
+    base_alias = "XBT" if base == "XBT" else base
+    quote_alias = "ZUSD" if quote == "USD" else quote
+    accepted_pair_keys = {
+        f"{base_alias}{quote}",
+        f"X{base_alias}{quote_alias}",
+    }
+    if base_alias == "XBT":
+        accepted_pair_keys.add(f"XXBT{quote_alias}")
+    matching_keys = [key for key in result_keys if key in accepted_pair_keys]
+    if len(matching_keys) != 1:
+        if not matching_keys:
+            raise ValueError("Kraken response market key did not match requested pair")
+        raise ValueError("Kraken response contained ambiguous market keys for requested pair")
+    pair_key = matching_keys[0]
+    rows = result.get(pair_key)
     if not isinstance(rows, list):
         raise ValueError("Kraken returned no candle rows")
     candles = []
