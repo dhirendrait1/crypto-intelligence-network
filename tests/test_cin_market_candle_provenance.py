@@ -35,6 +35,12 @@ def test_candle_metadata_does_not_claim_freshness_or_authenticity():
         quote_currency="USD",
     )
     assert result["timestamp_semantics"] == "candle_close_time"
+    forming = candle_observation_metadata(
+        source_id="binance_public", observed_at="2026-10-28T12:00:00+00:00",
+        retrieved_at="2026-10-28T11:59:05+00:00", interval="1m",
+        quote_currency="USDT", timestamp_semantics="candle_open_time",
+    )
+    assert forming["timestamp_semantics"] == "candle_open_time"
     assert result["freshness_assessed"] is False
     assert result["source_authenticity_verified"] is False
 
