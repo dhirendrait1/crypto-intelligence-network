@@ -126,3 +126,63 @@ def test_warning_text_rejects_non_string_entries(warning):
     with pytest.raises(ValidationError):
         MonitoringSnapshot(warnings=[warning])
 
+from datetime import datetime, timezone, timedelta
+from cin_monitoring_status_api import assess_timestamp_freshness
+
+
+def test_timestamp_freshness_exact_age_boundary_is_fresh():
+    now = datetime(2026, 10, 28, 12, 0, tzinfo=timezone.utc)
+    result = assess_timestamp_freshness(
+        "2026-10-28T11:55:00Z", now=now, max_age_seconds=300
+    )
+    assert result == {"freshness": "fresh", "age_seconds": 300, "reason": "within_limit"}
+
+
+def test_timestamp_freshness_one_second_over_limit_is_stale():
+    now = datetime(2026, 10, 28, 12, 0, tzinfo=timezone.utc)
+    result = assess_timestamp_freshness(
+        "2026-10-28T11:54:59Z", now=now, max_age_seconds=300
+    )
+    assert result["freshness"] == "stale"
+    assert result["age_seconds"] == 301
+
+
+def test_timestamp_freshness_tolerates_small_future_clock_skew():
+    now = datetime(2026, 10, 28, 12, 0, tzinfo=timezone.utc)
+    result = assess_timestamp_freshness(
+        "2026-10-28T12:04:00Z", now=now, max_age_seconds=300,
+        future_tolerance_seconds=300,
+    )
+    assert result["freshness"] == "fresh"
+    assert result["age_seconds"] == 0
+
+
+def test_timestamp_freshness_rejects_future_timestamp_beyond_tolerance():
+    now = datetime(2026, 10, 28, 12, 0, tzinfo=timezone.utc)
+    result = assess_timestamp_freshness(
+        "2026-10-28T12:05:01Z", now=now, max_age_seconds=300,
+        future_tolerance_seconds=300,
+    )
+    assert result["freshness"] == "unknown"
+    assert result["reason"] == "timestamp_too_far_in_future"
+
+
+@pytest.mark.parametrize("timestamp", ["invalid", "2026-10-28T11:00:00"])
+def test_timestamp_freshness_invalid_or_naive_timestamp_is_unknown(timestamp):
+    now = datetime(2026, 10, 28, 12, 0, tzinfo=timezone.utc)
+    result = assess_timestamp_freshness(timestamp, now=now, max_age_seconds=300)
+    assert result["freshness"] == "unknown"
+
+
+def test_timestamp_freshness_rejects_naive_clock_and_invalid_policy():
+    result = assess_timestamp_freshness(
+        "2026-10-28T11:59:00Z", now=datetime(2026, 10, 28, 12, 0),
+        max_age_seconds=300,
+    )
+    assert result["freshness"] == "unknown"
+    result = assess_timestamp_freshness(
+        "2026-10-28T11:59:00Z", now=datetime(2026, 10, 28, 12, 0, tzinfo=timezone.utc),
+        max_age_seconds=0,
+    )
+    assert result["freshness"] == "unknown"
+
