@@ -164,5 +164,5 @@ All four configured workflows passed on code/documentation checkpoint `2c1f816d5
 
 - Added `cin_alert_telegram_delivery.py` with an explicit worker entry point that claims due outbox items, sends plain-text messages only to the configured Telegram destination, and records success or sanitized failure/retry state.
 - Credentials are read from runtime environment variables only; no token or chat ID was committed. Tests mock provider responses and never send real messages.
-- All four configured workflows passed on code head `6165d1687b474ea4095f06a89bceefeec17a9a89`. Documentation changes after that code checkpoint require a fresh latest-head CI run.
+- All four configured workflows passed on latest checked PR head `391954f525831b759ac74e0e744b321f4f6504a5`: deployment scaffold validation, offline API safety tests, offline technical-analysis tests, and screening tests. This is offline CI only, not live Render or Telegram verification.
 - Step 26 is **Partial**: there is no scheduler, no configured production credential/destination, and no live Telegram delivery smoke test. Do not configure secrets or deploy automatically.
