@@ -68,10 +68,10 @@ def test_outcome_cannot_use_pre_horizon_observation(tmp_path):
         )
 
 
-def test_outcome_cannot_be_evaluated_before_horizon(tmp_path):
+def test_outcome_rejects_observation_after_evaluation_time(tmp_path):
     path = tmp_path / "forecasts.sqlite3"
     _record(path)
-    with pytest.raises(ValueError, match="horizon has not elapsed"):
+    with pytest.raises(ValueError, match="observation_at cannot be in the future relative to evaluated_at"):
         evaluate_forecast_outcome(
             path, forecast_id="forecast-btc-001", observation_source="coinbase",
             observation_at=NOW + timedelta(hours=1), observed_price=67000,
