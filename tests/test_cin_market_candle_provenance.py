@@ -37,3 +37,27 @@ def test_candle_metadata_does_not_claim_freshness_or_authenticity():
     assert result["timestamp_semantics"] == "candle_close_time"
     assert result["freshness_assessed"] is False
     assert result["source_authenticity_verified"] is False
+
+
+import asyncio
+from unittest.mock import patch
+import cin_public_market_candles_api as market_api
+
+
+def test_coinbase_fallback_endpoint_marks_actual_usd_quote():
+    rows = [{
+        "open_time": 1793185140000, "open": 100.0, "high": 102.0,
+        "low": 99.0, "close": 101.0, "volume": 5.0,
+        "close_time": 1793185199999,
+        "_source": "Coinbase Exchange public candles API (fallback after Binance HTTP 451)",
+        "_source_endpoint": market_api.COINBASE_CANDLES_URL,
+    }]
+    async def load(*args):
+        return rows
+    with patch.object(market_api, "_load", side_effect=load):
+        result = asyncio.run(market_api.get_market_candles("BTCUSDT", "1m", 5))
+    assert result["source_id"] == "coinbase_public"
+    assert result["requested_quote_currency"] == "USDT"
+    assert result["quote_currency"] == "USD"
+    assert result["pair_metadata_status"] == "mapped_provider_product"
+    assert result["data"][0]["observation_metadata"]["quote_currency"] == "USD"
