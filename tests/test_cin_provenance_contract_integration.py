@@ -9,13 +9,13 @@ from cin_source_observation_contract import validate_source_observation
 NOW = datetime(2026, 10, 28, 12, 0, tzinfo=timezone.utc)
 CLOSED_ROWS = [
     {
-        "open_time": 1793181600000 + i * 3_600_000,
+        "open_time": 1700000000000 + i * 3_600_000,
         "open": 100 + i,
         "high": 103 + i,
         "low": 99 + i,
         "close": 102 + i,
         "volume": 10.0,
-        "close_time": 1793185199999 + i * 3_600_000,
+        "close_time": 1700003599999 + i * 3_600_000,
     }
     for i in range(5)
 ]
