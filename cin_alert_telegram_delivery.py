@@ -117,7 +117,7 @@ def process_due_telegram_alerts(
     for item in claimed:
         try:
             sent = send_telegram_notification(item["payload"])
-            state = mark_alert_sent(database_path, item["idempotency_key"], now=now)
+            state = mark_alert_sent(database_path, item["idempotency_key"], now=now, claim_attempt=item["attempts"])
             results.append({
                 "idempotency_key": item["idempotency_key"],
                 "status": "sent" if state.get("status") == "sent" else "state_update_failed",
@@ -126,7 +126,7 @@ def process_due_telegram_alerts(
         except TelegramDeliveryError as exc:
             updated = mark_alert_failed(
                 database_path, item["idempotency_key"], now=now,
-                error_code=exc.code, max_attempts=max_attempts,
+                error_code=exc.code, max_attempts=max_attempts, claim_attempt=item["attempts"],
             )
             results.append({
                 "idempotency_key": item["idempotency_key"],
