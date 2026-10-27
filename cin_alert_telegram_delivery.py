@@ -117,7 +117,21 @@ def process_due_telegram_alerts(
     for item in claimed:
         try:
             sent = send_telegram_notification(item["payload"])
-            state = mark_alert_sent(database_path, item["idempotency_key"], now=now, claim_attempt=item["attempts"])
+            try:
+                state = mark_alert_sent(
+                    database_path, item["idempotency_key"],
+                    now=now, claim_attempt=item["attempts"],
+                )
+            except ValueError:
+                # A newer claim may own the row now. Do not overwrite its state
+                # or mark its attempt failed; the provider may already have accepted
+                # this message, so report uncertainty for operator reconciliation.
+                results.append({
+                    "idempotency_key": item["idempotency_key"],
+                    "status": "state_update_failed",
+                    "provider_message_id": sent.get("message_id"),
+                })
+                continue
             results.append({
                 "idempotency_key": item["idempotency_key"],
                 "status": "sent" if state.get("status") == "sent" else "state_update_failed",
