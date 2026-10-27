@@ -2,8 +2,8 @@
 
 **Scope:** Crypto Intelligence Network (CIN), read-only research, analysis, forecasting, monitoring, and alerts. This tracker records what is supported by repository evidence; it is not a claim that CIN is production-complete.
 
-**Branch:** `feat/cin-architecture-audit`  
-**Release controls (updated 2026-10-26):** PR #6 is merged and its deployment-aligned CI passes on main. PR #11 integrates additional read-only research modules and must pass all current-head workflows before merge. PR #7 and PR #8 remain unmerged audit branches; do not merge them wholesale because PR #8 predates the Coinbase fallback and conflicts with the current candle-provider module. `render.yaml` enables automatic deployment on main updates, so a merge may trigger Render deployment; confirm the deployed revision and live health/readiness/routes before calling the release complete. No order execution, wallet control, private keys, or fund movement.
+**Document status:** Evidence tracker for the current `main` branch; update this file whenever main changes materially.  
+**Release controls (updated 2026-10-27):** PR #6 and PR #11 are merged; do not describe PR #11 as awaiting merge. PR #14 (query-specific public news RSS fallback) and PR #16 (durable alert evaluation plus optional one-shot Telegram delivery) are open and their latest reported four-workflow suites passed, but neither is merged. Their offline tests do not prove live news-provider availability, persistent runtime storage, or real Telegram delivery. PR #7 and PR #8 remain unmerged audit branches; do not merge them wholesale because PR #8 predates the Coinbase fallback and conflicts with the current candle-provider module. `render.yaml` enables automatic deployment on main updates, so any merge can trigger a Render deployment; the user manages Render, and no deployment/configuration changes should be made without explicit approval. Verify deployed revision and live health/readiness/routes before calling release complete. No order execution, wallet control, private keys, or fund movement.
 
 ## Status definitions
 
@@ -884,3 +884,26 @@ This checkpoint validates configured offline automation only. It does not establ
 - Added an offline test that verifies both providers are bounded and their oversized bodies become structured invalid-response failures.
 - Source commit: `92e6277f04d1f83cf59ebbefee2c80afc31fd78f`; test commit: `b8017ae026cd7758108590a81a3fa68f95935eef`.
 - CI for current head is pending. CIN remains read-only; no deployment changes.
+
+
+## Provider-policy reconciliation (2026-10-27)
+
+- **Confirmed current-main mismatch:** `cin_public_market_candles_api.py` uses Binance public candles with Kraken fallback; `coin_screening_step2.py` uses CoinGecko first with CoinPaprika fallback.
+- **Previously established user preference:** Coinbase public market data first, and do not use CoinGecko unless the user explicitly changes that preference.
+- **Status: open / not yet reconciled.** This is a source-policy mismatch, not proof that any provider is unavailable. Coinbase candle endpoints and broad coin-screening datasets have different schemas and coverage; do not swap providers by assumption.
+- Issue #21 tracks the required inventory and acceptance criteria. Any provider migration must be implemented behind a PR with offline adapter tests for schema, asset/symbol mapping, timestamps, rate limits, cache/staleness, provenance, and sanitized errors.
+- No provider change has been made, no PR has been merged for this item, and no Render action is authorized. Because `render.yaml` enables auto-deploy from `main`, keep implementation changes unmerged until validated and deployment is explicitly authorized.
+
+## Additional open work verified 2026-10-27
+
+- PR #19 adds the simultaneous SQLite alert-claimer regression test; it remains unmerged and its four configured workflows were reported passing on its feature-branch head.
+- PR #20 adds malformed-URL isolation to the news RSS fallback and targets PR #14's branch to avoid duplicating the parent change. It remains unmerged; verify current-head CI before considering it validated.
+- Passing offline CI is not evidence of live provider access, durable production storage, a configured scheduler, real Telegram delivery, or the currently deployed Render revision.
+
+## Coinbase fallback coverage audit (2026-10-27)
+
+- Further source inspection confirms Coinbase Exchange candles are already implemented, but only as a **tertiary fallback**: Binance is tried first; Kraken is tried only after Binance HTTP 451; Coinbase is tried only if the Kraken attempt also fails.
+- The Coinbase adapter supports only `1m`, `5m`, `15m`, `1h`, `6h`, and `1d`. Other API-supported CIN timeframes cannot use this fallback. Coinbase's 300-candle response cap is handled by bounded adjacent-window requests.
+- **Quote-market caveat:** the adapter maps both `BASEUSD` and `BASEUSDT` requests to `BASE-USD`. The response records Coinbase as the actual source, but the requested USDT quote is not equivalent to an exchange-native USDT market. This needs explicit product/quote mapping policy and offline tests before treating the result as interchangeable.
+- Coin screening remains CoinGecko-primary with CoinPaprika fallback; Coinbase candles do not provide a drop-in replacement for the broad market-cap ranking and screening fields currently consumed by that endpoint.
+- Recommended safe sequence: (1) define endpoint-specific Coinbase-first scope and supported quote/timeframe contract; (2) build and test a provider adapter without changing screening semantics; (3) document unsupported pairs/timeframes as explicit controlled limitations; (4) keep all changes in an unmerged PR until reviewed. No deployment or provider-order change was made during this audit.
