@@ -129,3 +129,35 @@ def test_observation_after_retrieval_is_unknown_in_integration_contract():
     result = validate_source_observation(observation, now=NOW)
     assert result["validity"] == "unknown"
     assert result["reason"] == "observation_after_retrieval"
+
+
+def test_missing_interval_is_unknown_for_candle_semantics():
+    observation = {
+        "source_id": "coinbase_public",
+        "subject": "BTCUSDT",
+        "observed_at": "2026-10-28T11:59:00Z",
+        "retrieved_at": "2026-10-28T11:59:05Z",
+        "timestamp_semantics": "candle_close_time",
+        "provenance": "public-candles-endpoint",
+        "quote_currency": "USD",
+        "interval": None,
+    }
+    result = validate_source_observation(observation, now=NOW)
+    assert result["validity"] == "unknown"
+    assert result["reason"] == "market_candle_interval_required"
+
+
+def test_timezone_naive_observation_timestamp_is_unknown():
+    observation = {
+        "source_id": "coinbase_public",
+        "subject": "BTCUSDT",
+        "observed_at": "2026-10-28T11:59:00",
+        "retrieved_at": "2026-10-28T11:59:05Z",
+        "timestamp_semantics": "candle_close_time",
+        "provenance": "public-candles-endpoint",
+        "quote_currency": "USD",
+        "interval": "1h",
+    }
+    result = validate_source_observation(observation, now=NOW)
+    assert result["validity"] == "unknown"
+    assert result["reason"] == "invalid_or_timezone_naive_timestamp"
