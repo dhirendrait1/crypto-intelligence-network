@@ -72,3 +72,17 @@ def test_http_route_rejects_unknown_status_values():
         "provider_status": "probably-fine",
     })
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize("observed_at", [
+    "2026-10-28T12:30:00",
+    "not-a-timestamp",
+])
+def test_observed_at_rejects_invalid_or_timezone_naive_values(observed_at):
+    with pytest.raises(ValidationError):
+        MonitoringSnapshot(observed_at=observed_at)
+
+
+def test_observed_at_accepts_timezone_aware_iso8601():
+    snapshot = MonitoringSnapshot(observed_at="2026-10-28T12:30:00+05:30")
+    assert snapshot.observed_at == "2026-10-28T12:30:00+05:30"
