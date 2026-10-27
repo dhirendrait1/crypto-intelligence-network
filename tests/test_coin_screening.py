@@ -761,6 +761,9 @@ class ProviderTimestampBoundaryRegressionTests(unittest.TestCase):
             with self.subTest(timestamp=timestamp, expected=expected):
                 status, age = MODULE._market_freshness(timestamp.isoformat())
                 self.assertEqual(status, expected)
-                self.assertIsNotNone(age)
-                self.assertGreaterEqual(age, 0)
+                if expected == "unknown":
+                    self.assertIsNone(age)
+                else:
+                    self.assertIsNotNone(age)
+                    self.assertGreaterEqual(age, 0)
 
