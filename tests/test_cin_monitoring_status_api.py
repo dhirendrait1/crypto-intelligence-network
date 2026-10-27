@@ -1,3 +1,5 @@
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from pydantic import ValidationError
 import pytest
 
@@ -44,3 +46,29 @@ def test_missing_evidence_remains_unknown():
 def test_unknown_enum_value_is_rejected():
     with pytest.raises(ValidationError):
         MonitoringSnapshot(provider_status="probably-fine")
+
+
+def test_http_route_returns_explicit_caller_supplied_status_contract():
+    app = FastAPI()
+    from cin_monitoring_status_api import router
+    app.include_router(router)
+    response = TestClient(app).post("/monitoring/status", json={
+        "health": "healthy", "readiness": "ready",
+        "provider_status": "healthy", "freshness": "fresh",
+        "observed_at": "2026-10-28T00:00:00Z",
+    })
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "healthy"
+    assert body["checks_performed"] is False
+    assert body["read_only"] is True
+
+
+def test_http_route_rejects_unknown_status_values():
+    app = FastAPI()
+    from cin_monitoring_status_api import router
+    app.include_router(router)
+    response = TestClient(app).post("/monitoring/status", json={
+        "provider_status": "probably-fine",
+    })
+    assert response.status_code == 422
