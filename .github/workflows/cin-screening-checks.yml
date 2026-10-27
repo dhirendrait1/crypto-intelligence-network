@@ -25,5 +25,7 @@ jobs:
         run: python -m py_compile coin_screening_step2.py growth_fundamentals_assessment.py growth_fundamentals_api.py cin_evidence_ingestion.py cin_evidence_ingestion_api.py
       - name: Run offline screening tests
         run: python -m unittest discover -s tests -v
+      - name: Run screening adapter contract tests
+        run: python -m pytest -q tests/test_coin_screening_adapter_contract.py
       - name: Run evidence assessment and ingestion tests
         run: python -m pytest -q tests/test_commodity_backing_assessment.py tests/test_commodity_backing_api.py tests/test_growth_fundamentals.py tests/test_cin_evidence_ingestion.py
