@@ -111,6 +111,9 @@ def _get_rss_articles(query: str, max_records: int) -> tuple[list[dict[str, Any]
                 searchable = re.sub(r"<[^>]*>", " ", searchable)
                 searchable = re.sub(r"&(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);", " ", searchable)
                 if title and link and any(term in searchable for term in terms):
+                    # Reject malformed links before hostname parsing; keep scanning the feed.
+                    if not _is_http_url(link) or len(link) > _MAX_ARTICLE_URL_LENGTH:
+                        continue
                     date_raw = fields.get("pubdate") or fields.get("published") or fields.get("updated")
                     seen_at = None
                     if date_raw:
@@ -169,6 +172,9 @@ def _get_rss_articles(query: str, max_records: int) -> tuple[list[dict[str, Any]
                 searchable = re.sub(r"<[^>]*>", " ", searchable)
                 searchable = re.sub(r"&(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);", " ", searchable)
                 if title and link and any(term in searchable for term in terms):
+                    # Reject malformed links before hostname parsing; keep scanning the feed.
+                    if not _is_http_url(link) or len(link) > _MAX_ARTICLE_URL_LENGTH:
+                        continue
                     date_raw = fields.get("pubdate") or fields.get("published") or fields.get("updated")
                     seen_at = None
                     if date_raw:
