@@ -123,6 +123,15 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, "future open timestamp"):
             api._validate_candle_boundaries([row], "1h", 1800000000000)
 
+    def test_monthly_boundary_uses_calendar_month_end(self):
+        row = {"open_time": 1761955200000, "close_time": 1764547199999}
+        api._validate_candle_boundaries([row], "1M", 1800000000000)
+
+    def test_monthly_boundary_rejects_non_first_day(self):
+        row = {"open_time": 1762041600000, "close_time": 1764633599999}
+        with self.assertRaisesRegex(ValueError, "UTC month boundary"):
+            api._validate_candle_boundaries([row], "1M", 1800000000000)
+
     def test_weekly_boundary_requires_monday_utc(self):
         row = {"open_time": 1700000000000, "close_time": 1700000000000 + 604800000 - 1}
         with self.assertRaisesRegex(ValueError, "Monday UTC"):
