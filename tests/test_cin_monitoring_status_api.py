@@ -104,3 +104,20 @@ def test_degraded_health_is_reported_as_degraded():
         freshness="fresh",
     ))
     assert result["status"] == "degraded"
+
+def test_warning_text_is_trimmed_before_returning():
+    result = monitoring_status(MonitoringSnapshot(warnings=["  provider is slow  "]))
+    assert result["warnings"] == ["provider is slow"]
+
+
+@pytest.mark.parametrize("warning", ["", "   ", "x" * 501])
+def test_warning_text_rejects_blank_or_overlong_entries(warning):
+    with pytest.raises(ValidationError):
+        MonitoringSnapshot(warnings=[warning])
+
+
+def test_warning_text_accepts_exact_500_character_boundary():
+    warning = "x" * 500
+    snapshot = MonitoringSnapshot(warnings=[warning])
+    assert snapshot.warnings == [warning]
+
