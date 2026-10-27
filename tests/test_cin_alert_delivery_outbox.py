@@ -30,7 +30,7 @@ def test_claim_and_successful_delivery_state_transitions(tmp_path):
     assert len(claimed) == 1
     assert claimed[0]["status"] == "sending"
     assert claim_due_alerts(path, now=NOW) == []
-    sent = mark_alert_sent(path, item["idempotency_key"], now=NOW + timedelta(seconds=1))
+    sent = mark_alert_sent(path, item["idempotency_key"], now=NOW + timedelta(seconds=1), claim_attempt=claimed[0]["attempts"])
     assert sent["status"] == "sent"
     assert sent["attempts"] == 1
     assert claim_due_alerts(path, now=NOW + timedelta(days=1)) == []
@@ -40,7 +40,7 @@ def test_failure_uses_bounded_exponential_backoff_and_can_retry(tmp_path):
     path = tmp_path / "alerts.sqlite3"
     item = enqueue_alert_delivery(path, rule_id="r1", observation_id="e1", payload={"value": 1}, now=NOW)
     claim_due_alerts(path, now=NOW)
-    failed = mark_alert_failed(path, item["idempotency_key"], now=NOW, error_code="provider_timeout", retry_delay_seconds=30)
+    failed = mark_alert_failed(path, item["idempotency_key"], now=NOW, error_code="provider_timeout", retry_delay_seconds=30, claim_attempt=1)
     assert failed["status"] == "failed"
     assert failed["attempts"] == 1
     assert failed["next_attempt_at"] == (NOW + timedelta(seconds=30)).isoformat()
@@ -52,7 +52,7 @@ def test_retry_exhaustion_moves_to_dead_letter_and_never_claims_again(tmp_path):
     path = tmp_path / "alerts.sqlite3"
     item = enqueue_alert_delivery(path, rule_id="r1", observation_id="e1", payload={}, now=NOW)
     claim_due_alerts(path, now=NOW)
-    dead = mark_alert_failed(path, item["idempotency_key"], now=NOW, error_code="timeout", max_attempts=1)
+    dead = mark_alert_failed(path, item["idempotency_key"], now=NOW, error_code="timeout", max_attempts=1, claim_attempt=1)
     assert dead["status"] == "dead"
     assert claim_due_alerts(path, now=NOW + timedelta(days=2)) == []
 
@@ -105,3 +105,17 @@ def test_expired_lease_at_attempt_limit_moves_to_dead_letter(tmp_path):
 def test_in_memory_path_rejected(tmp_path):
     with pytest.raises(ValueError, match="persistent SQLite file path"):
         enqueue_alert_delivery(":memory:", rule_id="r1", observation_id="e1", payload={}, now=NOW)
+
+
+def test_stale_worker_cannot_mark_reclaimed_attempt_sent_or_failed(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    item = enqueue_alert_delivery(path, rule_id="r1", observation_id="stale", payload={"v": 1}, now=NOW)
+    old_claim = claim_due_alerts(path, now=NOW, lease_seconds=300)[0]
+    new_claim = claim_due_alerts(path, now=NOW + timedelta(seconds=300), lease_seconds=300)[0]
+    assert new_claim["attempts"] == old_claim["attempts"] + 1
+    with pytest.raises(ValueError, match="sending state"):
+        mark_alert_sent(path, item["idempotency_key"], now=NOW + timedelta(seconds=301), claim_attempt=old_claim["attempts"])
+    with pytest.raises(ValueError, match="sending state"):
+        mark_alert_failed(path, item["idempotency_key"], now=NOW + timedelta(seconds=301), error_code="stale_worker", claim_attempt=old_claim["attempts"])
+    current = mark_alert_sent(path, item["idempotency_key"], now=NOW + timedelta(seconds=302), claim_attempt=new_claim["attempts"])
+    assert current["status"] == "sent"
