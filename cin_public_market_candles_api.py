@@ -332,7 +332,7 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
         rows = _normalize_candle_sequence(rows)
         _validate_candle_boundaries(rows, interval, int(datetime.now(timezone.utc).timestamp() * 1000))
     except (KeyError, TypeError, ValueError):
-        raise HTTPException(status_code=502, detail="Public market-data provider returned an ambiguous candle sequence.") from None
+        raise HTTPException(status_code=502, detail="Public market-data provider returned invalid candle timestamps, interval boundaries, or duplicate rows.") from None
     for row in rows:
         row["_source"] = source
         row["_source_endpoint"] = endpoint
