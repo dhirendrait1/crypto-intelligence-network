@@ -142,6 +142,21 @@ class TelegramDeliveryTests(unittest.TestCase):
         self.assertEqual(result["results"][0]["status"], "failed")
         self.assertEqual(result["results"][0]["error_code"], "telegram_network_error")
 
+
+    @patch("cin_alert_telegram_delivery.mark_alert_failed", side_effect=ValueError("stale claim"))
+    @patch("cin_alert_telegram_delivery.send_telegram_notification", side_effect=TelegramDeliveryError("telegram_network_error"))
+    def test_stale_failure_completion_does_not_crash_or_overwrite_new_claim(self, mocked_send, mocked_mark_failed):
+        tmp_path = Path(tempfile.mkdtemp())
+        path = tmp_path / "alerts.sqlite3"
+        enqueue_alert_delivery(
+            path, rule_id="r1", observation_id="stale-failure",
+            payload={"text": "BTC alert"}, now=NOW,
+        )
+        result = process_due_telegram_alerts(str(path), now=NOW)
+        self.assertEqual(result["results"][0]["status"], "state_update_failed")
+        self.assertEqual(result["results"][0]["error_code"], "telegram_network_error")
+        mocked_mark_failed.assert_called_once()
+
     @patch.dict(os.environ, {"CIN_TELEGRAM_BOT_TOKEN": "", "CIN_TELEGRAM_CHAT_ID": ""})
     def test_worker_does_not_claim_items_without_configuration(self):
         tmp_path = Path(tempfile.mkdtemp())
