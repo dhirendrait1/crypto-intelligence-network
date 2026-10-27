@@ -96,3 +96,11 @@ def test_snapshot_rejects_unrecognized_fields():
 def test_snapshot_limits_warning_count():
     with pytest.raises(ValidationError):
         MonitoringSnapshot(warnings=[f"warning-{i}" for i in range(21)])
+
+
+def test_degraded_health_is_reported_as_degraded():
+    result = monitoring_status(MonitoringSnapshot(
+        health="degraded", readiness="ready", provider_status="healthy",
+        freshness="fresh",
+    ))
+    assert result["status"] == "degraded"
