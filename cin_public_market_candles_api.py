@@ -223,9 +223,11 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
     if not pair:
         raise ValueError(f"Coinbase fallback cannot map symbol {symbol}")
     base, quote = pair.groups()
-    # Coinbase Exchange spot products are quoted with a hyphen; USDT requests
-    # are mapped to the equivalent USD spot market, and the actual product is reported.
-    product_id = f"{base}-USD"
+    # Never substitute a USD market for a USDT request: the quote assets and
+    # prices are not interchangeable. Coinbase fallback currently supports USD only.
+    if quote != "USD":
+        raise ValueError(f"Coinbase fallback does not support quote currency {quote}")
+    product_id = f"{base}-{quote}"
     duration = COINBASE_GRANULARITY[interval]
     now = int(datetime.now(timezone.utc).timestamp())
     start = now - limit * duration
@@ -257,11 +259,13 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
             start_ms = int(row[0]) * 1000
             duration_ms = duration * 1000
             # Coinbase rows are [time, low, high, open, close, volume].
-            candles.append({
+            candle = {
                 "open_time": start_ms, "open": float(row[3]), "high": float(row[2]),
                 "low": float(row[1]), "close": float(row[4]), "volume": float(row[5]),
                 "close_time": start_ms + duration_ms - 1,
-            })
+            }
+            if _is_valid_candle(candle):
+                candles.append(candle)
         except (TypeError, ValueError, OverflowError):
             continue
     if not candles:
