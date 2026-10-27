@@ -86,3 +86,13 @@ def test_observed_at_rejects_invalid_or_timezone_naive_values(observed_at):
 def test_observed_at_accepts_timezone_aware_iso8601():
     snapshot = MonitoringSnapshot(observed_at="2026-10-28T12:30:00+05:30")
     assert snapshot.observed_at == "2026-10-28T12:30:00+05:30"
+
+
+def test_snapshot_rejects_unrecognized_fields():
+    with pytest.raises(ValidationError):
+        MonitoringSnapshot(health="healthy", secret_internal_field="unexpected")
+
+
+def test_snapshot_limits_warning_count():
+    with pytest.raises(ValidationError):
+        MonitoringSnapshot(warnings=[f"warning-{i}" for i in range(21)])
