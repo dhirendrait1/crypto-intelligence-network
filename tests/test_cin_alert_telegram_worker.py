@@ -27,7 +27,7 @@ def test_worker_processes_one_bounded_batch(capsys):
         }) as process:
             assert worker.main(["--once", "--limit", "3"]) == 0
     assert process.call_args.kwargs["limit"] == 3
-    assert process.call_args.kwargs["database_path"] if "database_path" in process.call_args.kwargs else process.call_args.args[0] == "/tmp/cin-alerts.sqlite3"
+    assert process.call_args.args[0] == "/tmp/cin-alerts.sqlite3"
     output = json.loads(capsys.readouterr().out)
     assert output["read_only"] is True
 
