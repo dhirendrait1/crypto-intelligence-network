@@ -163,15 +163,15 @@ def claim_due_alerts(
             raise
 
 
-def mark_alert_sent(database_path: str | Path, idempotency_key: str, *, now: datetime | str) -> dict[str, Any]:
+def mark_alert_sent(database_path: str | Path, idempotency_key: str, *, now: datetime | str, claim_attempt: int) -> dict[str, Any]:
     current = _timestamp(now, "now").isoformat()
     with _connect(database_path) as db:
         db.execute("BEGIN IMMEDIATE")
         try:
             changed = db.execute(
                 """UPDATE alert_delivery_outbox SET status='sent',
-                updated_at=?,last_error_code=NULL WHERE idempotency_key=? AND status='sending'""",
-                (current, idempotency_key),
+                updated_at=?,last_error_code=NULL WHERE idempotency_key=? AND status='sending' AND attempts=?""",
+                (current, idempotency_key, claim_attempt),
             ).rowcount
             if not changed:
                 raise ValueError("outbox item must exist and be in sending state")
@@ -197,8 +197,9 @@ def mark_alert_failed(
     error_code: str,
     retry_delay_seconds: int = 60,
     max_attempts: int = 5,
+    claim_attempt: int,
 ) -> dict[str, Any]:
-    """Record a bounded retry schedule; callers should pass sanitized error codes only."""
+    """Record a bounded retry schedule for the current claim only."""
     current_dt = _timestamp(now, "now")
     if not isinstance(error_code, str) or not error_code or len(error_code) > 80:
         raise ValueError("error_code must be a non-empty sanitized code of at most 80 characters")
@@ -214,7 +215,7 @@ def mark_alert_failed(
                 "SELECT attempts,status FROM alert_delivery_outbox WHERE idempotency_key=?",
                 (idempotency_key,),
             ).fetchone()
-            if not row or row[1] != "sending":
+            if not row or row[1] != "sending" or row[0] != claim_attempt:
                 raise ValueError("outbox item must exist and be in sending state")
             attempts = row[0]
             # Attempts are counted when work is claimed, including recovered leases.
