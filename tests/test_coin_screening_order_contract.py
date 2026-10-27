@@ -28,8 +28,8 @@ class ScreeningOutputOrderContractTests(unittest.TestCase):
 
         self.assertEqual([item["id"] for item in response["data"]], ["high-score", "mid-score", "large-cap"])
         self.assertEqual([item["screen_score"] for item in response["data"]], [90, 50, 20])
-        # Response order is a heuristic research score, not a market-cap rank.
-        self.assertGreater(response["data"][0]["market_cap"], response["data"][1]["market_cap"])
+        # The higher-scored first row has a smaller market cap than the second row.
+        self.assertLess(response["data"][0]["market_cap"], response["data"][1]["market_cap"])
         self.assertNotIn("market_cap_rank", response["data"][0])
 
     def test_missing_market_cap_stays_null_and_is_not_given_a_rank(self):
