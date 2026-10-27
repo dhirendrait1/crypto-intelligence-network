@@ -83,6 +83,20 @@ class DeploymentPatchTests(unittest.TestCase):
             with self.subTest(router=router):
                 self.assertEqual(second_text.count(f"app.include_router({router})"), 1)
 
+    def test_monitoring_api_module_is_copied_into_deployment_app(self):
+        result = self.run_patch()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        source = self.root / "cin_monitoring_status_api.py"
+        installed = self.app_dir / "cin_monitoring_status_api.py"
+        self.assertTrue(installed.is_file())
+        self.assertEqual(installed.read_text(encoding="utf-8"), source.read_text(encoding="utf-8"))
+        main_text = (self.app_dir / "main.py").read_text(encoding="utf-8")
+        self.assertIn(
+            "from app.cin_monitoring_status_api import router as cin_monitoring_status_router",
+            main_text,
+        )
+        self.assertEqual(main_text.count("app.include_router(cin_monitoring_status_router)"), 1)
+
     def test_missing_required_module_fails_before_any_scaffold_mutation(self):
         main_path = self.app_dir / "main.py"
         original_main = main_path.read_text(encoding="utf-8")
