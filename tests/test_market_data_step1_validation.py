@@ -110,6 +110,18 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         self.assertIn("market_data_older_than_15_minutes", result["data_quality_warnings"])
 
     @patch("market_data_step1.urllib.request.urlopen")
+    def test_fractionally_over_15_minutes_is_stale(self, mocked):
+        # More than 15 minutes old by a fraction of a second must not become
+        # fresh merely because the reported integer age is truncated to 900.
+        old = (datetime.now(timezone.utc) - timedelta(minutes=15, milliseconds=500)).isoformat()
+        mocked.return_value = FakeResponse([row(last_updated=old)])
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertEqual(result["freshness_status"], "stale")
+        self.assertEqual(result["freshness_age_seconds"], 900)
+        self.assertFalse(result["analysis_eligible"])
+        self.assertIn("market_data_older_than_15_minutes", result["data_quality_warnings"])
+
+    @patch("market_data_step1.urllib.request.urlopen")
     def test_missing_or_timezone_naive_timestamp_is_unknown(self, mocked):
         mocked.return_value = FakeResponse([row(last_updated="2026-10-24T00:00:00")])
         result = _fetch_market_data(["bitcoin"], "usd")[0]
