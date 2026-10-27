@@ -899,3 +899,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - PR #19 adds the simultaneous SQLite alert-claimer regression test; it remains unmerged and its four configured workflows were reported passing on its feature-branch head.
 - PR #20 adds malformed-URL isolation to the news RSS fallback and targets PR #14's branch to avoid duplicating the parent change. It remains unmerged; verify current-head CI before considering it validated.
 - Passing offline CI is not evidence of live provider access, durable production storage, a configured scheduler, real Telegram delivery, or the currently deployed Render revision.
+
+## Coinbase fallback coverage audit (2026-10-27)
+
+- Further source inspection confirms Coinbase Exchange candles are already implemented, but only as a **tertiary fallback**: Binance is tried first; Kraken is tried only after Binance HTTP 451; Coinbase is tried only if the Kraken attempt also fails.
+- The Coinbase adapter supports only `1m`, `5m`, `15m`, `1h`, `6h`, and `1d`. Other API-supported CIN timeframes cannot use this fallback. Coinbase's 300-candle response cap is handled by bounded adjacent-window requests.
+- **Quote-market caveat:** the adapter maps both `BASEUSD` and `BASEUSDT` requests to `BASE-USD`. The response records Coinbase as the actual source, but the requested USDT quote is not equivalent to an exchange-native USDT market. This needs explicit product/quote mapping policy and offline tests before treating the result as interchangeable.
+- Coin screening remains CoinGecko-primary with CoinPaprika fallback; Coinbase candles do not provide a drop-in replacement for the broad market-cap ranking and screening fields currently consumed by that endpoint.
+- Recommended safe sequence: (1) define endpoint-specific Coinbase-first scope and supported quote/timeframe contract; (2) build and test a provider adapter without changing screening semantics; (3) document unsupported pairs/timeframes as explicit controlled limitations; (4) keep all changes in an unmerged PR until reviewed. No deployment or provider-order change was made during this audit.
