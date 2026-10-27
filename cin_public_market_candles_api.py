@@ -385,12 +385,16 @@ async def analyze_public_market(
     freshness = _freshness_metadata(rows, interval, now_ms)
     source = rows[0].get("_source", "Binance public market-data API")
     endpoint = rows[0].get("_source_endpoint", BINANCE_KLINES_URL)
+    source_id = ("coinbase_public" if source.startswith("Coinbase") else
+                 "kraken_public" if source.startswith("Kraken") else "binance_public")
+    pair_metadata = market_pair_metadata(normalized, source_id)
     try:
         analysis = analyze_ohlc([{key: row[key] for key in ("open", "high", "low", "close")} for row in closed_rows])
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=f"Fetched candles failed analysis validation: {exc}") from exc
     analysis["input"].update({
-        "symbol": normalized, "timeframe": interval, "source": source, "source_endpoint": endpoint,
+        "symbol": normalized, "timeframe": interval, "source": source, "source_id": source_id,
+        "source_endpoint": endpoint, **pair_metadata,
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
         "requested_candle_count": len(rows),
         "analysis_candle_count": len(closed_rows),
