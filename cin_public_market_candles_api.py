@@ -160,9 +160,13 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     payload = _request_json(f"{KRAKEN_OHLC_URL}?{query}")
     if not isinstance(payload, dict):
         raise ValueError("Kraken response was not an object")
-    errors = payload.get("error") or []
+    errors = payload.get("error")
+    # Kraken's documented envelope always carries an error list. Treat missing,
+    # null, or malformed error fields as an invalid response, never as success.
+    if not isinstance(errors, list) or any(not isinstance(error, str) or not error.strip() for error in errors):
+        raise ValueError("Kraken response error field was malformed")
     if errors:
-        raise ValueError("Kraken rejected pair/timeframe: " + "; ".join(str(e) for e in errors))
+        raise ValueError("Kraken rejected pair/timeframe: " + "; ".join(errors))
     result = payload.get("result")
     if not isinstance(result, dict):
         raise ValueError("Kraken response had no result")
