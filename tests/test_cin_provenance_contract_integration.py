@@ -99,6 +99,39 @@ def test_invalid_quote_metadata_is_rejected_by_contract():
     assert result["reason"] == "market_candle_quote_currency_required"
 
 
+def test_unknown_timestamp_semantics_is_not_accepted_as_valid_metadata():
+    observation = {
+        "source_id": "coinbase_public",
+        "subject": "BTCUSDT",
+        "observed_at": "2026-10-28T11:59:00Z",
+        "retrieved_at": "2026-10-28T11:59:05Z",
+        "timestamp_semantics": "provider_timestamp_maybe",
+        "provenance": "public-candles-endpoint",
+        "quote_currency": "USD",
+        "interval": "1h",
+    }
+    result = validate_source_observation(observation, now=NOW)
+    assert result["validity"] == "unknown"
+    assert result["reason"] == "unknown_timestamp_semantics"
+
+
+def test_blank_provenance_is_rejected_as_missing_required_evidence():
+    observation = {
+        "source_id": "coinbase_public",
+        "subject": "BTCUSDT",
+        "observed_at": "2026-10-28T11:59:00Z",
+        "retrieved_at": "2026-10-28T11:59:05Z",
+        "timestamp_semantics": "candle_close_time",
+        "provenance": "   ",
+        "quote_currency": "USD",
+        "interval": "1h",
+    }
+    result = validate_source_observation(observation, now=NOW)
+    assert result["validity"] == "unknown"
+    assert result["reason"] == "missing_required_fields"
+    assert "provenance" in result["missing"]
+
+
 def test_future_observation_timestamp_is_unknown_even_when_other_fields_exist():
     observation = {
         "source_id": "binance_public",
