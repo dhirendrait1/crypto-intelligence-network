@@ -141,3 +141,13 @@ All four configured workflows passed on code/documentation checkpoint `2c1f816d5
 - The head includes CoinGecko unexpected provider/parser failure containment and offline API regression tests.
 - This verification is for the exact listed head only. It does not establish live-provider correctness or Render health. Any subsequent commit requires a fresh latest-head CI check.
 - PR #8 remains Draft and unmerged. No Render configuration or deployment was changed.
+
+
+## Step 10 offline acceptance refresh (2026-10-30)
+
+- **Step 10 remains Partial.** Offline acceptance now covers both screening-cache policy and market-data row provenance; live-provider behavior and deployed responses remain unverified.
+- Screening cache boundary tests are in Draft PR #65: fresh-cache TTL includes the exact 90-second boundary; refresh is attempted one second beyond it; stale cache is accepted at exactly 900 seconds and rejected one second beyond that limit when refresh fails. These are deterministic offline tests, not provider observations.
+- Market-data provenance is in Draft PR #66. Each normalized row records `provider: "CoinGecko"` and a timezone-aware `provider_retrieved_at`; the endpoint regression test verifies these row-level fields survive in `data[]` and remain distinct from the API response's own `retrieved_at`.
+- PR #66 latest verified head: `01fa12d0699359637280a098d4fc4a1bf13b3cc4`. All four workflows passed on this exact head: screening (run `40969401819`), offline API safety (run `40969401886`), offline technical analysis (run `40969401799`), and Render scaffold validation (run `40969401887`).
+- Both PRs remain Draft/open/unmerged. No production provider selection, cache acceptance rule, Render setting, or deployment was changed by this increment.
+- Remaining Step 10 acceptance: confirm live provider provenance and cache behavior under authorized read-only conditions, then verify deployed response metadata. Offline CI must not be represented as live verification.
