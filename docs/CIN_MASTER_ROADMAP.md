@@ -170,3 +170,10 @@ All four configured workflows passed on code/documentation checkpoint `2c1f816d5
 - PR #8 remains Draft/open. PR #65 and PR #66 remain Draft/open and unmerged.
 - PR #66’s roadmap evidence update is commit `8ea7709c5f170a8161d819f08e177e15fe7d34d7`; all four workflows passed on that exact commit (runs `40969923757`, `40969923901`, `40969923853`, `40969923779`).
 - This checkpoint records repository/CI state only. Render remains user-managed and has not been changed or deployed as part of this work.
+
+## Step 6 market-data timestamp boundary coverage (2026-10-30)
+
+- Made the market-data timestamp assessment clock injectable and deterministic for validation; a naive injected clock produces an explicit `unknown` status rather than silently assuming UTC.
+- Added exact-boundary regressions: provider timestamp age 900 seconds is fresh; 901 seconds is stale; a timestamp exactly 300 seconds in the future is tolerated as fresh with age zero; 301 seconds in the future is unknown.
+- This increment extends Step 6 offline validation only. Live CoinGecko freshness behavior and deployed API responses remain unverified; Step 6 therefore remains Partial.
+- Code/test commits: `f7cf8fa5518eff6c64f6659abc66d74641ee8d81` and `67675b4f043e29aa21cfc824199656bc3cee83eb`. Latest-head CI is pending and must pass on the final documentation commit before this increment is counted as verified.
