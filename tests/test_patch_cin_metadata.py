@@ -163,6 +163,15 @@ class DeploymentPatchTests(unittest.TestCase):
         self.assertFalse(any((self.app_dir / name).exists() for name in MODULES))
 
 
+    def test_source_observation_contract_is_copied_into_deployment_app(self):
+        result = self.run_patch()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        source = self.root / "cin_source_observation_contract.py"
+        installed = self.app_dir / "cin_source_observation_contract.py"
+        self.assertTrue(installed.is_file())
+        self.assertEqual(installed.read_text(encoding="utf-8"), source.read_text(encoding="utf-8"))
+
+
 if __name__ == "__main__":
     unittest.main()
 
