@@ -102,6 +102,11 @@ def test_snapshot_preserves_source_times_and_never_invents_liquidations(monkeypa
     assert result["order_book"]["ask_levels_used"] == 2
     assert result["order_book"]["retrieved_at"]
     assert result["order_book"]["bid_ask_notional_imbalance"] is not None
+    impact = result["order_book"]["visible_depth_impact_estimates"]
+    assert impact["reference_quote_currency"] == "USDT"
+    assert len(impact["bid_side"]) == 3
+    assert len(impact["ask_side"]) == 3
+    assert all(item["status"] == "estimated_full_visible_depth" for item in impact["bid_side"])
     assert len(calls) == 4
     assert all("order" not in params and "side" not in params for _, params in calls)
 
