@@ -119,6 +119,8 @@ class DashboardPreviewTests(unittest.TestCase):
         self.assertIn('if(name==="Technical analysis"){', self.html)
         self.assertIn('Waiting for verified API response; chart geometry remains illustrative.', self.html)
         self.assertIn('analysisPanel.querySelectorAll(".ref-kpi strong").forEach(node=>node.textContent="unknown")', self.html)
+        self.assertIn('document.querySelectorAll(".asset-rail .asset-item").forEach((item)=>', self.html)
+        self.assertIn('value.textContent="unknown / not verified"', self.html)
         self.assertIn("panel.setAttribute(\"data-api-state\",state)", self.html)
         self.assertIn("if(state!==\"available\")", self.html)
         self.assertIn('panel.setAttribute("data-api-state",state)', self.html)
