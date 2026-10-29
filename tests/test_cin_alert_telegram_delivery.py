@@ -182,27 +182,31 @@ def test_crash_after_provider_acceptance_retries_after_lease_and_is_at_least_onc
         payload={"text": "BTC alert"}, now=NOW,
     )
     accepted = FakeResponse({"ok": True, "result": {"message_id": 91}})
-    with patch("cin_alert_telegram_delivery.urllib.request.urlopen", return_value=accepted) as provider:
-        with patch(
-            "cin_alert_telegram_delivery.mark_alert_sent",
-            side_effect=RuntimeError("simulated process crash after provider acceptance"),
-        ):
-            with pytest.raises(RuntimeError, match="simulated process crash"):
-                process_due_telegram_alerts(str(path), now=NOW, lease_seconds=300)
-
-        with __import__("sqlite3").connect(path) as db:
-            row = db.execute(
-                "SELECT status, attempts FROM alert_delivery_outbox"
-            ).fetchone()
-        assert row == ("sending", 1)
-
-        with patch(
-            "cin_alert_telegram_delivery.mark_alert_sent",
-            side_effect=real_mark_alert_sent,
-        ):
-            result = process_due_telegram_alerts(
-                str(path), now=NOW + timedelta(seconds=300), lease_seconds=300
-            )
+    with patch.dict("os.environ", {
+        "CIN_TELEGRAM_BOT_TOKEN": "123456:fake-test-token",
+        "CIN_TELEGRAM_CHAT_ID": "-100123456789",
+    }):
+      with patch("cin_alert_telegram_delivery.urllib.request.urlopen", return_value=accepted) as provider:
+          with patch(
+              "cin_alert_telegram_delivery.mark_alert_sent",
+              side_effect=RuntimeError("simulated process crash after provider acceptance"),
+          ):
+              with pytest.raises(RuntimeError, match="simulated process crash"):
+                  process_due_telegram_alerts(str(path), now=NOW, lease_seconds=300)
+  
+          with __import__("sqlite3").connect(path) as db:
+              row = db.execute(
+                  "SELECT status, attempts FROM alert_delivery_outbox"
+              ).fetchone()
+          assert row == ("sending", 1)
+  
+          with patch(
+              "cin_alert_telegram_delivery.mark_alert_sent",
+              side_effect=real_mark_alert_sent,
+          ):
+              result = process_due_telegram_alerts(
+                  str(path), now=NOW + timedelta(seconds=300), lease_seconds=300
+              )
 
     assert provider.call_count == 2
     assert result["results"][0]["status"] == "sent"
