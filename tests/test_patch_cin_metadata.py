@@ -21,6 +21,7 @@ MODULES = (
     "cin_public_market_candles_api.py",
     "cin_derivatives_market_data_api.py",
     "cin_public_news_sentiment_api.py",
+    "cin_monitoring_status.py",
     "cin_monitoring_status_api.py",
     "cin_source_observation_contract.py",
 )
@@ -97,6 +98,14 @@ class DeploymentPatchTests(unittest.TestCase):
             main_text,
         )
         self.assertEqual(main_text.count("app.include_router(cin_monitoring_status_router)"), 1)
+
+    def test_shared_monitoring_aggregator_is_copied_into_deployment_app(self):
+        result = self.run_patch()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        source = self.root / "cin_monitoring_status.py"
+        installed = self.app_dir / "cin_monitoring_status.py"
+        self.assertTrue(installed.is_file())
+        self.assertEqual(installed.read_text(encoding="utf-8"), source.read_text(encoding="utf-8"))
 
     def test_missing_required_module_fails_before_any_scaffold_mutation(self):
         main_path = self.app_dir / "main.py"
