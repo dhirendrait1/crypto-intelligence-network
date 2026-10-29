@@ -1,4 +1,5 @@
 """Read-only API contract for caller-supplied CIN service monitoring snapshots."""
+import math
 from datetime import datetime
 from typing import Any
 from fastapi import APIRouter
@@ -76,3 +77,47 @@ def monitoring_status(snapshot: MonitoringSnapshot) -> dict[str, Any]:
         "checks_performed": False,
         "note": "Status summarizes caller-supplied fields; CIN did not poll providers or verify freshness in this request.",
     }
+
+def assess_timestamp_freshness(
+    observed_at: str,
+    *,
+    now: datetime,
+    max_age_seconds: int,
+    future_tolerance_seconds: int = 300,
+) -> dict[str, Any]:
+    """Assess a supplied source timestamp without fetching or verifying a source.
+
+    Invalid/naive timestamps, invalid policy values, and timestamps too far
+    in the future return unknown. Tolerated clock skew is clamped to zero age.
+    The caller remains responsible for source identity and trust.
+    """
+    if (
+        now.tzinfo is None
+        or now.utcoffset() is None
+        or isinstance(max_age_seconds, bool)
+        or not isinstance(max_age_seconds, int)
+        or max_age_seconds <= 0
+        or isinstance(future_tolerance_seconds, bool)
+        or not isinstance(future_tolerance_seconds, int)
+        or future_tolerance_seconds < 0
+    ):
+        return {"freshness": "unknown", "age_seconds": None, "reason": "invalid_policy_or_clock"}
+
+    try:
+        parsed = datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
+    except (AttributeError, TypeError, ValueError):
+        return {"freshness": "unknown", "age_seconds": None, "reason": "invalid_timestamp"}
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return {"freshness": "unknown", "age_seconds": None, "reason": "timezone_required"}
+
+    age_seconds = (now.astimezone(parsed.tzinfo) - parsed).total_seconds()
+    if age_seconds < -future_tolerance_seconds:
+        return {"freshness": "unknown", "age_seconds": None, "reason": "timestamp_too_far_in_future"}
+    age_seconds = max(0, age_seconds)
+    # Compare the unrounded duration to avoid treating 300.5 seconds as fresh
+    # under a 300-second policy. Report fractional ages rounded up to seconds.
+    reported_age_seconds = math.ceil(age_seconds)
+    if age_seconds > max_age_seconds:
+        return {"freshness": "stale", "age_seconds": reported_age_seconds, "reason": "age_exceeds_limit"}
+    return {"freshness": "fresh", "age_seconds": reported_age_seconds, "reason": "within_limit"}
+
