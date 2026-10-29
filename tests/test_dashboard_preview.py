@@ -62,5 +62,22 @@ class DashboardPreviewTests(unittest.TestCase):
         self.assertIn('Request blocked or network/CORS error.', self.html)
 
 
+    def test_read_only_endpoints_and_response_schemas_are_explicit(self):
+        for endpoint in (
+            "/market-candles?symbol=BTCUSDT",
+            "/technical-analysis/market?symbol=BTCUSDT",
+            "/coin-screening?vs_currency=usd",
+            "/news-sentiment?query=cryptocurrency",
+            "/derivatives/market-snapshot?symbol=BTCUSDT",
+        ):
+            with self.subTest(endpoint=endpoint):
+                self.assertIn(endpoint, self.html)
+        self.assertIn("Invalid CIN response schema", self.html)
+        self.assertIn("Number.isInteger(data.count)&&Array.isArray(data.data)", self.html)
+        self.assertIn("!!data.sentiment_summary", self.html)
+        self.assertIn("!!data.data_quality", self.html)
+        self.assertIn("not data correctness, freshness, or source authenticity", self.html)
+
+
 if __name__ == "__main__":
     unittest.main()
