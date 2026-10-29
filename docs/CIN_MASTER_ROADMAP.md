@@ -44,7 +44,7 @@
 15. **[Implemented — offline-tested]** Maintain derivatives snapshot validation for open interest, funding, mark/index price, and provider timestamps.
 16. **[Partial]** Validate order-book depth quality, spread/imbalance methodology, and slippage-aware interpretation.
 17. **[Implemented — offline-tested]** Expand indicator edge-case tests and make indicator limitations and signal uncertainty clear to consumers.
-18. **[Pending]** Add explicit cross-source conflict handling and evidence confidence rules where the same metric differs by source.
+18. **[Partial]** Add explicit cross-source conflict handling and evidence confidence rules where the same metric differs by source. The initial caller-supplied comparison helper and offline tests exist; API integration, live-source validation, and broader metric-specific tolerances remain outstanding.
 
 **Exit gate:** outputs are reproducible, provenance-backed, and avoid presenting incomplete data as confirmed signals.
 
@@ -140,3 +140,14 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - Added offline regression coverage for bid/ask adverse slippage, insufficient depth, invalid parameters, and snapshot serialization.
 - Explicit limitations: no fees, latency, hidden liquidity, queue position, market impact beyond displayed levels, or execution outcome is modeled. This is analysis only; no orders are placed or routed.
 - Step 16 remains Partial pending broader methodology review, multi-exchange coverage, and live snapshot validation. Latest head `ad0899433985b9c80e710fde8bcfd209d65a254c` has four workflows in progress at this checkpoint.
+
+
+## Step 18 cross-source comparison increment (2026-10-30)
+
+- Added `cross_source_evidence.py`: groups caller-supplied observations by exact metric and unit, validates finite numeric values and timezone-aware timestamps, deduplicates normalized source URLs, and compares observations within a configurable time window.
+- Explicit states: `agreement_observed`, `conflicting`, and `insufficient_independent_source_count`; confidence classes are descriptive evidence labels, not numeric probabilities.
+- Agreement tolerance defaults to 1% relative spread (0 absolute tolerance); thresholds are configurable and explicitly documented as heuristics. Observations outside the 5-minute default time window and duplicate URLs are not treated as separate corroboration.
+- No source ranking or winner selection; source independence and role authentication remain false. No fetching, persistence, certification, trade execution, or investment recommendation.
+- Added eight offline regression tests covering agreement, material disagreement, duplicate URLs, timestamp windows, unit separation, malformed/non-finite values, invalid tolerance configuration, and the exact tolerance boundary.
+- All four workflows passed on exact code/documentation head `f42634ea7b55f66db472bc73505184d337dd0846`: evidence ingestion API `40972958485`, technical analysis `40972958481`, automated tests `40972958476`, screening `40972958628`.
+- Step 18 remains Partial: this increment is a reusable comparison primitive and is not yet integrated into production metric APIs or validated against live sources.
