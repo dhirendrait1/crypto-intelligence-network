@@ -90,6 +90,17 @@ def _canonical_source_url(value: Any) -> str:
         return value.strip()
 
 
+
+def _source_host(value: Any) -> str | None:
+    """Return normalized hostname for source-diversity diagnostics only."""
+    if not _is_http_url(value):
+        return None
+    try:
+        return (urlsplit(value.strip()).hostname or "").lower() or None
+    except ValueError:
+        return None
+
+
 def _timestamp_identity(value: Any) -> str | None:
     parsed = _parse_timestamp(value)
     return parsed.isoformat() if parsed is not None else None
@@ -118,6 +129,7 @@ def normalize_evidence(item: Any, *, now: datetime | None = None,
             "missing_fields": list(REQUIRED_EVIDENCE_FIELDS),
             "timestamp_validation_errors": [],
             "source_url_valid": False,
+            "source_host": None,
             "freshness_threshold_days": max_age_days,
             "assessment_clock_valid": assessment_clock_valid,
             "invalid_record": True,
@@ -175,6 +187,7 @@ def normalize_evidence(item: Any, *, now: datetime | None = None,
             record["status_reason"] = f"Publication is older than the {max_age_days}-day freshness threshold."
 
     record["status"] = status
+    record["source_host"] = _source_host(record.get("source_url"))
     record["publication_age_days"] = age_days
     record["missing_fields"] = missing
     record["timestamp_validation_errors"] = timestamp_errors
@@ -231,11 +244,19 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
             )
             for record in records
         }
+        source_hosts = sorted({record.get("source_host") for record in records if record.get("source_host")})
         coverage[kind] = {
             "status": state,
             "evidence_count": len(identities),
             "duplicate_record_count": max(0, len(records) - len(identities)),
             "conflict_detected": state == "conflicting",
+            "distinct_source_host_count": len(source_hosts),
+            "source_host_diversity": (
+                "multiple_hosts" if len(source_hosts) > 1
+                else "single_host" if source_hosts
+                else "no_valid_hosts"
+            ),
+            "source_independence_verified": False,
         }
 
     statuses = [value["status"] for value in coverage.values()]
