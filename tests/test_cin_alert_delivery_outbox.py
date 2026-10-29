@@ -211,3 +211,24 @@ def test_legacy_database_migrates_status_constraint_and_preserves_rows(tmp_path)
         ).fetchone()[0]
         assert "uncertain" in schema
         assert db.execute("SELECT COUNT(*) FROM alert_delivery_outbox").fetchone()[0] == 1
+
+
+def test_uncertain_lease_overwrites_prior_failure_code_with_unknown_outcome(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    item = enqueue_alert_delivery(
+        path, rule_id="r1", observation_id="prior-failure",
+        payload={"text": "alert"}, now=NOW,
+    )
+    claim_due_alerts(path, now=NOW)
+    failed = mark_alert_failed(
+        path, item["idempotency_key"], now=NOW,
+        error_code="telegram_network_error", retry_delay_seconds=1, claim_attempt=1,
+    )
+    assert failed["last_error_code"] == "telegram_network_error"
+    second_claim = claim_due_alerts(path, now=NOW + timedelta(seconds=1))[0]
+    assert second_claim["attempts"] == 2
+
+    assert claim_due_alerts(path, now=NOW + timedelta(seconds=301)) == []
+    uncertain = list_uncertain_alert_deliveries(path)
+    assert len(uncertain) == 1
+    assert uncertain[0]["last_error_code"] == "delivery_outcome_unknown"
