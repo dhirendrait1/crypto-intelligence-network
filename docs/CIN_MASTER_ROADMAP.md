@@ -102,7 +102,7 @@ This section replaces superseded checkpoint narratives that separately described
 - Historical intermediate CI entries that said “pending” or “must be refreshed” have been consolidated above; their old commit-specific results remain in `CIN_IMPLEMENTATION_TRACKER.md`.
 - The tracker is the detailed implementation evidence ledger; this roadmap is the authoritative numbered scope/status view. Architecture status is a high-level architecture register, not a second roadmap.
 - PR state is recorded in the repository reconciliation section below and should be refreshed from GitHub before future status claims.
-- Step 5 remains Partial only for any remaining legacy references or duplicate milestone narratives outside this consolidated roadmap/tracker relationship. No release or live-provider work is implied.
+- **Step 5 is Implemented — reconciled.** The roadmap, historical tracker, and architecture register have distinct roles and a single active numbering source. This documentation closure does not imply live-provider validation or release readiness.
 
 ## Operating rule
 
