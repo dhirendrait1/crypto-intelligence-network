@@ -100,12 +100,12 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
 <div id="api-results" class="small" aria-live="polite"></div>
 </section>
 <section class="grid" aria-label="CIN modules">
-<article class="card"><h2>Market data</h2><div class="state">Awaiting API</div><p class="muted small">Provider, instrument, candle interval and observation timestamp will appear here.</p></article>
-<article class="card"><h2>Technical analysis</h2><div class="state">Awaiting API</div><p class="muted small">Trend structure and indicators must include timeframe and closed-candle status.</p></article>
-<article class="card"><h2>Coin screening</h2><div class="state">Awaiting API</div><p class="muted small">Scores should expose methodology, inputs and data limitations.</p></article>
-<article class="card"><h2>Evidence & provenance</h2><div class="state">Not verified</div><p class="muted small">Source identity, retrieval time, observed time and evidence completeness.</p></article>
-<article class="card"><h2>News & derivatives</h2><div class="state">Awaiting API</div><p class="muted small">Sentiment and derivatives metrics remain unavailable until returned by the service.</p></article>
-<article class="card"><h2>Monitoring</h2><div class="state">Policy not configured</div><p class="muted small">Unknown freshness stays unknown; no universal thresholds are assumed.</p></article>
+<article class="card" data-cin-panel="market"><h2>Market data</h2><div class="state">Awaiting API</div><p class="muted small">Provider, instrument, candle interval and observation timestamp will appear here.</p></article>
+<article class="card" data-cin-panel="technical"><h2>Technical analysis</h2><div class="state">Awaiting API</div><p class="muted small">Trend structure and indicators must include timeframe and closed-candle status.</p></article>
+<article class="card" data-cin-panel="screening"><h2>Coin screening</h2><div class="state">Awaiting API</div><p class="muted small">Scores should expose methodology, inputs and data limitations.</p></article>
+<article class="card" data-cin-panel="evidence"><h2>Evidence & provenance</h2><div class="state">Not verified</div><p class="muted small">Source identity, retrieval time, observed time and evidence completeness.</p></article>
+<article class="card" data-cin-panel="news"><h2>News & derivatives</h2><div class="state">Awaiting API</div><p class="muted small">Sentiment and derivatives metrics remain unavailable until returned by the service.</p></article>
+<article class="card" data-cin-panel="monitoring"><h2>Monitoring</h2><div class="state">Policy not configured</div><p class="muted small">Unknown freshness stays unknown; no universal thresholds are assumed.</p></article>
 <article class="card full"><h2>Data quality rules</h2><ul><li>Show unavailable and unknown states explicitly; never substitute fabricated values.</li><li>Display source and timestamps beside each dataset.</li><li>Separate heuristic research outputs from verified facts.</li><li>All controls are informational only: no orders, wallets or fund movement.</li></ul><div class="actions"><button id="refresh" type="button">Recheck preview state</button><span id="refresh-state" class="muted small" role="status" aria-live="polite">No API request has been made.</span></div></article>
 </section>
 <footer class="foot">Crypto Intelligence Network (CIN) · Preview only · No trading or order execution · No wallet access</footer>
@@ -147,7 +147,26 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
     try{const url=new URL(value);return (url.protocol==="https:"||url.protocol==="http:")&&url.origin===value.replace(/\/$/,"")&&!url.username&&!url.password&&url.search===""&&url.hash===""&&url.pathname==="/";}
     catch(_){return false;}
   }
+  const panelForEndpoint={
+    "Market candles":"market",
+    "Technical analysis":"technical",
+    "Coin screening":"screening",
+    "Public news sentiment":"news",
+    "Derivatives snapshot":"news"
+  };
+  function updateDashboardPanel(name,state,detail){
+    const key=panelForEndpoint[name];
+    if(!key) return;
+    const panel=document.querySelector('[data-cin-panel="'+key+'"]');
+    if(!panel) return;
+    const stateNode=panel.querySelector(".state");
+    const description=panel.querySelector("p");
+    if(stateNode) stateNode.textContent=state==="available"?"API response received":state==="unavailable"?"Unavailable":"Awaiting API";
+    if(description) description.textContent=detail;
+    panel.setAttribute("data-api-state",state);
+  }
   function renderRow(name,state,detail){
+    updateDashboardPanel(name,state,detail);
     const row=document.createElement("article");
     row.style.cssText="border-top:1px solid var(--line);padding:10px 0";
     const heading=document.createElement("strong");heading.textContent=name+" — "+state;row.appendChild(heading);
@@ -193,6 +212,7 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
     if(activeController) activeController.abort();
     activeController=null;connectButton.disabled=false;results.replaceChildren();
     status.textContent="Disconnected. Existing displayed endpoint results cleared.";
+    document.querySelectorAll("[data-cin-panel]").forEach(panel=>{panel.removeAttribute("data-api-state");const stateNode=panel.querySelector(".state");if(stateNode)stateNode.textContent=panel.dataset.cinPanel==="evidence"?"Not verified":panel.dataset.cinPanel==="monitoring"?"Policy not configured":"Awaiting API";});
     document.querySelector(".notice").textContent="Connection state: not connected. No live values are shown until you explicitly connect to an API.";
   });
 })();
