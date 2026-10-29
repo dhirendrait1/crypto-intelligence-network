@@ -8,8 +8,8 @@ from typing import Any
 def market_pair_metadata(symbol: str, source_id: str) -> dict[str, Any]:
     """Describe the actual pair returned by a provider, not merely the request.
 
-    Coinbase fallback currently maps USDT requests to a USD product; this helper
-    makes that distinction explicit instead of silently labelling USD data USDT.
+    Coinbase USD candles are not a valid substitute for a requested USDT pair.
+    If that mismatch appears, report the quote as unverified rather than relabeling it.
     """
     normalized = symbol.strip().upper()
     match = re.fullmatch(r"([A-Z0-9]+)(USDT|USD)", normalized)
@@ -23,13 +23,14 @@ def market_pair_metadata(symbol: str, source_id: str) -> dict[str, Any]:
         }
 
     base_asset, requested_quote = match.groups()
-    actual_quote = "USD" if source_id == "coinbase_public" else requested_quote
+    quote_mismatch = source_id == "coinbase_public" and requested_quote == "USDT"
+    actual_quote = None if quote_mismatch else requested_quote
     return {
         "source_id": source_id,
         "base_asset": base_asset,
         "requested_quote_currency": requested_quote,
         "quote_currency": actual_quote,
-        "pair_metadata_status": "mapped_provider_product" if actual_quote != requested_quote else "identified",
+        "pair_metadata_status": "quote_mismatch" if quote_mismatch else "identified",
     }
 
 
