@@ -169,7 +169,7 @@ class DashboardPreviewTests(unittest.TestCase):
             if 'class="ticker"' in line and "BTC / USDT" in line
         )
         self.assertIn("BTC / USDT", ticker)
-        self.assertNotIn("<span>BTC / USD", ticker)
+        self.assertNotIn("<span>BTC / USD <b>", ticker)
         self.assertIn("/market-candles?symbol=BTCUSDT", self.html)
 
 
