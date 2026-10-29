@@ -121,7 +121,7 @@ class DashboardPreviewTests(unittest.TestCase):
         self.assertIn('analysisPanel.querySelectorAll(".ref-kpi strong").forEach(node=>node.textContent="unknown")', self.html)
         self.assertIn('document.querySelectorAll(".asset-rail .asset-item").forEach((item)=>', self.html)
         self.assertIn('value.textContent="unknown / not verified"', self.html)
-        self.assertIn('node.textContent.includes("BTC / USD")', self.html)
+        self.assertIn('node.textContent.includes("BTC / USDT")', self.html)
         self.assertIn('value.textContent=latest&&latest.close!=null?safeText(latest.close):"UNKNOWN"', self.html)
         self.assertIn('if(value) value.textContent="UNKNOWN"', self.html)
         self.assertIn("panel.setAttribute(\"data-api-state\",state)", self.html)
