@@ -122,7 +122,19 @@ def _get_rss_articles(query: str, max_records: int) -> tuple[list[dict[str, Any]
     return parsed, " + ".join(providers) + " (public RSS fallback; query-filtered)"
 
 
-def _headline_sentiment(title: str) -> dict[str, Any]:
+def _headline_sentiment(title: str, language: str | None = None) -> dict[str, Any]:
+    """Score English headlines only; never label a known non-English headline neutral."""
+    normalized_language = language.strip().lower().replace("_", "-").split("-", 1)[0] if isinstance(language, str) and language.strip() else None
+    if normalized_language is not None and normalized_language != "en":
+        return {
+            "label": "unavailable",
+            "score": None,
+            "positive_terms_matched": 0,
+            "negative_terms_matched": 0,
+            "confidence": "unsupported_language",
+            "language_status": "unsupported_language",
+            "method": "English-only keyword lexicon; sentiment not scored for this provider-declared language",
+        }
     words = {word.strip(".,:;!?()[]{}\"'").lower() for word in title.split()}
     positive = len(words & _POSITIVE)
     negative = len(words & _NEGATIVE)
@@ -130,13 +142,15 @@ def _headline_sentiment(title: str) -> dict[str, Any]:
     score = (positive - negative) / matched if matched else 0.0
     label = "positive" if score > 0 else ("negative" if score < 0 else "neutral")
     confidence = "low" if matched <= 1 else "low_to_moderate"
+    language_status = "supported_english" if normalized_language == "en" else "language_unverified"
     return {
         "label": label,
         "score": round(score, 4),
         "positive_terms_matched": positive,
         "negative_terms_matched": negative,
         "confidence": confidence,
-        "method": "Small transparent headline keyword lexicon; not a trained financial sentiment model",
+        "language_status": language_status,
+        "method": "Small transparent English headline keyword lexicon; not a trained financial sentiment model",
     }
 
 
@@ -260,7 +274,7 @@ def _parse_articles(payload: Any, max_records: int) -> list[dict[str, Any]]:
             "domain": _optional_provider_text(row.get("domain"), 253),
             "language": _optional_provider_text(row.get("language"), 32),
             "source_country": _optional_provider_text(row.get("sourcecountry"), 64),
-            "headline_sentiment": _headline_sentiment(title),
+            "headline_sentiment": _headline_sentiment(title, _optional_provider_text(row.get("language"), 32)),
         })
         if len(articles) >= max_records:
             break
@@ -314,7 +328,7 @@ def _search(query: str, max_records: int) -> dict[str, Any]:
                 "Provider timestamp quality counts describe provider indexing/publication metadata, not independently verified original publication times.",
                 "GDELT is primary; public RSS feeds are used only when GDELT fails. RSS fallback applies a headline/summary keyword relevance filter.",
                 "Public news search coverage and timestamps depend on provider indexing and feed metadata.",
-                "Headline sentiment uses a small transparent keyword lexicon and can miss context, negation, sarcasm, and asset-specific meaning.",
+                "Headline sentiment uses an English-only keyword lexicon and can miss context, negation, sarcasm, and asset-specific meaning. Provider-declared non-English headlines are not scored; missing language metadata is marked unverified and must not be assumed English.",
                 "This endpoint does not ingest X, Reddit, Telegram, or other social platforms.",
                 "An empty result means no articles were returned for this query, not that news or sentiment is absent globally.",
             ],
