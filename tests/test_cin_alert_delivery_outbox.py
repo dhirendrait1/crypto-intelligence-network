@@ -111,18 +111,19 @@ def test_in_memory_path_rejected(tmp_path):
         enqueue_alert_delivery(":memory:", rule_id="r1", observation_id="e1", payload={}, now=NOW)
 
 
-def test_stale_worker_cannot_mark_reclaimed_attempt_sent_or_failed(tmp_path):
+def test_stale_worker_cannot_acknowledge_after_expired_lease_becomes_uncertain(tmp_path):
     path = tmp_path / "alerts.sqlite3"
     item = enqueue_alert_delivery(path, rule_id="r1", observation_id="stale", payload={"v": 1}, now=NOW)
     old_claim = claim_due_alerts(path, now=NOW, lease_seconds=300)[0]
-    new_claim = claim_due_alerts(path, now=NOW + timedelta(seconds=300), lease_seconds=300)[0]
-    assert new_claim["attempts"] == old_claim["attempts"] + 1
+    assert old_claim["status"] == "sending"
+    assert claim_due_alerts(path, now=NOW + timedelta(seconds=300), lease_seconds=300) == []
+    uncertain = list_uncertain_alert_deliveries(path)
+    assert len(uncertain) == 1
+    assert uncertain[0]["idempotency_key"] == item["idempotency_key"]
     with pytest.raises(ValueError, match="sending state"):
         mark_alert_sent(path, item["idempotency_key"], now=NOW + timedelta(seconds=301), claim_attempt=old_claim["attempts"])
     with pytest.raises(ValueError, match="sending state"):
         mark_alert_failed(path, item["idempotency_key"], now=NOW + timedelta(seconds=301), error_code="stale_worker", claim_attempt=old_claim["attempts"])
-    current = mark_alert_sent(path, item["idempotency_key"], now=NOW + timedelta(seconds=302), claim_attempt=new_claim["attempts"])
-    assert current["status"] == "sent"
 
 
 
