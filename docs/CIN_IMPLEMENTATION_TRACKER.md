@@ -904,3 +904,13 @@ This checkpoint validates configured offline automation only. It does not establ
 - **Step 16 — partial increment:** derivatives snapshots now expose bid/ask visible-book sweep estimates for 10k/50k/100k USDT reference notionals. Complete visible depth reports a volume-weighted average price and adverse slippage basis points; insufficient depth reports coverage only and leaves slippage/average price null. Regression tests cover both sides, insufficient depth, invalid parameters, and response serialization.
 - All four workflows passed on exact code head `ad0899433985b9c80e710fde8bcfd209d65a254c`: Technical Analysis Tests `40972666017`, Evidence Ingestion API `40972666026`, Screening Checks `40972666110`, Automated Tests `40972666015`.
 - **Boundary:** slippage references are hypothetical displayed-book calculations, not execution forecasts or instructions. They exclude fees, latency, hidden liquidity, queue position, and impact beyond returned levels. Step 16 remains Partial pending broader methodology review, multi-exchange coverage, and live snapshot validation. Step 17 offline tests do not establish live-provider behavior.
+
+
+## Step 18 — cross-source metric conflict and confidence increment (2026-10-30)
+
+- Added `cross_source_evidence.py` as a reusable, read-only comparison primitive for caller-supplied metric observations. It validates metric/unit/value/source/timestamp fields, groups only exact metric+unit pairs, applies a configurable observation-time window, and deduplicates normalized source URLs.
+- Confidence semantics: fewer than two distinct URLs => `insufficient_evidence`; values within the configured spread tolerance => `limited_corroboration`; values outside tolerance => `low_confidence_conflict`. No numeric probability, source ranking, or preferred source is produced.
+- Defaults: 300-second comparison window; 1% relative tolerance; zero absolute tolerance. These are explicit heuristics and require metric-specific calibration before production use.
+- Source independence and role authentication are always false. Distinct URLs/hosts are not proof of independent ownership or authorship. The helper does not fetch, persist, certify, or execute.
+- Eight offline tests passed with all four configured workflows on code/documentation head `f42634ea7b55f66db472bc73505184d337dd0846` (run IDs: `40972958485`, `40972958481`, `40972958476`, `40972958628`).
+- Remaining acceptance: integrate the comparison primitive into applicable metric APIs, define metric-specific tolerance/time-window policies, add provider-specific tests, and perform authorized live-source validation. Step 18 is Partial, not complete.
