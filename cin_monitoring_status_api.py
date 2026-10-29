@@ -134,7 +134,12 @@ class SourceFreshnessRequest(BaseModel):
 def assess_source_observation_freshness(request: SourceFreshnessRequest) -> dict[str, Any]:
     """Combine metadata validation and timestamp freshness; never polls a provider."""
     from datetime import timezone
-    from cin_source_observation_contract import validate_source_observation
+    try:
+        # In the deployed scaffold, modules are imported through the app package.
+        from app.cin_source_observation_contract import validate_source_observation
+    except ModuleNotFoundError:
+        # Keep direct-module imports working in the offline contract test suite.
+        from cin_source_observation_contract import validate_source_observation
 
     now = datetime.now(timezone.utc)
     metadata = validate_source_observation(request.observation, now=now)
