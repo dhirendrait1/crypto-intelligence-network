@@ -43,7 +43,7 @@
 14. **[Implemented — offline-tested]** Maintain coin-screening identity deduplication, invalid-ID accounting, deterministic ranking, and numeric arithmetic guards.
 15. **[Implemented — offline-tested]** Maintain derivatives snapshot validation for open interest, funding, mark/index price, and provider timestamps.
 16. **[Partial]** Validate order-book depth quality, spread/imbalance methodology, and slippage-aware interpretation.
-17. **[Partial]** Expand indicator edge-case tests and make indicator limitations and signal uncertainty clear to consumers.
+17. **[Implemented — offline-tested]** Expand indicator edge-case tests and make indicator limitations and signal uncertainty clear to consumers.
 18. **[Pending]** Add explicit cross-source conflict handling and evidence confidence rules where the same metric differs by source.
 
 **Exit gate:** outputs are reproducible, provenance-backed, and avoid presenting incomplete data as confirmed signals.
@@ -89,7 +89,7 @@
 
 This section replaces superseded checkpoint narratives that separately described intermediate commits as pending CI. Historical commit IDs remain in the implementation tracker; current status is governed by the numbered steps above and exact-head CI records below.
 
-- **Current verified documentation head:** `92075a147bc64c0af3860b18ed01f821d1708232`. All four configured workflows passed on this exact head: CIN Technical Analysis Tests (`40970157697`), CIN Automated Tests (`40970157850`), CIN evidence ingestion API checks (`40970157709`), and CIN screening checks (`40970157715`).
+- **Latest verified feature head:** `9de32c047ef87acde481da46bb702c83d545fb89`. All four configured workflows passed on this exact head: CIN Technical Analysis Tests (`40972458689`), CIN Automated Tests (`40972458409`), CIN evidence ingestion API checks (`40972458435`), and CIN screening checks (`40972458395`).
 - **Candle validation evidence:** PR #27 remains the offline interval-boundary test branch; latest known head `23c6489121664d766c44de98ea40833f55a44e4e` passed all four workflows. Kraken compatibility is tested with mocked timestamp fixtures only; live exchange behavior remains unverified.
 - **Screening cache evidence:** PR #65 adds exact fresh-cache and stale-cache boundary tests. The PR remains Draft/open/unmerged; tests are offline.
 - **Market-data provenance evidence:** PR #66 records provider identity and provider retrieval time per row and verifies endpoint serialization. Its latest documentation head is the current checkpoint above; all four workflows passed. This does not establish live provider correctness.
