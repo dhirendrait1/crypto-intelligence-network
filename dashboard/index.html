@@ -38,6 +38,30 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
 .terminal-bottom{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:10px}
 @media(max-width:850px){.terminal-layout{grid-template-columns:1fr 1fr}.terminal-center{grid-column:1/-1;grid-row:1}.particle-stage{min-height:250px}.terminal-bottom{grid-template-columns:1fr}}
 @media(max-width:560px){main{padding:10px 8px 24px}.terminal-layout{grid-template-columns:1fr}.terminal-center{grid-column:auto;grid-row:auto}.particle-stage{min-height:225px}.particle-ring{width:210px}.metric-big{font-size:1.2rem}.terminal-panel{padding:10px}.top{gap:8px}.brand{font-size:1.1rem}}
+/* Reference-matched compact intelligence workstation */
+.ticker{display:flex;gap:18px;overflow:hidden;white-space:nowrap;padding:7px 10px;border:1px solid #263a54;background:#080e19;color:#93a9c6;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;margin:8px 0}
+.ticker b{color:#d5e7f8}.ticker .up{color:#5ff0bf}.ticker .down{color:#ff7b91}
+.reference-board{display:grid;grid-template-columns:1.02fr 1.2fr 1.55fr .72fr;gap:5px;margin:6px 0}
+.ref-panel{min-width:0;overflow:hidden;border:1px solid #243650;background:linear-gradient(155deg,#0b1422,#060a12);padding:8px;font-size:.65rem}
+.ref-head{display:flex;align-items:center;justify-content:space-between;gap:6px;text-transform:uppercase;letter-spacing:.12em;font-size:.61rem;color:#a4bdd9;border-bottom:1px solid #1c2d43;padding-bottom:7px;margin-bottom:8px}
+.ref-tag{color:#5de6cc;border:1px solid #23574f;padding:2px 4px;font-size:.56rem}
+.ref-metric{font-size:clamp(1.25rem,2.5vw,2.2rem);font-weight:800;letter-spacing:-.06em;color:#73efbf;line-height:1.2;margin:14px 0 5px}
+.ref-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:10px 0}.ref-kpi{border:1px solid #1c2c42;padding:6px}.ref-kpi strong{display:block;color:#d7e7f6;font-size:.83rem}.ref-kpi span{font-size:.55rem;color:#8299b7;text-transform:uppercase}
+.ref-line{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid #142238;padding:6px 0;color:#91a5bf}.ref-line strong{color:#d4e4f5;font-weight:600}.ref-chart{display:block;width:100%;height:115px}.ref-smallchart{display:block;width:100%;height:74px}
+.network-row{display:grid;grid-template-columns:minmax(0,1fr) 104px;gap:5px;margin:5px 0}
+.network-visual{position:relative;min-width:0;min-height:350px;border:1px solid #263852;background:radial-gradient(ellipse at 48% 54%,#10213a 0,#080e19 48%,#050912 100%);overflow:hidden}
+.network-visual svg{position:absolute;width:100%;height:100%;inset:0}
+.network-caption{position:absolute;left:10px;top:9px;font-size:.6rem;letter-spacing:.13em;color:#a7bfd8;text-transform:uppercase}
+.network-legend{position:absolute;bottom:8px;left:10px;right:10px;display:flex;gap:10px;flex-wrap:wrap;font-size:.56rem;color:#849bb9;text-transform:uppercase}
+.asset-rail{border:1px solid #263852;background:#080e19;padding:7px;min-width:0}
+.asset-rail h3{font-size:.58rem;letter-spacing:.1em;color:#9eb8d5;text-transform:uppercase;margin:2px 0 8px}
+.asset-item{padding:8px 0;border-bottom:1px solid #18263a;font-size:.62rem}.asset-item:last-child{border-bottom:0}.asset-item strong{display:block;color:#e1edf8}.asset-item span{color:#8299b7}.asset-item em{display:block;color:#5ce7bb;font-style:normal;margin-top:3px}
+.ref-bottom{display:grid;grid-template-columns:1.1fr 1fr;gap:5px;margin:5px 0}
+.ref-table{width:100%;border-collapse:collapse;font-size:.58rem}.ref-table th,.ref-table td{text-align:left;padding:6px 4px;border-bottom:1px solid #17263a;white-space:nowrap}.ref-table th{color:#6f89a9;font-weight:500;text-transform:uppercase}.ref-table td{color:#a9bed5}
+.ref-bottom-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:8px}.ref-bottom-kpis div{border:1px solid #243650;padding:6px;color:#7f9ab9;font-size:.55rem;text-transform:uppercase}.ref-bottom-kpis b{display:block;color:#d8e9f9;font-size:.78rem;margin-top:3px}
+@media(max-width:950px){.reference-board{grid-template-columns:1fr 1fr}.network-row{grid-template-columns:minmax(0,1fr) 110px}.network-visual{min-height:300px}}
+@media(max-width:560px){.reference-board{grid-template-columns:1fr 1fr}.ref-panel{padding:6px}.reference-board .latency-panel{grid-column:1/-1}.network-row{grid-template-columns:1fr}.network-visual{min-height:265px}.asset-rail{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 10px}.asset-rail h3{grid-column:1/-1}.asset-item{min-width:0}.ref-bottom{grid-template-columns:1fr}.ticker{font-size:.56rem}.ref-chart{height:90px}}
+
 @media(max-width:720px){main{padding:18px 12px 32px}.card,.wide{grid-column:1/-1}.card{padding:14px}.top{align-items:flex-start}}
 </style>
 </head>
@@ -50,35 +74,20 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
 <h1>Intelligence console</h1>
 <p class="intro">A mobile-first control panel for market analysis, screening, source evidence and monitoring. Live values are intentionally withheld until a verified API response is connected.</p>
 <div class="notice" role="status"><strong>Connection state: not connected.</strong> This preview does not fetch live data and does not represent current market conditions.</div>
-<section class="terminal-layout" aria-label="CIN intelligence overview">
-  <div class="terminal-panel">
-    <h2>Market pulse / BTC-USDT</h2>
-    <div class="metric-caption">Live value appears after API connection</div>
-    <div class="metric-big" id="hero-btc-price">— —</div>
-    <div class="terminal-row"><span>Market feed</span><span class="signal-warn">NOT CONNECTED</span></div>
-    <div class="terminal-row"><span>Analysis timeframe</span><span>1H</span></div>
-    <div class="terminal-row"><span>Closed candle rule</span><span class="signal">ENFORCED</span></div>
-    <svg class="micro-chart" viewBox="0 0 300 66" role="img" aria-label="Illustrative market chart; not live data"><path d="M0 54 L20 48 L37 51 L53 31 L70 38 L87 24 L106 35 L123 20 L140 30 L159 15 L178 26 L197 19 L214 28 L233 10 L252 21 L270 13 L300 8" fill="none" stroke="#51d9ff" stroke-width="1.5"/><path d="M0 54 L20 48 L37 51 L53 31 L70 38 L87 24 L106 35 L123 20 L140 30 L159 15 L178 26 L197 19 L214 28 L233 10 L252 21 L270 13 L300 8 L300 66 L0 66Z" fill="#51d9ff" opacity=".07"/></svg>
-    <p class="metric-caption">Illustrative chart only · no market values simulated</p>
-  </div>
-  <div class="terminal-panel terminal-center particle-stage">
-    <div class="particle-ring" aria-hidden="true"><div class="ring-core"></div></div>
-    <div class="stage-caption">CIN intelligence field · visual concept / not a live network map</div>
-  </div>
-  <div class="terminal-panel">
-    <h2>System status / read-only</h2>
-    <div class="terminal-row"><span>Market data</span><span class="signal-warn">UNKNOWN</span></div>
-    <div class="terminal-row"><span>Technical analysis</span><span class="signal-warn">UNKNOWN</span></div>
-    <div class="terminal-row"><span>Coin screening</span><span class="signal-warn">UNKNOWN</span></div>
-    <div class="terminal-row"><span>News intelligence</span><span class="signal-warn">UNKNOWN</span></div>
-    <div class="terminal-row"><span>Derivatives</span><span class="signal-warn">UNKNOWN</span></div>
-    <div class="terminal-row"><span>Source freshness policy</span><span class="signal-warn">CHECK REQUIRED</span></div>
-    <p class="metric-caption">Status changes only after schema-checked API responses.</p>
-  </div>
+<div class="ticker" aria-label="Market status ribbon"><span>◈ CIN INTELLIGENCE TERMINAL</span><span>MARKET FEED <b>—</b></span><span>BTC / USD <b>—</b></span><span>ETH / USD <b>—</b></span><span>VOLATILITY <b>UNKNOWN</b></span><span>NETWORK <b>READ-ONLY</b></span><span>UTC <b>—</b></span></div>
+<section class="reference-board" aria-label="Top intelligence panels">
+ <article class="ref-panel"><div class="ref-head"><span>◈ Asset balance / overview</span><span class="ref-tag">RESEARCH</span></div><div class="metric-caption">Verified portfolio data</div><div class="ref-metric">— — —</div><div class="metric-caption">No wallet connected · no portfolio value inferred</div><div class="ref-kpis"><div class="ref-kpi"><strong>—</strong><span>24H change</span></div><div class="ref-kpi"><strong>—</strong><span>Volume</span></div><div class="ref-kpi"><strong>—</strong><span>Assets</span></div></div><div class="ref-line"><span>Evidence coverage</span><strong>UNKNOWN</strong></div><div class="ref-line"><span>Feed status</span><strong>NOT CONNECTED</strong></div><div class="ref-line"><span>Last update</span><strong>—</strong></div></article>
+ <article class="ref-panel"><div class="ref-head"><span>▥ BTC market structure</span><span class="ref-tag">1H</span></div><div class="ref-line"><span>Instrument</span><strong>BTCUSDT</strong></div><div class="ref-line"><span>Candle status</span><strong>UNAVAILABLE</strong></div><svg class="ref-chart" viewBox="0 0 300 115" preserveAspectRatio="none" role="img" aria-label="Illustrative candlestick chart, not market data"><g stroke="#17283d" stroke-width="1"><path d="M0 20H300M0 45H300M0 70H300M0 95H300"/></g><g stroke="#5ce8ba" fill="#5ce8ba"><path d="M18 63V34M14 43H22V56H14Z M46 70V42M42 48H50V61H42Z M74 56V24M70 30H78V43H70Z M102 64V39M98 43H106V57H98Z M130 48V19M126 24H134V39H126Z"/></g><g stroke="#ff718a" fill="#ff718a"><path d="M158 54V30M154 35H162V48H154Z M186 68V40M182 44H190V60H182Z M214 58V25M210 31H218V49H210Z"/></g><g stroke="#5ce8ba" fill="#5ce8ba"><path d="M242 46V15M238 20H246V36H238Z M270 38V8M266 13H274V28H266Z"/></g><path d="M0 83L30 76L60 81L90 55L120 61L150 44L180 68L210 37L240 42L270 18L300 25" fill="none" stroke="#f0c46c" stroke-width="1.4" opacity=".8"/></svg><div class="ref-kpis"><div class="ref-kpi"><strong>—</strong><span>RSI</span></div><div class="ref-kpi"><strong>—</strong><span>Trend</span></div><div class="ref-kpi"><strong>—</strong><span>Structure</span></div></div><div class="metric-caption">Chart is a visual placeholder until connected.</div></article>
+ <article class="ref-panel latency-panel"><div class="ref-head"><span>⌁ Feed latency & data quality</span><span class="ref-tag">UNVERIFIED</span></div><svg class="ref-smallchart" viewBox="0 0 420 74" preserveAspectRatio="none" role="img" aria-label="Illustrative telemetry lines, not live measurements"><g stroke="#17283d"><path d="M0 15H420M0 37H420M0 59H420"/></g><path d="M0 60L25 51L50 54L75 35L100 43L125 31L150 36L175 26L200 33L225 20L250 26L275 15L300 21L325 12L350 19L375 8L420 12" fill="none" stroke="#5ddfc4" stroke-width="1.6"/><path d="M0 66L25 61L50 63L75 51L100 55L125 45L150 49L175 40L200 46L225 35L250 41L275 29L300 34L325 27L350 30L375 22L420 24" fill="none" stroke="#78baff" stroke-width="1" opacity=".8"/></svg><div class="ref-kpis"><div class="ref-kpi"><strong>UNKNOWN</strong><span>Freshness</span></div><div class="ref-kpi"><strong>UNKNOWN</strong><span>Latency</span></div><div class="ref-kpi"><strong>UNKNOWN</strong><span>Completeness</span></div></div><div class="ref-line"><span>Policy registry</span><strong>EXPLICIT POLICY REQUIRED</strong></div><div class="ref-line"><span>Data provenance</span><strong>WAITING FOR API</strong></div></article>
+ <article class="ref-panel"><div class="ref-head"><span>◉ System</span></div><div class="ref-line"><span>API</span><strong>OFFLINE</strong></div><div class="ref-line"><span>Screening</span><strong>—</strong></div><div class="ref-line"><span>News</span><strong>—</strong></div><div class="ref-line"><span>Derivatives</span><strong>—</strong></div><div class="ref-line"><span>Alerts</span><strong>—</strong></div><div class="ref-line"><span>Mode</span><strong>READ ONLY</strong></div></article>
 </section>
-<section class="terminal-bottom" aria-label="Research telemetry panels">
-  <div class="terminal-panel"><h2>Research stream</h2><div class="terminal-row"><span>Evidence provenance</span><span>WAITING</span></div><div class="terminal-row"><span>Timestamp validation</span><span>WAITING</span></div><div class="terminal-row"><span>Data quality checks</span><span>WAITING</span></div></div>
-  <div class="terminal-panel"><h2>Risk & methodology</h2><div class="terminal-row"><span>Output type</span><span>RESEARCH ONLY</span></div><div class="terminal-row"><span>Execution capability</span><span class="signal">DISABLED</span></div><div class="terminal-row"><span>Wallet access</span><span class="signal">NONE</span></div></div>
+<div class="network-row">
+ <section class="network-visual" aria-label="Central intelligence network visualization"><div class="network-caption">✳ Neural shell / evidence relationship map</div><svg viewBox="0 0 900 430" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Decorative 3D particle-ring concept; no live network relationships represented"><defs><radialGradient id="shellGlow"><stop offset="0" stop-color="#17385b" stop-opacity=".1"/><stop offset=".7" stop-color="#2a6480" stop-opacity=".12"/><stop offset="1" stop-color="#050a12" stop-opacity="0"/></radialGradient><linearGradient id="nodeGold"><stop stop-color="#e5cf8a"/><stop offset="1" stop-color="#5edbc8"/></linearGradient></defs><ellipse cx="445" cy="220" rx="310" ry="155" fill="url(#shellGlow)"/><g fill="none" stroke-width=".7" opacity=".55"><ellipse cx="445" cy="220" rx="300" ry="105" stroke="#5a9dc4"/><ellipse cx="445" cy="220" rx="280" ry="80" stroke="#5a9dc4" transform="rotate(-19 445 220)"/><ellipse cx="445" cy="220" rx="280" ry="80" stroke="#5a9dc4" transform="rotate(19 445 220)"/><ellipse cx="445" cy="220" rx="230" ry="65" stroke="#c5b778" transform="rotate(52 445 220)"/><ellipse cx="445" cy="220" rx="230" ry="65" stroke="#c5b778" transform="rotate(-52 445 220)"/></g><g id="network-dots"></g><g fill="none" stroke="#6b9fbd" stroke-width=".8" opacity=".5"><path d="M35 110Q170 150 240 220T420 220T670 200T860 80"/><path d="M25 300Q175 275 260 235T455 230T700 285T875 340"/><path d="M90 40Q210 130 300 195T450 220T610 170T820 100"/><path d="M55 360Q200 300 330 250T520 210T780 250T860 390"/></g><g fill="#5fe7d0"><circle cx="240" cy="220" r="3"/><circle cx="670" cy="200" r="3"/><circle cx="330" cy="250" r="3"/><circle cx="610" cy="170" r="3"/></g><g fill="#e4c978"><circle cx="95" cy="40" r="3"/><circle cx="820" cy="100" r="3"/><circle cx="780" cy="250" r="3"/></g></svg><div class="network-legend"><span>○ Source identity: pending</span><span>○ Evidence links: pending</span><span>○ Nodes are illustrative</span></div></section>
+ <aside class="asset-rail" aria-label="Watchlist sidebar"><h3>◈ Watchlist / screening</h3><div class="asset-item"><strong>BTC · Bitcoin</strong><span>Score / trend</span><em>— / UNKNOWN</em></div><div class="asset-item"><strong>ETH · Ethereum</strong><span>Score / trend</span><em>— / UNKNOWN</em></div><div class="asset-item"><strong>SOL · Solana</strong><span>Score / trend</span><em>— / UNKNOWN</em></div><div class="asset-item"><strong>BNB · BNB</strong><span>Score / trend</span><em>— / UNKNOWN</em></div><div class="asset-item"><strong>LINK · Chainlink</strong><span>Score / trend</span><em>— / UNKNOWN</em></div><div class="asset-item"><strong>AVAX · Avalanche</strong><span>Score / trend</span><em>— / UNKNOWN</em></div></aside>
+</div>
+<section class="ref-bottom" aria-label="Bottom intelligence tables">
+ <article class="ref-panel"><div class="ref-head"><span>▤ Execution tape / event stream</span><span class="ref-tag">READ ONLY</span></div><table class="ref-table"><thead><tr><th>UTC time</th><th>Source</th><th>Event</th><th>Status</th></tr></thead><tbody><tr><td>—</td><td>—</td><td>No event feed connected</td><td>UNKNOWN</td></tr><tr><td>—</td><td>—</td><td>Evidence validation</td><td>WAITING</td></tr><tr><td>—</td><td>—</td><td>Freshness assessment</td><td>WAITING</td></tr><tr><td>—</td><td>—</td><td>Alert evaluation</td><td>WAITING</td></tr></tbody></table><div class="ref-bottom-kpis"><div>Evidence<b>—</b></div><div>Completeness<b>—</b></div><div>Alerts<b>—</b></div><div>Mode<b>Read-only</b></div></div></article>
+ <article class="ref-panel"><div class="ref-head"><span>⌁ Resolution funnel / analysis trace</span><span class="ref-tag">PREVIEW</span></div><svg class="ref-chart" viewBox="0 0 400 115" preserveAspectRatio="none" role="img" aria-label="Illustrative resolution trace, not live analysis"><g stroke="#182940"><path d="M0 20H400M0 45H400M0 70H400M0 95H400"/></g><path d="M0 33C45 20 54 75 94 53S155 28 180 59S232 70 260 57S322 65 350 82S378 89 400 93" fill="none" stroke="#5bdac4" stroke-width="1.6"/><path d="M0 75C45 65 54 90 94 70S155 66 180 75S232 30 260 42S322 47 350 34S378 38 400 28" fill="none" stroke="#729fe0" stroke-width="1.2"/></svg><div class="ref-line"><span>Input → validation → analysis</span><strong>WAITING</strong></div><div class="ref-line"><span>Output confidence</span><strong>NOT CALCULATED</strong></div><div class="ref-line"><span>Interpretation</span><strong>NO LIVE DATA</strong></div></article>
 </section>
 <section class="card full" aria-labelledby="api-connect-title">
 <h2 id="api-connect-title">Read-only API connection</h2>
@@ -117,6 +126,22 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
     {name:"Public news sentiment",path:"/news-sentiment?query=cryptocurrency&max_records=5",summary:data=>"Articles: "+safeText(data.count)+" · label: "+safeText(data.sentiment_summary&&data.sentiment_summary.label)+" · confidence: "+safeText(data.sentiment_summary&&data.sentiment_summary.confidence)+" · source: "+safeText(data.source)+" · retrieved: "+safeText(data.retrieved_at)},
     {name:"Derivatives snapshot",path:"/derivatives/market-snapshot?symbol=BTCUSDT",summary:data=>`Symbol: ${safeText(data.symbol)} · source: ${safeText(data.source)} · retrieved: ${safeText(data.retrieved_at)} · freshness: ${safeText(data.data_quality&&data.data_quality.freshness_status)}`}
   ];
+  const dotGroup=document.getElementById("network-dots");
+  if(dotGroup){
+    const ns="http://www.w3.org/2000/svg";
+    for(let i=0;i<560;i++){
+      const angle=i*2.3999632297;
+      const radius=Math.sqrt((i+.5)/560);
+      const x=445+Math.cos(angle)*290*radius;
+      const y=220+Math.sin(angle)*105*radius;
+      const depth=(Math.sin(angle*2.7)+1)/2;
+      const circle=document.createElementNS(ns,"circle");
+      circle.setAttribute("cx",x.toFixed(1));circle.setAttribute("cy",y.toFixed(1));
+      circle.setAttribute("r",(0.55+depth*1.05).toFixed(2));
+      circle.setAttribute("fill",depth>.72?"#e5cf8a":depth>.4?"#71dcca":"#75a9d4");
+      circle.setAttribute("opacity",(0.2+depth*.65).toFixed(2));dotGroup.appendChild(circle);
+    }
+  }
   function safeText(value){return value===null||value===undefined||value===""?"unknown":String(value);}
   function validOrigin(value){
     try{const url=new URL(value);return (url.protocol==="https:"||url.protocol==="http:")&&url.origin===value.replace(/\/$/,"")&&!url.username&&!url.password&&url.search===""&&url.hash===""&&url.pathname==="/";}
