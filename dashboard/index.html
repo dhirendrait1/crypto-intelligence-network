@@ -177,7 +177,7 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
         metricLine(metrics,"Freshness warning",data.stale_data_warning||"none reported");
         metricLine(metrics,"Provider",data.source);
       }else if(name==="Technical analysis"){
-        const summary=data.summary||data.analysis||{};
+        const summary=data.market_structure||data.summary||data.analysis||{};
         const input=data.input||{};
         metricLine(metrics,"Analysis candles",input.analysis_candle_count);
         metricLine(metrics,"Forming candles excluded",input.forming_candle_excluded_count);
@@ -218,15 +218,15 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
       });
     }
     if(name==="Technical analysis"){
-      const input=data.input||{},summary=data.summary||data.analysis||{};
+      const input=data.input||{},summary=data.market_structure||data.summary||data.analysis||{};
       const panel=document.querySelector(".reference-board article:nth-child(2)");
       if(panel){
         const lines=panel.querySelectorAll(".ref-line strong");
         if(lines[1]) lines[1].textContent="CLOSED-CANDLE ANALYSIS";
         const kpis=panel.querySelectorAll(".ref-kpi strong");
-        if(kpis[0]) kpis[0].textContent=safeText(summary.rsi);
-        if(kpis[1]) kpis[1].textContent=safeText(summary.trend||summary.bias||summary.direction);
-        if(kpis[2]) kpis[2].textContent=safeText(summary.market_structure||summary.structure);
+        if(kpis[0]) kpis[0].textContent=safeText(summary.rsi_14??summary.rsi);
+        if(kpis[1]) kpis[1].textContent=safeText(summary.directional_bias||summary.trend||summary.bias||summary.direction);
+        if(kpis[2]) kpis[2].textContent=safeText(summary.structure_event||summary.market_structure||summary.structure);
         const caption=panel.querySelector(".metric-caption:last-child");
         if(caption) caption.textContent="API metrics only; chart geometry remains illustrative.";
       }
