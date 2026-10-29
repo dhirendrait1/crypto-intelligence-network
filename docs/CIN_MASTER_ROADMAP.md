@@ -125,3 +125,9 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - This file is the only numbered roadmap (7 stages / 35 steps). The tracker is the detailed evidence ledger. `CIN_ARCHITECTURE_STATUS.md` is an architecture register, not a parallel roadmap.
 - The active PR state and latest-head CI must be refreshed from GitHub before any future status report.
 - **Step 5 reconciliation is complete:** the repository now has one authoritative numbered roadmap, the tracker is explicitly historical, and the architecture status is a register rather than a competing roadmap. The dated historical entries remain available as evidence but no longer act as current status. This documentation closure does not imply live validation or release readiness.
+
+## Step 11 commodity evidence contract clarification (2026-10-30)
+
+- Corrected the commodity-backed evidence API documentation to match the implemented and tested `max_age_days` contract: the accepted range is **0–3650 days**, not 1–3650.
+- Existing offline API tests already cover the zero-day threshold, maximum threshold, strict integer typing, and invalid values.
+- Step 11 remains Partial: CIN currently validates caller-supplied evidence metadata and freshness; it does not fetch issuer/reserve/custody documents or independently verify the underlying claims.
