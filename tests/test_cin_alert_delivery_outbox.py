@@ -210,7 +210,23 @@ def test_legacy_database_migrates_status_constraint_and_preserves_rows(tmp_path)
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='alert_delivery_outbox'"
         ).fetchone()[0]
         assert "uncertain" in schema
+        assert "CHECK (attempts >= 0)" in schema
         assert db.execute("SELECT COUNT(*) FROM alert_delivery_outbox").fetchone()[0] == 1
+        indexes = {
+            row[0] for row in db.execute(
+                "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='alert_delivery_outbox'"
+            )
+        }
+        assert "idx_alert_outbox_due" in indexes
+        assert "idx_alert_delivery_outbox_due" in indexes
+        with pytest.raises(sqlite3.IntegrityError):
+            db.execute(
+                """INSERT INTO alert_delivery_outbox
+                (idempotency_key,rule_id,observation_id,payload_json,status,attempts,
+                 next_attempt_at,created_at,updated_at,last_error_code)
+                VALUES ('invalid:attempts','invalid','attempts','{}','pending',-1,?,?,?,NULL)""",
+                (timestamp, timestamp, timestamp),
+            )
 
 
 def test_uncertain_lease_overwrites_prior_failure_code_with_unknown_outcome(tmp_path):
