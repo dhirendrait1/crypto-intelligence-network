@@ -165,8 +165,8 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
     const key=panelForEndpoint[name];
     const panel=key?document.querySelector('[data-cin-panel="'+key+'"]'):null;
     if(panel){
-      let metrics=panel.querySelector(".api-metrics");
-      if(!metrics){metrics=document.createElement("div");metrics.className="api-metrics";panel.appendChild(metrics);}
+      let metrics=panel.querySelector('[data-api-metrics="'+name+'"]');
+      if(!metrics){metrics=document.createElement("div");metrics.className="api-metrics";metrics.setAttribute("data-api-metrics",name);panel.appendChild(metrics);}
       metrics.replaceChildren();
       if(name==="Market candles"){
         const candles=Array.isArray(data.data)?data.data:[];
@@ -278,7 +278,7 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
     panel.setAttribute("data-api-state",state);
     if(state==="available"&&data) renderEndpointMetrics(name,data);
     if(state!=="available"){
-      const metrics=panel.querySelector(".api-metrics");if(metrics)metrics.replaceChildren();
+      const metrics=panel.querySelector('[data-api-metrics="'+name+'"]');if(metrics)metrics.replaceChildren();
       if(name==="Market candles"){
         const ribbon=document.querySelector(".ticker");
         if(ribbon){
