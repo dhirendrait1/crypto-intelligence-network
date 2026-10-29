@@ -154,7 +154,84 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
     "Public news sentiment":"news",
     "Derivatives snapshot":"news"
   };
-  function updateDashboardPanel(name,state,detail){
+  function metricLine(container,label,value){
+    const line=document.createElement("div");
+    line.className="ref-line";
+    const left=document.createElement("span");left.textContent=label;
+    const right=document.createElement("strong");right.textContent=safeText(value);
+    line.append(left,right);container.appendChild(line);
+  }
+  function renderEndpointMetrics(name,data){
+    const key=panelForEndpoint[name];
+    const panel=key?document.querySelector('[data-cin-panel="'+key+'"]'):null;
+    if(panel){
+      let metrics=panel.querySelector(".api-metrics");
+      if(!metrics){metrics=document.createElement("div");metrics.className="api-metrics";panel.appendChild(metrics);}
+      metrics.replaceChildren();
+      if(name==="Market candles"){
+        const candles=Array.isArray(data.data)?data.data:[];
+        const latest=candles.length?candles[candles.length-1]:null;
+        metricLine(metrics,"Latest close",latest&&latest.close);
+        metricLine(metrics,"Latest candle closed",latest?String(latest.is_closed):"unknown");
+        metricLine(metrics,"Data freshness",data.freshness_status||data.freshness||"unknown");
+        metricLine(metrics,"Provider",data.source);
+      }else if(name==="Technical analysis"){
+        const summary=data.summary||data.analysis||{};
+        const input=data.input||{};
+        metricLine(metrics,"Analysis candles",input.analysis_candle_count);
+        metricLine(metrics,"Forming candles excluded",input.forming_candle_excluded_count);
+        metricLine(metrics,"Last closed candle",input.last_candle_close_time_utc);
+        metricLine(metrics,"Provider",input.source);
+        for(const [label,value] of Object.entries(summary).slice(0,3)) metricLine(metrics,label,value);
+      }else if(name==="Coin screening"){
+        const rows=Array.isArray(data.data)?data.data:[];
+        metricLine(metrics,"Assets returned",data.count);
+        metricLine(metrics,"Data mode",data.data_mode);
+        metricLine(metrics,"Cache age (seconds)",data.cache_age_seconds);
+        rows.slice(0,5).forEach((asset,i)=>metricLine(metrics,safeText(asset.name||asset.symbol||asset.id||("Asset "+(i+1))),asset.screen_score));
+        if(data.stale_data_warning) metricLine(metrics,"Data warning",data.stale_data_warning);
+      }else if(name==="Public news sentiment"){
+        const summary=data.sentiment_summary||{};
+        metricLine(metrics,"Headline sentiment",summary.label);
+        metricLine(metrics,"Confidence",summary.confidence);
+        metricLine(metrics,"Articles returned",data.count);
+        metricLine(metrics,"Provider timestamp quality",JSON.stringify(data.data_quality&&data.data_quality.provider_timestamp_quality_counts||{}));
+        (Array.isArray(data.articles)?data.articles:[]).slice(0,3).forEach((article,i)=>metricLine(metrics,safeText(article.title||("Headline "+(i+1)),article.provider_seen_at||article.published_at||"time unknown")));
+      }else if(name==="Derivatives snapshot"){
+        const d=data.data||{},q=data.data_quality||{},book=data.order_book||{};
+        metricLine(metrics,"Funding (% / interval)",d.funding_rate_percent_per_interval);
+        metricLine(metrics,"Open interest (contracts)",d.open_interest_contracts);
+        metricLine(metrics,"Mark price",d.mark_price);
+        metricLine(metrics,"Order-book spread (%)",book.spread_percent);
+        metricLine(metrics,"Freshness",q.freshness_status);
+        metricLine(metrics,"Liquidations",data.liquidations&&data.liquidations.status||"unknown");
+      }
+    }
+    if(name==="Coin screening"&&Array.isArray(data.data)){
+      const items=document.querySelectorAll(".asset-rail .asset-item");
+      data.data.slice(0,items.length).forEach((asset,i)=>{
+        const item=items[i];const em=item.querySelector("em");
+        if(em) em.textContent=safeText(asset.screen_score)+" / "+safeText(asset.analysis_eligibility||asset.score_band||"screened");
+        const label=item.querySelector("strong");
+        if(label) label.textContent=safeText(asset.symbol||asset.name||asset.id);
+      });
+    }
+    if(name==="Technical analysis"){
+      const input=data.input||{},summary=data.summary||data.analysis||{};
+      const panel=document.querySelector(".reference-board article:nth-child(2)");
+      if(panel){
+        const lines=panel.querySelectorAll(".ref-line strong");
+        if(lines[1]) lines[1].textContent="CLOSED-CANDLE ANALYSIS";
+        const kpis=panel.querySelectorAll(".ref-kpi strong");
+        if(kpis[0]) kpis[0].textContent=safeText(summary.rsi);
+        if(kpis[1]) kpis[1].textContent=safeText(summary.trend||summary.bias||summary.direction);
+        if(kpis[2]) kpis[2].textContent=safeText(summary.market_structure||summary.structure);
+        const caption=panel.querySelector(".metric-caption:last-child");
+        if(caption) caption.textContent="API metrics only; chart geometry remains illustrative.";
+      }
+    }
+  }
+  function updateDashboardPanel(name,state,detail,data){
     const key=panelForEndpoint[name];
     if(!key) return;
     const panel=document.querySelector('[data-cin-panel="'+key+'"]');
@@ -164,9 +241,11 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
     if(stateNode) stateNode.textContent=state==="available"?"API response received":state==="unavailable"?"Unavailable":"Awaiting API";
     if(description) description.textContent=detail;
     panel.setAttribute("data-api-state",state);
+    if(state==="available"&&data) renderEndpointMetrics(name,data);
+    if(state!=="available"){const metrics=panel.querySelector(".api-metrics");if(metrics)metrics.replaceChildren();}
   }
-  function renderRow(name,state,detail){
-    updateDashboardPanel(name,state,detail);
+  function renderRow(name,state,detail,data){
+    updateDashboardPanel(name,state,detail,data);
     const row=document.createElement("article");
     row.style.cssText="border-top:1px solid var(--line);padding:10px 0";
     const heading=document.createElement("strong");heading.textContent=name+" — "+state;row.appendChild(heading);
@@ -196,7 +275,7 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
         const schemaValid=endpoint.name==="Market candles"?typeof data.symbol==="string"&&typeof data.timeframe==="string"&&Number.isInteger(data.count)&&Array.isArray(data.data)&&typeof data.source==="string"&&typeof data.retrieved_at==="string":endpoint.name==="Technical analysis"?!!data.input&&typeof data.input.symbol==="string"&&typeof data.input.timeframe==="string"&&typeof data.input.source==="string"&&typeof data.input.retrieved_at==="string"&&Array.isArray(data.limitations):endpoint.name==="Coin screening"?Number.isInteger(data.count)&&Array.isArray(data.data)&&typeof data.source==="string"&&typeof data.data_mode==="string"&&typeof data.retrieved_at==="string"&&typeof data.methodology==="string":endpoint.name==="Public news sentiment"?Array.isArray(data.articles)&&Number.isInteger(data.count)&&!!data.sentiment_summary&&typeof data.source==="string"&&typeof data.retrieved_at==="string":endpoint.name==="Derivatives snapshot"?typeof data.symbol==="string"&&typeof data.source==="string"&&typeof data.retrieved_at==="string"&&!!data.data_quality:false;
         if(!schemaValid) throw new Error("Invalid CIN response schema; expected fields are missing or have wrong types");
         success++;
-        renderRow(endpoint.name,"available",endpoint.summary(data));
+        renderRow(endpoint.name,"available",endpoint.summary(data),data);
       }catch(error){
         if(controller.signal.aborted) return;
         renderRow(endpoint.name,"unavailable",error&&error.name==="TypeError"?"Request blocked or network/CORS error. Check API origin and browser CORS policy.":safeText(error&&error.message));
