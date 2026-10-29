@@ -240,6 +240,11 @@ def test_source_freshness_endpoint_validates_metadata_before_classifying_age():
     assert body["metadata"]["validity"] == "valid_metadata"
     assert body["metadata"]["freshness_assessed"] is False
     assert body["freshness"]["freshness"] == "fresh"
+    assert body["freshness_policy"] == {
+        "max_age_seconds": 300,
+        "selection": "caller_supplied_not_source_specific",
+    }
+    assert "not a CIN-enforced source-specific policy" in body["note"]
     assert body["checks_performed"] is False
     assert body["read_only"] is True
 
