@@ -22,6 +22,7 @@ Each record stores evidence type, source name and URL, publication timestamp, ch
 - Optional `source_role` values (`issuer`, `custodian`, `auditor`, `regulator`, `exchange`, `independent_research`, `other`) are caller-supplied classifications. Unknown or absent roles become `unspecified`; CIN reports role counts but always sets `source_role_authenticated: false` and `source_roles_authenticated: false.
 - Conflicting statuses remain visible through per-status counts and a per-record conflict summary containing the supplied role, source name, URL, and status. Conflicts require manual review; CIN does not rank sources, select a winner, or authenticate source roles.
 - Each normalized evidence record includes a deterministic SHA-256 fingerprint over its supplied evidence fields, source role, and notes. This is a metadata-change detection aid only; it is not a signature, trusted timestamp, document-content hash, or proof of source authenticity.
+- Optional caller-supplied `evidence_id` values (1–128 characters) provide stable keys for `compare_evidence_snapshots(previous, current)`. The comparator reports added, removed, changed, and unchanged records; duplicate IDs are marked ambiguous and records without IDs are counted as untracked. It compares only the two snapshots supplied by the caller: it does not persist version history or authenticate IDs.
 
 ## Example
 
