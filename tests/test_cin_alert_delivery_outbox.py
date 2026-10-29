@@ -9,6 +9,8 @@ from cin_alert_delivery_outbox import (
     enqueue_alert_delivery,
     mark_alert_failed,
     mark_alert_sent,
+    list_uncertain_alert_deliveries,
+    resolve_uncertain_alert_delivery,
 )
 
 NOW = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
@@ -119,3 +121,44 @@ def test_stale_worker_cannot_mark_reclaimed_attempt_sent_or_failed(tmp_path):
         mark_alert_failed(path, item["idempotency_key"], now=NOW + timedelta(seconds=301), error_code="stale_worker", claim_attempt=old_claim["attempts"])
     current = mark_alert_sent(path, item["idempotency_key"], now=NOW + timedelta(seconds=302), claim_attempt=new_claim["attempts"])
     assert current["status"] == "sent"
+
+
+
+def test_expired_lease_becomes_uncertain_and_is_not_automatically_retried(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    item = enqueue_alert_delivery(path, rule_id="r1", observation_id="uncertain", payload={"text": "alert"}, now=NOW)
+    claim_due_alerts(path, now=NOW, lease_seconds=300)
+    assert claim_due_alerts(path, now=NOW + timedelta(seconds=300), lease_seconds=300) == []
+    uncertain = list_uncertain_alert_deliveries(path)
+    assert len(uncertain) == 1
+    assert uncertain[0]["idempotency_key"] == item["idempotency_key"]
+    assert uncertain[0]["status"] == "uncertain"
+    assert uncertain[0]["last_error_code"] == "delivery_outcome_unknown"
+    assert claim_due_alerts(path, now=NOW + timedelta(days=1), lease_seconds=300) == []
+
+
+def test_operator_can_resolve_uncertain_as_sent_or_authorize_retry(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    sent_item = enqueue_alert_delivery(path, rule_id="r1", observation_id="sent", payload={}, now=NOW)
+    retry_item = enqueue_alert_delivery(path, rule_id="r1", observation_id="retry", payload={}, now=NOW)
+    claim_due_alerts(path, now=NOW, limit=2, lease_seconds=300)
+    claim_due_alerts(path, now=NOW + timedelta(seconds=300), limit=2, lease_seconds=300)
+
+    resolved_sent = resolve_uncertain_alert_delivery(path, sent_item["idempotency_key"], resolution="sent", now=NOW + timedelta(seconds=301))
+    assert resolved_sent["status"] == "sent"
+    resolved_retry = resolve_uncertain_alert_delivery(path, retry_item["idempotency_key"], resolution="retry_authorized", now=NOW + timedelta(seconds=301))
+    assert resolved_retry["status"] == "pending"
+    assert resolved_retry["last_error_code"] == "operator_authorized_retry_duplicate_risk"
+    assert claim_due_alerts(path, now=NOW + timedelta(seconds=302), limit=2)[0]["status"] == "sending"
+
+
+def test_uncertain_resolution_rejects_invalid_or_repeated_resolution(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    item = enqueue_alert_delivery(path, rule_id="r1", observation_id="resolve", payload={}, now=NOW)
+    claim_due_alerts(path, now=NOW)
+    claim_due_alerts(path, now=NOW + timedelta(seconds=300))
+    with pytest.raises(ValueError):
+        resolve_uncertain_alert_delivery(path, item["idempotency_key"], resolution="maybe", now=NOW)
+    resolve_uncertain_alert_delivery(path, item["idempotency_key"], resolution="sent", now=NOW)
+    with pytest.raises(ValueError):
+        resolve_uncertain_alert_delivery(path, item["idempotency_key"], resolution="sent", now=NOW)
