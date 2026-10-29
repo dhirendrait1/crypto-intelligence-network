@@ -271,6 +271,13 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
     if(state==="available"&&data) renderEndpointMetrics(name,data);
     if(state!=="available"){
       const metrics=panel.querySelector(".api-metrics");if(metrics)metrics.replaceChildren();
+      if(name==="Coin screening"){
+        document.querySelectorAll(".asset-rail .asset-item").forEach((item)=>{
+          const label=item.querySelector("strong"),value=item.querySelector("em");
+          if(label) label.textContent="Awaiting API";
+          if(value) value.textContent="unknown / not verified";
+        });
+      }
       if(name==="Technical analysis"){
         const analysisPanel=document.querySelector(".reference-board article:nth-child(2)");
         if(analysisPanel){
