@@ -20,12 +20,12 @@ Example request:
 }
 ```
 
-The example is intentionally short; RSI, MACD, ATR, and T1–T3 need more observations. Use up to 500 bars, oldest first.
+The example is intentionally short; RSI(14) needs at least 15 bars, ATR(14) needs at least 15 bars, and the MACD signal line first becomes available at 34 bars (35+ is recommended for additional context). Use up to 500 bars, oldest first.
 
 ## Output
 - Confirmed swing high/low pattern labels (HH/HL/LH/LL where enough swings exist).
 - Simple structure event (BOS/CHOCH) based on last close versus latest confirmed swing.
-- RSI(14), MACD(12,26,9), ATR(14) when enough data exists.
+- RSI(14), MACD(12,26,9), ATR(14) when enough data exists. Flat RSI input resolves to 50; monotonic gains/losses resolve to 100/0. A zero prior-volume baseline leaves relative volume unavailable rather than dividing by zero.
 - Swing highs/lows as liquidity reference levels; these are not actual order-book liquidity.
 - T1/T2/T3 as illustrative 1x/2x/3x ATR scenarios only when bias is directional.
 
