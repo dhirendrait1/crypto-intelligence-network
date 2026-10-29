@@ -19,6 +19,7 @@ Each record stores evidence type, source name and URL, publication timestamp, ch
 - Evidence older than the configured freshness threshold (default 90 days) is marked `stale`.
 - Missing evidence is unknown, not proof that backing exists or is absent.
 - Complete evidence-category coverage means only that each category has a record marked verified; it is not a guarantee of reserves, solvency, custody, or redemption.\n- Coverage reports distinct URL hostnames as a source-diversity diagnostic. Multiple hostnames do **not** establish independent ownership, authorship, audit, or corroboration; CIN always reports `source_independence_verified: false`.
+- Optional `source_role` values (`issuer`, `custodian`, `auditor`, `regulator`, `exchange`, `independent_research`, `other`) are caller-supplied classifications. Unknown or absent roles become `unspecified`; CIN reports role counts but always sets `source_role_authenticated: false` and `source_roles_authenticated: false.
 
 ## Example
 
