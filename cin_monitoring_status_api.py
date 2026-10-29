@@ -54,14 +54,31 @@ def monitoring_status(snapshot: MonitoringSnapshot) -> dict[str, Any]:
     provider = values["provider_status"]
     freshness = values["freshness"]
 
-    if "unavailable" in (health, readiness, provider) or readiness == "not_ready":
-        status = "unavailable"
-    elif "degraded" in (health, readiness, provider) or freshness == "stale":
+    try:
+        from app.cin_monitoring_status import summarize_monitoring_status
+    except ModuleNotFoundError as exc:
+        if exc.name != "app":
+            raise
+        from cin_monitoring_status import summarize_monitoring_status
+
+    summary = summarize_monitoring_status(
+        health_ok=False if health == "unavailable" else True if health in ("healthy", "ok", "degraded") else None,
+        ready=False if readiness in ("not_ready", "unavailable") else True if readiness in ("ready", "degraded") else None,
+        provider_ok=True if provider == "healthy" else False if provider in ("degraded", "unavailable") else None,
+        data_freshness=freshness,
+    )
+    status = summary.status
+    explicit_degradation = health == "degraded" or readiness == "degraded" or provider == "degraded"
+    if explicit_degradation and status not in ("unavailable", "degraded"):
         status = "degraded"
-    elif all(value in ("healthy", "ok") for value in (health,)) and readiness == "ready" and provider == "healthy" and freshness == "fresh":
-        status = "healthy"
-    else:
-        status = "unknown"
+    reasons = list(summary.reasons)
+    if health == "degraded":
+        reasons.append("service_health_degraded")
+    if readiness == "degraded":
+        reasons.append("service_readiness_degraded")
+    if provider == "degraded":
+        reasons.append("provider_degraded")
+    reasons = list(dict.fromkeys(reasons))
 
     return {
         "status": status,
@@ -74,6 +91,7 @@ def monitoring_status(snapshot: MonitoringSnapshot) -> dict[str, Any]:
             "freshness": freshness,
         },
         "warnings": values["warnings"],
+        "reasons": reasons,
         "checks_performed": False,
         "note": "Status summarizes caller-supplied fields; CIN did not poll providers or verify freshness in this request.",
     }
