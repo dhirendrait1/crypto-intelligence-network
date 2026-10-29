@@ -119,3 +119,47 @@ def test_stale_worker_cannot_mark_reclaimed_attempt_sent_or_failed(tmp_path):
         mark_alert_failed(path, item["idempotency_key"], now=NOW + timedelta(seconds=301), error_code="stale_worker", claim_attempt=old_claim["attempts"])
     current = mark_alert_sent(path, item["idempotency_key"], now=NOW + timedelta(seconds=302), claim_attempt=new_claim["attempts"])
     assert current["status"] == "sent"
+
+
+def test_concurrent_workers_claim_each_due_item_at_most_once(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    for index in range(12):
+        enqueue_alert_delivery(
+            path,
+            rule_id="r1",
+            observation_id=f"e{index}",
+            payload={"index": index},
+            now=NOW,
+        )
+
+    barrier = __import__("threading").Barrier(4)
+
+    def claim(_):
+        barrier.wait()
+        return claim_due_alerts(path, now=NOW, limit=4)
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        batches = list(pool.map(claim, range(4)))
+
+    keys = [item["idempotency_key"] for batch in batches for item in batch]
+    assert len(keys) == 12
+    assert len(set(keys)) == 12
+    assert all(item["status"] == "sending" for batch in batches for item in batch)
+
+
+def test_active_lease_is_not_reclaimed_before_expiry(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    enqueue_alert_delivery(
+        path, rule_id="r1", observation_id="active", payload={}, now=NOW
+    )
+    first = claim_due_alerts(path, now=NOW, lease_seconds=300)[0]
+
+    assert claim_due_alerts(
+        path, now=NOW + timedelta(seconds=299), lease_seconds=300
+    ) == []
+    recovered = claim_due_alerts(
+        path, now=NOW + timedelta(seconds=300), lease_seconds=300
+    )
+    assert len(recovered) == 1
+    assert recovered[0]["idempotency_key"] == first["idempotency_key"]
+    assert recovered[0]["attempts"] == first["attempts"] + 1
