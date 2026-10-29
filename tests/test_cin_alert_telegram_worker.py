@@ -43,9 +43,10 @@ def test_worker_reports_sanitized_telegram_configuration_error(capsys):
 
 def test_importing_worker_never_processes_alerts():
     import importlib
+    import cin_alert_telegram_delivery as delivery
 
     with patch.object(
-        worker,
+        delivery,
         "process_due_telegram_alerts",
         side_effect=AssertionError("import must not start alert delivery"),
     ) as process:
