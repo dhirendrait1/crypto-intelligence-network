@@ -6,6 +6,7 @@ requests and does not prove source authenticity or market-data correctness.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from datetime import datetime
 from typing import Any
 
@@ -94,7 +95,7 @@ def validate_source_observation(observation: Any, *, now: datetime) -> dict[str,
         "provenance": observation["provenance"].strip(),
         "quote_currency": quote_currency.strip() if isinstance(quote_currency, str) else None,
         "interval": interval.strip() if isinstance(interval, str) else None,
-        "age_seconds_at_retrieval": int((retrieved - observed).total_seconds()),
+        "age_seconds_at_retrieval": math.ceil((retrieved - observed).total_seconds()),
         "freshness_assessed": False,
         "source_authenticity_verified": False,
     }
