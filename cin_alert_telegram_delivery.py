@@ -10,7 +10,7 @@ import os
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from cin_alert_delivery_outbox import (
     claim_due_alerts,
@@ -99,6 +99,7 @@ def process_due_telegram_alerts(
     limit: int = 10,
     lease_seconds: int = 300,
     max_attempts: int = 5,
+    clock: Callable[[], datetime] | None = None,
 ) -> dict[str, Any]:
     """Deliver a batch of due alerts using configured credentials and outbox state.
 
@@ -140,7 +141,7 @@ def process_due_telegram_alerts(
         except TelegramDeliveryError as exc:
             try:
                 updated = mark_alert_failed(
-                    database_path, item["idempotency_key"], now=now,
+                    database_path, item["idempotency_key"], now=acknowledgement_clock(),
                     error_code=exc.code, max_attempts=max_attempts, claim_attempt=item["attempts"],
                     lease_seconds=lease_seconds,
                 )
