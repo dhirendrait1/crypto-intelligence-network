@@ -151,6 +151,10 @@ def assess_source_observation_freshness(request: SourceFreshnessRequest) -> dict
             "metadata": metadata,
             "freshness": {"freshness": "unknown", "age_seconds": None,
                           "reason": "observation_metadata_not_valid"},
+            "freshness_policy": {
+                "max_age_seconds": request.max_age_seconds,
+                "selection": "caller_supplied_not_source_specific",
+            },
             "note": "Caller-supplied metadata only; CIN did not contact or authenticate the source.",
         }
 
@@ -165,5 +169,12 @@ def assess_source_observation_freshness(request: SourceFreshnessRequest) -> dict
         "checks_performed": False,
         "metadata": metadata,
         "freshness": freshness,
-        "note": "Timestamp age is assessed locally; source authenticity and provider availability are not verified.",
+        "freshness_policy": {
+            "max_age_seconds": request.max_age_seconds,
+            "selection": "caller_supplied_not_source_specific",
+        },
+        "note": (
+            "Timestamp age is assessed against the caller-supplied limit, not a CIN-enforced "
+            "source-specific policy; source authenticity and provider availability are not verified."
+        ),
     }
