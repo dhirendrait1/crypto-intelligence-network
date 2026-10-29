@@ -82,8 +82,12 @@ class DashboardPreviewTests(unittest.TestCase):
     def test_verified_endpoint_states_update_visible_dashboard_panels(self):
         for panel in ("market", "technical", "screening", "evidence", "news", "monitoring"):
             self.assertIn('data-cin-panel="' + panel + '"', self.html)
-        self.assertIn("function updateDashboardPanel(name,state,detail)", self.html)
-        self.assertIn("updateDashboardPanel(name,state,detail);", self.html)
+        self.assertIn("function updateDashboardPanel(name,state,detail,data)", self.html)
+        self.assertIn("updateDashboardPanel(name,state,detail,data);", self.html)
+        self.assertIn("function renderEndpointMetrics(name,data)", self.html)
+        self.assertIn("function metricLine(container,label,value)", self.html)
+        self.assertIn("Latest close", self.html)
+        self.assertIn("Funding (% / interval)", self.html)
         self.assertIn('panel.setAttribute("data-api-state",state)', self.html)
         self.assertIn('document.querySelectorAll("[data-cin-panel]")', self.html)
 
