@@ -17,7 +17,7 @@
 
 Agreement between two URLs is not proof of independent ownership, authorship, audit, or source quality. This helper does not fetch source data, validate the underlying metric methodology, adjust values across units, or persist history. Tolerance values are comparison heuristics, not accuracy guarantees. Confidence classes describe the observed evidence agreement only; they are not investment advice or a trade signal.
 
-The helper is not wired to a production endpoint in this increment. API integration and live-source validation remain separate acceptance work.
+The FastAPI router is integrated through the repository's idempotent deployment-scaffold patch and exposes the caller-supplied comparison endpoint. Offline tests validate the route contract and scaffold registration; live-source accuracy and deployed endpoint availability remain separate acceptance work.
 
 
 ## Read-only API integration
