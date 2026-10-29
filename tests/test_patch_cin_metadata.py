@@ -22,6 +22,7 @@ MODULES = (
     "cin_derivatives_market_data_api.py",
     "cin_public_news_sentiment_api.py",
     "cin_monitoring_status_api.py",
+    "cin_source_observation_contract.py",
 )
 
 
@@ -164,3 +165,12 @@ class DeploymentPatchTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    def test_source_observation_contract_is_copied_into_deployment_app(self):
+        result = self.run_patch()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        source = self.root / "cin_source_observation_contract.py"
+        installed = self.app_dir / "cin_source_observation_contract.py"
+        self.assertTrue(installed.is_file())
+        self.assertEqual(installed.read_text(encoding="utf-8"), source.read_text(encoding="utf-8"))
+
