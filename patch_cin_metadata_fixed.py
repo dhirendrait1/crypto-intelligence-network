@@ -24,6 +24,8 @@ MODULES = (
     "cin_public_market_candles_api.py",
     "cin_derivatives_market_data_api.py",
     "cin_public_news_sentiment_api.py",
+    "cross_source_evidence.py",
+    "cross_source_evidence_api.py",
 )
 main_path = APP_DIR / "main.py"
 if not main_path.is_file():
@@ -93,6 +95,12 @@ registrations = [
         "from app.cin_public_news_sentiment_api import router as cin_public_news_sentiment_router\n"
         "app.include_router(cin_public_news_sentiment_router)\n",
     ),
+    (
+        "cin_cross_source_evidence_router",
+        "\\n# CIN: caller-supplied cross-source metric comparison (read-only)\\n"
+        "from app.cross_source_evidence_api import router as cin_cross_source_evidence_router\\n"
+        "app.include_router(cin_cross_source_evidence_router)\\n",
+    ),
 ]
 # Insert registrations before a direct-execution guard so routes are ready
 # even when the module is run as a script, not only imported by Uvicorn.
@@ -149,4 +157,4 @@ for module_name in MODULES:
     shutil.copyfile(ROOT / module_name, APP_DIR / module_name)
 
 
-print(f"CIN metadata verified; read-only market data, screening, assessment, evidence, and technical-analysis and public market-candle routers installed; files updated: {changed}")
+print(f"CIN metadata verified; read-only market data, screening, assessment, evidence, and technical-analysis public market-candle, and cross-source evidence routers installed; files updated: {changed}")
