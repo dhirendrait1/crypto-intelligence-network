@@ -933,3 +933,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Defined explicit approval gates, official/authorized API access, least-privilege scopes, provider access-tier/terms review, rate limits, deletion/retention obligations, privacy minimization, secret/log redaction, timestamp provenance, record deduplication, and release checklist.
 - Prohibited unauthorized scraping/access-control bypass, private/restricted Telegram collection without permission, outbound Telegram messaging, unsupported identity/whale attribution, and any trade/wallet/funds capability.
 - Step 20 remains Partial. No social API credentials, connectors, collection jobs, or live provider calls were added; provider authorization and implementation remain outstanding.
+
+
+## Step 21 — exchange-flow and whale-attribution methodology (2026-10-30)
+
+- Added `docs/CIN_EXCHANGE_FLOW_AND_WHALE_ATTRIBUTION.md` defining observed on-chain transfer vs exchange-associated flow vs entity attribution vs whale claim.
+- Specified evidence tiers for exchange labels, chain-specific/time-bounded provenance, gross inflow/outflow/net-flow definitions, event exclusions and double-counting controls, coverage/finality metadata, and uncertainty output.
+- Explicitly prohibits personal deanonymization, unsupported beneficial-owner/whale claims, inferring intent from transfers, wallet control, signing, broadcasting, and fund movement.
+- Step 21 remains Partial. No chain indexer, exchange-label registry, flow API, provider dependency, or live integration was added. Provider access-tier, free-plan/payment, licensing, and data-quality review must precede implementation.
