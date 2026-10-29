@@ -24,7 +24,7 @@ class DashboardPreviewTests(unittest.TestCase):
     def test_required_research_panels_are_present(self):
         for panel in (
             "Market data", "Technical analysis", "Coin screening",
-            "Evidence &amp; provenance", "News &amp; derivatives",
+            "Evidence & provenance", "News & derivatives",
             "Monitoring", "Data quality rules",
         ):
             with self.subTest(panel=panel):
