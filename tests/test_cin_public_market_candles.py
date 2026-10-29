@@ -286,5 +286,44 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.exception.status_code, 503)
 
 
+    def test_kraken_interval_compatibility_matrix_preserves_utc_boundaries(self):
+        # Kraken OHLC timestamps are Unix seconds. Verify only documented interval
+        # durations and UTC boundaries; do not impose a gap-free sequence.
+        cases = [
+            ("1h", 3600, 1704067200),       # 2024-01-01 00:00 UTC
+            ("4h", 14400, 1704067200),
+            ("1d", 86400, 1704067200),
+            ("1w", 604800, 1704067200),     # Monday 00:00 UTC
+        ]
+        for interval, seconds, start in cases:
+            with self.subTest(interval=interval):
+                payload = {
+                    "error": [],
+                    "result": {
+                        "XBTUSDT": [
+                            [start, "100", "102", "99", "101", "100.5", "10", 4],
+                            [start + seconds * 2, "101", "103", "100", "102", "101.5", "12", 5],
+                        ],
+                        "last": start + seconds * 2,
+                    },
+                }
+                with patch.object(api, "_request_json", return_value=payload):
+                    rows = api._fetch_kraken("BTCUSDT", interval, 5)
+                self.assertEqual([r["open_time"] for r in rows],
+                                 [start * 1000, (start + seconds * 2) * 1000])
+                api._validate_candle_boundaries(rows, interval, (start + seconds * 3) * 1000)
+                self.assertEqual(rows[0]["close_time"], (start + seconds) * 1000 - 1)
+
+    def test_kraken_boundary_validation_allows_missing_intervals(self):
+        # A missing candle is a market-data gap, not a timestamp-integrity failure.
+        start = 1704067200000
+        rows = [
+            {"open_time": start, "close_time": start + 3_600_000 - 1},
+            {"open_time": start + 2 * 3_600_000,
+             "close_time": start + 3 * 3_600_000 - 1},
+        ]
+        api._validate_candle_boundaries(rows, "1h", start + 4 * 3_600_000)
+
+
 if __name__ == "__main__":
     unittest.main()
