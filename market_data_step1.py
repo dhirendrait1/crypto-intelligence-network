@@ -35,7 +35,11 @@ def _finite_number(value: Any, *, minimum: float | None = None) -> bool:
     return minimum is None or numeric_value >= minimum
 
 
-def _timestamp_status(value: Any) -> tuple[str, int | None, str | None]:
+def _timestamp_status(
+    value: Any,
+    *,
+    now: datetime | None = None,
+) -> tuple[str, int | None, str | None]:
     if not isinstance(value, str) or not value.strip():
         return "unknown", None, "missing_or_invalid_last_updated"
     try:
@@ -45,10 +49,13 @@ def _timestamp_status(value: Any) -> tuple[str, int | None, str | None]:
         parsed = parsed.astimezone(timezone.utc)
     except (ValueError, OverflowError, OSError):
         return "unknown", None, "invalid_last_updated_timestamp"
-    now = datetime.now(timezone.utc)
-    if parsed > now + FUTURE_TIMESTAMP_TOLERANCE:
+    current_time = now or datetime.now(timezone.utc)
+    if current_time.tzinfo is None or current_time.utcoffset() is None:
+        return "unknown", None, "invalid_assessment_clock"
+    current_time = current_time.astimezone(timezone.utc)
+    if parsed > current_time + FUTURE_TIMESTAMP_TOLERANCE:
         return "unknown", None, "future_last_updated_timestamp"
-    age = max(0, int((now - parsed).total_seconds()))
+    age = max(0, int((current_time - parsed).total_seconds()))
     return ("fresh" if age <= MARKET_DATA_MAX_AGE.total_seconds() else "stale"), age, None
 
 
