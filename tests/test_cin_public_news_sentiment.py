@@ -354,3 +354,37 @@ def test_rss_query_terms_are_specific_for_asset_queries():
     assert api._rss_query_terms("bitcoin") == {"bitcoin"}
     assert "ethereum" in api._rss_query_terms("cryptocurrency")
     assert "bitcoin" in api._rss_query_terms("cryptocurrency")
+
+
+def test_headline_sentiment_does_not_score_provider_declared_non_english():
+    result = api._headline_sentiment("Adoption bullish growth", language="es")
+    assert result["label"] == "unavailable"
+    assert result["score"] is None
+    assert result["confidence"] == "unsupported_language"
+    assert result["language_status"] == "unsupported_language"
+
+
+def test_headline_sentiment_marks_missing_language_as_unverified():
+    result = api._headline_sentiment("Bullish adoption gains")
+    assert result["label"] == "positive"
+    assert result["language_status"] == "language_unverified"
+
+
+def test_headline_sentiment_normalizes_english_locale_tags():
+    result = api._headline_sentiment("Bullish adoption", language="en-US")
+    assert result["label"] == "positive"
+    assert result["language_status"] == "supported_english"
+
+
+def test_article_declared_language_is_passed_to_sentiment_classifier():
+    rows = api._parse_articles(
+        {
+            "articles": [
+                {"title": "Bullish adoption", "url": "https://news.example/en", "language": "en"},
+                {"title": "Bullish adoption", "url": "https://news.example/es", "language": "es"},
+            ]
+        },
+        10,
+    )
+    assert rows[0]["headline_sentiment"]["language_status"] == "supported_english"
+    assert rows[1]["headline_sentiment"]["label"] == "unavailable"
