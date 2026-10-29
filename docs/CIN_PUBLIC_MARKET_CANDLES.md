@@ -26,3 +26,11 @@ This fetches public candles and passes OHLC values into CIN's existing determini
 - Volume is returned as provider context but is not yet used in indicator calculations.
 - No credentials, user accounts, order placement, or trade execution are involved.
 - RSI/MACD/ATR and structure labels are descriptive analytical outputs, not guaranteed predictions or financial advice.
+
+## Provider interval compatibility
+
+- Binance candle rows are checked against the selected interval's open/close boundary rules, including Monday 00:00 UTC weekly opens and calendar-month monthly opens.
+- Kraken fallback supports only the intervals listed by `KRAKEN_INTERVALS`. Its Unix-second open timestamps are normalized to milliseconds; close times are derived from the selected minute interval, then checked by the same boundary validator.
+- Offline compatibility regressions cover Kraken 1h, 4h, 1d, and 1w candles, including a missing interval between otherwise valid candles. Missing candles are permitted; malformed boundaries and future opens are not.
+- The 3d interval intentionally has no assumed epoch anchor. Kraken does not advertise a 3d interval in this adapter. Coinbase has its own supported-granularity mapping and is not represented as an equivalent USDT quote market.
+- These are deterministic offline contract tests. They do not establish live Kraken alignment for every market, provider uptime, source authenticity, or deployed behavior; those remain part of authorized live smoke testing.
