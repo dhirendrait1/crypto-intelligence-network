@@ -42,6 +42,53 @@ def _timestamp(value: datetime | str, field: str) -> datetime:
     return value.astimezone(timezone.utc)
 
 
+def _migrate_outbox_schema(connection: sqlite3.Connection) -> None:
+    """Rebuild legacy outbox tables whose status CHECK excludes 'uncertain'."""
+    row = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='alert_delivery_outbox'"
+    ).fetchone()
+    if not row or "uncertain" in (row[0] or "").lower():
+        return
+
+    # SQLite cannot alter a CHECK constraint in place. Rebuild transactionally,
+    # preserving every existing outbox row and recreating its index.
+    connection.execute("BEGIN IMMEDIATE")
+    try:
+        connection.execute("DROP INDEX IF EXISTS idx_alert_outbox_due")
+        connection.execute(
+            """CREATE TABLE alert_delivery_outbox_new (
+                idempotency_key TEXT PRIMARY KEY,
+                rule_id TEXT NOT NULL,
+                observation_id TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN ('pending','sending','sent','failed','dead','uncertain')),
+                attempts INTEGER NOT NULL DEFAULT 0,
+                next_attempt_at TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                last_error_code TEXT
+            )"""
+        )
+        connection.execute(
+            """INSERT INTO alert_delivery_outbox_new
+            (idempotency_key,rule_id,observation_id,payload_json,status,attempts,
+             next_attempt_at,created_at,updated_at,last_error_code)
+            SELECT idempotency_key,rule_id,observation_id,payload_json,status,attempts,
+                   next_attempt_at,created_at,updated_at,last_error_code
+            FROM alert_delivery_outbox"""
+        )
+        connection.execute("DROP TABLE alert_delivery_outbox")
+        connection.execute("ALTER TABLE alert_delivery_outbox_new RENAME TO alert_delivery_outbox")
+        connection.execute(
+            "CREATE INDEX idx_alert_outbox_due ON alert_delivery_outbox(status, next_attempt_at)"
+        )
+        connection.execute("COMMIT")
+    except Exception:
+        if connection.in_transaction:
+            connection.execute("ROLLBACK")
+        raise
+
+
 def _connect(path: str | Path) -> sqlite3.Connection:
     target = str(path)
     if target == ":memory:":
@@ -50,6 +97,7 @@ def _connect(path: str | Path) -> sqlite3.Connection:
     connection = sqlite3.connect(target, timeout=10, isolation_level=None)
     connection.execute("PRAGMA busy_timeout = 10000")
     connection.executescript(_SCHEMA)
+    _migrate_outbox_schema(connection)
     return connection
 
 
