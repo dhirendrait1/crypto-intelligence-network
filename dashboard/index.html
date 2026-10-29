@@ -287,7 +287,7 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
         }else if(name==="Derivatives snapshot"&&data&&data.data_quality&&data.data_quality.freshness_status){
           freshness=safeText(data.data_quality.freshness_status);
         }
-        if(freshness!=="UNKNOWN") kpis[0].textContent=freshness;
+        if(name==="Market candles"||name==="Derivatives snapshot") kpis[0].textContent=freshness;
       }
       if(kpis[1]&&meta&&Number.isFinite(meta.latencyMs)) kpis[1].textContent=meta.latencyMs+" ms";
       if(state!=="available"){
