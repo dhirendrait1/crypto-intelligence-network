@@ -292,8 +292,7 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
 
 
 
-    @patch("market_data_step1.datetime")
-    def test_freshness_threshold_boundary_is_deterministic(self, mocked_datetime):
+    def test_freshness_threshold_boundary_is_deterministic(self):
         fixed_now = datetime(2026, 10, 30, 12, 0, tzinfo=timezone.utc)
 
         class FixedDateTime(datetime):
@@ -301,11 +300,7 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
             def now(cls, tz=None):
                 return fixed_now if tz is not None else fixed_now.replace(tzinfo=None)
 
-        mocked_datetime.now.side_effect = FixedDateTime.now
-        mocked_datetime.fromisoformat.side_effect = datetime.fromisoformat
-
         with patch("market_data_step1.datetime", FixedDateTime):
-            fresh = _fetch_market_data(["bitcoin"], "usd") if False else None
             from market_data_step1 import _timestamp_status
             self.assertEqual(
                 _timestamp_status((fixed_now - timedelta(minutes=15)).isoformat()),
