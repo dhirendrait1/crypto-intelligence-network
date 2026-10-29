@@ -7,6 +7,8 @@ that backing exists.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from hashlib import sha256
+import json
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -202,6 +204,16 @@ def normalize_evidence(item: Any, *, now: datetime | None = None,
     record["source_url_valid"] = url_valid
     record["freshness_threshold_days"] = max_age_days
     record["assessment_clock_valid"] = assessment_clock_valid
+    fingerprint_fields = {
+        field: record.get(field)
+        for field in (*REQUIRED_EVIDENCE_FIELDS, "source_role", "notes")
+    }
+    canonical_payload = json.dumps(
+        fingerprint_fields, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str
+    ).encode("utf-8")
+    record["record_fingerprint_sha256"] = sha256(canonical_payload).hexdigest()
+    record["fingerprint_scope"] = "normalized_supplied_metadata"
+    record["fingerprint_is_authenticity_proof"] = False
     return record
 
 
