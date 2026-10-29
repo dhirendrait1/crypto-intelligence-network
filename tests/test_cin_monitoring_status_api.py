@@ -214,3 +214,45 @@ def test_http_route_normalizes_warning_text_and_rejects_blank_warning():
     )
     assert rejected.status_code == 422
 
+
+from datetime import timedelta
+
+
+def test_source_freshness_endpoint_validates_metadata_before_classifying_age():
+    now = datetime.now(timezone.utc)
+    observation = {
+        "source_id": "coinbase_public",
+        "subject": "BTC-USD",
+        "observed_at": (now - timedelta(seconds=30)).isoformat(),
+        "retrieved_at": (now - timedelta(seconds=10)).isoformat(),
+        "timestamp_semantics": "snapshot_time",
+        "provenance": "test-fixture",
+    }
+    app = FastAPI()
+    from cin_monitoring_status_api import router
+    app.include_router(router)
+    response = TestClient(app).post("/monitoring/source-freshness", json={
+        "observation": observation, "max_age_seconds": 300,
+    })
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "fresh"
+    assert body["metadata"]["validity"] == "valid_metadata"
+    assert body["metadata"]["freshness_assessed"] is False
+    assert body["freshness"]["freshness"] == "fresh"
+    assert body["checks_performed"] is False
+    assert body["read_only"] is True
+
+
+def test_source_freshness_endpoint_keeps_missing_identity_unknown():
+    app = FastAPI()
+    from cin_monitoring_status_api import router
+    app.include_router(router)
+    response = TestClient(app).post("/monitoring/source-freshness", json={
+        "observation": {"subject": "BTC-USD"}, "max_age_seconds": 300,
+    })
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "unknown"
+    assert body["freshness"]["freshness"] == "unknown"
+    assert body["checks_performed"] is False
