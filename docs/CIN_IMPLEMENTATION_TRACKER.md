@@ -895,3 +895,12 @@ This checkpoint validates configured offline automation only. It does not establ
 - PR #8 is Draft/open; PR #65 and PR #66 are Draft/open and unmerged.
 - PR #66 adds row-level market-data provider and retrieval-time provenance. Its roadmap update commit `8ea7709c5f170a8161d819f08e177e15fe7d34d7` passed all four repository workflows. This is offline CI evidence only.
 - Historical entries below retain their original commit-specific results and should not be interpreted as the latest repository state unless they identify the current head explicitly.
+
+
+## Technical-analysis and order-book depth validation increment (2026-10-30)
+
+- **Step 17 — implemented, offline-tested:** deterministic tests now cover RSI flat input (50), monotonic gain/loss bounds (100/0), minimum observation count, EMA seed boundary, ATR minimum history, MACD signal-line availability boundary, and zero prior-volume baseline behavior. Indicator documentation states the availability and edge-case semantics.
+- All four workflows passed on exact code head `9de32c047ef87acde481da46bb702c83d545fb89`: Technical Analysis Tests `40972458689`, Automated Tests `40972458409`, Evidence Ingestion API `40972458435`, Screening Checks `40972458395`.
+- **Step 16 — partial increment:** derivatives snapshots now expose bid/ask visible-book sweep estimates for 10k/50k/100k USDT reference notionals. Complete visible depth reports a volume-weighted average price and adverse slippage basis points; insufficient depth reports coverage only and leaves slippage/average price null. Regression tests cover both sides, insufficient depth, invalid parameters, and response serialization.
+- All four workflows passed on exact code head `ad0899433985b9c80e710fde8bcfd209d65a254c`: Technical Analysis Tests `40972666017`, Evidence Ingestion API `40972666026`, Screening Checks `40972666110`, Automated Tests `40972666015`.
+- **Boundary:** slippage references are hypothetical displayed-book calculations, not execution forecasts or instructions. They exclude fees, latency, hidden liquidity, queue position, and impact beyond returned levels. Step 16 remains Partial pending broader methodology review, multi-exchange coverage, and live snapshot validation. Step 17 offline tests do not establish live-provider behavior.
