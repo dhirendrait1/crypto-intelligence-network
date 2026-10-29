@@ -380,6 +380,8 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
   disconnectButton.addEventListener("click",function(){
     if(activeController) activeController.abort();
     activeController=null;connectButton.disabled=false;results.replaceChildren();
+    // Clear API-derived values as well as the result log so disconnected panels cannot display stale readings.
+    for(const endpoint of endpoints) updateDashboardPanel(endpoint.name,"unavailable","Disconnected; reconnect to refresh this read-only endpoint.",null,null);
     status.textContent="Disconnected. Existing displayed endpoint results cleared.";
     document.querySelectorAll("[data-cin-panel]").forEach(panel=>{panel.removeAttribute("data-api-state");const stateNode=panel.querySelector(".state");if(stateNode)stateNode.textContent=panel.dataset.cinPanel==="evidence"?"Not verified":panel.dataset.cinPanel==="monitoring"?"Policy not configured":"Awaiting API";});
     const quality=document.querySelector(".latency-panel");if(quality){quality.querySelectorAll(".ref-kpi strong").forEach(node=>node.textContent="UNKNOWN");const tag=quality.querySelector(".ref-tag");if(tag)tag.textContent="UNVERIFIED";}
