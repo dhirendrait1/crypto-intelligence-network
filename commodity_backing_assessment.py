@@ -254,6 +254,19 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
         }
         source_hosts = sorted({record.get("source_host") for record in records if record.get("source_host")})
         role_counts = {role: sum(1 for record in records if record.get("source_role") == role) for role in sorted(VALID_SOURCE_ROLES | {"unspecified"})}
+        status_counts = {status: sum(1 for record in records if record.get("status") == status) for status in sorted(VALID_STATUSES)}
+        conflict_evidence = []
+        if state == "conflicting":
+            conflict_evidence = [
+                {
+                    "status": record.get("status"),
+                    "source_role": record.get("source_role", "unspecified"),
+                    "source_role_authenticated": False,
+                    "source_name": record.get("source_name"),
+                    "source_url": record.get("source_url"),
+                }
+                for record in records
+            ]
         coverage[kind] = {
             "status": state,
             "evidence_count": len(identities),
@@ -268,6 +281,10 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
             "source_independence_verified": False,
             "source_role_counts_self_reported": role_counts,
             "source_roles_authenticated": False,
+            "status_counts": status_counts,
+            "conflict_evidence": conflict_evidence,
+            "conflict_resolution": "manual_review_required" if state == "conflicting" else "not_applicable",
+            "preferred_source_selected": False,
         }
 
     statuses = [value["status"] for value in coverage.values()]
