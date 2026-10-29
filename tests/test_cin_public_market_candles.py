@@ -314,6 +314,8 @@ class CoinbaseCandleValidationTests(unittest.TestCase):
             [1700000060.5, 99, 102, 100, 101, 10],
             [True, 99, 102, 100, 101, 10],
             [float("nan"), 99, 102, 100, 101, 10],
+            [-1, 99, 102, 100, 101, 10],
+            [9999999999999, 99, 102, 100, 101, 10],
         ]
         with patch.object(api, "_request_json", return_value=payload):
             rows = api._fetch_coinbase("BTCUSD", "1m", 5)
