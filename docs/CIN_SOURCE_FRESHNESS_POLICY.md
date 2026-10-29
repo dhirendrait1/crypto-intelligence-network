@@ -42,7 +42,7 @@ A monitoring snapshot's own `observed_at` indicates when the snapshot was record
 
 ## Acceptance tests required before live integration
 
-- Exact freshness limit and one second beyond the limit.
+- Exact freshness limit, fractional-second age beyond the limit (for example, 300.5 seconds under a 300-second maximum), and one full second beyond the limit.
 - Naive, malformed, missing, and future timestamps.
 - Distinct source-event and retrieval timestamps.
 - Old observation retrieved just now remains stale.
