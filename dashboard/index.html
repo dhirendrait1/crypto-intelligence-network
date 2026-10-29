@@ -266,7 +266,7 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
       }
     }
   }
-  function updateDashboardPanel(name,state,detail,data){
+  function updateDashboardPanel(name,state,detail,data,meta){
     const key=panelForEndpoint[name];
     if(!key) return;
     const panel=document.querySelector('[data-cin-panel="'+key+'"]');
@@ -277,6 +277,29 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
     if(description) description.textContent=detail;
     panel.setAttribute("data-api-state",state);
     if(state==="available"&&data) renderEndpointMetrics(name,data);
+    const quality=document.querySelector(".latency-panel");
+    if(quality){
+      const kpis=quality.querySelectorAll(".ref-kpi strong");
+      if(kpis[0]){
+        let freshness="UNKNOWN";
+        if(name==="Market candles"&&data){
+          freshness=data.stale_data_warning?safeText(data.stale_data_warning):data.latest_closed_candle_age_seconds!=null?safeText(data.latest_closed_candle_age_seconds)+" s age":"UNKNOWN";
+        }else if(name==="Derivatives snapshot"&&data&&data.data_quality&&data.data_quality.freshness_status){
+          freshness=safeText(data.data_quality.freshness_status);
+        }
+        if(freshness!=="UNKNOWN") kpis[0].textContent=freshness;
+      }
+      if(kpis[1]&&meta&&Number.isFinite(meta.latencyMs)) kpis[1].textContent=meta.latencyMs+" ms";
+      if(kpis[2]&&state==="available"&&data){
+        let completeness="UNKNOWN";
+        if(name==="Market candles"&&Array.isArray(data.data)&&Number.isInteger(data.count)) completeness=data.data.length+"/"+data.count+" candles";
+        else if(name==="Coin screening"&&Array.isArray(data.data)&&Number.isInteger(data.count)) completeness=data.data.length+"/"+data.count+" assets";
+        else if(name==="Public news sentiment"&&Array.isArray(data.articles)&&Number.isInteger(data.count)) completeness=data.articles.length+"/"+data.count+" headlines";
+        if(completeness!=="UNKNOWN") kpis[2].textContent=completeness;
+      }
+      const tag=quality.querySelector(".ref-tag");
+      if(tag) tag.textContent="API-REPORTED / MEASURED";
+    }
     if(state!=="available"){
       const metrics=panel.querySelector('[data-api-metrics="'+name+'"]');if(metrics)metrics.replaceChildren();
       if(name==="Market candles"){
@@ -304,8 +327,8 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
       }
     }
   }
-  function renderRow(name,state,detail,data){
-    updateDashboardPanel(name,state,detail,data);
+  function renderRow(name,state,detail,data,meta){
+    updateDashboardPanel(name,state,detail,data,meta);
     const row=document.createElement("article");
     row.style.cssText="border-top:1px solid var(--line);padding:10px 0";
     const heading=document.createElement("strong");heading.textContent=name+" — "+state;row.appendChild(heading);
@@ -327,18 +350,20 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
     let success=0;
     for(const endpoint of endpoints){
       if(controller.signal.aborted) return;
+      let requestStarted=Date.now();
       try{
         const response=await fetch(base+endpoint.path,{method:"GET",headers:{Accept:"application/json"},signal:controller.signal,cache:"no-store",credentials:"omit",redirect:"error"});
         if(!response.ok) throw new Error("HTTP "+response.status);
         const data=await response.json();
+        const latencyMs=Date.now()-requestStarted;
         if(!data||typeof data!=="object"||Array.isArray(data)) throw new Error("Unexpected JSON response shape");
         const schemaValid=endpoint.name==="Market candles"?typeof data.symbol==="string"&&typeof data.timeframe==="string"&&Number.isInteger(data.count)&&Array.isArray(data.data)&&typeof data.source==="string"&&typeof data.retrieved_at==="string":endpoint.name==="Technical analysis"?!!data.input&&typeof data.input.symbol==="string"&&typeof data.input.timeframe==="string"&&typeof data.input.source==="string"&&typeof data.input.retrieved_at==="string"&&Array.isArray(data.limitations):endpoint.name==="Coin screening"?Number.isInteger(data.count)&&Array.isArray(data.data)&&typeof data.source==="string"&&typeof data.data_mode==="string"&&typeof data.retrieved_at==="string"&&typeof data.methodology==="string":endpoint.name==="Public news sentiment"?Array.isArray(data.articles)&&Number.isInteger(data.count)&&!!data.sentiment_summary&&typeof data.source==="string"&&typeof data.retrieved_at==="string":endpoint.name==="Derivatives snapshot"?typeof data.symbol==="string"&&typeof data.source==="string"&&typeof data.retrieved_at==="string"&&!!data.data_quality:false;
         if(!schemaValid) throw new Error("Invalid CIN response schema; expected fields are missing or have wrong types");
         success++;
-        renderRow(endpoint.name,"available",endpoint.summary(data),data);
+        renderRow(endpoint.name,"available",endpoint.summary(data),data,{latencyMs});
       }catch(error){
         if(controller.signal.aborted) return;
-        renderRow(endpoint.name,"unavailable",error&&error.name==="TypeError"?"Request blocked or network/CORS error. Check API origin and browser CORS policy.":safeText(error&&error.message));
+        renderRow(endpoint.name,"unavailable",error&&error.name==="TypeError"?"Request blocked or network/CORS error. Check API origin and browser CORS policy.":safeText(error&&error.message),null,{latencyMs:Date.now()-requestStarted});
       }
     }
     if(controller.signal.aborted) return;
@@ -352,6 +377,7 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
     activeController=null;connectButton.disabled=false;results.replaceChildren();
     status.textContent="Disconnected. Existing displayed endpoint results cleared.";
     document.querySelectorAll("[data-cin-panel]").forEach(panel=>{panel.removeAttribute("data-api-state");const stateNode=panel.querySelector(".state");if(stateNode)stateNode.textContent=panel.dataset.cinPanel==="evidence"?"Not verified":panel.dataset.cinPanel==="monitoring"?"Policy not configured":"Awaiting API";});
+    const quality=document.querySelector(".latency-panel");if(quality){quality.querySelectorAll(".ref-kpi strong").forEach(node=>node.textContent="UNKNOWN");const tag=quality.querySelector(".ref-tag");if(tag)tag.textContent="UNVERIFIED";}
     document.querySelector(".notice").textContent="Connection state: not connected. No live values are shown until you explicitly connect to an API.";
   });
 })();
