@@ -353,3 +353,31 @@ def test_previous_claim_cannot_acknowledge_after_retry_is_reclaimed(tmp_path):
     )
     assert accepted["status"] == "sent"
     assert accepted["attempts"] == 2
+
+
+@pytest.mark.parametrize("claim_attempt", [True, False, "1", 1.5, 0, -1, None])
+def test_sent_rejects_invalid_claim_attempt_identifier(tmp_path, claim_attempt):
+    path = tmp_path / "invalid-sent-claim.sqlite3"
+    item = enqueue_alert_delivery(
+        path, rule_id="r1", observation_id="sent-invalid", payload={}, now=NOW,
+    )
+    claim_due_alerts(path, now=NOW)
+    with pytest.raises(ValueError, match="claim_attempt"):
+        mark_alert_sent(
+            path, item["idempotency_key"], now=NOW,
+            claim_attempt=claim_attempt,
+        )
+
+
+@pytest.mark.parametrize("claim_attempt", [True, False, "1", 1.5, 0, -1, None])
+def test_failure_rejects_invalid_claim_attempt_identifier(tmp_path, claim_attempt):
+    path = tmp_path / "invalid-failed-claim.sqlite3"
+    item = enqueue_alert_delivery(
+        path, rule_id="r1", observation_id="failed-invalid", payload={}, now=NOW,
+    )
+    claim_due_alerts(path, now=NOW)
+    with pytest.raises(ValueError, match="claim_attempt"):
+        mark_alert_failed(
+            path, item["idempotency_key"], now=NOW,
+            error_code="provider_timeout", claim_attempt=claim_attempt,
+        )
