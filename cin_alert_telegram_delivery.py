@@ -120,7 +120,7 @@ def process_due_telegram_alerts(
             try:
                 state = mark_alert_sent(
                     database_path, item["idempotency_key"],
-                    now=now, claim_attempt=item["attempts"],
+                    now=now, claim_attempt=item["attempts"], lease_seconds=lease_seconds,
                 )
             except ValueError:
                 # A newer claim may own the row now. Do not overwrite its state
@@ -142,6 +142,7 @@ def process_due_telegram_alerts(
                 updated = mark_alert_failed(
                     database_path, item["idempotency_key"], now=now,
                     error_code=exc.code, max_attempts=max_attempts, claim_attempt=item["attempts"],
+                    lease_seconds=lease_seconds,
                 )
             except ValueError:
                 # Another worker may have reclaimed this lease. Never let a stale
