@@ -256,9 +256,13 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.exception.status_code, 400)
 
     async def test_provider_rate_limit_is_safe_503(self):
-        with patch.object(api, "_fetch_binance", side_effect=urllib.error.HTTPError(
-            api.BINANCE_KLINES_URL, 429, "rate limited", {}, None
-        )):
+        # The USDT route tries Kraken first, then Binance. Force both providers
+        # to fail so the test verifies the terminal, sanitized 503 behavior.
+        with patch.object(api, "_fetch_kraken", side_effect=ValueError("temporarily unavailable")), patch.object(
+            api, "_fetch_binance", side_effect=urllib.error.HTTPError(
+                api.BINANCE_KLINES_URL, 429, "rate limited", {}, None
+            )
+        ):
             with self.assertRaises(HTTPException) as ctx:
                 await api._load("BTCUSDT", "1h", 50)
         self.assertEqual(ctx.exception.status_code, 503)
