@@ -29,13 +29,12 @@ jobs:
         run: python -m pip install --upgrade pip pytest
       - name: Compile alert modules and tests
         run: |
-          python -m compileall -q cin_alert_rules.py cin_alert_state.py cin_alert_delivery_outbox.py cin_alert_telegram_delivery.py cin_alert_telegram_worker.py
+          python -m compileall -q cin_alert_rules.py cin_alert_state_store.py cin_alert_delivery_outbox.py cin_alert_telegram_delivery.py cin_alert_telegram_worker.py
           python -m compileall -q tests
       - name: Run alert reliability tests only
         run: |
           python -m pytest -q \
-            tests/test_cin_alert_rules.py \
-            tests/test_cin_alert_state.py \
+            tests/test_cin_alert_state_store.py \
             tests/test_cin_alert_delivery_outbox.py \
             tests/test_cin_alert_telegram_delivery.py \
             tests/test_cin_alert_telegram_worker.py
