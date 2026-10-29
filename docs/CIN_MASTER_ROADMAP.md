@@ -131,3 +131,12 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - Corrected the commodity-backed evidence API documentation to match the implemented and tested `max_age_days` contract: the accepted range is **0–3650 days**, not 1–3650.
 - Existing offline API tests already cover the zero-day threshold, maximum threshold, strict integer typing, and invalid values.
 - Step 11 remains Partial: CIN currently validates caller-supplied evidence metadata and freshness; it does not fetch issuer/reserve/custody documents or independently verify the underlying claims.
+
+
+## Step 16 visible-depth methodology increment (2026-10-30)
+
+- Added bid/ask visible-book sweep estimates at fixed 10,000 / 50,000 / 100,000 USDT reference notionals.
+- Reports visible-depth coverage and adverse slippage basis points only when the full reference notional fits within returned levels; insufficient depth returns null slippage and average price rather than extrapolating.
+- Added offline regression coverage for bid/ask adverse slippage, insufficient depth, invalid parameters, and snapshot serialization.
+- Explicit limitations: no fees, latency, hidden liquidity, queue position, market impact beyond displayed levels, or execution outcome is modeled. This is analysis only; no orders are placed or routed.
+- Step 16 remains Partial pending broader methodology review, multi-exchange coverage, and live snapshot validation. Latest head `ad0899433985b9c80e710fde8bcfd209d65a254c` has four workflows in progress at this checkpoint.
