@@ -221,6 +221,7 @@ def test_source_freshness_endpoint_validates_metadata_before_classifying_age():
     now = datetime.now(timezone.utc)
     observation = {
         "source_id": "coinbase_public",
+        "data_type": "market_candles",
         "subject": "BTC-USD",
         "observed_at": (now - timedelta(seconds=30)).isoformat(),
         "retrieved_at": (now - timedelta(seconds=10)).isoformat(),
@@ -231,19 +232,22 @@ def test_source_freshness_endpoint_validates_metadata_before_classifying_age():
     from cin_monitoring_status_api import router
     app.include_router(router)
     response = TestClient(app).post("/monitoring/source-freshness", json={
-        "observation": observation, "max_age_seconds": 300,
+        "observation": observation,
     })
     assert response.status_code == 200
     body = response.json()
-    assert body["status"] == "fresh"
+    assert body["status"] == "unknown"
     assert body["metadata"]["validity"] == "valid_metadata"
     assert body["metadata"]["freshness_assessed"] is False
-    assert body["freshness"]["freshness"] == "fresh"
+    assert body["freshness"]["freshness"] == "unknown"
+    assert body["freshness"]["reason"] == "source_data_type_policy_not_configured"
     assert body["freshness_policy"] == {
-        "max_age_seconds": 300,
-        "selection": "caller_supplied_not_source_specific",
+        "selection": "source_data_type_registry",
+        "configured": False,
+        "source_id": "coinbase_public",
+        "data_type": "market_candles",
     }
-    assert "not a CIN-enforced source-specific policy" in body["note"]
+    assert "no threshold was guessed" in body["note"]
     assert body["checks_performed"] is False
     assert body["read_only"] is True
 
@@ -253,7 +257,7 @@ def test_source_freshness_endpoint_keeps_missing_identity_unknown():
     from cin_monitoring_status_api import router
     app.include_router(router)
     response = TestClient(app).post("/monitoring/source-freshness", json={
-        "observation": {"subject": "BTC-USD"}, "max_age_seconds": 300,
+        "observation": {"subject": "BTC-USD"},
     })
     assert response.status_code == 200
     body = response.json()
