@@ -147,6 +147,18 @@ def test_timestamp_freshness_one_second_over_limit_is_stale():
     assert result["age_seconds"] == 301
 
 
+def test_timestamp_freshness_fractional_second_over_limit_is_stale():
+    now = datetime(2026, 10, 28, 12, 0, tzinfo=timezone.utc)
+    result = assess_timestamp_freshness(
+        "2026-10-28T11:54:59.500Z", now=now, max_age_seconds=300
+    )
+    assert result == {
+        "freshness": "stale",
+        "age_seconds": 301,
+        "reason": "age_exceeds_limit",
+    }
+
+
 def test_timestamp_freshness_tolerates_small_future_clock_skew():
     now = datetime(2026, 10, 28, 12, 0, tzinfo=timezone.utc)
     result = assess_timestamp_freshness(
