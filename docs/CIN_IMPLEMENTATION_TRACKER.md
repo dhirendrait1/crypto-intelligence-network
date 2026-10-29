@@ -916,3 +916,12 @@ This checkpoint validates configured offline automation only. It does not establ
 - API integration follow-up: added `POST /cross-source-evidence-comparison`, bounded request models, idempotent scaffold module-copy/router registration, and five endpoint contract tests. The scaffold regression tests also verify the new router is registered once and copied into the application.
 - All four workflows passed on integration head `ba69aec7750099913ec52a4687dc3af74a9883d1` (run IDs: `40973205679`, `40973205697`, `40973205857`, `40973206105`).
 - Remaining acceptance: metric-specific tolerance calibration, provider-specific tests, and authorized live-source validation. Step 18 is Partial, not complete.
+
+
+## Step 19 — public news language-scope increment (2026-10-30)
+
+- Updated `_headline_sentiment` to consume provider language metadata. Explicit non-English tags return `unavailable` / null score / `unsupported_language` rather than being scored by the English keyword lexicon or mislabeled neutral.
+- English locale tags (for example `en-US`) normalize to supported English. Missing language metadata retains the existing low-confidence keyword result but is marked `language_unverified`.
+- Added four offline tests covering non-English suppression, unknown-language status, English locale normalization, and parser-to-classifier propagation.
+- Updated `docs/CIN_PUBLIC_NEWS_SENTIMENT.md` and the master roadmap with English-only scope and remaining multilingual limitations.
+- Remaining acceptance: multilingual model/translation and mixed-language evaluation, context/negation handling, and authorized live GDELT/RSS validation. Step 19 remains Partial.
