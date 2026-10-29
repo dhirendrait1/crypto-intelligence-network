@@ -1,15 +1,22 @@
 from cin_market_candle_provenance import candle_observation_metadata, market_pair_metadata
 
 
-def test_coinbase_fallback_reports_actual_usd_quote_for_requested_usdt_pair():
+def test_coinbase_usd_product_is_not_substituted_for_requested_usdt_pair():
     result = market_pair_metadata("BTCUSDT", "coinbase_public")
     assert result == {
         "source_id": "coinbase_public",
         "base_asset": "BTC",
         "requested_quote_currency": "USDT",
-        "quote_currency": "USD",
-        "pair_metadata_status": "mapped_provider_product",
+        "quote_currency": None,
+        "pair_metadata_status": "quote_mismatch",
     }
+
+
+def test_coinbase_usd_pair_is_identified_without_substitution():
+    result = market_pair_metadata("BTCUSD", "coinbase_public")
+    assert result["requested_quote_currency"] == "USD"
+    assert result["quote_currency"] == "USD"
+    assert result["pair_metadata_status"] == "identified"
 
 
 def test_binance_and_kraken_keep_requested_quote_currency():
@@ -50,7 +57,7 @@ from unittest.mock import patch
 import cin_public_market_candles_api as market_api
 
 
-def test_coinbase_fallback_endpoint_marks_actual_usd_quote():
+def test_coinbase_usdt_mismatch_is_not_reported_as_usd_quote():
     rows = [{
         "open_time": 1793185140000, "open": 100.0, "high": 102.0,
         "low": 99.0, "close": 101.0, "volume": 5.0,
@@ -64,6 +71,6 @@ def test_coinbase_fallback_endpoint_marks_actual_usd_quote():
         result = asyncio.run(market_api.get_market_candles("BTCUSDT", "1m", 5))
     assert result["source_id"] == "coinbase_public"
     assert result["requested_quote_currency"] == "USDT"
-    assert result["quote_currency"] == "USD"
-    assert result["pair_metadata_status"] == "mapped_provider_product"
-    assert result["data"][0]["observation_metadata"]["quote_currency"] == "USD"
+    assert result["quote_currency"] is None
+    assert result["pair_metadata_status"] == "quote_mismatch"
+    assert result["data"][0]["observation_metadata"]["quote_currency"] is None
