@@ -318,3 +318,11 @@ def test_concurrent_workers_never_claim_the_same_pending_item(tmp_path):
     assert len(set(keys)) == 12
     assert all(item["status"] == "sending" and item["attempts"] == 1 for item in claimed)
     assert claim_due_alerts(path, now=NOW, limit=12) == []
+
+
+@pytest.mark.parametrize("lease_seconds", [True, False, "300", 1.5, None, 29, 3601])
+def test_claim_rejects_invalid_lease_seconds_before_time_arithmetic(tmp_path, lease_seconds):
+    path = tmp_path / "invalid-lease.sqlite3"
+    enqueue_alert_delivery(path, rule_id="r1", observation_id="e1", payload={"value": 1}, now=NOW)
+    with pytest.raises(ValueError, match="lease_seconds"):
+        claim_due_alerts(path, now=NOW, lease_seconds=lease_seconds)
