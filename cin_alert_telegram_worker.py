@@ -33,6 +33,12 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.once:
         parser.error("pass --once to explicitly authorize one batch")
+    if args.limit < 1:
+        parser.error("--limit must be at least 1")
+    if args.lease_seconds < 1:
+        parser.error("--lease-seconds must be at least 1")
+    if args.max_attempts < 1:
+        parser.error("--max-attempts must be at least 1")
     database_path = os.environ.get("CIN_ALERT_DATABASE_PATH", "").strip()
     if not database_path or database_path == ":memory:":
         print(

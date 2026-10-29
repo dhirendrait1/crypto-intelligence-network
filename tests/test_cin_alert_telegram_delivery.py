@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from cin_alert_delivery_outbox import enqueue_alert_delivery
+from cin_alert_delivery_outbox import claim_due_alerts, enqueue_alert_delivery
 from cin_alert_telegram_delivery import (
     TelegramDeliveryError,
     process_due_telegram_alerts,
@@ -169,3 +169,74 @@ class TelegramDeliveryTests(unittest.TestCase):
             process_due_telegram_alerts(str(path), now=NOW)
         with __import__("sqlite3").connect(path) as db:
             self.assertEqual(db.execute("SELECT status FROM alert_delivery_outbox").fetchone()[0], "pending")
+
+
+
+def test_crash_before_send_leaves_claim_recoverable_only_after_lease_expiry(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    enqueue_alert_delivery(
+        path,
+        rule_id="r1",
+        observation_id="crash-before-send",
+        payload={"text": "BTC alert"},
+        now=NOW,
+    )
+
+    # Credentials are fake test values; the provider call is fully mocked.
+    # Simulate abrupt process termination before the provider call completes.
+    with patch.dict(os.environ, {
+        "CIN_TELEGRAM_BOT_TOKEN": "fake-test-token",
+        "CIN_TELEGRAM_CHAT_ID": "fake-test-chat",
+    }):
+        with patch(
+            "cin_alert_telegram_delivery.send_telegram_notification",
+            side_effect=SystemExit("simulated process crash"),
+        ):
+            with pytest.raises(SystemExit, match="simulated process crash"):
+                process_due_telegram_alerts(str(path), now=NOW)
+
+    assert claim_due_alerts(
+        path, now=NOW + __import__("datetime").timedelta(seconds=299)
+    ) == []
+    recovered = claim_due_alerts(
+        path, now=NOW + __import__("datetime").timedelta(seconds=300)
+    )
+    assert len(recovered) == 1
+    assert recovered[0]["idempotency_key"] == "r1:crash-before-send"
+    assert recovered[0]["attempts"] == 2
+
+
+
+def test_crash_after_provider_acceptance_is_at_least_once_not_exactly_once(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    enqueue_alert_delivery(
+        path,
+        rule_id="r1",
+        observation_id="accepted-before-crash",
+        payload={"text": "BTC alert"},
+        now=NOW,
+    )
+    accepted = {"provider": "telegram", "accepted": True, "message_id": 77}
+    with patch.dict(os.environ, {
+        "CIN_TELEGRAM_BOT_TOKEN": "fake-test-token",
+        "CIN_TELEGRAM_CHAT_ID": "fake-test-chat",
+    }):
+        with patch(
+            "cin_alert_telegram_delivery.send_telegram_notification",
+            return_value=accepted,
+        ) as mocked_send:
+            # Provider accepts, then the worker crashes before durable local acknowledgement.
+            with patch(
+                "cin_alert_telegram_delivery.mark_alert_sent",
+                side_effect=SystemExit("simulated crash after provider acceptance"),
+            ):
+                with pytest.raises(SystemExit, match="simulated crash after provider acceptance"):
+                    process_due_telegram_alerts(str(path), now=NOW)
+
+            # Lease expiry permits recovery; without provider-side idempotency,
+            # a second accepted send is possible by design.
+            result = process_due_telegram_alerts(
+                str(path), now=NOW + __import__("datetime").timedelta(seconds=300)
+            )
+    assert mocked_send.call_count == 2
+    assert result["results"][0]["status"] == "sent"

@@ -163,3 +163,27 @@ def test_active_lease_is_not_reclaimed_before_expiry(tmp_path):
     assert len(recovered) == 1
     assert recovered[0]["idempotency_key"] == first["idempotency_key"]
     assert recovered[0]["attempts"] == first["attempts"] + 1
+
+
+
+def test_dead_letter_stays_terminal_when_later_claim_uses_higher_attempt_limit(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    item = enqueue_alert_delivery(
+        path, rule_id="r1", observation_id="terminal", payload={}, now=NOW
+    )
+    claim_due_alerts(path, now=NOW, max_attempts=1)
+    dead = mark_alert_failed(
+        path, item["idempotency_key"], now=NOW,
+        error_code="provider_timeout", max_attempts=1, claim_attempt=1,
+    )
+    assert dead["status"] == "dead"
+
+    # Increasing a future worker's limit must not resurrect a terminal row.
+    assert claim_due_alerts(
+        path, now=NOW + timedelta(days=3), max_attempts=5
+    ) == []
+    with __import__("sqlite3").connect(path) as db:
+        row = db.execute(
+            "SELECT status, last_error_code FROM alert_delivery_outbox"
+        ).fetchone()
+    assert row == ("dead", "provider_timeout")
