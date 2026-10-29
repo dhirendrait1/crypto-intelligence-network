@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from commodity_backing_assessment import assess_commodity_asset, normalize_evidence
+from commodity_backing_assessment import assess_commodity_asset, compare_evidence_snapshots, normalize_evidence
 
 
 NOW = datetime(2026, 10, 24, tzinfo=timezone.utc)
@@ -355,3 +355,39 @@ def test_evidence_record_fingerprint_changes_when_supplied_metadata_changes():
     first = normalize_evidence(valid_item(source_role="issuer"), now=NOW)
     changed = normalize_evidence(valid_item(source_role="auditor"), now=NOW)
     assert first["record_fingerprint_sha256"] != changed["record_fingerprint_sha256"]
+
+def test_snapshot_comparison_classifies_added_removed_changed_and_unchanged():
+    previous = [
+        valid_item(evidence_id="same", notes="unchanged"),
+        valid_item(evidence_id="changed", notes="before"),
+        valid_item(evidence_id="removed"),
+    ]
+    current = [
+        valid_item(evidence_id="same", notes="unchanged"),
+        valid_item(evidence_id="changed", notes="after"),
+        valid_item(evidence_id="added"),
+    ]
+    result = compare_evidence_snapshots(previous, current, now=NOW)
+    assert result["counts"] == {"added": 1, "removed": 1, "changed": 1, "unchanged": 1}
+    assert result["history_persisted"] is False
+    assert {item["evidence_id"]: item["change_type"] for item in result["changes"]} == {
+        "same": "unchanged", "changed": "changed", "removed": "removed", "added": "added"
+    }
+
+def test_snapshot_comparison_excludes_duplicate_stable_ids_as_ambiguous():
+    previous = [valid_item(evidence_id="duplicate"), valid_item(evidence_id="duplicate", notes="second") ]
+    current = [valid_item(evidence_id="duplicate")]
+    result = compare_evidence_snapshots(previous, current, now=NOW)
+    assert result["ambiguous_evidence_ids"] == ["duplicate"]
+    assert result["changes"] == []
+
+def test_snapshot_comparison_counts_records_without_stable_ids_as_untracked():
+    result = compare_evidence_snapshots([valid_item()], [valid_item()], now=NOW)
+    assert result["untracked_previous_record_count"] == 1
+    assert result["untracked_current_record_count"] == 1
+    assert result["change_count"] == 0
+
+def test_snapshot_comparison_requires_two_lists():
+    import pytest
+    with pytest.raises(ValueError):
+        compare_evidence_snapshots([], "not-a-list", now=NOW)
