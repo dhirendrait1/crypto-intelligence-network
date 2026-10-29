@@ -228,17 +228,43 @@ def claim_due_alerts(
             raise
 
 
-def mark_alert_sent(database_path: str | Path, idempotency_key: str, *, now: datetime | str, claim_attempt: int) -> dict[str, Any]:
+def _validate_claim_lease(
+    claim_updated_at: str, current_dt: datetime, lease_seconds: int
+) -> None:
+    if (
+        isinstance(lease_seconds, bool)
+        or not isinstance(lease_seconds, int)
+        or not 30 <= lease_seconds <= 3600
+    ):
+        raise ValueError("lease_seconds must be an integer from 30 through 3600")
+    claim_time = _timestamp(claim_updated_at, "claim_updated_at")
+    if current_dt >= claim_time + timedelta(seconds=lease_seconds):
+        raise ValueError("worker claim lease has expired")
+
+
+def mark_alert_sent(
+    database_path: str | Path, idempotency_key: str, *,
+    now: datetime | str, claim_attempt: int, lease_seconds: int = 300
+) -> dict[str, Any]:
     if isinstance(claim_attempt, bool) or not isinstance(claim_attempt, int) or claim_attempt < 1:
         raise ValueError("claim_attempt must be a positive integer")
-    current = _timestamp(now, "now").isoformat()
+    current_dt = _timestamp(now, "now")
+    current = current_dt.isoformat()
     with _connect(database_path) as db:
         db.execute("BEGIN IMMEDIATE")
         try:
+            claim = db.execute(
+                "SELECT status,attempts,updated_at FROM alert_delivery_outbox WHERE idempotency_key=?",
+                (idempotency_key,),
+            ).fetchone()
+            if not claim or claim[0] != "sending" or claim[1] != claim_attempt:
+                raise ValueError("outbox item must exist and be in sending state")
+            _validate_claim_lease(claim[2], current_dt, lease_seconds)
             changed = db.execute(
                 """UPDATE alert_delivery_outbox SET status='sent',
-                updated_at=?,last_error_code=NULL WHERE idempotency_key=? AND status='sending' AND attempts=?""",
-                (current, idempotency_key, claim_attempt),
+                updated_at=?,last_error_code=NULL
+                WHERE idempotency_key=? AND status='sending' AND attempts=? AND updated_at=?""",
+                (current, idempotency_key, claim_attempt, claim[2]),
             ).rowcount
             if not changed:
                 raise ValueError("outbox item must exist and be in sending state")
@@ -265,8 +291,9 @@ def mark_alert_failed(
     retry_delay_seconds: int = 60,
     max_attempts: int = 5,
     claim_attempt: int,
+    lease_seconds: int = 300,
 ) -> dict[str, Any]:
-    """Record a bounded retry schedule for the current claim only."""
+    """Record a bounded retry schedule for the current, unexpired claim only."""
     current_dt = _timestamp(now, "now")
     if isinstance(claim_attempt, bool) or not isinstance(claim_attempt, int) or claim_attempt < 1:
         raise ValueError("claim_attempt must be a positive integer")
@@ -281,11 +308,12 @@ def mark_alert_failed(
         db.execute("BEGIN IMMEDIATE")
         try:
             row = db.execute(
-                "SELECT attempts,status FROM alert_delivery_outbox WHERE idempotency_key=?",
+                "SELECT attempts,status,updated_at FROM alert_delivery_outbox WHERE idempotency_key=?",
                 (idempotency_key,),
             ).fetchone()
             if not row or row[1] != "sending" or row[0] != claim_attempt:
                 raise ValueError("outbox item must exist and be in sending state")
+            _validate_claim_lease(row[2], current_dt, lease_seconds)
             attempts = row[0]
             # Attempts are counted when work is claimed, including recovered leases.
             status = "failed" if attempts < max_attempts else "dead"
