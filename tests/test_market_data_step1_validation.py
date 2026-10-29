@@ -49,6 +49,7 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         retrieved_at = datetime.fromisoformat(result[0]["provider_retrieved_at"].replace("Z", "+00:00"))
         self.assertEqual(retrieved_at.tzinfo, timezone.utc)
 
+    @patch("market_data_step1.urllib.request.urlopen")
     def test_valid_row_includes_freshness_metadata(self, mocked):
         mocked.return_value = FakeResponse([row()])
         result = _fetch_market_data(["bitcoin"], "usd")
