@@ -56,7 +56,8 @@ h1{font-size:clamp(1.65rem,5vw,2.5rem);line-height:1.1;margin:30px 0 8px}.intro{
   const endpoints=[
     {name:"Market candles",path:"/market-candles?symbol=BTCUSDT&interval=1h&limit=50",summary:data=>`Symbol: ${safeText(data.symbol)} · timeframe: ${safeText(data.timeframe)} · candles: ${safeText(data.count)} · source: ${safeText(data.source)} · retrieved: ${safeText(data.retrieved_at)}`},
     {name:"Technical analysis",path:"/technical-analysis/market?symbol=BTCUSDT&interval=1h&limit=100",summary:data=>`Symbol: ${safeText(data.input&&data.input.symbol)} · timeframe: ${safeText(data.input&&data.input.timeframe)} · source: ${safeText(data.input&&data.input.source)} · retrieved: ${safeText(data.input&&data.input.retrieved_at)}`},
-    {name:"Public news sentiment",path:"/news-sentiment?query=cryptocurrency&max_records=5",summary:data=>`Articles: ${safeText(data.count)} · label: ${safeText(data.sentiment_summary&&data.sentiment_summary.label)} · confidence: ${safeText(data.sentiment_summary&&data.sentiment_summary.confidence)} · source: ${safeText(data.source)}`},
+    {name:"Coin screening",path:"/coin-screening?vs_currency=usd&per_page=5&min_score=0&asset_type=growth",summary:data=>"Assets returned: "+safeText(data.count)+" · source: "+safeText(data.source)+" · data mode: "+safeText(data.data_mode)+" · retrieved: "+safeText(data.retrieved_at)+" · methodology: "+safeText(data.methodology)},
+    {name:"Public news sentiment",path:"/news-sentiment?query=cryptocurrency&max_records=5",summary:data=>"Articles: "+safeText(data.count)+" · label: "+safeText(data.sentiment_summary&&data.sentiment_summary.label)+" · confidence: "+safeText(data.sentiment_summary&&data.sentiment_summary.confidence)+" · source: "+safeText(data.source)+" · retrieved: "+safeText(data.retrieved_at)},
     {name:"Derivatives snapshot",path:"/derivatives/market-snapshot?symbol=BTCUSDT",summary:data=>`Symbol: ${safeText(data.symbol)} · source: ${safeText(data.source)} · retrieved: ${safeText(data.retrieved_at)} · freshness: ${safeText(data.data_quality&&data.data_quality.freshness_status)}`}
   ];
   function safeText(value){return value===null||value===undefined||value===""?"unknown":String(value);}
@@ -82,6 +83,7 @@ h1{font-size:clamp(1.65rem,5vw,2.5rem);line-height:1.1;margin:30px 0 8px}.intro{
     const controller=activeController;
     connectButton.disabled=true;results.replaceChildren();
     status.textContent="Connecting. Each endpoint is read-only; results may be partial.";
+    document.querySelector(".notice").textContent="Connection state: checking read-only endpoints. HTTP/JSON availability does not establish data correctness or freshness.";
     let success=0;
     for(const endpoint of endpoints){
       if(controller.signal.aborted) return;
@@ -99,6 +101,7 @@ h1{font-size:clamp(1.65rem,5vw,2.5rem);line-height:1.1;margin:30px 0 8px}.intro{
     }
     if(controller.signal.aborted) return;
     status.textContent=success===endpoints.length?"Connected: all "+success+" read-only endpoints responded.":"Partial connection: "+success+" of "+endpoints.length+" endpoints responded. Failed endpoints remain unavailable.";
+    document.querySelector(".notice").textContent=success===endpoints.length?"Connection state: endpoints responded. This confirms HTTP/JSON availability only, not data correctness, freshness, or source authenticity.":"Connection state: partial. "+success+" of "+endpoints.length+" endpoints responded; unavailable endpoints remain unverified.";
     connectButton.disabled=false;
     activeController=null;
   });
@@ -106,6 +109,7 @@ h1{font-size:clamp(1.65rem,5vw,2.5rem);line-height:1.1;margin:30px 0 8px}.intro{
     if(activeController) activeController.abort();
     activeController=null;connectButton.disabled=false;results.replaceChildren();
     status.textContent="Disconnected. Existing displayed endpoint results cleared.";
+    document.querySelector(".notice").textContent="Connection state: not connected. No live values are shown until you explicitly connect to an API.";
   });
 })();
 </script>
