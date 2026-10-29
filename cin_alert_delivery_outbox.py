@@ -171,14 +171,14 @@ def claim_due_alerts(
 ) -> list[dict[str, Any]]:
     """Claim due work and recover abandoned sending leases after worker crashes."""
     current_dt = _timestamp(now, "now")
-    current = current_dt.isoformat()
-    stale_before = (current_dt - timedelta(seconds=lease_seconds)).isoformat()
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
         raise ValueError("limit must be an integer from 1 through 100")
     if isinstance(lease_seconds, bool) or not isinstance(lease_seconds, int) or not 30 <= lease_seconds <= 3600:
         raise ValueError("lease_seconds must be an integer from 30 through 3600")
     if isinstance(max_attempts, bool) or not isinstance(max_attempts, int) or not 1 <= max_attempts <= 20:
         raise ValueError("max_attempts must be an integer from 1 through 20")
+    current = current_dt.isoformat()
+    stale_before = (current_dt - timedelta(seconds=lease_seconds)).isoformat()
     with _connect(database_path) as db:
         db.execute("BEGIN IMMEDIATE")
         try:
