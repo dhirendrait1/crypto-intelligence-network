@@ -33,15 +33,33 @@ class DashboardPreviewTests(unittest.TestCase):
     def test_read_only_boundary_is_visible(self):
         self.assertIn("No trading or order execution", self.html)
         self.assertIn("No wallet access", self.html)
-        self.assertNotIn("fetch(", self.html)
         self.assertNotIn("XMLHttpRequest", self.html)
         self.assertNotIn("WebSocket(", self.html)
+        self.assertIn('id="connect-api"', self.html)
+        self.assertIn('method:"GET"', self.html)
+        self.assertIn('credentials:"omit"', self.html)
+        self.assertIn('redirect:"error"', self.html)
+        self.assertIn('id="disconnect-api"', self.html)
+        self.assertNotIn('method:"POST"', self.html)
+        self.assertNotIn("/orders", self.html)
+        self.assertNotIn("/wallet", self.html)
 
     def test_preview_button_only_updates_local_status(self):
         self.assertIn('document.getElementById("refresh-state").textContent=', self.html)
-        self.assertIn("no network request was made", self.html)
+        self.assertIn("No request was made by this button.", self.html)
         self.assertIn('role="status"', self.html)
         self.assertIn('aria-live="polite"', self.html)
+
+    def test_api_requests_require_explicit_user_action_and_safe_origin(self):
+        self.assertIn('connectButton.addEventListener("click"', self.html)
+        self.assertIn('disconnectButton.addEventListener("click"', self.html)
+        self.assertIn('function validOrigin(value)', self.html)
+        self.assertIn('url.protocol==="https:"||url.protocol==="http:"', self.html)
+        self.assertIn('activeController=new AbortController()', self.html)
+        self.assertIn('cache:"no-store"', self.html)
+        self.assertIn('results.replaceChildren()', self.html)
+        self.assertIn('Partial connection:', self.html)
+        self.assertIn('Request blocked or network/CORS error.', self.html)
 
 
 if __name__ == "__main__":
