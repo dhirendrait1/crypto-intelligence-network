@@ -326,3 +326,30 @@ def test_claim_rejects_invalid_lease_seconds_before_time_arithmetic(tmp_path, le
     enqueue_alert_delivery(path, rule_id="r1", observation_id="e1", payload={"value": 1}, now=NOW)
     with pytest.raises(ValueError, match="lease_seconds"):
         claim_due_alerts(path, now=NOW, lease_seconds=lease_seconds)
+
+
+def test_previous_claim_cannot_acknowledge_after_retry_is_reclaimed(tmp_path):
+    path = tmp_path / "attempt-fencing.sqlite3"
+    item = enqueue_alert_delivery(
+        path, rule_id="r1", observation_id="fenced", payload={"value": 1}, now=NOW,
+    )
+    first = claim_due_alerts(path, now=NOW)[0]
+    failed = mark_alert_failed(
+        path, item["idempotency_key"], now=NOW,
+        error_code="provider_timeout", retry_delay_seconds=1,
+        claim_attempt=first["attempts"],
+    )
+    assert failed["status"] == "failed"
+    second = claim_due_alerts(path, now=NOW + timedelta(seconds=2))[0]
+    assert second["attempts"] == first["attempts"] + 1
+    with pytest.raises(ValueError, match="sending state"):
+        mark_alert_sent(
+            path, item["idempotency_key"], now=NOW + timedelta(seconds=3),
+            claim_attempt=first["attempts"],
+        )
+    accepted = mark_alert_sent(
+        path, item["idempotency_key"], now=NOW + timedelta(seconds=3),
+        claim_attempt=second["attempts"],
+    )
+    assert accepted["status"] == "sent"
+    assert accepted["attempts"] == 2
