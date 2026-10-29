@@ -290,6 +290,11 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
         if(freshness!=="UNKNOWN") kpis[0].textContent=freshness;
       }
       if(kpis[1]&&meta&&Number.isFinite(meta.latencyMs)) kpis[1].textContent=meta.latencyMs+" ms";
+      if(state!=="available"){
+        if(kpis[0]) kpis[0].textContent="UNKNOWN";
+        if(kpis[1]) kpis[1].textContent="UNKNOWN";
+        if(kpis[2]) kpis[2].textContent="UNKNOWN";
+      }
       if(kpis[2]&&state==="available"&&data){
         let completeness="UNKNOWN";
         if(name==="Market candles"&&Array.isArray(data.data)&&Number.isInteger(data.count)) completeness=data.data.length+"/"+data.count+" candles";
@@ -298,7 +303,7 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
         if(completeness!=="UNKNOWN") kpis[2].textContent=completeness;
       }
       const tag=quality.querySelector(".ref-tag");
-      if(tag) tag.textContent="API-REPORTED / MEASURED";
+      if(tag) tag.textContent=state==="available"?"API-REPORTED / MEASURED":"UNVERIFIED";
     }
     if(state!=="available"){
       const metrics=panel.querySelector('[data-api-metrics="'+name+'"]');if(metrics)metrics.replaceChildren();
