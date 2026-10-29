@@ -14,6 +14,8 @@ Set these environment variables only in the authorized runtime that will execute
 
 Never commit credentials, print them, or pass the destination through alert payloads. The adapter intentionally uses only the configured destination. Do not use an ephemeral filesystem for durable production alert state: container restarts can erase it. The current SQLite design is single-host/single-writer oriented and is not a multi-instance shared queue.
 
+The evaluator commits the trigger decision, cooldown state, audit event, and pending outbox intent atomically in one SQLite transaction. Later worker claims, provider outcomes, lease recovery, and operator reconciliation are separate transactions; this does not make the external Telegram send part of the database transaction.
+
 ## Explicit one-shot invocation
 
 After the database and destination are deliberately configured, run:
