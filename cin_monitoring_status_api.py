@@ -121,3 +121,44 @@ def assess_timestamp_freshness(
         return {"freshness": "stale", "age_seconds": reported_age_seconds, "reason": "age_exceeds_limit"}
     return {"freshness": "fresh", "age_seconds": reported_age_seconds, "reason": "within_limit"}
 
+
+
+class SourceFreshnessRequest(BaseModel):
+    """Validate one caller-supplied observation and assess its timestamp age."""
+    model_config = ConfigDict(extra="forbid")
+    observation: dict[str, Any]
+    max_age_seconds: int = Field(gt=0, le=604800)
+
+
+@router.post("/monitoring/source-freshness")
+def assess_source_observation_freshness(request: SourceFreshnessRequest) -> dict[str, Any]:
+    """Combine metadata validation and timestamp freshness; never polls a provider."""
+    from datetime import timezone
+    from cin_source_observation_contract import validate_source_observation
+
+    now = datetime.now(timezone.utc)
+    metadata = validate_source_observation(request.observation, now=now)
+    if metadata.get("validity") != "valid_metadata":
+        return {
+            "status": "unknown",
+            "read_only": True,
+            "checks_performed": False,
+            "metadata": metadata,
+            "freshness": {"freshness": "unknown", "age_seconds": None,
+                          "reason": "observation_metadata_not_valid"},
+            "note": "Caller-supplied metadata only; CIN did not contact or authenticate the source.",
+        }
+
+    freshness = assess_timestamp_freshness(
+        metadata["observed_at"],
+        now=now,
+        max_age_seconds=request.max_age_seconds,
+    )
+    return {
+        "status": freshness["freshness"],
+        "read_only": True,
+        "checks_performed": False,
+        "metadata": metadata,
+        "freshness": freshness,
+        "note": "Timestamp age is assessed locally; source authenticity and provider availability are not verified.",
+    }
