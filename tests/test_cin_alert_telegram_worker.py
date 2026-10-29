@@ -52,3 +52,19 @@ def test_importing_worker_never_processes_alerts():
     ) as process:
         importlib.reload(worker)
         process.assert_not_called()
+
+@pytest.mark.parametrize(
+    ("option", "value"),
+    [
+        ("--limit", "0"),
+        ("--limit", "-1"),
+        ("--lease-seconds", "0"),
+        ("--max-attempts", "0"),
+    ],
+)
+def test_worker_rejects_nonpositive_bounds_before_processing(option, value):
+    with patch.object(worker, "process_due_telegram_alerts") as process:
+        with pytest.raises(SystemExit) as raised:
+            worker.main(["--once", option, value])
+    assert raised.value.code == 2
+    process.assert_not_called()
