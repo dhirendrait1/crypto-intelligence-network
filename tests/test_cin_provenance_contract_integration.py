@@ -52,9 +52,9 @@ def test_endpoint_quote_mismatch_is_unknown_in_source_observation_contract():
     )
     assert validated["validity"] == "unknown"
     assert validated["reason"] == "market_candle_quote_currency_required"
-    assert validated["source_id"] == "coinbase_public"
-    assert validated["quote_currency"] is None
-    assert validated["timestamp_semantics"] == "candle_close_time"
+    assert observation["source_id"] == "coinbase_public"
+    assert observation["quote_currency"] is None
+    assert observation["timestamp_semantics"] == "candle_close_time"
 
 
 def test_forming_candle_open_time_semantics_is_accepted_but_not_called_fresh():
