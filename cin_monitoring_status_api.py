@@ -64,7 +64,7 @@ def monitoring_status(snapshot: MonitoringSnapshot) -> dict[str, Any]:
     summary = summarize_monitoring_status(
         health_ok=False if health == "unavailable" else True if health in ("healthy", "ok", "degraded") else None,
         ready=False if readiness in ("not_ready", "unavailable") else True if readiness in ("ready", "degraded") else None,
-        provider_ok=True if provider == "healthy" else False if provider in ("degraded", "unavailable") else None,
+        provider_ok=True if provider in ("healthy", "degraded") else False if provider == "unavailable" else None,
         data_freshness=freshness,
     )
     status = summary.status
