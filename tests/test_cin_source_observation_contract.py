@@ -23,6 +23,19 @@ def base_observation(**overrides):
     return value
 
 
+def test_fractional_observation_age_is_rounded_up_not_truncated():
+    result = validate_source_observation(
+        base_observation(
+            observed_at="2026-10-28T11:54:59.500Z",
+            retrieved_at="2026-10-28T12:00:00Z",
+        ),
+        now=NOW,
+    )
+    assert result["validity"] == "valid_metadata"
+    assert result["age_seconds_at_retrieval"] == 301
+    assert result["freshness_assessed"] is False
+
+
 def test_valid_envelope_preserves_provenance_and_does_not_claim_freshness():
     result = validate_source_observation(base_observation(), now=NOW)
     assert result["validity"] == "valid_metadata"
