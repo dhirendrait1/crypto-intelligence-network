@@ -105,75 +105,22 @@ This section replaces superseded checkpoint narratives that separately described
 
 ## Operating rule
 
-When continuing work, choose the earliest unfinished step that can be completed safely in the repository without deployment approval. Update the relevant tests and implementation evidence, refresh latest-head CI, then update this roadmap. Do not mark live or release checks complete based on offline tests.
+When continuing work, choose the earliest unfinished step that can be completed safely in the repository without deployment approval. Update relevant tests and implementation evidence, refresh latest-head CI, then update this roadmap. Do not mark live or release checks complete based on offline tests.
 
+## Current verification and evidence index (2026-10-30)
 
-## CI evidence refresh (2026-10-25)
+- **Current branch:** `feat/cin-market-data-row-provenance` (Draft PR #66).
+- **Current verified head:** `6670db058163176fdc7d4222aa8fe2a62ccd2300`.
+- **Exact-head CI:** all four configured workflows passed on this SHA: CIN Technical Analysis Tests (`40970346455`), CIN Automated Tests (`40970346454`), CIN screening checks (`40970346496`), and CIN evidence ingestion API checks (`40970346495`).
+- **Step 6 increment:** deterministic provider-timestamp boundary tests cover 900/901-second freshness and 300/301-second future tolerance. This is offline evidence only; Step 6 remains Partial pending live-provider/deployed response verification.
+- **Step 9:** candle interval/close-time and Kraken timestamp normalization regression work is recorded in Draft PR #27. Latest known PR head `23c6489121664d766c44de98ea40833f55a44e4e` passed its four configured workflows. Live Kraken compatibility remains unverified.
+- **Step 10:** screening cache boundary tests are recorded in Draft PR #65; row-level provider/retrieval provenance is recorded in Draft PR #66. Live provider/cache behavior and deployed response metadata remain unverified.
+- **Release controls:** PR #8, #65 and #66 remain Draft/open/unmerged; PR #11 is merged. Render is user-managed and was not changed or deployed.
 
-All four configured workflows passed on checkpoint `1b847b843c14e0929f9ec972fbc36af14b70a356`. The tracker was subsequently clarified in commit `a9f7e96b4a86e7c139806feca312e407ecc32505`; CI on that new head must be refreshed. Live-provider behavior and production health remain unverified.
+## Historical evidence policy and Step 5 reconciliation (2026-10-30)
 
-
-## Latest automated verification (2026-10-25)
-
-All four configured workflows passed on code/documentation checkpoint `2c1f816d59bc4fa6aa1c31ce2ee01228cd46f29b`. The tracker was subsequently updated in commit `9a4dea4b00afe3fcf22d1335b8fc957539c6aad2` to record those results and the monthly-candle calendar-boundary caveat. CI must be refreshed for that newer tracker-only commit. Live-provider and deployment checks remain incomplete.
-
-## Monthly candle freshness fix (2026-10-25)
-
-- Implemented calendar-aware monthly duration for freshness thresholds using the latest closed candle open timestamp.
-- Regression coverage includes leap-year February, common-year February, 30/31-day months, December year rollover, and the derived freshness threshold.
-- Code: `5259bc9500068d577cba6bc617b9083ae92fdbc3`; tests: `b4d55897b08dc788e848b9273e4277dc31550702`; tracker: `59c421c11aad40c85ecf6263a8e70a76bdf102f9`.
-- Latest-head CI is not yet verified. Open-time alignment, close-time consistency, live-provider behavior, and deployment checks remain unfinished.
-
-## Candle boundary validation increment (2026-10-25)
-
-- Binance candle boundary validation now checks close-time consistency, weekly Monday UTC anchoring, and monthly calendar boundaries; deterministic regression tests were added.
-- Fixed-interval epoch alignment is not assumed without provider-specific evidence, 3-day anchoring remains provider-specific, and Kraken enforcement is deferred pending a compatibility pass.
-- Code commits: `56b9578bba9df3b77168acf7051445ec924bfb15`, `0cb4e6efb60f4228142ceca005279afca54f3f39`; tests: `46e14b24f6c1ad98bb567bb4967242b41dd29f73`; tracker: `fd0f9c1b93c8f431ef679dc455df7d5e9b943366`.
-- Latest-head CI is pending; live-provider and deployment checks remain outstanding.
-
-## Latest-head CI and interval matrix verification (2026-10-25)
-
-- Verified all four configured workflows passed on current Draft PR head `6367afc875e2084dbf25053aed8a0d23badc4227`:
-  - CIN Technical Analysis Tests: [40143588595](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40143588595)
-  - CIN evidence ingestion API checks: [40143588598](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40143588598)
-  - CIN Automated Tests: [40143588591](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40143588591)
-  - CIN screening checks: [40143588616](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40143588616)
-- This head includes deterministic weekly Monday-UTC boundary tests and 3-day candle duration tests that intentionally avoid an unsupported epoch anchor assumption.
-- These results establish offline CI only. Kraken boundary enforcement/compatibility, live provider behavior, and deployed service health remain unverified. PR #8 remains Draft and unmerged; no deployment or trading execution was performed.
-
-
-## Latest-head verification refresh (2026-10-25)
-
-- All four configured PR workflows passed on code/documentation head `540c886ef6b7dd2b07c4ff27cf8500070b4d58b7`:
-  - CIN screening checks: [40146915587](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40146915587)
-  - CIN Automated Tests: [40146915579](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40146915579)
-  - CIN Technical Analysis Tests: [40146915637](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40146915637)
-  - CIN evidence ingestion API checks: [40146915576](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40146915576)
-- The head includes CoinGecko unexpected provider/parser failure containment and offline API regression tests.
-- This verification is for the exact listed head only. It does not establish live-provider correctness or Render health. Any subsequent commit requires a fresh latest-head CI check.
-- PR #8 remains Draft and unmerged. No Render configuration or deployment was changed.
-
-
-## Step 10 offline acceptance refresh (2026-10-30)
-
-- **Step 10 remains Partial.** Offline acceptance now covers both screening-cache policy and market-data row provenance; live-provider behavior and deployed responses remain unverified.
-- Screening cache boundary tests are in Draft PR #65: fresh-cache TTL includes the exact 90-second boundary; refresh is attempted one second beyond it; stale cache is accepted at exactly 900 seconds and rejected one second beyond that limit when refresh fails. These are deterministic offline tests, not provider observations.
-- Market-data provenance is in Draft PR #66. Each normalized row records `provider: "CoinGecko"` and a timezone-aware `provider_retrieved_at`; the endpoint regression test verifies these row-level fields survive in `data[]` and remain distinct from the API response's own `retrieved_at`.
-- PR #66 latest verified head: `01fa12d0699359637280a098d4fc4a1bf13b3cc4`. All four workflows passed on this exact head: screening (run `40969401819`), offline API safety (run `40969401886`), offline technical analysis (run `40969401799`), and Render scaffold validation (run `40969401887`).
-- Both PRs remain Draft/open/unmerged. No production provider selection, cache acceptance rule, Render setting, or deployment was changed by this increment.
-- Remaining Step 10 acceptance: confirm live provider provenance and cache behavior under authorized read-only conditions, then verify deployed response metadata. Offline CI must not be represented as live verification.
-
-
-## Repository reconciliation checkpoint (2026-10-30)
-
-- PR #11 (`integrate/cin-audit-mainline`) is merged; the implementation tracker’s prior statement that it was awaiting merge is historical and has been corrected at its release-controls header.
-- PR #8 remains Draft/open. PR #65 and PR #66 remain Draft/open and unmerged.
-- PR #66’s roadmap evidence update is commit `8ea7709c5f170a8161d819f08e177e15fe7d34d7`; all four workflows passed on that exact commit (runs `40969923757`, `40969923901`, `40969923853`, `40969923779`).
-- This checkpoint records repository/CI state only. Render remains user-managed and has not been changed or deployed as part of this work.
-
-## Step 6 market-data timestamp boundary coverage (2026-10-30)
-
-- Made the market-data timestamp assessment clock injectable and deterministic for validation; a naive injected clock produces an explicit `unknown` status rather than silently assuming UTC.
-- Added exact-boundary regressions: provider timestamp age 900 seconds is fresh; 901 seconds is stale; a timestamp exactly 300 seconds in the future is tolerated as fresh with age zero; 301 seconds in the future is unknown.
-- This increment extends Step 6 offline validation only. Live CoinGecko freshness behavior and deployed API responses remain unverified; Step 6 therefore remains Partial.
-- Code/test commits: `f7cf8fa5518eff6c64f6659abc66d74641ee8d81` and `67675b4f043e29aa21cfc824199656bc3cee83eb`. Latest-head CI is pending and must pass on the final documentation commit before this increment is counted as verified.
+- The former dated checkpoint blocks have been removed from this active roadmap because they repeated superseded “pending CI” statements and obscured the current state.
+- Detailed commit-by-commit history remains in `CIN_IMPLEMENTATION_TRACKER.md`. A historical “CI pending” entry describes only the state at the time it was written; it is not a current failure or current release status.
+- This file is the only numbered roadmap (7 stages / 35 steps). The tracker is the detailed evidence ledger. `CIN_ARCHITECTURE_STATUS.md` is an architecture register, not a parallel roadmap.
+- The active PR state and latest-head CI must be refreshed from GitHub before any future status report.
+- Step 5 remains Partial only for any further stale or duplicate step references found outside the active roadmap. This cleanup does not imply live validation or release readiness.
