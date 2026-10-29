@@ -4,8 +4,8 @@
 **Purpose:** A single numbered acceptance roadmap reconciled to the implementation evidence tracker.  
 **Scope boundary:** Read-only public crypto intelligence, research, technical analysis, screening, forecasting, monitoring and alerts. No order execution, wallet control, private keys, or fund movement.  
 **Working baseline:** 7 stages / 35 numbered steps. This is a practical delivery baseline, not a claim that every future product requirement has been exhaustively discovered. New requirements should be added explicitly rather than silently inflating progress counts.  
-**Branch:** `feat/cin-architecture-audit`  
-**Release gate:** PR #8 stays Draft/unmerged; no Render changes or deployment without fresh explicit approval.
+**Active work branch:** `feat/cin-market-data-row-provenance` (PR #66); the architecture-audit branch remains a separate Draft PR #8.  
+**Release gate:** PRs #8, #65, and #66 remain open/unmerged; PR #11 was merged on 2026-10-26. No Render changes or deployment without fresh explicit user approval.
 
 ## Status meanings
 
@@ -151,3 +151,11 @@ All four configured workflows passed on code/documentation checkpoint `2c1f816d5
 - PR #66 latest verified head: `01fa12d0699359637280a098d4fc4a1bf13b3cc4`. All four workflows passed on this exact head: screening (run `40969401819`), offline API safety (run `40969401886`), offline technical analysis (run `40969401799`), and Render scaffold validation (run `40969401887`).
 - Both PRs remain Draft/open/unmerged. No production provider selection, cache acceptance rule, Render setting, or deployment was changed by this increment.
 - Remaining Step 10 acceptance: confirm live provider provenance and cache behavior under authorized read-only conditions, then verify deployed response metadata. Offline CI must not be represented as live verification.
+
+
+## Repository reconciliation checkpoint (2026-10-30)
+
+- PR #11 (`integrate/cin-audit-mainline`) is merged; the implementation tracker’s prior statement that it was awaiting merge is historical and has been corrected at its release-controls header.
+- PR #8 remains Draft/open. PR #65 and PR #66 remain Draft/open and unmerged.
+- PR #66’s roadmap evidence update is commit `8ea7709c5f170a8161d819f08e177e15fe7d34d7`; all four workflows passed on that exact commit (runs `40969923757`, `40969923901`, `40969923853`, `40969923779`).
+- This checkpoint records repository/CI state only. Render remains user-managed and has not been changed or deployed as part of this work.
