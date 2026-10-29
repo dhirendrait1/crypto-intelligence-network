@@ -21,6 +21,9 @@ MODULES = (
     "cin_public_market_candles_api.py",
     "cin_derivatives_market_data_api.py",
     "cin_public_news_sentiment_api.py",
+    "cin_monitoring_status.py",
+    "cin_monitoring_status_api.py",
+    "cin_source_observation_contract.py",
 )
 
 
@@ -77,9 +80,32 @@ class DeploymentPatchTests(unittest.TestCase):
             "cin_public_market_candles_router",
             "cin_derivatives_market_data_router",
             "cin_public_news_sentiment_router",
+            "cin_monitoring_status_router",
         ):
             with self.subTest(router=router):
                 self.assertEqual(second_text.count(f"app.include_router({router})"), 1)
+
+    def test_monitoring_api_module_is_copied_into_deployment_app(self):
+        result = self.run_patch()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        source = self.root / "cin_monitoring_status_api.py"
+        installed = self.app_dir / "cin_monitoring_status_api.py"
+        self.assertTrue(installed.is_file())
+        self.assertEqual(installed.read_text(encoding="utf-8"), source.read_text(encoding="utf-8"))
+        main_text = (self.app_dir / "main.py").read_text(encoding="utf-8")
+        self.assertIn(
+            "from app.cin_monitoring_status_api import router as cin_monitoring_status_router",
+            main_text,
+        )
+        self.assertEqual(main_text.count("app.include_router(cin_monitoring_status_router)"), 1)
+
+    def test_shared_monitoring_aggregator_is_copied_into_deployment_app(self):
+        result = self.run_patch()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        source = self.root / "cin_monitoring_status.py"
+        installed = self.app_dir / "cin_monitoring_status.py"
+        self.assertTrue(installed.is_file())
+        self.assertEqual(installed.read_text(encoding="utf-8"), source.read_text(encoding="utf-8"))
 
     def test_missing_required_module_fails_before_any_scaffold_mutation(self):
         main_path = self.app_dir / "main.py"
@@ -144,6 +170,24 @@ class DeploymentPatchTests(unittest.TestCase):
         self.assertIn("Partial router registration detected", result.stderr)
         self.assertEqual(main_path.read_text(encoding="utf-8"), broken)
         self.assertFalse(any((self.app_dir / name).exists() for name in MODULES))
+
+
+    def test_source_observation_contract_is_copied_into_deployment_app(self):
+        result = self.run_patch()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        source = self.root / "cin_source_observation_contract.py"
+        installed = self.app_dir / "cin_source_observation_contract.py"
+        self.assertTrue(installed.is_file())
+        self.assertEqual(installed.read_text(encoding="utf-8"), source.read_text(encoding="utf-8"))
+
+
+    def test_source_observation_contract_is_copied_into_deployment_app(self):
+        result = self.run_patch()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        source = self.root / "cin_source_observation_contract.py"
+        installed = self.app_dir / "cin_source_observation_contract.py"
+        self.assertTrue(installed.is_file())
+        self.assertEqual(installed.read_text(encoding="utf-8"), source.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

@@ -24,6 +24,9 @@ MODULES = (
     "cin_public_market_candles_api.py",
     "cin_derivatives_market_data_api.py",
     "cin_public_news_sentiment_api.py",
+    "cin_monitoring_status.py",
+    "cin_monitoring_status_api.py",
+    "cin_source_observation_contract.py",
 )
 main_path = APP_DIR / "main.py"
 if not main_path.is_file():
@@ -92,6 +95,12 @@ registrations = [
         "\n# CIN: read-only public news and heuristic headline sentiment\n"
         "from app.cin_public_news_sentiment_api import router as cin_public_news_sentiment_router\n"
         "app.include_router(cin_public_news_sentiment_router)\n",
+    ),
+    (
+        "cin_monitoring_status_router",
+        "\n# CIN: caller-supplied monitoring status summary; no polling or alert delivery\n"
+        "from app.cin_monitoring_status_api import router as cin_monitoring_status_router\n"
+        "app.include_router(cin_monitoring_status_router)\n",
     ),
 ]
 # Insert registrations before a direct-execution guard so routes are ready
