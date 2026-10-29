@@ -1,4 +1,4 @@
-"""Read-only public OHLC candles with Binance and Kraken public-provider fallback."""
+"""Read-only public OHLC candles with quote-safe, Coinbase-first provider selection."""
 from __future__ import annotations
 
 import asyncio
@@ -223,8 +223,10 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
     if not pair:
         raise ValueError(f"Coinbase fallback cannot map symbol {symbol}")
     base, quote = pair.groups()
-    # Coinbase Exchange spot products are quoted with a hyphen; USDT requests
-    # are mapped to the equivalent USD spot market, and the actual product is reported.
+    # Never substitute a USD market for a USDT request: the quote asset is part
+    # of the market identity and must not be silently changed.
+    if quote != "USD":
+        raise ValueError("Coinbase fallback requires an exact USD-quoted symbol")
     product_id = f"{base}-USD"
     duration = COINBASE_GRANULARITY[interval]
     now = int(datetime.now(timezone.utc).timestamp())
@@ -275,31 +277,45 @@ def _fetch_klines(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
 
 
 async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
-    try:
-        rows = await asyncio.to_thread(_fetch_binance, symbol, interval, limit)
-        source, endpoint = "Binance public market-data API", BINANCE_KLINES_URL
-    except urllib.error.HTTPError as exc:
-        if exc.code != 451:
-            if exc.code in (418, 429):
-                raise HTTPException(status_code=503, detail="Public market-data rate limit reached; retry later.") from exc
-            raise HTTPException(status_code=502, detail=f"Binance public market-data provider returned HTTP {exc.code}.") from exc
+    """Load public candles with Coinbase first where its quote matches exactly.
+
+    USD requests prefer Coinbase Exchange. USDT requests prefer Kraken because
+    Coinbase's spot candle endpoint here is USD-quoted only. Binance is the
+    final public fallback; no fallback is allowed to relabel a USD market as USDT.
+    """
+    match = re.fullmatch(r"([A-Z0-9]+)(USDT|USD)", symbol)
+    if not match:
+        raise HTTPException(status_code=400, detail="Symbol must be a supported USD or USDT trading pair.")
+    _, quote = match.groups()
+    if quote == "USD":
+        providers = [
+            (_fetch_coinbase, "Coinbase Exchange public candles API", COINBASE_CANDLES_URL),
+            (_fetch_kraken, "Kraken public OHLC API (fallback)", KRAKEN_OHLC_URL),
+            (_fetch_binance, "Binance public market-data API (fallback)", BINANCE_KLINES_URL),
+        ]
+    else:
+        providers = [
+            (_fetch_kraken, "Kraken public OHLC API", KRAKEN_OHLC_URL),
+            (_fetch_binance, "Binance public market-data API (fallback)", BINANCE_KLINES_URL),
+        ]
+
+    failures: list[tuple[str, Exception]] = []
+    rows = None
+    source = endpoint = None
+    for fetcher, provider_name, provider_endpoint in providers:
         try:
-            rows = await asyncio.to_thread(_fetch_kraken, symbol, interval, limit)
-            source, endpoint = "Kraken public OHLC API (fallback after Binance HTTP 451)", KRAKEN_OHLC_URL
-        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
-            try:
-                rows = await asyncio.to_thread(_fetch_coinbase, symbol, interval, limit)
-                source, endpoint = "Coinbase Exchange public candles API (fallback after Binance HTTP 451)", COINBASE_CANDLES_URL
-            except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as coinbase_exc:
-                # Do not disguise provider failure or return stale/empty data as live.
-                reason = "Kraken and Coinbase fallbacks unavailable or pair/timeframe unsupported"
-                if isinstance(coinbase_exc, urllib.error.HTTPError):
-                    reason += f" (Coinbase HTTP {coinbase_exc.code})"
-                raise HTTPException(status_code=503, detail=reason + "; Binance returned HTTP 451.") from None
-    except (urllib.error.URLError, TimeoutError, OSError):
-        raise HTTPException(status_code=503, detail="Binance public market-data provider is temporarily unavailable.") from None
-    except (ValueError, json.JSONDecodeError):
-        raise HTTPException(status_code=502, detail="Binance public market-data provider returned an invalid response.") from None
+            rows = await asyncio.to_thread(fetcher, symbol, interval, limit)
+            source, endpoint = provider_name, provider_endpoint
+            break
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
+            failures.append((provider_name, exc))
+
+    if rows is None:
+        # Rate-limit responses should be retried later, not mistaken for valid data.
+        if any(isinstance(exc, urllib.error.HTTPError) and exc.code in (418, 429) for _, exc in failures):
+            raise HTTPException(status_code=503, detail="Public market-data rate limit reached; retry later.") from None
+        raise HTTPException(status_code=503, detail="No quote-compatible public market-data provider returned valid candles.") from None
+
     try:
         rows = _normalize_candle_sequence(rows)
     except (KeyError, TypeError, ValueError):
@@ -307,6 +323,8 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
     for row in rows:
         row["_source"] = source
         row["_source_endpoint"] = endpoint
+        row["_requested_quote_currency"] = quote
+        row["_actual_quote_currency"] = quote
     return rows
 
 
