@@ -50,7 +50,7 @@
 
 ## Stage 4 — Intelligence coverage and research evidence
 
-19. **[Partial]** Complete public news search and low-confidence headline sentiment with multilingual/context limitations documented.
+19. **[Partial]** Complete public news search and low-confidence headline sentiment with multilingual/context limitations documented. English-only language gating and explicit unknown-language status are now implemented and offline-tested; multilingual sentiment and live provider validation remain outstanding.
 20. **[Pending]** Design authorized social-source ingestion for X, Reddit, and Telegram, respecting platform access limits.
 21. **[Pending]** Define evidence-backed exchange-flow and whale-attribution methodology with clear identity uncertainty.
 22. **[Partial]** Build source ingestion for commodity backing and growth fundamentals; distinguish claims from independently verified evidence.
@@ -160,3 +160,11 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - Added five API contract tests for agreement/conflict output, limited-corroboration labeling, batch limits, unknown fields, and tolerance/window validation.
 - All four workflows passed on exact integration head `ba69aec7750099913ec52a4687dc3af74a9883d1`: technical analysis `40973205679`, evidence API `40973205697`, automated tests `40973205857`, screening `40973206105`.
 - Step 18 remains Partial pending live-source validation and metric-specific tolerance calibration. No Render deployment was performed.
+
+
+### Step 19 language-scope increment (2026-10-30)
+
+- Headline sentiment now accepts provider language metadata. English locale tags are normalized; provider-declared non-English headlines return unavailable/null sentiment instead of a misleading neutral score.
+- Missing language metadata is explicitly labeled `language_unverified`; the existing low-confidence keyword score is retained for backward compatibility, with a warning not to assume English.
+- Added four offline regression tests for non-English suppression, unknown-language status, English locale normalization, and article parser/classifier integration.
+- Multilingual translation/modeling, mixed-language detection, context/negation handling, and live GDELT/RSS validation remain outstanding. Step 19 remains Partial.
