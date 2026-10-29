@@ -141,6 +141,7 @@ class DashboardPreviewTests(unittest.TestCase):
         self.assertIn("if(state!==\"available\")", self.html)
         self.assertIn('panel.setAttribute("data-api-state",state)', self.html)
         self.assertIn('document.querySelectorAll("[data-cin-panel]")', self.html)
+        self.assertIn('for(const endpoint of endpoints) updateDashboardPanel(endpoint.name,"unavailable","Disconnected; reconnect to refresh this read-only endpoint.",null,null)', self.html)
 
     def test_reference_matched_dense_intelligence_terminal_is_present(self):
         for section in (
