@@ -381,3 +381,41 @@ def test_failure_rejects_invalid_claim_attempt_identifier(tmp_path, claim_attemp
             path, item["idempotency_key"], now=NOW,
             error_code="provider_timeout", claim_attempt=claim_attempt,
         )
+
+
+@pytest.mark.parametrize("acknowledgement", ["sent", "failed"])
+def test_expired_claim_cannot_acknowledge_before_lease_recovery(tmp_path, acknowledgement):
+    path = tmp_path / f"expired-{acknowledgement}.sqlite3"
+    item = enqueue_alert_delivery(
+        path, rule_id="r1", observation_id=f"expired-{acknowledgement}",
+        payload={"text": "alert"}, now=NOW,
+    )
+    claim = claim_due_alerts(path, now=NOW, lease_seconds=300)[0]
+    expired_at = NOW + timedelta(seconds=300)
+
+    with pytest.raises(ValueError, match="lease has expired"):
+        if acknowledgement == "sent":
+            mark_alert_sent(
+                path, item["idempotency_key"], now=expired_at,
+                claim_attempt=claim["attempts"], lease_seconds=300,
+            )
+        else:
+            mark_alert_failed(
+                path, item["idempotency_key"], now=expired_at,
+                error_code="provider_timeout", claim_attempt=claim["attempts"],
+                lease_seconds=300,
+            )
+
+    # Rejected acknowledgements leave the row unchanged; recovery then marks
+    # the provider outcome uncertain and never silently retries it.
+    with sqlite3.connect(path) as db:
+        assert db.execute(
+            "SELECT status FROM alert_delivery_outbox WHERE idempotency_key=?",
+            (item["idempotency_key"],),
+        ).fetchone()[0] == "sending"
+
+    assert claim_due_alerts(path, now=expired_at, lease_seconds=300) == []
+    uncertain = list_uncertain_alert_deliveries(path)
+    assert len(uncertain) == 1
+    assert uncertain[0]["idempotency_key"] == item["idempotency_key"]
+    assert uncertain[0]["status"] == "uncertain"
