@@ -72,6 +72,7 @@ def _fetch_market_data(ids: list[str], vs_currency: str) -> list[dict[str, Any]]
         raw = response.read(MAX_PROVIDER_RESPONSE_BYTES + 1)
     if len(raw) > MAX_PROVIDER_RESPONSE_BYTES:
         raise ValueError("CoinGecko response exceeded the configured size limit")
+    provider_retrieved_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     payload = json.loads(raw.decode("utf-8"))
 
     if not isinstance(payload, list):
@@ -146,6 +147,8 @@ def _fetch_market_data(ids: list[str], vs_currency: str) -> list[dict[str, Any]]
             "symbol": symbol,
             "name": name,
             "currency": vs_currency.upper(),
+            "provider": "CoinGecko",
+            "provider_retrieved_at": provider_retrieved_at,
             "price": price,
             "market_cap": market_cap,
             "market_cap_status": market_cap_status,
