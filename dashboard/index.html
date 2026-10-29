@@ -74,7 +74,7 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
 <h1>Intelligence console</h1>
 <p class="intro">A mobile-first control panel for market analysis, screening, source evidence and monitoring. Live values are intentionally withheld until a verified API response is connected.</p>
 <div class="notice" role="status"><strong>Connection state: not connected.</strong> This preview does not fetch live data. No live data is shown in this preview, and it does not represent current market conditions.</div>
-<div class="ticker" aria-label="Market status ribbon"><span>◈ CIN INTELLIGENCE TERMINAL</span><span>MARKET FEED <b>—</b></span><span>BTC / USD <b>—</b></span><span>ETH / USD <b>—</b></span><span>VOLATILITY <b>UNKNOWN</b></span><span>NETWORK <b>READ-ONLY</b></span><span>UTC <b>—</b></span></div>
+<div class="ticker" aria-label="Market status ribbon"><span>◈ CIN INTELLIGENCE TERMINAL</span><span>MARKET FEED <b>—</b></span><span>BTC / USDT <b>—</b></span><span>ETH / USD <b>—</b></span><span>VOLATILITY <b>UNKNOWN</b></span><span>NETWORK <b>READ-ONLY</b></span><span>UTC <b>—</b></span></div>
 <section class="reference-board" aria-label="Top intelligence panels">
  <article class="ref-panel"><div class="ref-head"><span>◈ Asset balance / overview</span><span class="ref-tag">RESEARCH</span></div><div class="metric-caption">Verified portfolio data</div><div class="ref-metric">— — —</div><div class="metric-caption">No wallet connected · no portfolio value inferred</div><div class="ref-kpis"><div class="ref-kpi"><strong>—</strong><span>24H change</span></div><div class="ref-kpi"><strong>—</strong><span>Volume</span></div><div class="ref-kpi"><strong>—</strong><span>Assets</span></div></div><div class="ref-line"><span>Evidence coverage</span><strong>UNKNOWN</strong></div><div class="ref-line"><span>Feed status</span><strong>NOT CONNECTED</strong></div><div class="ref-line"><span>Last update</span><strong>—</strong></div></article>
  <article class="ref-panel"><div class="ref-head"><span>▥ BTC market structure</span><span class="ref-tag">1H</span></div><div class="ref-line"><span>Instrument</span><strong>BTCUSDT</strong></div><div class="ref-line"><span>Candle status</span><strong>UNAVAILABLE</strong></div><svg class="ref-chart" viewBox="0 0 300 115" preserveAspectRatio="none" role="img" aria-label="Illustrative candlestick chart, not market data"><g stroke="#17283d" stroke-width="1"><path d="M0 20H300M0 45H300M0 70H300M0 95H300"/></g><g stroke="#5ce8ba" fill="#5ce8ba"><path d="M18 63V34M14 43H22V56H14Z M46 70V42M42 48H50V61H42Z M74 56V24M70 30H78V43H70Z M102 64V39M98 43H106V57H98Z M130 48V19M126 24H134V39H126Z"/></g><g stroke="#ff718a" fill="#ff718a"><path d="M158 54V30M154 35H162V48H154Z M186 68V40M182 44H190V60H182Z M214 58V25M210 31H218V49H210Z"/></g><g stroke="#5ce8ba" fill="#5ce8ba"><path d="M242 46V15M238 20H246V36H238Z M270 38V8M266 13H274V28H266Z"/></g><path d="M0 83L30 76L60 81L90 55L120 61L150 44L180 68L210 37L240 42L270 18L300 25" fill="none" stroke="#f0c46c" stroke-width="1.4" opacity=".8"/></svg><div class="ref-kpis"><div class="ref-kpi"><strong>—</strong><span>RSI</span></div><div class="ref-kpi"><strong>—</strong><span>Trend</span></div><div class="ref-kpi"><strong>—</strong><span>Structure</span></div></div><div class="metric-caption">Chart is a visual placeholder until connected.</div></article>
@@ -178,7 +178,7 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
         metricLine(metrics,"Provider",data.source);
         const ribbon=document.querySelector(".ticker");
         if(ribbon){
-          const btcValue=Array.from(ribbon.children).find(node=>node.textContent.includes("BTC / USD"));
+          const btcValue=Array.from(ribbon.children).find(node=>node.textContent.includes("BTC / USDT"));
           if(btcValue){
             const value=btcValue.querySelector("b");
             if(value) value.textContent=latest&&latest.close!=null?safeText(latest.close):"UNKNOWN";
@@ -310,7 +310,7 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
       if(name==="Market candles"){
         const ribbon=document.querySelector(".ticker");
         if(ribbon){
-          const btcValue=Array.from(ribbon.children).find(node=>node.textContent.includes("BTC / USD"));
+          const btcValue=Array.from(ribbon.children).find(node=>node.textContent.includes("BTC / USDT"));
           const value=btcValue&&btcValue.querySelector("b");
           if(value) value.textContent="UNKNOWN";
         }
