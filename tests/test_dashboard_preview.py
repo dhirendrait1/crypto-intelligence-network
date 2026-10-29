@@ -79,6 +79,14 @@ class DashboardPreviewTests(unittest.TestCase):
         self.assertIn("not data correctness, freshness, or source authenticity", self.html)
 
 
+    def test_verified_endpoint_states_update_visible_dashboard_panels(self):
+        for panel in ("market", "technical", "screening", "evidence", "news", "monitoring"):
+            self.assertIn('data-cin-panel="' + panel + '"', self.html)
+        self.assertIn("function updateDashboardPanel(name,state,detail)", self.html)
+        self.assertIn("updateDashboardPanel(name,state,detail);", self.html)
+        self.assertIn('panel.setAttribute("data-api-state",state)', self.html)
+        self.assertIn('document.querySelectorAll("[data-cin-panel]")', self.html)
+
     def test_reference_matched_dense_intelligence_terminal_is_present(self):
         for section in (
             "Market status ribbon",
