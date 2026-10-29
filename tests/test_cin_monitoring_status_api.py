@@ -186,3 +186,19 @@ def test_timestamp_freshness_rejects_naive_clock_and_invalid_policy():
     )
     assert result["freshness"] == "unknown"
 
+def test_http_route_normalizes_warning_text_and_rejects_blank_warning():
+    app = FastAPI()
+    from cin_monitoring_status_api import router
+    app.include_router(router)
+
+    accepted = TestClient(app).post(
+        "/monitoring/status", json={"warnings": ["  delayed feed  "]}
+    )
+    assert accepted.status_code == 200
+    assert accepted.json()["warnings"] == ["delayed feed"]
+
+    rejected = TestClient(app).post(
+        "/monitoring/status", json={"warnings": ["   "]}
+    )
+    assert rejected.status_code == 422
+
