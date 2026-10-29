@@ -8,9 +8,9 @@ from fastapi import HTTPException
 import cin_public_market_candles_api as api
 
 SAMPLE = [
-    {"open_time": 1700000000000 + i * 3600000, "open": 100 + i, "high": 102 + i,
+    {"open_time": 1699999200000 + i * 3600000, "open": 100 + i, "high": 102 + i,
      "low": 99 + i, "close": 101 + i, "volume": 10.0,
-     "close_time": 1700003599999 + i * 3600000}
+     "close_time": 1699999200000 + (i + 1) * 3600000 - 1}
     for i in range(50)
 ]
 
@@ -100,6 +100,43 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(ValueError, "no valid candles"):
                 api._fetch_binance("BTCUSDT", "1h", 5)
 
+    def test_interval_boundary_validator_accepts_aligned_candles_and_gaps(self):
+        rows = [dict(SAMPLE[0]), dict(SAMPLE[2])]
+        api._validate_candle_boundaries(rows, "1h", 1800000000000)
+
+    def test_interval_boundary_validator_rejects_misaligned_open(self):
+        row = dict(SAMPLE[0])
+        row["open_time"] += 1
+        with self.assertRaisesRegex(ValueError, "interval-aligned"):
+            api._validate_candle_boundaries([row], "1h", 1800000000000)
+
+    def test_interval_boundary_validator_rejects_inconsistent_close(self):
+        row = dict(SAMPLE[0])
+        row["close_time"] -= 1
+        with self.assertRaisesRegex(ValueError, "close timestamp"):
+            api._validate_candle_boundaries([row], "1h", 1800000000000)
+
+    def test_interval_boundary_validator_rejects_future_open(self):
+        row = dict(SAMPLE[0])
+        row["open_time"] = 1800000000001
+        row["close_time"] = row["open_time"] + 3600000 - 1
+        with self.assertRaisesRegex(ValueError, "future open timestamp"):
+            api._validate_candle_boundaries([row], "1h", 1800000000000)
+
+    def test_monthly_boundary_uses_calendar_month_end(self):
+        row = {"open_time": 1761955200000, "close_time": 1764547199999}
+        api._validate_candle_boundaries([row], "1M", 1800000000000)
+
+    def test_monthly_boundary_rejects_non_first_day(self):
+        row = {"open_time": 1762041600000, "close_time": 1764633599999}
+        with self.assertRaisesRegex(ValueError, "UTC month boundary"):
+            api._validate_candle_boundaries([row], "1M", 1800000000000)
+
+    def test_weekly_boundary_requires_monday_utc(self):
+        row = {"open_time": 1700000000000, "close_time": 1700000000000 + 604800000 - 1}
+        with self.assertRaisesRegex(ValueError, "Monday UTC"):
+            api._validate_candle_boundaries([row], "1w", 1800000000000)
+
     async def test_load_sorts_out_of_order_candles_chronologically(self):
         reversed_rows = [dict(SAMPLE[2]), dict(SAMPLE[0]), dict(SAMPLE[1])]
         with patch.object(api, "_fetch_binance", return_value=reversed_rows):
@@ -112,7 +149,7 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(HTTPException) as ctx:
                 await api._load("BTCUSDT", "1h", 5)
         self.assertEqual(ctx.exception.status_code, 502)
-        self.assertIn("ambiguous candle sequence", ctx.exception.detail)
+        self.assertIn("invalid candle timestamps, interval boundaries, or duplicate rows", ctx.exception.detail)
 
     async def test_candle_endpoint_returns_provenance_and_timestamps(self):
         with patch.object(api, "_load", return_value=SAMPLE):
@@ -247,6 +284,45 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(HTTPException) as ctx:
                 await api._load("BTCUSDT", "1h", 50)
         self.assertEqual(ctx.exception.status_code, 503)
+
+
+    def test_kraken_interval_compatibility_matrix_preserves_utc_boundaries(self):
+        # Kraken OHLC timestamps are Unix seconds. Verify only documented interval
+        # durations and UTC boundaries; do not impose a gap-free sequence.
+        cases = [
+            ("1h", 3600, 1704067200),       # 2024-01-01 00:00 UTC
+            ("4h", 14400, 1704067200),
+            ("1d", 86400, 1704067200),
+            ("1w", 604800, 1704067200),     # Monday 00:00 UTC
+        ]
+        for interval, seconds, start in cases:
+            with self.subTest(interval=interval):
+                payload = {
+                    "error": [],
+                    "result": {
+                        "XBTUSDT": [
+                            [start, "100", "102", "99", "101", "100.5", "10", 4],
+                            [start + seconds * 2, "101", "103", "100", "102", "101.5", "12", 5],
+                        ],
+                        "last": start + seconds * 2,
+                    },
+                }
+                with patch.object(api, "_request_json", return_value=payload):
+                    rows = api._fetch_kraken("BTCUSDT", interval, 5)
+                self.assertEqual([r["open_time"] for r in rows],
+                                 [start * 1000, (start + seconds * 2) * 1000])
+                api._validate_candle_boundaries(rows, interval, (start + seconds * 3) * 1000)
+                self.assertEqual(rows[0]["close_time"], (start + seconds) * 1000 - 1)
+
+    def test_kraken_boundary_validation_allows_missing_intervals(self):
+        # A missing candle is a market-data gap, not a timestamp-integrity failure.
+        start = 1704067200000
+        rows = [
+            {"open_time": start, "close_time": start + 3_600_000 - 1},
+            {"open_time": start + 2 * 3_600_000,
+             "close_time": start + 3 * 3_600_000 - 1},
+        ]
+        api._validate_candle_boundaries(rows, "1h", start + 4 * 3_600_000)
 
 
 if __name__ == "__main__":

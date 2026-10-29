@@ -201,6 +201,34 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     return candles[-limit:]
 
 
+def _validate_candle_boundaries(rows: list[dict[str, Any]], interval: str, now_ms: int) -> None:
+    """Reject impossible interval boundaries and future-open candles without requiring gap-free data."""
+    if interval not in _INTERVAL_MS:
+        raise ValueError("Unsupported candle interval")
+    for row in rows:
+        open_time = row["open_time"]
+        close_time = row["close_time"]
+        if open_time > now_ms:
+            raise ValueError("Provider returned a candle with a future open timestamp")
+        if interval == "1M":
+            start = datetime.fromtimestamp(open_time / 1000, timezone.utc)
+            if start.day != 1 or start.hour or start.minute or start.second or start.microsecond:
+                raise ValueError("Monthly candle open timestamp is not aligned to a UTC month boundary")
+            expected_close = open_time + _interval_duration_ms(interval, open_time) - 1
+        else:
+            duration = _INTERVAL_MS[interval]
+            if interval == "1w":
+                # Weekly exchange candles are anchored to Monday 00:00 UTC.
+                dt = datetime.fromtimestamp(open_time / 1000, timezone.utc)
+                if dt.weekday() != 0 or dt.hour or dt.minute or dt.second or dt.microsecond:
+                    raise ValueError("Weekly candle open timestamp is not aligned to Monday UTC")
+            elif interval != "3d" and open_time % duration != 0:
+                raise ValueError(f"{interval} candle open timestamp is not interval-aligned")
+            expected_close = open_time + duration - 1
+        if close_time != expected_close:
+            raise ValueError("Candle close timestamp is inconsistent with its interval boundary")
+
+
 def _normalize_candle_sequence(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Return candles in chronological order and reject ambiguous duplicate timestamps."""
     ordered = sorted(rows, key=lambda row: row["open_time"])
@@ -302,8 +330,9 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
         raise HTTPException(status_code=502, detail="Binance public market-data provider returned an invalid response.") from None
     try:
         rows = _normalize_candle_sequence(rows)
+        _validate_candle_boundaries(rows, interval, int(datetime.now(timezone.utc).timestamp() * 1000))
     except (KeyError, TypeError, ValueError):
-        raise HTTPException(status_code=502, detail="Public market-data provider returned an ambiguous candle sequence.") from None
+        raise HTTPException(status_code=502, detail="Public market-data provider returned an ambiguous candle sequence (invalid candle timestamps, interval boundaries, or duplicate rows).") from None
     for row in rows:
         row["_source"] = source
         row["_source_endpoint"] = endpoint
