@@ -25,6 +25,7 @@ MODULES = (
     "cin_derivatives_market_data_api.py",
     "cin_public_news_sentiment_api.py",
     "cin_monitoring_status_api.py",
+    "cin_source_observation_contract.py",
 )
 main_path = APP_DIR / "main.py"
 if not main_path.is_file():
