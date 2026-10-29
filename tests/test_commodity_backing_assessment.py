@@ -342,3 +342,16 @@ def test_conflict_details_preserve_each_source_without_selecting_a_winner():
     assert all(item["source_role_authenticated"] is False for item in coverage["conflict_evidence"])
     assert coverage["conflict_resolution"] == "manual_review_required"
     assert coverage["preferred_source_selected"] is False
+
+def test_evidence_record_fingerprint_is_deterministic_for_same_metadata():
+    first = normalize_evidence(valid_item(source_role="issuer"), now=NOW)
+    second = normalize_evidence(valid_item(source_role="issuer"), now=NOW)
+    assert first["record_fingerprint_sha256"] == second["record_fingerprint_sha256"]
+    assert len(first["record_fingerprint_sha256"]) == 64
+    assert first["fingerprint_scope"] == "normalized_supplied_metadata"
+    assert first["fingerprint_is_authenticity_proof"] is False
+
+def test_evidence_record_fingerprint_changes_when_supplied_metadata_changes():
+    first = normalize_evidence(valid_item(source_role="issuer"), now=NOW)
+    changed = normalize_evidence(valid_item(source_role="auditor"), now=NOW)
+    assert first["record_fingerprint_sha256"] != changed["record_fingerprint_sha256"]
