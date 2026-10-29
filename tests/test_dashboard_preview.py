@@ -83,7 +83,7 @@ class DashboardPreviewTests(unittest.TestCase):
         for panel in ("market", "technical", "screening", "evidence", "news", "monitoring"):
             self.assertIn('data-cin-panel="' + panel + '"', self.html)
         self.assertIn("function updateDashboardPanel(name,state,detail,data,meta)", self.html)
-        self.assertIn("updateDashboardPanel(name,state,detail,data);", self.html)
+        self.assertIn("updateDashboardPanel(name,state,detail,data,meta);", self.html)
         self.assertIn("function renderEndpointMetrics(name,data)", self.html)
         self.assertIn("function metricLine(container,label,value)", self.html)
         self.assertIn("Latest close", self.html)
