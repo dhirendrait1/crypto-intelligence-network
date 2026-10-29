@@ -352,8 +352,11 @@ async def get_market_candles(
     freshness = _freshness_metadata(rows, interval, now_ms)
     source = rows[0].get("_source", "Binance public market-data API")
     endpoint = rows[0].get("_source_endpoint", BINANCE_KLINES_URL)
+    requested_quote = rows[0].get("_requested_quote_currency", re.fullmatch(r"([A-Z0-9]+)(USDT|USD)", normalized).group(2))
+    actual_quote = rows[0].get("_actual_quote_currency", requested_quote)
     return {
         "service": "cin", "mode": "read_only", "source": source, "source_endpoint": endpoint,
+        "requested_quote_currency": requested_quote, "actual_quote_currency": actual_quote,
         "retrieved_at": datetime.now(timezone.utc).isoformat(), "symbol": normalized,
         "timeframe": interval, "count": len(rows),
         **freshness,
@@ -391,12 +394,15 @@ async def analyze_public_market(
     freshness = _freshness_metadata(rows, interval, now_ms)
     source = rows[0].get("_source", "Binance public market-data API")
     endpoint = rows[0].get("_source_endpoint", BINANCE_KLINES_URL)
+    requested_quote = rows[0].get("_requested_quote_currency", re.fullmatch(r"([A-Z0-9]+)(USDT|USD)", normalized).group(2))
+    actual_quote = rows[0].get("_actual_quote_currency", requested_quote)
     try:
         analysis = analyze_ohlc([{key: row[key] for key in ("open", "high", "low", "close")} for row in closed_rows])
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=f"Fetched candles failed analysis validation: {exc}") from exc
     analysis["input"].update({
         "symbol": normalized, "timeframe": interval, "source": source, "source_endpoint": endpoint,
+        "requested_quote_currency": requested_quote, "actual_quote_currency": actual_quote,
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
         "requested_candle_count": len(rows),
         "analysis_candle_count": len(closed_rows),
