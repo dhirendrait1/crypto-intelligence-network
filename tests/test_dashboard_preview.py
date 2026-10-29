@@ -99,6 +99,16 @@ class DashboardPreviewTests(unittest.TestCase):
         self.assertIn("open_interest_contracts", self.html)
         self.assertIn("spread_percent", self.html)
         self.assertIn("article.provider_seen_at||article.published_at||\"time unknown\"", self.html)
+        for metric in (
+            "Directional bias", "Structure event", "RSI (14)", "MACD histogram",
+            "ATR (14)", "Buy-side swing reference", "Scenario targets status",
+            "Analysis limitations",
+        ):
+            with self.subTest(metric=metric):
+                self.assertIn(metric, self.html)
+        self.assertIn("data.market_structure||data.summary||data.analysis", self.html)
+        self.assertIn("data.indicators||{}", self.html)
+        self.assertIn("data.scenario_targets||{}", self.html)
         self.assertIn("panel.setAttribute(\"data-api-state\",state)", self.html)
         self.assertIn("if(state!==\"available\")", self.html)
         self.assertIn('panel.setAttribute("data-api-state",state)', self.html)
