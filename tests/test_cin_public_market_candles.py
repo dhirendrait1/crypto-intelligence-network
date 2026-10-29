@@ -51,6 +51,44 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(candles), 5)
         self.assertEqual(candles[-1]["open_time"], 1700014400000)
 
+    async def test_kraken_rejects_missing_or_malformed_error_field(self):
+        rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
+        malformed_payloads = [
+            {"result": {"XBTUSDT": rows, "last": 1700000000}},
+            {"error": None, "result": {"XBTUSDT": rows, "last": 1700000000}},
+            {"error": "not-a-list", "result": {"XBTUSDT": rows, "last": 1700000000}},
+            {"error": [7], "result": {"XBTUSDT": rows, "last": 1700000000}},
+        ]
+        for payload in malformed_payloads:
+            with self.subTest(payload=payload):
+                with patch.object(api, "_request_json", return_value=payload):
+                    with self.assertRaisesRegex(ValueError, "error field was malformed"):
+                        api._fetch_kraken("BTCUSDT", "1h", 5)
+
+    async def test_kraken_rejects_unexpected_or_ambiguous_market_keys(self):
+        rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
+        cases = [
+            ({"error": [], "result": {"ETHUSDT": rows, "last": 1700000000}}, "market key did not match"),
+            ({"error": [], "result": {"XBTUSDT": rows, "XXBTUSDT": rows, "last": 1700000000}}, "ambiguous market keys"),
+            ({"error": [], "result": {"last": 1700000000}}, "market key did not match"),
+        ]
+        for payload, message in cases:
+            with self.subTest(payload=payload):
+                with patch.object(api, "_request_json", return_value=payload):
+                    with self.assertRaisesRegex(ValueError, message):
+                        api._fetch_kraken("BTCUSDT", "1h", 5)
+
+    async def test_kraken_accepts_canonical_usd_market_aliases(self):
+        rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
+        cases = [("BTCUSD", "XXBTZUSD"), ("ETHUSD", "XETHZUSD")]
+        for symbol, market_key in cases:
+            with self.subTest(symbol=symbol):
+                payload = {"error": [], "result": {market_key: rows, "last": 1700000000}}
+                with patch.object(api, "_request_json", return_value=payload):
+                    candles = api._fetch_kraken(symbol, "1h", 5)
+                self.assertEqual(len(candles), 1)
+                self.assertEqual(candles[0]["close"], 101.0)
+
     async def test_kraken_skips_fractional_and_boolean_timestamps(self):
         rows = [
             [1700000000.5, "100", "102", "99", "101", "100.5", "10", 4],
@@ -102,13 +140,13 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_load_sorts_out_of_order_candles_chronologically(self):
         reversed_rows = [dict(SAMPLE[2]), dict(SAMPLE[0]), dict(SAMPLE[1])]
-        with patch.object(api, "_fetch_binance", return_value=reversed_rows):
+        with patch.object(api, "_fetch_kraken", return_value=reversed_rows):
             rows = await api._load("BTCUSDT", "1h", 5)
         self.assertEqual([row["open_time"] for row in rows], sorted(row["open_time"] for row in rows))
 
     async def test_load_rejects_duplicate_candle_timestamps(self):
         duplicate_rows = [dict(SAMPLE[0]), dict(SAMPLE[0])]
-        with patch.object(api, "_fetch_binance", return_value=duplicate_rows):
+        with patch.object(api, "_fetch_kraken", return_value=duplicate_rows):
             with self.assertRaises(HTTPException) as ctx:
                 await api._load("BTCUSDT", "1h", 5)
         self.assertEqual(ctx.exception.status_code, 502)
@@ -119,6 +157,8 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             result = await api.get_market_candles("BTCUSDT", "1h", 50)
         self.assertEqual(result["mode"], "read_only")
         self.assertEqual(result["source"], "Binance public market-data API")
+        self.assertEqual(result["requested_quote_currency"], "USDT")
+        self.assertEqual(result["actual_quote_currency"], "USDT")
         self.assertEqual(result["count"], 50)
         self.assertIn("open_time_utc", result["data"][0])
         self.assertIn("close_time_utc", result["data"][0])
@@ -131,6 +171,8 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["input"]["symbol"], "BTCUSDT")
         self.assertEqual(result["input"]["timeframe"], "1h")
         self.assertEqual(result["input"]["source"], "Binance public market-data API")
+        self.assertEqual(result["input"]["requested_quote_currency"], "USDT")
+        self.assertEqual(result["input"]["actual_quote_currency"], "USDT")
         self.assertEqual(result["input"]["candle_count"], 50)
         self.assertTrue(any("not independently audited" in item for item in result["limitations"]))
 
@@ -185,24 +227,37 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.exception.status_code, 422)
         self.assertIn("five completed candles", ctx.exception.detail)
 
-    async def test_451_falls_back_to_kraken_and_labels_source(self):
-        import asyncio
-        with patch.object(api, "_fetch_binance", side_effect=urllib.error.HTTPError(
-            api.BINANCE_KLINES_URL, 451, "unavailable for legal reasons", {}, None
-        )), patch.object(api, "_fetch_kraken", return_value=[dict(SAMPLE[0])]):
-            rows = await api._load("BTCUSDT", "1h", 5)
-        self.assertEqual(rows[0]["_source"], "Kraken public OHLC API (fallback after Binance HTTP 451)")
-        self.assertEqual(rows[0]["_source_endpoint"], api.KRAKEN_OHLC_URL)
+    async def test_usd_pair_prefers_coinbase_and_labels_exact_quote(self):
+        with patch.object(api, "_fetch_coinbase", return_value=[dict(SAMPLE[0])]) as coinbase, patch.object(
+            api, "_fetch_kraken", side_effect=AssertionError("Kraken should not be called when Coinbase succeeds")
+        ), patch.object(api, "_fetch_binance", side_effect=AssertionError("Binance should not be called when Coinbase succeeds")):
+            rows = await api._load("BTCUSD", "1h", 5)
+        coinbase.assert_called_once_with("BTCUSD", "1h", 5)
+        self.assertEqual(rows[0]["_source"], "Coinbase Exchange public candles API")
+        self.assertEqual(rows[0]["_requested_quote_currency"], "USD")
+        self.assertEqual(rows[0]["_actual_quote_currency"], "USD")
 
-    async def test_451_uses_coinbase_when_kraken_fails(self):
-        with patch.object(api, "_fetch_binance", side_effect=urllib.error.HTTPError(
-            api.BINANCE_KLINES_URL, 451, "unavailable for legal reasons", {}, None
-        )), patch.object(api, "_fetch_kraken", side_effect=ValueError("pair unavailable")), patch.object(
-            api, "_fetch_coinbase", return_value=[dict(SAMPLE[0])]
+    async def test_usdt_pair_prefers_quote_compatible_kraken(self):
+        with patch.object(api, "_fetch_kraken", return_value=[dict(SAMPLE[0])]) as kraken, patch.object(
+            api, "_fetch_coinbase", side_effect=AssertionError("Coinbase USD data must not replace a USDT pair")
+        ), patch.object(api, "_fetch_binance", side_effect=AssertionError("Binance should not be called when Kraken succeeds")):
+            rows = await api._load("BTCUSDT", "1h", 5)
+        kraken.assert_called_once_with("BTCUSDT", "1h", 5)
+        self.assertEqual(rows[0]["_source"], "Kraken public OHLC API")
+        self.assertEqual(rows[0]["_requested_quote_currency"], "USDT")
+        self.assertEqual(rows[0]["_actual_quote_currency"], "USDT")
+
+    async def test_usdt_pair_falls_back_to_binance_when_kraken_fails(self):
+        with patch.object(api, "_fetch_kraken", side_effect=ValueError("pair unavailable")), patch.object(
+            api, "_fetch_binance", return_value=[dict(SAMPLE[0])]
         ):
             rows = await api._load("BTCUSDT", "1h", 5)
-        self.assertEqual(rows[0]["_source"], "Coinbase Exchange public candles API (fallback after Binance HTTP 451)")
-        self.assertEqual(rows[0]["_source_endpoint"], api.COINBASE_CANDLES_URL)
+        self.assertEqual(rows[0]["_source"], "Binance public market-data API (fallback)")
+        self.assertEqual(rows[0]["_actual_quote_currency"], "USDT")
+
+    def test_coinbase_rejects_usdt_to_usd_quote_substitution(self):
+        with self.assertRaisesRegex(ValueError, "exact USD-quoted symbol"):
+            api._fetch_coinbase("BTCUSDT", "1h", 5)
 
     def test_coinbase_candle_rows_are_normalized_and_sorted(self):
         payload = [
@@ -210,7 +265,7 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             [1700000000, "98", "102", "100", "101", "10.5"],
         ]
         with patch.object(api, "_request_json", return_value=payload):
-            rows = api._fetch_coinbase("BTCUSDT", "1h", 5)
+            rows = api._fetch_coinbase("BTCUSD", "1h", 5)
         self.assertEqual(len(rows), 2)
         self.assertLess(rows[0]["open_time"], rows[1]["open_time"])
         self.assertEqual(rows[0]["open"], 100.0)
@@ -219,16 +274,14 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rows[0]["close"], 101.0)
         self.assertEqual(rows[0]["volume"], 10.5)
 
-    async def test_451_and_fallback_failure_returns_clear_503(self):
-        with patch.object(api, "_fetch_binance", side_effect=urllib.error.HTTPError(
-            api.BINANCE_KLINES_URL, 451, "unavailable for legal reasons", {}, None
-        )), patch.object(api, "_fetch_kraken", side_effect=ValueError("unsupported pair")), patch.object(
-            api, "_fetch_coinbase", side_effect=ValueError("unsupported product")
+    async def test_quote_compatible_provider_failure_returns_clear_503(self):
+        with patch.object(api, "_fetch_kraken", side_effect=ValueError("unsupported pair")), patch.object(
+            api, "_fetch_binance", side_effect=ValueError("unsupported symbol")
         ):
             with self.assertRaises(HTTPException) as ctx:
                 await api._load("BTCUSDT", "1h", 5)
         self.assertEqual(ctx.exception.status_code, 503)
-        self.assertIn("fallbacks unavailable", ctx.exception.detail)
+        self.assertIn("quote-compatible", ctx.exception.detail)
 
     async def test_rejects_bad_symbol(self):
         with self.assertRaises(HTTPException) as ctx:
@@ -241,9 +294,13 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.exception.status_code, 400)
 
     async def test_provider_rate_limit_is_safe_503(self):
-        with patch.object(api, "_fetch_binance", side_effect=urllib.error.HTTPError(
-            api.BINANCE_KLINES_URL, 429, "rate limited", {}, None
-        )):
+        # The USDT route tries Kraken first, then Binance. Force both providers
+        # to fail so the test verifies the terminal, sanitized 503 behavior.
+        with patch.object(api, "_fetch_kraken", side_effect=ValueError("temporarily unavailable")), patch.object(
+            api, "_fetch_binance", side_effect=urllib.error.HTTPError(
+                api.BINANCE_KLINES_URL, 429, "rate limited", {}, None
+            )
+        ):
             with self.assertRaises(HTTPException) as ctx:
                 await api._load("BTCUSDT", "1h", 50)
         self.assertEqual(ctx.exception.status_code, 503)

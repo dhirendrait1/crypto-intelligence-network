@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, fix/deploy-scaffold-ci-alignment]
   pull_request:
-    branches: [main]
+    branches: [main, integration/quote-safe-provenance]
   workflow_dispatch:
 
 permissions:
