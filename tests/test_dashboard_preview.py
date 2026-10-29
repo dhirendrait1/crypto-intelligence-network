@@ -134,6 +134,7 @@ class DashboardPreviewTests(unittest.TestCase):
         self.assertIn('tag.textContent=state==="available"?"API-REPORTED / MEASURED":"UNVERIFIED"', self.html)
         self.assertIn('tag.textContent="UNVERIFIED"', self.html)
         self.assertIn('if(state!=="available")', self.html)
+        self.assertIn('if(name==="Market candles"||name==="Derivatives snapshot") kpis[0].textContent=freshness', self.html)
         self.assertIn('if(kpis[2]) kpis[2].textContent="UNKNOWN"', self.html)
         self.assertIn('tag.textContent=state==="available"?"API-REPORTED / MEASURED":"UNVERIFIED"', self.html)
         self.assertIn('const metrics=panel.querySelector(\'[data-api-metrics="\'+name+\'"]\');if(metrics)metrics.replaceChildren();', self.html)
