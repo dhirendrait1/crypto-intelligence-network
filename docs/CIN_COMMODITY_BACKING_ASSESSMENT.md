@@ -21,6 +21,7 @@ Each record stores evidence type, source name and URL, publication timestamp, ch
 - Complete evidence-category coverage means only that each category has a record marked verified; it is not a guarantee of reserves, solvency, custody, or redemption.\n- Coverage reports distinct URL hostnames as a source-diversity diagnostic. Multiple hostnames do **not** establish independent ownership, authorship, audit, or corroboration; CIN always reports `source_independence_verified: false`.
 - Optional `source_role` values (`issuer`, `custodian`, `auditor`, `regulator`, `exchange`, `independent_research`, `other`) are caller-supplied classifications. Unknown or absent roles become `unspecified`; CIN reports role counts but always sets `source_role_authenticated: false` and `source_roles_authenticated: false.
 - Conflicting statuses remain visible through per-status counts and a per-record conflict summary containing the supplied role, source name, URL, and status. Conflicts require manual review; CIN does not rank sources, select a winner, or authenticate source roles.
+- Each normalized evidence record includes a deterministic SHA-256 fingerprint over its supplied evidence fields, source role, and notes. This is a metadata-change detection aid only; it is not a signature, trusted timestamp, document-content hash, or proof of source authenticity.
 
 ## Example
 
