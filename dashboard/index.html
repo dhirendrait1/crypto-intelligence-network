@@ -23,6 +23,16 @@ h1{font-size:clamp(1.65rem,5vw,2.5rem);line-height:1.1;margin:30px 0 8px}.intro{
 <h1>Intelligence console</h1>
 <p class="intro">A mobile-first control panel for market analysis, screening, source evidence and monitoring. Live values are intentionally withheld until a verified API response is connected.</p>
 <div class="notice" role="status"><strong>Connection state: not connected.</strong> This preview does not fetch live data and does not represent current market conditions.</div>
+<section class="card full" aria-labelledby="api-connect-title">
+<h2 id="api-connect-title">Read-only API connection</h2>
+<p class="muted small">Optional and user-initiated. Enter the API origin you control. CIN makes no request until you press Connect. Cross-origin access requires the API to permit browser CORS.</p>
+<label for="api-origin" class="small">API origin (for example, your CIN API base URL)</label>
+<div class="actions"><input id="api-origin" type="url" inputmode="url" autocomplete="url" placeholder="https://your-cin-api.example" aria-describedby="api-origin-help" style="flex:1;min-width:220px;background:#0b1020;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit"></div>
+<p id="api-origin-help" class="muted small">Use the origin only; do not include a path, credentials, API keys, or secrets.</p>
+<div class="actions"><button id="connect-api" type="button">Connect read-only API</button><button id="disconnect-api" type="button">Disconnect</button></div>
+<p id="api-status" class="muted small" role="status" aria-live="polite">Disconnected. No API request has been made.</p>
+<div id="api-results" class="small" aria-live="polite"></div>
+</section>
 <section class="grid" aria-label="CIN modules">
 <article class="card"><h2>Market data</h2><div class="state">Awaiting API</div><p class="muted small">Provider, instrument, candle interval and observation timestamp will appear here.</p></article>
 <article class="card"><h2>Technical analysis</h2><div class="state">Awaiting API</div><p class="muted small">Trend structure and indicators must include timeframe and closed-candle status.</p></article>
@@ -35,7 +45,69 @@ h1{font-size:clamp(1.65rem,5vw,2.5rem);line-height:1.1;margin:30px 0 8px}.intro{
 <footer class="foot">Crypto Intelligence Network (CIN) · Preview only · No trading or order execution · No wallet access</footer>
 </main>
 <script>
-document.getElementById("refresh").addEventListener("click",function(){document.getElementById("refresh-state").textContent="Preview rechecked. API remains disconnected; no network request was made.";});
+(function(){
+  "use strict";
+  const originInput=document.getElementById("api-origin");
+  const connectButton=document.getElementById("connect-api");
+  const disconnectButton=document.getElementById("disconnect-api");
+  const status=document.getElementById("api-status");
+  const results=document.getElementById("api-results");
+  let activeController=null;
+  const endpoints=[
+    {name:"Market candles",path:"/market-candles?symbol=BTCUSDT&interval=1h&limit=50",summary:data=>`Symbol: ${safeText(data.symbol)} · timeframe: ${safeText(data.timeframe)} · candles: ${safeText(data.count)} · source: ${safeText(data.source)} · retrieved: ${safeText(data.retrieved_at)}`},
+    {name:"Technical analysis",path:"/technical-analysis/market?symbol=BTCUSDT&interval=1h&limit=100",summary:data=>`Symbol: ${safeText(data.input&&data.input.symbol)} · timeframe: ${safeText(data.input&&data.input.timeframe)} · source: ${safeText(data.input&&data.input.source)} · retrieved: ${safeText(data.input&&data.input.retrieved_at)}`},
+    {name:"Public news sentiment",path:"/news-sentiment?query=cryptocurrency&max_records=5",summary:data=>`Articles: ${safeText(data.count)} · label: ${safeText(data.sentiment_summary&&data.sentiment_summary.label)} · confidence: ${safeText(data.sentiment_summary&&data.sentiment_summary.confidence)} · source: ${safeText(data.source)}`},
+    {name:"Derivatives snapshot",path:"/derivatives/market-snapshot?symbol=BTCUSDT",summary:data=>`Symbol: ${safeText(data.symbol)} · source: ${safeText(data.source)} · retrieved: ${safeText(data.retrieved_at)} · freshness: ${safeText(data.data_quality&&data.data_quality.freshness_status)}`}
+  ];
+  function safeText(value){return value===null||value===undefined||value===""?"unknown":String(value);}
+  function validOrigin(value){
+    try{const url=new URL(value);return (url.protocol==="https:"||url.protocol==="http:")&&url.origin===value.replace(/\/$/,"")&&!url.username&&!url.password&&url.search===""&&url.hash===""&&url.pathname==="/";}
+    catch(_){return false;}
+  }
+  function renderRow(name,state,detail){
+    const row=document.createElement("article");
+    row.style.cssText="border-top:1px solid var(--line);padding:10px 0";
+    const heading=document.createElement("strong");heading.textContent=name+" — "+state;row.appendChild(heading);
+    const paragraph=document.createElement("p");paragraph.className="muted small";paragraph.textContent=detail;row.appendChild(paragraph);
+    results.appendChild(row);
+  }
+  document.getElementById("refresh").addEventListener("click",function(){
+    document.getElementById("refresh-state").textContent=activeController?"Connection attempt in progress.":"Preview rechecked. No request was made by this button.";
+  });
+  connectButton.addEventListener("click",async function(){
+    if(activeController) activeController.abort();
+    const base=originInput.value.trim().replace(/\/$/,"");
+    if(!validOrigin(base)){status.textContent="Not connected. Enter a valid HTTP(S) origin without a path or credentials.";return;}
+    activeController=new AbortController();
+    const controller=activeController;
+    connectButton.disabled=true;results.replaceChildren();
+    status.textContent="Connecting. Each endpoint is read-only; results may be partial.";
+    let success=0;
+    for(const endpoint of endpoints){
+      if(controller.signal.aborted) return;
+      try{
+        const response=await fetch(base+endpoint.path,{method:"GET",headers:{Accept:"application/json"},signal:controller.signal,cache:"no-store",credentials:"omit",redirect:"error"});
+        if(!response.ok) throw new Error("HTTP "+response.status);
+        const data=await response.json();
+        if(!data||typeof data!=="object"||Array.isArray(data)) throw new Error("Unexpected JSON response shape");
+        success++;
+        renderRow(endpoint.name,"available",endpoint.summary(data));
+      }catch(error){
+        if(controller.signal.aborted) return;
+        renderRow(endpoint.name,"unavailable",error&&error.name==="TypeError"?"Request blocked or network/CORS error. Check API origin and browser CORS policy.":safeText(error&&error.message));
+      }
+    }
+    if(controller.signal.aborted) return;
+    status.textContent=success===endpoints.length?"Connected: all "+success+" read-only endpoints responded.":"Partial connection: "+success+" of "+endpoints.length+" endpoints responded. Failed endpoints remain unavailable.";
+    connectButton.disabled=false;
+    activeController=null;
+  });
+  disconnectButton.addEventListener("click",function(){
+    if(activeController) activeController.abort();
+    activeController=null;connectButton.disabled=false;results.replaceChildren();
+    status.textContent="Disconnected. Existing displayed endpoint results cleared.";
+  });
+})();
 </script>
 </body>
 </html>
