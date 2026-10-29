@@ -38,3 +38,16 @@ def test_worker_reports_sanitized_telegram_configuration_error(capsys):
             assert worker.main(["--once"]) == 2
     output = json.loads(capsys.readouterr().err)
     assert output == {"status": "error", "error_code": "telegram_configuration_missing"}
+
+
+
+def test_importing_worker_never_processes_alerts():
+    import importlib
+
+    with patch.object(
+        worker,
+        "process_due_telegram_alerts",
+        side_effect=AssertionError("import must not start alert delivery"),
+    ) as process:
+        importlib.reload(worker)
+        process.assert_not_called()
