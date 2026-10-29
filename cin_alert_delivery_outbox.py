@@ -63,7 +63,7 @@ def _migrate_outbox_schema(connection: sqlite3.Connection) -> None:
                 observation_id TEXT NOT NULL,
                 payload_json TEXT NOT NULL,
                 status TEXT NOT NULL CHECK(status IN ('pending','sending','sent','failed','dead','uncertain')),
-                attempts INTEGER NOT NULL DEFAULT 0,
+                attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
                 next_attempt_at TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
