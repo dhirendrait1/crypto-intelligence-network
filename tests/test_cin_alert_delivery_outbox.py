@@ -296,3 +296,25 @@ def test_intermediate_schema_with_uncertain_but_unconstrained_attempts_is_migrat
                 VALUES ('invalid:negative','invalid','negative','{}','pending',-1,?,?,?,NULL)""",
                 (timestamp, timestamp, timestamp),
             )
+
+
+def test_concurrent_workers_never_claim_the_same_pending_item(tmp_path):
+    path = tmp_path / "concurrent-claims.sqlite3"
+    for i in range(12):
+        enqueue_alert_delivery(
+            path, rule_id="concurrent", observation_id=f"event-{i}",
+            payload={"event": i}, now=NOW,
+        )
+
+    def claim_batch(_):
+        return claim_due_alerts(path, now=NOW, limit=12)
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        batches = list(pool.map(claim_batch, range(6)))
+
+    claimed = [item for batch in batches for item in batch]
+    keys = [item["idempotency_key"] for item in claimed]
+    assert len(claimed) == 12
+    assert len(set(keys)) == 12
+    assert all(item["status"] == "sending" and item["attempts"] == 1 for item in claimed)
+    assert claim_due_alerts(path, now=NOW, limit=12) == []
