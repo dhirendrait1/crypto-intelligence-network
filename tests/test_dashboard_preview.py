@@ -163,6 +163,15 @@ class DashboardPreviewTests(unittest.TestCase):
         self.assertIn("@media(max-width:560px)", self.html)
         self.assertIn("No live data", self.html)
 
+    def test_btc_ticker_quote_currency_matches_btcusdt_api_symbol(self):
+        ticker = next(
+            line for line in self.html.splitlines()
+            if 'class="ticker"' in line and "BTC / USDT" in line
+        )
+        self.assertIn("BTC / USDT", ticker)
+        self.assertNotIn("BTC / USD", ticker)
+        self.assertIn("/market-candles?symbol=BTCUSDT", self.html)
+
 
 if __name__ == "__main__":
     unittest.main()
