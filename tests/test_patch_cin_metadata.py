@@ -172,9 +172,6 @@ class DeploymentPatchTests(unittest.TestCase):
         self.assertEqual(installed.read_text(encoding="utf-8"), source.read_text(encoding="utf-8"))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
     def test_source_observation_contract_is_copied_into_deployment_app(self):
         result = self.run_patch()
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -183,3 +180,6 @@ if __name__ == "__main__":
         self.assertTrue(installed.is_file())
         self.assertEqual(installed.read_text(encoding="utf-8"), source.read_text(encoding="utf-8"))
 
+
+if __name__ == "__main__":
+    unittest.main()
