@@ -253,6 +253,31 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         self.assertEqual(result["missing_coins"], ["ethereum"])
 
     @patch("market_data_step1._fetch_market_data")
+    def test_endpoint_preserves_row_provider_provenance(self, mocked):
+        provider_retrieved_at = "2026-10-30T12:34:56Z"
+        mocked.return_value = [{
+            "id": "bitcoin",
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "currency": "USD",
+            "provider": "CoinGecko",
+            "provider_retrieved_at": provider_retrieved_at,
+            "price": 100.0,
+            "market_cap": 1000.0,
+            "total_volume_24h": 100.0,
+            "price_change_percentage_24h": 1.5,
+            "last_updated": "2026-10-30T12:34:00Z",
+            "freshness_status": "fresh",
+            "freshness_age_seconds": 56,
+            "analysis_eligible": True,
+            "data_quality_warnings": [],
+        }]
+        result = asyncio.run(get_public_market_data("bitcoin", "usd"))
+        self.assertEqual(result["data"][0]["provider"], "CoinGecko")
+        self.assertEqual(result["data"][0]["provider_retrieved_at"], provider_retrieved_at)
+        self.assertNotEqual(result["retrieved_at"], provider_retrieved_at)
+
+    @patch("market_data_step1._fetch_market_data")
     def test_endpoint_deduplicates_requested_coin_ids(self, mocked):
         mocked.return_value = [{
             "id": "bitcoin",
