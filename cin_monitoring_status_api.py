@@ -1,5 +1,5 @@
-import math
 """Read-only API contract for caller-supplied CIN service monitoring snapshots."""
+import math
 from datetime import datetime
 from typing import Any
 from fastapi import APIRouter
