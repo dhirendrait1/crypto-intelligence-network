@@ -83,16 +83,18 @@ def test_invalid_time_and_retry_limits_are_rejected(tmp_path):
         claim_due_alerts(path, now=NOW, limit=True)
 
 
-def test_abandoned_worker_lease_is_reclaimed(tmp_path):
+def test_abandoned_worker_lease_becomes_uncertain_not_reclaimed(tmp_path):
     path = tmp_path / "alerts.sqlite3"
     item = enqueue_alert_delivery(path, rule_id="r1", observation_id="stuck", payload={"v": 1}, now=NOW)
     first = claim_due_alerts(path, now=NOW)[0]
     assert first["attempts"] == 1
     assert claim_due_alerts(path, now=NOW + timedelta(seconds=299)) == []
-    recovered = claim_due_alerts(path, now=NOW + timedelta(seconds=300))
-    assert len(recovered) == 1
-    assert recovered[0]["idempotency_key"] == item["idempotency_key"]
-    assert recovered[0]["attempts"] == 2
+    assert claim_due_alerts(path, now=NOW + timedelta(seconds=300)) == []
+    uncertain = list_uncertain_alert_deliveries(path)
+    assert len(uncertain) == 1
+    assert uncertain[0]["idempotency_key"] == item["idempotency_key"]
+    assert uncertain[0]["status"] == "uncertain"
+    assert uncertain[0]["attempts"] == 1
 
 
 def test_expired_lease_at_attempt_limit_moves_to_dead_letter(tmp_path):
