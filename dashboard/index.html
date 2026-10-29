@@ -176,6 +176,14 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
         metricLine(metrics,"Latest closed candle age (seconds)",data.latest_closed_candle_age_seconds);
         metricLine(metrics,"Freshness warning",data.stale_data_warning||"none reported");
         metricLine(metrics,"Provider",data.source);
+        const ribbon=document.querySelector(".ticker");
+        if(ribbon){
+          const btcValue=Array.from(ribbon.children).find(node=>node.textContent.includes("BTC / USD"));
+          if(btcValue){
+            const value=btcValue.querySelector("b");
+            if(value) value.textContent=latest&&latest.close!=null?safeText(latest.close):"UNKNOWN";
+          }
+        }
       }else if(name==="Technical analysis"){
         const summary=data.market_structure||data.summary||data.analysis||{};
         const indicators=data.indicators||{};
@@ -271,6 +279,14 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
     if(state==="available"&&data) renderEndpointMetrics(name,data);
     if(state!=="available"){
       const metrics=panel.querySelector(".api-metrics");if(metrics)metrics.replaceChildren();
+      if(name==="Market candles"){
+        const ribbon=document.querySelector(".ticker");
+        if(ribbon){
+          const btcValue=Array.from(ribbon.children).find(node=>node.textContent.includes("BTC / USD"));
+          const value=btcValue&&btcValue.querySelector("b");
+          if(value) value.textContent="UNKNOWN";
+        }
+      }
       if(name==="Coin screening"){
         document.querySelectorAll(".asset-rail .asset-item").forEach((item)=>{
           const label=item.querySelector("strong"),value=item.querySelector("em");
