@@ -51,6 +51,44 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(candles), 5)
         self.assertEqual(candles[-1]["open_time"], 1700014400000)
 
+    async def test_kraken_rejects_missing_or_malformed_error_field(self):
+        rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
+        malformed_payloads = [
+            {"result": {"XBTUSDT": rows, "last": 1700000000}},
+            {"error": None, "result": {"XBTUSDT": rows, "last": 1700000000}},
+            {"error": "not-a-list", "result": {"XBTUSDT": rows, "last": 1700000000}},
+            {"error": [7], "result": {"XBTUSDT": rows, "last": 1700000000}},
+        ]
+        for payload in malformed_payloads:
+            with self.subTest(payload=payload):
+                with patch.object(api, "_request_json", return_value=payload):
+                    with self.assertRaisesRegex(ValueError, "error field was malformed"):
+                        api._fetch_kraken("BTCUSDT", "1h", 5)
+
+    async def test_kraken_rejects_unexpected_or_ambiguous_market_keys(self):
+        rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
+        cases = [
+            ({"error": [], "result": {"ETHUSDT": rows, "last": 1700000000}}, "market key did not match"),
+            ({"error": [], "result": {"XBTUSDT": rows, "XXBTUSDT": rows, "last": 1700000000}}, "ambiguous market keys"),
+            ({"error": [], "result": {"last": 1700000000}}, "market key did not match"),
+        ]
+        for payload, message in cases:
+            with self.subTest(payload=payload):
+                with patch.object(api, "_request_json", return_value=payload):
+                    with self.assertRaisesRegex(ValueError, message):
+                        api._fetch_kraken("BTCUSDT", "1h", 5)
+
+    async def test_kraken_accepts_canonical_usd_market_aliases(self):
+        rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
+        cases = [("BTCUSD", "XXBTZUSD"), ("ETHUSD", "XETHZUSD")]
+        for symbol, market_key in cases:
+            with self.subTest(symbol=symbol):
+                payload = {"error": [], "result": {market_key: rows, "last": 1700000000}}
+                with patch.object(api, "_request_json", return_value=payload):
+                    candles = api._fetch_kraken(symbol, "1h", 5)
+                self.assertEqual(len(candles), 1)
+                self.assertEqual(candles[0]["close"], 101.0)
+
     async def test_kraken_skips_fractional_and_boolean_timestamps(self):
         rows = [
             [1700000000.5, "100", "102", "99", "101", "100.5", "10", 4],
