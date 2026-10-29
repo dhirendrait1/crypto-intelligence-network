@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from cin_alert_delivery_outbox import enqueue_alert_delivery
+from cin_alert_delivery_outbox import claim_due_alerts, enqueue_alert_delivery
 from cin_alert_telegram_delivery import (
     TelegramDeliveryError,
     process_due_telegram_alerts,
@@ -169,3 +169,33 @@ class TelegramDeliveryTests(unittest.TestCase):
             process_due_telegram_alerts(str(path), now=NOW)
         with __import__("sqlite3").connect(path) as db:
             self.assertEqual(db.execute("SELECT status FROM alert_delivery_outbox").fetchone()[0], "pending")
+
+
+
+def test_crash_before_send_leaves_claim_recoverable_only_after_lease_expiry(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    enqueue_alert_delivery(
+        path,
+        rule_id="r1",
+        observation_id="crash-before-send",
+        payload={"text": "BTC alert"},
+        now=NOW,
+    )
+
+    # Simulate abrupt process termination before the provider call completes.
+    with patch(
+        "cin_alert_telegram_delivery.send_telegram_notification",
+        side_effect=SystemExit("simulated process crash"),
+    ):
+        with pytest.raises(SystemExit, match="simulated process crash"):
+            process_due_telegram_alerts(str(path), now=NOW)
+
+    assert claim_due_alerts(
+        path, now=NOW + __import__("datetime").timedelta(seconds=299)
+    ) == []
+    recovered = claim_due_alerts(
+        path, now=NOW + __import__("datetime").timedelta(seconds=300)
+    )
+    assert len(recovered) == 1
+    assert recovered[0]["idempotency_key"] == "r1:crash-before-send"
+    assert recovered[0]["attempts"] == 2
