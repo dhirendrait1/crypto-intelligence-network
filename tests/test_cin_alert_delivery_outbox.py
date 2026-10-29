@@ -248,3 +248,51 @@ def test_uncertain_lease_overwrites_prior_failure_code_with_unknown_outcome(tmp_
     uncertain = list_uncertain_alert_deliveries(path)
     assert len(uncertain) == 1
     assert uncertain[0]["last_error_code"] == "delivery_outcome_unknown"
+
+
+def test_intermediate_schema_with_uncertain_but_unconstrained_attempts_is_migrated(tmp_path):
+    path = tmp_path / "intermediate-alerts.sqlite3"
+    timestamp = NOW.isoformat()
+    intermediate_schema = """
+    CREATE TABLE alert_delivery_outbox (
+        idempotency_key TEXT PRIMARY KEY,
+        rule_id TEXT NOT NULL,
+        observation_id TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('pending','sending','sent','failed','dead','uncertain')),
+        attempts INTEGER NOT NULL DEFAULT 0,
+        next_attempt_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        last_error_code TEXT
+    );
+    CREATE INDEX idx_alert_outbox_due ON alert_delivery_outbox(status, next_attempt_at);
+    """
+    with sqlite3.connect(path) as db:
+        db.executescript(intermediate_schema)
+        db.execute(
+            """INSERT INTO alert_delivery_outbox
+            (idempotency_key,rule_id,observation_id,payload_json,status,attempts,
+             next_attempt_at,created_at,updated_at,last_error_code)
+            VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            ("r1:intermediate", "r1", "intermediate", '{"text":"preserve"}',
+             "uncertain", 1, timestamp, timestamp, timestamp, "delivery_outcome_unknown"),
+        )
+
+    uncertain = list_uncertain_alert_deliveries(path)
+    assert len(uncertain) == 1
+    assert uncertain[0]["idempotency_key"] == "r1:intermediate"
+    with sqlite3.connect(path) as db:
+        schema = db.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='alert_delivery_outbox'"
+        ).fetchone()[0]
+        assert "CHECK (attempts >= 0)" in schema
+        assert db.execute("SELECT COUNT(*) FROM alert_delivery_outbox").fetchone()[0] == 1
+        with pytest.raises(sqlite3.IntegrityError):
+            db.execute(
+                """INSERT INTO alert_delivery_outbox
+                (idempotency_key,rule_id,observation_id,payload_json,status,attempts,
+                 next_attempt_at,created_at,updated_at,last_error_code)
+                VALUES ('invalid:negative','invalid','negative','{}','pending',-1,?,?,?,NULL)""",
+                (timestamp, timestamp, timestamp),
+            )
