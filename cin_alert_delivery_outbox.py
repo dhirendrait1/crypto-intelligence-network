@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS alert_delivery_outbox (
     rule_id TEXT NOT NULL,
     observation_id TEXT NOT NULL,
     payload_json TEXT NOT NULL,
-    status TEXT NOT NULL CHECK(status IN ('pending','sending','sent','failed','dead')),
+    status TEXT NOT NULL CHECK(status IN ('pending','sending','sent','failed','dead','uncertain')),
     attempts INTEGER NOT NULL DEFAULT 0,
     next_attempt_at TEXT NOT NULL,
     created_at TEXT NOT NULL,
@@ -130,6 +130,15 @@ def claim_due_alerts(
                 WHERE status='sending' AND updated_at <= ? AND attempts >= ?""",
                 (current, stale_before, max_attempts),
             )
+            # An expired lease has an unknown provider outcome. Never blindly resend it:
+            # the provider may have accepted the message before the worker crashed.
+            db.execute(
+                """UPDATE alert_delivery_outbox
+                SET status='uncertain',updated_at=?,
+                    last_error_code=COALESCE(last_error_code,'delivery_outcome_unknown')
+                WHERE status='sending' AND updated_at <= ? AND attempts < ?""",
+                (current, stale_before, max_attempts),
+            )
             rows = db.execute(
                 """SELECT idempotency_key,rule_id,observation_id,payload_json,status,
                 attempts,next_attempt_at,created_at,updated_at,last_error_code
@@ -235,6 +244,67 @@ def mark_alert_failed(
             ).fetchone()
             db.execute("COMMIT")
             return _row(updated)
+        except Exception:
+            if db.in_transaction:
+                db.execute("ROLLBACK")
+            raise
+
+
+
+def list_uncertain_alert_deliveries(database_path: str | Path, *, limit: int = 100) -> list[dict[str, Any]]:
+    """Return uncertain outcomes for operator reconciliation; never sends messages."""
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 500:
+        raise ValueError("limit must be an integer from 1 through 500")
+    with _connect(database_path) as db:
+        rows = db.execute(
+            """SELECT idempotency_key,rule_id,observation_id,payload_json,status,
+            attempts,next_attempt_at,created_at,updated_at,last_error_code
+            FROM alert_delivery_outbox WHERE status='uncertain'
+            ORDER BY updated_at,idempotency_key LIMIT ?""",
+            (limit,),
+        ).fetchall()
+    return [_row(row) for row in rows]
+
+
+def resolve_uncertain_alert_delivery(
+    database_path: str | Path,
+    idempotency_key: str,
+    *,
+    resolution: str,
+    now: datetime | str,
+) -> dict[str, Any]:
+    """Resolve an uncertain outcome as sent, or explicitly authorize a retry.
+
+    'retry_authorized' changes the item back to pending. This is an operator
+    decision and can produce a duplicate if the provider accepted the original.
+    """
+    if resolution not in {"sent", "retry_authorized"}:
+        raise ValueError("resolution must be 'sent' or 'retry_authorized'")
+    current = _timestamp(now, "now").isoformat()
+    if resolution == "retry_authorized":
+        status = "pending"
+        error_code = "operator_authorized_retry_duplicate_risk"
+    else:
+        status = "sent"
+        error_code = None
+    with _connect(database_path) as db:
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            changed = db.execute(
+                """UPDATE alert_delivery_outbox SET status=?,updated_at=?,last_error_code=?
+                WHERE idempotency_key=? AND status='uncertain'""",
+                (status, current, error_code, idempotency_key),
+            ).rowcount
+            if not changed:
+                raise ValueError("outbox item must exist and be in uncertain state")
+            row = db.execute(
+                """SELECT idempotency_key,rule_id,observation_id,payload_json,status,
+                attempts,next_attempt_at,created_at,updated_at,last_error_code
+                FROM alert_delivery_outbox WHERE idempotency_key=?""",
+                (idempotency_key,),
+            ).fetchone()
+            db.execute("COMMIT")
+            return _row(row)
         except Exception:
             if db.in_transaction:
                 db.execute("ROLLBACK")
