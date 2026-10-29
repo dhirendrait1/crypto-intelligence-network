@@ -10,6 +10,7 @@
 ## Status meanings
 
 - **Implemented — offline-tested:** code and automated tests exist; live-provider or production behavior is not implied.
+- **Implemented — reconciled:** repository documentation and status controls are consolidated; this does not imply code, live-provider, or deployment validation.
 - **Partial:** some implementation exists, with acceptance work still outstanding.
 - **Pending:** capability or acceptance work is not established as complete.
 - **Release-blocked:** requires live environment access and/or explicit deployment approval.
@@ -20,7 +21,7 @@
 2. **[Implemented — offline-tested]** Keep public-data interfaces separate from exchange account/order capabilities.
 3. **[Implemented — offline-tested]** Add controlled API errors and input validation for the existing public endpoints.
 4. **[Implemented — offline-tested]** Maintain regression tests and the implementation evidence tracker.
-5. **[Partial]** Reconcile all legacy step references, duplicate roadmap notes, and acceptance evidence into this master roadmap.
+5. **[Implemented — reconciled]** Establish one numbered roadmap, consolidate superseded checkpoint narratives, and distinguish the historical evidence ledger from current status.
 
 **Exit gate:** all active modules remain read-only; no secrets, wallet control, or order execution are introduced.
 
@@ -123,4 +124,4 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - Detailed commit-by-commit history remains in `CIN_IMPLEMENTATION_TRACKER.md`. A historical “CI pending” entry describes only the state at the time it was written; it is not a current failure or current release status.
 - This file is the only numbered roadmap (7 stages / 35 steps). The tracker is the detailed evidence ledger. `CIN_ARCHITECTURE_STATUS.md` is an architecture register, not a parallel roadmap.
 - The active PR state and latest-head CI must be refreshed from GitHub before any future status report.
-- Step 5 remains Partial only for any further stale or duplicate step references found outside the active roadmap. This cleanup does not imply live validation or release readiness.
+- **Step 5 reconciliation is complete:** the repository now has one authoritative numbered roadmap, the tracker is explicitly historical, and the architecture status is a register rather than a competing roadmap. The dated historical entries remain available as evidence but no longer act as current status. This documentation closure does not imply live validation or release readiness.
