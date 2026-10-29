@@ -18,7 +18,7 @@ Each record stores evidence type, source name and URL, publication timestamp, ch
 - A supplied `verified` status is not a CIN certification. Missing metadata downgrades it to `unverified`.
 - Evidence older than the configured freshness threshold (default 90 days) is marked `stale`.
 - Missing evidence is unknown, not proof that backing exists or is absent.
-- Complete evidence-category coverage means only that each category has a record marked verified; it is not a guarantee of reserves, solvency, custody, or redemption.
+- Complete evidence-category coverage means only that each category has a record marked verified; it is not a guarantee of reserves, solvency, custody, or redemption.\n- Coverage reports distinct URL hostnames as a source-diversity diagnostic. Multiple hostnames do **not** establish independent ownership, authorship, audit, or corroboration; CIN always reports `source_independence_verified: false`.
 
 ## Example
 
