@@ -913,4 +913,6 @@ This checkpoint validates configured offline automation only. It does not establ
 - Defaults: 300-second comparison window; 1% relative tolerance; zero absolute tolerance. These are explicit heuristics and require metric-specific calibration before production use.
 - Source independence and role authentication are always false. Distinct URLs/hosts are not proof of independent ownership or authorship. The helper does not fetch, persist, certify, or execute.
 - Eight offline tests passed with all four configured workflows on code/documentation head `f42634ea7b55f66db472bc73505184d337dd0846` (run IDs: `40972958485`, `40972958481`, `40972958476`, `40972958628`).
-- Remaining acceptance: integrate the comparison primitive into applicable metric APIs, define metric-specific tolerance/time-window policies, add provider-specific tests, and perform authorized live-source validation. Step 18 is Partial, not complete.
+- API integration follow-up: added `POST /cross-source-evidence-comparison`, bounded request models, idempotent scaffold module-copy/router registration, and five endpoint contract tests. The scaffold regression tests also verify the new router is registered once and copied into the application.
+- All four workflows passed on integration head `ba69aec7750099913ec52a4687dc3af74a9883d1` (run IDs: `40973205679`, `40973205697`, `40973205857`, `40973206105`).
+- Remaining acceptance: metric-specific tolerance calibration, provider-specific tests, and authorized live-source validation. Step 18 is Partial, not complete.
