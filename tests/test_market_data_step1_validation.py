@@ -109,6 +109,47 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         self.assertIn("invalid_total_volume_omitted", result["data_quality_warnings"])
         self.assertIn("invalid_price_change_percentage_omitted", result["data_quality_warnings"])
 
+    def test_provider_timestamp_exact_freshness_boundary_is_fresh(self):
+        from market_data_step1 import _timestamp_status
+
+        now = datetime(2026, 10, 30, 12, 0, tzinfo=timezone.utc)
+        timestamp = (now - timedelta(minutes=15)).isoformat()
+        self.assertEqual(_timestamp_status(timestamp, now=now), ("fresh", 900, None))
+
+    def test_provider_timestamp_one_second_past_freshness_boundary_is_stale(self):
+        from market_data_step1 import _timestamp_status
+
+        now = datetime(2026, 10, 30, 12, 0, tzinfo=timezone.utc)
+        timestamp = (now - timedelta(minutes=15, seconds=1)).isoformat()
+        self.assertEqual(_timestamp_status(timestamp, now=now), ("stale", 901, None))
+
+    def test_provider_timestamp_exact_future_tolerance_is_fresh(self):
+        from market_data_step1 import _timestamp_status
+
+        now = datetime(2026, 10, 30, 12, 0, tzinfo=timezone.utc)
+        timestamp = (now + timedelta(minutes=5)).isoformat()
+        self.assertEqual(_timestamp_status(timestamp, now=now), ("fresh", 0, None))
+
+    def test_provider_timestamp_one_second_beyond_future_tolerance_is_unknown(self):
+        from market_data_step1 import _timestamp_status
+
+        now = datetime(2026, 10, 30, 12, 0, tzinfo=timezone.utc)
+        timestamp = (now + timedelta(minutes=5, seconds=1)).isoformat()
+        self.assertEqual(
+            _timestamp_status(timestamp, now=now),
+            ("unknown", None, "future_last_updated_timestamp"),
+        )
+
+    def test_naive_assessment_clock_is_unknown(self):
+        from market_data_step1 import _timestamp_status
+
+        now = datetime(2026, 10, 30, 12, 0)
+        timestamp = "2026-10-30T12:00:00+00:00"
+        self.assertEqual(
+            _timestamp_status(timestamp, now=now),
+            ("unknown", None, "invalid_assessment_clock"),
+        )
+
     @patch("market_data_step1.urllib.request.urlopen")
     def test_old_provider_timestamp_is_stale(self, mocked):
         old = (datetime.now(timezone.utc) - timedelta(minutes=20)).isoformat()
