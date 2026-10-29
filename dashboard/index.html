@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#111827">
+<title>CIN · Intelligence Console</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1020;--panel:#141c2e;--line:#26334a;--text:#edf2fb;--muted:#9baac2;--accent:#c5d8a4;--warn:#f4d28a}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#19243a 0,var(--bg) 55%);color:var(--text);font:15px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:1100px;margin:auto;padding:22px 16px 44px}.top{display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap}.brand{font-size:1.35rem;font-weight:750;letter-spacing:.02em}.sub,.muted{color:var(--muted)}.pill{border:1px solid var(--line);border-radius:999px;padding:5px 10px;font-size:.78rem;color:var(--warn)}
+h1{font-size:clamp(1.65rem,5vw,2.5rem);line-height:1.1;margin:30px 0 8px}.intro{max-width:680px;color:var(--muted);margin:0 0 22px}
+.grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:12px}.card{grid-column:span 4;background:linear-gradient(145deg,#182238,var(--panel));border:1px solid var(--line);border-radius:16px;padding:16px;min-width:0}.wide{grid-column:span 8}.full{grid-column:1/-1}.card h2{font-size:1rem;margin:0 0 8px}.state{font-size:1.15rem;font-weight:700;margin:12px 0 4px}.state:before{content:"";display:inline-block;width:8px;height:8px;background:var(--warn);border-radius:50%;margin:0 8px 2px 0}.foot{margin-top:20px;border-top:1px solid var(--line);padding-top:16px;color:var(--muted);font-size:.85rem}button{background:var(--accent);color:#172015;border:0;border-radius:10px;padding:10px 14px;font:inherit;font-weight:700;cursor:pointer}button:focus-visible{outline:3px solid white;outline-offset:3px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.notice{padding:12px;border:1px solid #66502a;background:#2a2418;border-radius:12px;color:#f6dfad;margin:18px 0}.small{font-size:.85rem}
+@media(max-width:720px){main{padding:18px 12px 32px}.card,.wide{grid-column:1/-1}.card{padding:14px}.top{align-items:flex-start}}
+</style>
+</head>
+<body>
+<main>
+<header class="top">
+<div><div class="brand">CIN <span class="muted">/ Intelligence Network</span></div><div class="sub small">Read-only research · monitoring · evidence</div></div>
+<span class="pill">UI PREVIEW · API NOT CONNECTED</span>
+</header>
+<h1>Intelligence console</h1>
+<p class="intro">A mobile-first control panel for market analysis, screening, source evidence and monitoring. Live values are intentionally withheld until a verified API response is connected.</p>
+<div class="notice" role="status"><strong>Connection state: not connected.</strong> This preview does not fetch live data and does not represent current market conditions.</div>
+<section class="grid" aria-label="CIN modules">
+<article class="card"><h2>Market data</h2><div class="state">Awaiting API</div><p class="muted small">Provider, instrument, candle interval and observation timestamp will appear here.</p></article>
+<article class="card"><h2>Technical analysis</h2><div class="state">Awaiting API</div><p class="muted small">Trend structure and indicators must include timeframe and closed-candle status.</p></article>
+<article class="card"><h2>Coin screening</h2><div class="state">Awaiting API</div><p class="muted small">Scores should expose methodology, inputs and data limitations.</p></article>
+<article class="card"><h2>Evidence & provenance</h2><div class="state">Not verified</div><p class="muted small">Source identity, retrieval time, observed time and evidence completeness.</p></article>
+<article class="card"><h2>News & derivatives</h2><div class="state">Awaiting API</div><p class="muted small">Sentiment and derivatives metrics remain unavailable until returned by the service.</p></article>
+<article class="card"><h2>Monitoring</h2><div class="state">Policy not configured</div><p class="muted small">Unknown freshness stays unknown; no universal thresholds are assumed.</p></article>
+<article class="card full"><h2>Data quality rules</h2><ul><li>Show unavailable and unknown states explicitly; never substitute fabricated values.</li><li>Display source and timestamps beside each dataset.</li><li>Separate heuristic research outputs from verified facts.</li><li>All controls are informational only: no orders, wallets or fund movement.</li></ul><div class="actions"><button id="refresh" type="button">Recheck preview state</button><span id="refresh-state" class="muted small" role="status" aria-live="polite">No API request has been made.</span></div></article>
+</section>
+<footer class="foot">Crypto Intelligence Network (CIN) · Preview only · No trading or order execution · No wallet access</footer>
+</main>
+<script>
+document.getElementById("refresh").addEventListener("click",function(){document.getElementById("refresh-state").textContent="Preview rechecked. API remains disconnected; no network request was made.";});
+</script>
+</body>
+</html>
