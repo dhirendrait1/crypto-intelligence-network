@@ -92,6 +92,8 @@ h1{font-size:clamp(1.65rem,5vw,2.5rem);line-height:1.1;margin:30px 0 8px}.intro{
         if(!response.ok) throw new Error("HTTP "+response.status);
         const data=await response.json();
         if(!data||typeof data!=="object"||Array.isArray(data)) throw new Error("Unexpected JSON response shape");
+        const schemaValid=endpoint.name==="Market candles"?typeof data.symbol==="string"&&typeof data.timeframe==="string"&&Number.isInteger(data.count)&&Array.isArray(data.data)&&typeof data.source==="string"&&typeof data.retrieved_at==="string":endpoint.name==="Technical analysis"?!!data.input&&typeof data.input.symbol==="string"&&typeof data.input.timeframe==="string"&&typeof data.input.source==="string"&&typeof data.input.retrieved_at==="string"&&Array.isArray(data.limitations):endpoint.name==="Coin screening"?Number.isInteger(data.count)&&Array.isArray(data.data)&&typeof data.source==="string"&&typeof data.data_mode==="string"&&typeof data.retrieved_at==="string"&&typeof data.methodology==="string":endpoint.name==="Public news sentiment"?Array.isArray(data.articles)&&Number.isInteger(data.count)&&!!data.sentiment_summary&&typeof data.source==="string"&&typeof data.retrieved_at==="string":endpoint.name==="Derivatives snapshot"?typeof data.symbol==="string"&&typeof data.source==="string"&&typeof data.retrieved_at==="string"&&!!data.data_quality:false;
+        if(!schemaValid) throw new Error("Invalid CIN response schema; expected fields are missing or have wrong types");
         success++;
         renderRow(endpoint.name,"available",endpoint.summary(data));
       }catch(error){
