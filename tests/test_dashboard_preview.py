@@ -79,15 +79,26 @@ class DashboardPreviewTests(unittest.TestCase):
         self.assertIn("not data correctness, freshness, or source authenticity", self.html)
 
 
-    def test_reference_inspired_dark_terminal_layout_is_present(self):
-        self.assertIn("terminal-layout", self.html)
-        self.assertIn("particle-stage", self.html)
-        self.assertIn("CIN intelligence field", self.html)
-        self.assertIn("visual concept / not a live network map", self.html)
-        self.assertIn("Illustrative chart only", self.html)
-        self.assertIn("System status / read-only", self.html)
+    def test_reference_matched_dense_intelligence_terminal_is_present(self):
+        for section in (
+            "Market status ribbon",
+            "BTC market structure",
+            "Feed latency & data quality",
+            "Neural shell / evidence relationship map",
+            "Watchlist / screening",
+            "Execution tape / event stream",
+            "Resolution funnel / analysis trace",
+            "READ ONLY",
+            "No wallet connected",
+        ):
+            with self.subTest(section=section):
+                self.assertIn(section, self.html)
+        self.assertIn('id="network-dots"', self.html)
+        self.assertIn("for(let i=0;i<560;i++)", self.html)
+        self.assertIn("not live measurements", self.html)
+        self.assertIn("Nodes are illustrative", self.html)
         self.assertIn("@media(max-width:560px)", self.html)
-        self.assertIn("Execution capability", self.html)
+        self.assertIn("No live data", self.html)
 
 
 if __name__ == "__main__":
