@@ -99,6 +99,12 @@ class DashboardPreviewTests(unittest.TestCase):
         self.assertIn("open_interest_contracts", self.html)
         self.assertIn("spread_percent", self.html)
         self.assertIn("article.provider_seen_at||article.published_at||\"time unknown\"", self.html)
+        self.assertIn("Sentiment method warning", self.html)
+        self.assertIn("Headline-only public news; no X, Reddit, or Telegram ingestion.", self.html)
+        self.assertIn("Bid/ask notional imbalance", self.html)
+        self.assertIn("Open-interest value change (4h %)", self.html)
+        self.assertIn("JSON.stringify(data.timestamp_quality||{})", self.html)
+        self.assertIn("Analysis eligibility", self.html)
         for metric in (
             "Directional bias", "Structure event", "RSI (14)", "MACD histogram",
             "ATR (14)", "Buy-side swing reference", "Scenario targets status",
