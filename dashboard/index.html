@@ -237,13 +237,14 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
       });
     }
     if(name==="Technical analysis"){
-      const input=data.input||{},summary=data.market_structure||data.summary||data.analysis||{};
+      const summary=data.market_structure||data.summary||data.analysis||{};
+      const indicators=data.indicators||{};
       const panel=document.querySelector(".reference-board article:nth-child(2)");
       if(panel){
         const lines=panel.querySelectorAll(".ref-line strong");
         if(lines[1]) lines[1].textContent="CLOSED-CANDLE ANALYSIS";
         const kpis=panel.querySelectorAll(".ref-kpi strong");
-        if(kpis[0]) kpis[0].textContent=safeText(summary.rsi_14??summary.rsi);
+        if(kpis[0]) kpis[0].textContent=safeText(indicators.rsi_14??summary.rsi_14??summary.rsi);
         if(kpis[1]) kpis[1].textContent=safeText(summary.directional_bias||summary.trend||summary.bias||summary.direction);
         if(kpis[2]) kpis[2].textContent=safeText(summary.structure_event||summary.market_structure||summary.structure);
         const caption=panel.querySelector(".metric-caption:last-child");
@@ -262,7 +263,17 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
     if(description) description.textContent=detail;
     panel.setAttribute("data-api-state",state);
     if(state==="available"&&data) renderEndpointMetrics(name,data);
-    if(state!=="available"){const metrics=panel.querySelector(".api-metrics");if(metrics)metrics.replaceChildren();}
+    if(state!=="available"){
+      const metrics=panel.querySelector(".api-metrics");if(metrics)metrics.replaceChildren();
+      if(name==="Technical analysis"){
+        const analysisPanel=document.querySelector(".reference-board article:nth-child(2)");
+        if(analysisPanel){
+          analysisPanel.querySelectorAll(".ref-kpi strong").forEach(node=>node.textContent="unknown");
+          const caption=analysisPanel.querySelector(".metric-caption:last-child");
+          if(caption) caption.textContent="Waiting for verified API response; chart geometry remains illustrative.";
+        }
+      }
+    }
   }
   function renderRow(name,state,detail,data){
     updateDashboardPanel(name,state,detail,data);
