@@ -174,7 +174,7 @@ def claim_due_alerts(
         try:
             db.execute(
                 """UPDATE alert_delivery_outbox
-                SET status='dead',updated_at=?,last_error_code=COALESCE(last_error_code,'worker_lease_expired_max_attempts')
+                SET status='dead',updated_at=?,last_error_code='worker_lease_expired_max_attempts'
                 WHERE status='sending' AND updated_at <= ? AND attempts >= ?""",
                 (current, stale_before, max_attempts),
             )
@@ -183,7 +183,7 @@ def claim_due_alerts(
             db.execute(
                 """UPDATE alert_delivery_outbox
                 SET status='uncertain',updated_at=?,
-                    last_error_code=COALESCE(last_error_code,'delivery_outcome_unknown')
+                    last_error_code='delivery_outcome_unknown'
                 WHERE status='sending' AND updated_at <= ? AND attempts < ?""",
                 (current, stale_before, max_attempts),
             )
@@ -191,19 +191,17 @@ def claim_due_alerts(
                 """SELECT idempotency_key,rule_id,observation_id,payload_json,status,
                 attempts,next_attempt_at,created_at,updated_at,last_error_code
                 FROM alert_delivery_outbox
-                WHERE (status IN ('pending','failed') AND next_attempt_at <= ?)
-                   OR (status='sending' AND updated_at <= ? AND attempts < ?)
+                WHERE status IN ('pending','failed') AND next_attempt_at <= ?
                 ORDER BY created_at,idempotency_key LIMIT ?""",
-                (current, stale_before, max_attempts, limit),
+                (current, limit),
             ).fetchall()
             claimed = []
             for row in rows:
                 db.execute(
                     """UPDATE alert_delivery_outbox SET status='sending',attempts=attempts+1,updated_at=?
-                    WHERE idempotency_key=? AND
-                      ((status IN ('pending','failed') AND next_attempt_at <= ?)
-                       OR (status='sending' AND updated_at <= ? AND attempts < ?))""",
-                    (current, row[0], current, stale_before, max_attempts),
+                    WHERE idempotency_key=? AND status IN ('pending','failed')
+                      AND next_attempt_at <= ?""",
+                    (current, row[0], current),
                 )
                 updated = db.execute(
                     """SELECT idempotency_key,rule_id,observation_id,payload_json,status,
