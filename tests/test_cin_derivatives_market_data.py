@@ -449,3 +449,28 @@ def test_validate_payloads_rejects_duplicate_history_timestamps():
     row_b = {"symbol": "BTCUSDT", "sumOpenInterestValue": "110", "timestamp": 1_800_000_000_000}
     with pytest.raises(ValueError, match="duplicate timestamps"):
         api._validate_payloads(open_interest, premium, [row_a, row_b], "BTCUSDT")
+
+def test_depth_impact_estimates_report_adverse_slippage_for_fully_visible_sweeps():
+    asks = [(101.0, 100.0), (102.0, 100.0)]
+    bids = [(99.0, 100.0), (98.0, 100.0)]
+    ask_result = api._depth_impact_estimates(asks, side="ask", midpoint=100.0, quote_notionals=(1000.0,))[0]
+    bid_result = api._depth_impact_estimates(bids, side="bid", midpoint=100.0, quote_notionals=(1000.0,))[0]
+    assert ask_result["status"] == "estimated_full_visible_depth"
+    assert bid_result["status"] == "estimated_full_visible_depth"
+    assert ask_result["estimated_adverse_slippage_bps"] > 0
+    assert bid_result["estimated_adverse_slippage_bps"] > 0
+    assert ask_result["visible_depth_coverage_ratio"] == 1.0
+    assert bid_result["visible_depth_coverage_ratio"] == 1.0
+
+def test_depth_impact_estimates_do_not_publish_slippage_when_visible_depth_is_insufficient():
+    result = api._depth_impact_estimates([(101.0, 0.1)], side="ask", midpoint=100.0, quote_notionals=(1000.0,))[0]
+    assert result["status"] == "insufficient_visible_depth"
+    assert result["visible_depth_coverage_ratio"] < 1.0
+    assert result["estimated_adverse_slippage_bps"] is None
+    assert result["volume_weighted_average_price"] is None
+
+def test_depth_impact_estimates_reject_invalid_side_and_reference_notional():
+    with pytest.raises(ValueError, match="Invalid side or midpoint"):
+        api._depth_impact_estimates([(101.0, 1.0)], side="buy", midpoint=100.0)
+    with pytest.raises(ValueError, match="finite and positive"):
+        api._depth_impact_estimates([(101.0, 1.0)], side="ask", midpoint=100.0, quote_notionals=(0.0,))
