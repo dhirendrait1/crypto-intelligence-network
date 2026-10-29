@@ -306,9 +306,6 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.exception.status_code, 503)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class CoinbaseCandleValidationTests(unittest.TestCase):
     def test_coinbase_rejects_fractional_boolean_and_nonfinite_timestamps(self):
@@ -339,3 +336,6 @@ class CoinbaseCandleValidationTests(unittest.TestCase):
         with patch.object(api, "_request_json", return_value=payload):
             with self.assertRaisesRegex(ValueError, "no valid candles"):
                 api._fetch_coinbase("BTCUSD", "1m", 5)
+
+if __name__ == "__main__":
+    unittest.main()
