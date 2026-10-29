@@ -18,7 +18,6 @@ def test_fully_healthy_snapshot_is_healthy_but_does_not_claim_live_checks():
 
 @pytest.mark.parametrize("kwargs", [
     {"readiness": "not_ready"},
-    {"provider_status": "unavailable"},
     {"health": "unavailable"},
 ])
 def test_unavailable_inputs_take_precedence(kwargs):
@@ -261,3 +260,22 @@ def test_source_freshness_endpoint_keeps_missing_identity_unknown():
     assert body["status"] == "unknown"
     assert body["freshness"]["freshness"] == "unknown"
     assert body["checks_performed"] is False
+
+
+def test_provider_unavailable_degrades_without_claiming_service_unavailable():
+    result = monitoring_status(MonitoringSnapshot(health="healthy", readiness="ready", provider_status="unavailable", freshness="fresh"))
+    assert result["status"] == "degraded"
+    assert "provider_unavailable" in result["reasons"]
+    assert result["checks_performed"] is False
+
+
+def test_degraded_readiness_is_degraded_not_healthy():
+    result = monitoring_status(MonitoringSnapshot(health="healthy", readiness="degraded", provider_status="healthy", freshness="fresh"))
+    assert result["status"] == "degraded"
+    assert "service_readiness_degraded" in result["reasons"]
+
+
+def test_shared_aggregator_preserves_unknown_when_evidence_is_incomplete():
+    result = monitoring_status(MonitoringSnapshot(health="healthy", readiness="ready", provider_status="unknown", freshness="fresh"))
+    assert result["status"] == "unknown"
+    assert result["checks_performed"] is False
