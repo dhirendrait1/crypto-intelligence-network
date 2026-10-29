@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS alert_delivery_outbox (
     rule_id TEXT NOT NULL,
     observation_id TEXT NOT NULL,
     payload_json TEXT NOT NULL,
-    status TEXT NOT NULL CHECK(status IN ('pending','sending','sent','failed','dead')),
+    status TEXT NOT NULL CHECK(status IN ('pending','sending','sent','failed','dead','uncertain')),
     attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
     next_attempt_at TEXT NOT NULL,
     created_at TEXT NOT NULL,

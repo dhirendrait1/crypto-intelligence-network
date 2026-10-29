@@ -110,7 +110,7 @@ class TelegramDeliveryTests(unittest.TestCase):
             path, rule_id="r1", observation_id="e1",
             payload={"text": "BTC alert"}, now=NOW,
         )
-        result = process_due_telegram_alerts(str(path), now=NOW)
+        result = process_due_telegram_alerts(str(path), now=NOW, clock=lambda: NOW)
         self.assertEqual(result["claimed"], 1)
         self.assertEqual(result["results"][0]["status"], "sent")
 
@@ -125,7 +125,7 @@ class TelegramDeliveryTests(unittest.TestCase):
             path, rule_id="r1", observation_id="stale-completion",
             payload={"text": "BTC alert"}, now=NOW,
         )
-        result = process_due_telegram_alerts(str(path), now=NOW)
+        result = process_due_telegram_alerts(str(path), now=NOW, clock=lambda: NOW)
         self.assertEqual(result["results"][0]["status"], "state_update_failed")
         self.assertEqual(result["results"][0]["provider_message_id"], 88)
         mark_sent.assert_called_once()
@@ -138,7 +138,7 @@ class TelegramDeliveryTests(unittest.TestCase):
             path, rule_id="r1", observation_id="e1",
             payload={"text": "BTC alert"}, now=NOW,
         )
-        result = process_due_telegram_alerts(str(path), now=NOW)
+        result = process_due_telegram_alerts(str(path), now=NOW, clock=lambda: NOW)
         self.assertEqual(result["results"][0]["status"], "failed")
         self.assertEqual(result["results"][0]["error_code"], "telegram_network_error")
 
@@ -152,7 +152,7 @@ class TelegramDeliveryTests(unittest.TestCase):
             path, rule_id="r1", observation_id="stale-failure",
             payload={"text": "BTC alert"}, now=NOW,
         )
-        result = process_due_telegram_alerts(str(path), now=NOW)
+        result = process_due_telegram_alerts(str(path), now=NOW, clock=lambda: NOW)
         self.assertEqual(result["results"][0]["status"], "state_update_failed")
         self.assertEqual(result["results"][0]["error_code"], "telegram_network_error")
         mocked_mark_failed.assert_called_once()
@@ -166,6 +166,30 @@ class TelegramDeliveryTests(unittest.TestCase):
             payload={"text": "BTC alert"}, now=NOW,
         )
         with self.assertRaises(TelegramDeliveryError):
-            process_due_telegram_alerts(str(path), now=NOW)
+            process_due_telegram_alerts(str(path), now=NOW, clock=lambda: NOW)
         with __import__("sqlite3").connect(path) as db:
             self.assertEqual(db.execute("SELECT status FROM alert_delivery_outbox").fetchone()[0], "pending")
+
+
+    @patch("cin_alert_telegram_delivery.urllib.request.urlopen")
+    def test_slow_provider_acceptance_uses_completion_clock_and_never_auto_resends(self, mocked):
+        from datetime import timedelta
+        from cin_alert_delivery_outbox import claim_due_alerts, list_uncertain_alert_deliveries
+
+        mocked.return_value = FakeResponse({"ok": True, "result": {"message_id": 99}})
+        path = Path(tempfile.mkdtemp()) / "alerts.sqlite3"
+        item = enqueue_alert_delivery(
+            path, rule_id="r1", observation_id="slow-provider",
+            payload={"text": "BTC alert"}, now=NOW,
+        )
+        completion = NOW + timedelta(seconds=301)
+        result = process_due_telegram_alerts(
+            str(path), now=NOW, clock=lambda: completion,
+        )
+        self.assertEqual(result["results"][0]["status"], "state_update_failed")
+        self.assertEqual(result["results"][0]["provider_message_id"], 99)
+        recovered = claim_due_alerts(path, now=completion, lease_seconds=300)
+        self.assertEqual(recovered, [])
+        uncertain = list_uncertain_alert_deliveries(path)
+        self.assertEqual(len(uncertain), 1)
+        self.assertEqual(uncertain[0]["idempotency_key"], item["idempotency_key"])
