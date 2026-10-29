@@ -197,7 +197,7 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
         metricLine(metrics,"Confidence",summary.confidence);
         metricLine(metrics,"Articles returned",data.count);
         metricLine(metrics,"Provider timestamp quality",JSON.stringify(data.data_quality&&data.data_quality.provider_timestamp_quality_counts||{}));
-        (Array.isArray(data.articles)?data.articles:[]).slice(0,3).forEach((article,i)=>metricLine(metrics,safeText(article.title||("Headline "+(i+1)),article.provider_seen_at||article.published_at||"time unknown")));
+        (Array.isArray(data.articles)?data.articles:[]).slice(0,3).forEach((article,i)=>metricLine(metrics,safeText(article.title||("Headline "+(i+1))),article.provider_seen_at||article.published_at||"time unknown"));
       }else if(name==="Derivatives snapshot"){
         const d=data.data||{},q=data.data_quality||{},book=data.order_book||{};
         metricLine(metrics,"Funding (% / interval)",d.funding_rate_percent_per_interval);
