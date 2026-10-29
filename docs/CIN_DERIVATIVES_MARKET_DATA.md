@@ -46,3 +46,14 @@ These thresholds are CIN heuristics, not exchange guarantees. Automated tests us
 ### Analysis eligibility when timestamp evidence is incomplete
 
 `data_quality.freshness_status` is `warning` if any timestamp-quality component is stale, future-dated, invalid, or unavailable. The response also exposes `data_quality.analysis_eligibility`: `eligible` only when all tracked timestamp checks are acceptable, otherwise `not_recommended`, with a reason. This is a conservative consumer-facing warning, not a hard endpoint failure; the raw snapshot remains available for inspection. In particular, empty open-interest history leaves history-derived metrics null and must not be interpreted as a clean freshness result. Offline tests do not establish live provider availability.
+
+
+## Visible-depth and slippage-reference methodology
+
+The response now includes `order_book.visible_depth_impact_estimates` for both bid and ask sides at fixed 10,000 / 50,000 / 100,000 USDT quote-notional references. Levels are consumed in price priority; the volume-weighted average price is compared with the snapshot midpoint and adverse slippage is reported in basis points only when the entire reference notional fits inside the returned visible levels.
+
+- `estimated_full_visible_depth` means the requested reference notional fit within the displayed snapshot levels; it is not a promise that liquidity will remain available.
+- `insufficient_visible_depth` reports the visible coverage ratio and leaves average price and slippage null. CIN does not extrapolate beyond displayed depth.
+- Estimates exclude fees, latency, hidden liquidity, queue position, market impact beyond returned levels, and execution outcomes. The snapshot is not a simulation of a guaranteed fill.
+- Bid-side and ask-side results are separate hypothetical book-side measurements. They do not recommend a direction, order size, entry, or execution.
+- This feature is analytical only. CIN does not submit, route, amend, or cancel orders.
