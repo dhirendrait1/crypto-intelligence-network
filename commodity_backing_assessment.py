@@ -11,6 +11,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 VALID_STATUSES = {"verified", "unverified", "stale", "unavailable"}
+VALID_SOURCE_ROLES = {"issuer", "custodian", "auditor", "regulator", "exchange", "independent_research", "other"}
 REQUIRED_EVIDENCE_FIELDS = (
     "evidence_type",
     "source_name",
@@ -136,6 +137,13 @@ def normalize_evidence(item: Any, *, now: datetime | None = None,
         }
 
     record = {field: item.get(field) for field in REQUIRED_EVIDENCE_FIELDS}
+    raw_source_role = item.get("source_role")
+    normalized_source_role = raw_source_role.strip().lower() if isinstance(raw_source_role, str) else None
+    if normalized_source_role not in VALID_SOURCE_ROLES:
+        normalized_source_role = "unspecified"
+    record["source_role"] = normalized_source_role
+    record["source_role_is_self_reported"] = raw_source_role is not None
+    record["source_role_authenticated"] = False
     record["notes"] = str(item.get("notes", "")).strip() or None
     record["invalid_record"] = False
     status = str(record.get("status") or "unverified").lower()
@@ -245,6 +253,7 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
             for record in records
         }
         source_hosts = sorted({record.get("source_host") for record in records if record.get("source_host")})
+        role_counts = {role: sum(1 for record in records if record.get("source_role") == role) for role in sorted(VALID_SOURCE_ROLES | {"unspecified"})}
         coverage[kind] = {
             "status": state,
             "evidence_count": len(identities),
@@ -257,6 +266,8 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
                 else "no_valid_hosts"
             ),
             "source_independence_verified": False,
+            "source_role_counts_self_reported": role_counts,
+            "source_roles_authenticated": False,
         }
 
     statuses = [value["status"] for value in coverage.values()]
