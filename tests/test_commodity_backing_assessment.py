@@ -269,3 +269,29 @@ def test_invalid_ports_in_source_urls_are_rejected():
         result = normalize_evidence(valid_item(source_url=url), now=NOW)
         assert result["source_url_valid"] is False
         assert result["status"] == "unverified"
+
+
+def test_source_host_diversity_is_reported_without_claiming_independence():
+    evidence = [
+        valid_item(source_url="https://issuer.example/reserves"),
+        valid_item(
+            source_url="https://auditor.example/attestation",
+            source_name="Auditor",
+            published_at="2026-10-02T00:00:00Z",
+        ),
+    ]
+    result = assess_commodity_asset("PAXG", evidence, now=NOW)
+    coverage = result["evidence_coverage"]["reserve_attestation"]
+    assert coverage["distinct_source_host_count"] == 2
+    assert coverage["source_host_diversity"] == "multiple_hosts"
+    assert coverage["source_independence_verified"] is False
+
+
+def test_invalid_source_urls_do_not_count_toward_source_host_diversity():
+    result = assess_commodity_asset(
+        "PAXG", [valid_item(source_url="javascript:alert(1)")], now=NOW
+    )
+    coverage = result["evidence_coverage"]["reserve_attestation"]
+    assert coverage["distinct_source_host_count"] == 0
+    assert coverage["source_host_diversity"] == "no_valid_hosts"
+    assert coverage["source_independence_verified"] is False
