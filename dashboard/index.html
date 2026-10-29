@@ -173,7 +173,8 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
         const latest=candles.length?candles[candles.length-1]:null;
         metricLine(metrics,"Latest close",latest&&latest.close);
         metricLine(metrics,"Latest candle closed",latest?String(latest.is_closed):"unknown");
-        metricLine(metrics,"Data freshness",data.freshness_status||data.freshness||"unknown");
+        metricLine(metrics,"Latest closed candle age (seconds)",data.latest_closed_candle_age_seconds);
+        metricLine(metrics,"Freshness warning",data.stale_data_warning||"none reported");
         metricLine(metrics,"Provider",data.source);
       }else if(name==="Technical analysis"){
         const summary=data.summary||data.analysis||{};
