@@ -197,13 +197,24 @@ def claim_due_alerts(
                 WHERE status='sending' AND updated_at <= ? AND attempts < ?""",
                 (current, stale_before, max_attempts),
             )
+            # A runtime reduction of max_attempts must not allow an already
+            # exhausted failed item to be sent again. Explicit operator-authorized
+            # retries from an uncertain outcome remain claimable, even at the cap.
+            db.execute(
+                """UPDATE alert_delivery_outbox
+                SET status='dead',updated_at=?,last_error_code='max_attempts_reached'
+                WHERE status='failed' AND attempts >= ?""",
+                (current, max_attempts),
+            )
             rows = db.execute(
                 """SELECT idempotency_key,rule_id,observation_id,payload_json,status,
                 attempts,next_attempt_at,created_at,updated_at,last_error_code
                 FROM alert_delivery_outbox
                 WHERE status IN ('pending','failed') AND next_attempt_at <= ?
+                  AND (attempts < ? OR
+                       (status='pending' AND last_error_code='operator_authorized_retry_duplicate_risk'))
                 ORDER BY created_at,idempotency_key LIMIT ?""",
-                (current, limit),
+                (current, max_attempts, limit),
             ).fetchall()
             claimed = []
             for row in rows:
