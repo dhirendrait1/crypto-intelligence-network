@@ -31,7 +31,7 @@
 | Exchange flows / whale attribution | No complete end-to-end capability established | Not established | Define verifiable sources and attribution limitations; avoid unsupported whale claims |
 | Public news search and headline sentiment | `cin_public_news_sentiment_api.py`; GDELT DOC public article search; URL deduplication, provider article-time preservation, explicit low-confidence keyword sentiment, structured provider failures, scaffold route registration and offline regression tests | Partial / offline-tested | Live source validation; improve multilingual/context handling; this is news, not X/Reddit/Telegram sentiment |
 | Social-platform sentiment (X, Reddit, Telegram, etc.) | No complete end-to-end capability established; news headlines are not social sentiment | Not established | Identify public/authorized sources, respect access limits, deduplicate posts, preserve timestamps and uncertainty; no unsupported social claims |
-| Alerts and monitoring | No complete end-to-end capability established | Not established | Rules, delivery channels, deduplication, cooldowns, delivery-state tracking |
+| Alerts and monitoring | `cin_alert_rules.py`, `cin_alert_state_store.py`, `cin_alert_delivery_outbox.py`; offline tests for threshold semantics, persistent cooldown, duplicate prevention, concurrent enqueue, retry backoff, and terminal dead letters | Partial / offline-tested | Scheduler and live observation source; user rule CRUD/authentication; delivery adapter and credentials; abandoned `sending` recovery; worker-lease recovery; live delivery smoke test |
 | Forecast outcome tracking | No complete end-to-end capability established | Not established | Store forecast timestamp, horizon, price source, outcome calculation and calibration metrics |
 | Dashboard / Android-friendly UX | No complete end-to-end capability established by the source inventory | Not established | Define user flows, API integration, accessibility, loading/error/stale states |
 | Production release validation | Current Render revision has not been confirmed against feature-branch code; public smoke check was inaccessible from the current web access path | Release-blocked | Explicit release authorization, then controlled deployment and health/readiness/live smoke validation |
@@ -884,3 +884,30 @@ This checkpoint validates configured offline automation only. It does not establ
 - Added an offline test that verifies both providers are bounded and their oversized bodies become structured invalid-response failures.
 - Source commit: `92e6277f04d1f83cf59ebbefee2c80afc31fd78f`; test commit: `b8017ae026cd7758108590a81a3fa68f95935eef`.
 - CI for current head is pending. CIN remains read-only; no deployment changes.
+
+
+## Alert milestone refresh (2026-10-27)
+
+- PR #16 adds deterministic threshold evaluation, durable per-rule cooldown/event state, and a transport-neutral SQLite delivery outbox with idempotent enqueue, worker claims, bounded retry backoff, and terminal dead-letter state.
+- Offline regression tests and all four configured GitHub workflows passed on the latest checked PR head `498b77bfba506bfab829942cc7a39865c31e156f`. The scaffold CI runs the offline test suite; this is not live-provider or delivery verification.
+- Alert work remains **partial**, not production complete: there is no scheduler, user-facing rule API/authentication, notification provider adapter, or recovery for abandoned `sending` rows. The state store can atomically queue a supplied notification payload with a triggered decision, but no external delivery is performed. SQLite requires durable single-host storage or an explicit shared/single-writer strategy.
+- PR #15 was closed as superseded by PR #16 to prevent duplicate overlapping alert implementations. PR #16 remains open and unmerged; no deployment was initiated.
+
+
+## Alert implementation and verification refresh (2026-10-27)
+
+- Latest checked PR #16 head: `444efee19a201bad091191148608f00168cd7f8a`; all four configured GitHub workflows passed on this exact commit.
+- Alert threshold evaluation validates rule identity, metric identity, finite numeric values, and timezone-aware timestamps. SQLite state persists observation decisions and per-rule cooldowns with duplicate-event protection.
+- The canonical `cin_alert_delivery_outbox.py` is integrated with the state store: a trigger decision, cooldown state, audit event, and notification intent are committed in one transaction.
+- The outbox has idempotent enqueue, atomic worker claims, bounded exponential retries, terminal dead-letter state, and lease-based recovery for abandoned `sending` work.
+- This remains **partial**: no scheduler/live polling, rule CRUD API, user ownership/authentication, or notification provider adapter is connected. A queued message is not a delivered message. External delivery and Render deployment remain unverified.
+- PR #16 remains open and unmerged. No Render/Cloudflare changes were made; no trade/order execution, wallet access, private keys, or fund movement were introduced.
+
+
+## Telegram delivery adapter refresh (2026-10-27)
+
+- Added `cin_alert_telegram_delivery.py`: optional Telegram Bot API adapter plus explicit batch worker using the canonical durable outbox.
+- The adapter reads `CIN_TELEGRAM_BOT_TOKEN` and `CIN_TELEGRAM_CHAT_ID` from runtime environment variables, never from payload-controlled destination fields. Error codes are sanitized so provider exception text does not expose the token.
+- Added mocked/offline tests for successful acceptance, missing configuration, malformed messages, provider rejection, HTTP/network errors, and outbox success/retry transitions. Tests do not call Telegram or send real messages.
+- All four configured workflows passed on latest checked PR head `391954f525831b759ac74e0e744b321f4f6504a5`: deployment scaffold validation, offline API safety tests, offline technical-analysis tests, and screening tests. The scaffold workflow includes the offline test suite; its run is not a live Render test.
+- Step 26 is **Partial**: credentials/destination are not configured, no scheduler is installed, and live delivery is unverified. Do not deploy or configure secrets without the user's explicit Render/hosting action.

@@ -59,9 +59,9 @@
 
 ## Stage 5 — Alerts, monitoring, and forecast evaluation
 
-24. **[Pending]** Define user-configurable alert rules and threshold semantics.
-25. **[Pending]** Implement deduplication, cooldowns, delivery-state tracking, and retry/error handling.
-26. **[Pending]** Add an authorized alert delivery channel and keep credentials out of source control.
+24. **[Partial]** Threshold semantics (`above` / `below`) and a deterministic evaluator are implemented with offline tests; user-configurable rule CRUD, ownership, and API integration remain pending.
+25. **[Partial]** SQLite event deduplication, per-rule cooldown state, and a transport-neutral outbox with atomic claims, bounded retry backoff, terminal dead-letter state, and lease-based recovery for abandoned workers are implemented offline; the state store atomically enqueues a supplied notification payload with the trigger decision, but external delivery remains unconnected.
+26. **[Partial]** Add an optional Telegram Bot API adapter and explicit outbox worker using runtime-only `CIN_TELEGRAM_BOT_TOKEN` / `CIN_TELEGRAM_CHAT_ID`; scheduler, authorized destination setup, and live delivery verification remain pending.
 27. **[Pending]** Persist forecast timestamp, asset, price source, horizon, and target/invalidating conditions.
 28. **[Pending]** Evaluate forecast outcomes and calibration with reproducible metrics and survivorship/look-ahead safeguards.
 29. **[Partial]** Define monitoring health, freshness, provider outage, and stale-data warning states across services.
@@ -141,3 +141,36 @@ All four configured workflows passed on code/documentation checkpoint `2c1f816d5
 - The head includes CoinGecko unexpected provider/parser failure containment and offline API regression tests.
 - This verification is for the exact listed head only. It does not establish live-provider correctness or Render health. Any subsequent commit requires a fresh latest-head CI check.
 - PR #8 remains Draft and unmerged. No Render configuration or deployment was changed.
+
+
+## Alert milestone refresh (2026-10-27)
+
+- PR #16 contains the alert evaluator, SQLite state store, durable outbox, retry state machine, and offline regression tests. Latest checked PR head `498b77bfba506bfab829942cc7a39865c31e156f` passed all four configured workflows.
+- PR #15 was closed as a duplicate of PR #16. PR #16 remains open/unmerged; no deployment has been initiated.
+- This advances steps 24 and 25 to **Partial**, not complete. Steps 26 (authorized delivery), 27–28 (forecast outcome tracking/calibration), and release gate 35 remain unfinished. No live provider, notification, or Render checks are inferred from offline CI.
+
+
+## Alert implementation refresh (2026-10-27)
+
+- PR #16 latest checked head: `444efee19a201bad091191148608f00168cd7f8a`.
+- All four configured GitHub workflows passed on this exact head: Render deployment scaffold validation, offline API safety tests, offline technical-analysis tests, and screening tests.
+- The alert state store and canonical delivery outbox now share one SQLite schema. A triggered decision, cooldown state, audit event, and notification intent are written in one transaction.
+- The canonical outbox supports idempotent enqueue, atomic claims, bounded exponential retry, terminal dead-letter state, and lease-based recovery for abandoned worker claims.
+- Step 24 remains **Partial** because user-configurable rules, ownership/authentication, and scheduler/API integration are pending. Step 25 remains **Partial** because no authorized provider adapter is connected and delivery is not live-tested.
+- PR #16 remains open/unmerged. No Render or Cloudflare changes and no deployment were performed.
+
+
+## Telegram adapter implementation refresh (2026-10-27)
+
+- Added `cin_alert_telegram_delivery.py` with an explicit worker entry point that claims due outbox items, sends plain-text messages only to the configured Telegram destination, and records success or sanitized failure/retry state.
+- Credentials are read from runtime environment variables only; no token or chat ID was committed. Tests mock provider responses and never send real messages.
+- All four configured workflows passed on latest checked PR head `391954f525831b759ac74e0e744b321f4f6504a5`: deployment scaffold validation, offline API safety tests, offline technical-analysis tests, and screening tests. This is offline CI only, not live Render or Telegram verification.
+- Step 26 is **Partial**: there is no scheduler, no configured production credential/destination, and no live Telegram delivery smoke test. Do not configure secrets or deploy automatically.
+
+## One-shot worker CLI and latest-head CI (2026-10-27)
+
+- Added `cin_alert_telegram_worker.py`, an explicit one-shot CLI. It requires `--once`, a persistent SQLite path via `CIN_ALERT_DATABASE_PATH`, and runtime Telegram credentials; it never runs at import/startup and is not a scheduler.
+- Added offline CLI tests for explicit invocation, missing database configuration, bounded batch forwarding, and sanitized configuration failures. Added `docs/CIN_ALERT_WORKER_OPERATIONS.md` covering setup boundaries and release acceptance.
+- Latest PR #16 head `5cdd3f970c3f6051f6d8a6fbb29ef7edd4b35b56` passed all four configured GitHub workflows: Render deployment scaffold validation, offline API safety tests, offline technical-analysis tests, and screening checks.
+- This remains offline CI only. No real Telegram message was sent, no secrets were configured, no scheduler was enabled, and no Render/Cloudflare changes were made.
+- PR #16 remains open and unmerged. Release readiness is still blocked on persistent storage design, explicit destination setup, authorized live smoke tests, scheduler/monitoring decisions, and live deployment verification.
