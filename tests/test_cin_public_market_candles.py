@@ -148,26 +148,26 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["input"]["candle_count"], 50)
         self.assertTrue(any("not independently audited" in item for item in result["limitations"]))
 
-    async def test_coinbase_fallback_endpoint_marks_actual_usd_quote(self):
+    async def test_coinbase_usdt_mismatch_endpoint_does_not_claim_usd_quote(self):
         rows = [dict(row, _source="Coinbase Exchange public candles API (fallback after Binance HTTP 451)",
                      _source_endpoint=api.COINBASE_CANDLES_URL) for row in SAMPLE]
         with patch.object(api, "_load", return_value=rows):
             result = await api.get_market_candles("BTCUSDT", "1h", 50)
         self.assertEqual(result["source_id"], "coinbase_public")
         self.assertEqual(result["requested_quote_currency"], "USDT")
-        self.assertEqual(result["quote_currency"], "USD")
-        self.assertEqual(result["pair_metadata_status"], "mapped_provider_product")
-        self.assertEqual(result["data"][0]["observation_metadata"]["quote_currency"], "USD")
+        self.assertIsNone(result["quote_currency"])
+        self.assertEqual(result["pair_metadata_status"], "quote_mismatch")
+        self.assertIsNone(result["data"][0]["observation_metadata"]["quote_currency"])
 
-    async def test_coinbase_fallback_analysis_marks_actual_usd_quote(self):
+    async def test_coinbase_usdt_mismatch_analysis_does_not_claim_usd_quote(self):
         rows = [dict(row, _source="Coinbase Exchange public candles API (fallback after Binance HTTP 451)",
                      _source_endpoint=api.COINBASE_CANDLES_URL) for row in SAMPLE]
         with patch.object(api, "_load", return_value=rows):
             result = await api.analyze_public_market("BTCUSDT", "1h", 50)
         self.assertEqual(result["input"]["source_id"], "coinbase_public")
         self.assertEqual(result["input"]["requested_quote_currency"], "USDT")
-        self.assertEqual(result["input"]["quote_currency"], "USD")
-        self.assertEqual(result["input"]["pair_metadata_status"], "mapped_provider_product")
+        self.assertIsNone(result["input"]["quote_currency"])
+        self.assertEqual(result["input"]["pair_metadata_status"], "quote_mismatch")
 
     async def test_market_analysis_excludes_forming_candles_and_reports_freshness(self):
         now_ms = int(api.datetime.now(api.timezone.utc).timestamp() * 1000)
