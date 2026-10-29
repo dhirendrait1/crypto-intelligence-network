@@ -308,3 +308,34 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CoinbaseCandleValidationTests(unittest.TestCase):
+    def test_coinbase_rejects_fractional_boolean_and_nonfinite_timestamps(self):
+        payload = [
+            [1700000000, 99, 102, 100, 101, 10],
+            [1700000060.5, 99, 102, 100, 101, 10],
+            [True, 99, 102, 100, 101, 10],
+            [float("nan"), 99, 102, 100, 101, 10],
+        ]
+        with patch.object(api, "_request_json", return_value=payload):
+            rows = api._fetch_coinbase("BTCUSD", "1m", 5)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["open_time"], 1700000000000)
+
+    def test_coinbase_rejects_impossible_ohlc_and_nonfinite_volume(self):
+        payload = [
+            [1700000000, 99, 99, 100, 101, 10],  # high below close
+            [1700000060, 99, 102, 100, 101, float("inf")],
+            [1700000120, 99, 102, 100, 101, 10],  # valid
+        ]
+        with patch.object(api, "_request_json", return_value=payload):
+            rows = api._fetch_coinbase("BTCUSD", "1m", 5)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["open_time"], 1700000120000)
+
+    def test_coinbase_fails_if_every_candle_is_invalid(self):
+        payload = [[1700000000, 99, 99, 100, 101, 10]]
+        with patch.object(api, "_request_json", return_value=payload):
+            with self.assertRaisesRegex(ValueError, "no valid candles"):
+                api._fetch_coinbase("BTCUSD", "1m", 5)
