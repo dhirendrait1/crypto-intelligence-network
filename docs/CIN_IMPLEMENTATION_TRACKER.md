@@ -1,5 +1,8 @@
 # CIN Implementation Evidence Tracker
 
+> **Historical-log interpretation (reconciled 2026-10-30):** This file is an append-only implementation evidence ledger, not the active roadmap or a live status dashboard. Dated entries containing “CI pending”, “awaiting CI”, or “not yet verified” describe the checkpoint at the time of that entry; they must not be read as current workflow status. For current step status, use `docs/CIN_MASTER_ROADMAP.md`. For current CI, inspect the exact current PR head and its workflow runs in GitHub. The roadmap is the sole 7-stage / 35-step numbering source; historical tracker headings are not additional steps.
+
+
 **Scope:** Crypto Intelligence Network (CIN), read-only research, analysis, forecasting, monitoring, and alerts. This tracker records what is supported by repository evidence; it is not a claim that CIN is production-complete.
 
 **Branch:** `feat/cin-market-data-row-provenance` (current evidence update; this tracker is also referenced by the architecture-audit branch).  
