@@ -139,6 +139,9 @@ def normalize_evidence(item: Any, *, now: datetime | None = None,
         }
 
     record = {field: item.get(field) for field in REQUIRED_EVIDENCE_FIELDS}
+    raw_evidence_id = item.get("evidence_id")
+    record["evidence_id"] = raw_evidence_id.strip() if isinstance(raw_evidence_id, str) and 0 < len(raw_evidence_id.strip()) <= 128 else None
+    record["evidence_id_is_caller_supplied"] = record["evidence_id"] is not None
     raw_source_role = item.get("source_role")
     normalized_source_role = raw_source_role.strip().lower() if isinstance(raw_source_role, str) else None
     if normalized_source_role not in VALID_SOURCE_ROLES:
@@ -206,7 +209,7 @@ def normalize_evidence(item: Any, *, now: datetime | None = None,
     record["assessment_clock_valid"] = assessment_clock_valid
     fingerprint_fields = {
         field: record.get(field)
-        for field in (*REQUIRED_EVIDENCE_FIELDS, "source_role", "notes")
+        for field in (*REQUIRED_EVIDENCE_FIELDS, "evidence_id", "source_role", "notes")
     }
     canonical_payload = json.dumps(
         fingerprint_fields, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str
@@ -216,6 +219,68 @@ def normalize_evidence(item: Any, *, now: datetime | None = None,
     record["fingerprint_is_authenticity_proof"] = False
     return record
 
+
+def compare_evidence_snapshots(previous: list[dict[str, Any]], current: list[dict[str, Any]], *, now: datetime | None = None, max_age_days: int = 90) -> dict[str, Any]:
+    """Compare caller-supplied snapshots by stable evidence_id; persist nothing."""
+    if not isinstance(previous, list) or not isinstance(current, list):
+        raise ValueError("previous and current snapshots must both be lists")
+
+    def index_snapshot(items):
+        indexed = {}
+        duplicates = set()
+        untracked = 0
+        for item in items:
+            normalized = normalize_evidence(item, now=now, max_age_days=max_age_days)
+            evidence_id = normalized.get("evidence_id")
+            if not evidence_id:
+                untracked += 1
+                continue
+            if evidence_id in indexed:
+                duplicates.add(evidence_id)
+                indexed.pop(evidence_id, None)
+                continue
+            if evidence_id not in duplicates:
+                indexed[evidence_id] = normalized
+        return indexed, duplicates, untracked
+
+    previous_index, previous_duplicates, previous_untracked = index_snapshot(previous)
+    current_index, current_duplicates, current_untracked = index_snapshot(current)
+    ambiguous_ids = sorted(previous_duplicates | current_duplicates)
+    changes = []
+    for evidence_id in sorted((set(previous_index) | set(current_index)) - set(ambiguous_ids)):
+        before = previous_index.get(evidence_id)
+        after = current_index.get(evidence_id)
+        if before is None:
+            change_type = "added"
+        elif after is None:
+            change_type = "removed"
+        elif before.get("record_fingerprint_sha256") != after.get("record_fingerprint_sha256"):
+            change_type = "changed"
+        else:
+            change_type = "unchanged"
+        changes.append({
+            "evidence_id": evidence_id,
+            "change_type": change_type,
+            "previous_fingerprint_sha256": before.get("record_fingerprint_sha256") if before else None,
+            "current_fingerprint_sha256": after.get("record_fingerprint_sha256") if after else None,
+        })
+
+    return {
+        "comparison_mode": "caller_supplied_snapshots",
+        "history_persisted": False,
+        "change_count": len(changes),
+        "counts": {kind: sum(1 for item in changes if item["change_type"] == kind) for kind in ("added", "removed", "changed", "unchanged")},
+        "changes": changes,
+        "ambiguous_evidence_ids": ambiguous_ids,
+        "untracked_previous_record_count": previous_untracked,
+        "untracked_current_record_count": current_untracked,
+        "limitations": [
+            "CIN compares only snapshots supplied in this request; no history is stored.",
+            "Stable evidence_id values are caller-supplied and are not authenticated by CIN.",
+            "Fingerprints cover normalized metadata, not source-document contents or authenticity.",
+            "Ambiguous duplicate IDs are excluded from change classification.",
+        ],
+    }
 
 def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
                            now: datetime | None = None,
