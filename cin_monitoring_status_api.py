@@ -142,25 +142,27 @@ def assess_timestamp_freshness(
 
 
 class SourceFreshnessRequest(BaseModel):
-    """Validate one caller-supplied observation and assess its timestamp age."""
+    """Validate one caller-supplied observation against CIN-configured policy only."""
     model_config = ConfigDict(extra="forbid")
     observation: dict[str, Any]
-    max_age_seconds: int = Field(gt=0, le=604800)
 
 
 @router.post("/monitoring/source-freshness")
 def assess_source_observation_freshness(request: SourceFreshnessRequest) -> dict[str, Any]:
-    """Combine metadata validation and timestamp freshness; never polls a provider."""
+    """Assess timestamp age only when an exact source/data-type policy is configured."""
     from datetime import timezone
     try:
-        # In the deployed scaffold, modules are imported through the app package.
         from app.cin_source_observation_contract import validate_source_observation
-    except ModuleNotFoundError:
-        # Keep direct-module imports working in the offline contract test suite.
+        from app.cin_source_freshness_policy import resolve_freshness_policy
+    except ModuleNotFoundError as exc:
+        if exc.name != "app":
+            raise
         from cin_source_observation_contract import validate_source_observation
+        from cin_source_freshness_policy import resolve_freshness_policy
 
     now = datetime.now(timezone.utc)
-    metadata = validate_source_observation(request.observation, now=now)
+    observation = request.observation
+    metadata = validate_source_observation(observation, now=now)
     if metadata.get("validity") != "valid_metadata":
         return {
             "status": "unknown",
@@ -169,17 +171,38 @@ def assess_source_observation_freshness(request: SourceFreshnessRequest) -> dict
             "metadata": metadata,
             "freshness": {"freshness": "unknown", "age_seconds": None,
                           "reason": "observation_metadata_not_valid"},
-            "freshness_policy": {
-                "max_age_seconds": request.max_age_seconds,
-                "selection": "caller_supplied_not_source_specific",
-            },
+            "freshness_policy": {"selection": "source_data_type_registry", "configured": False},
             "note": "Caller-supplied metadata only; CIN did not contact or authenticate the source.",
+        }
+
+    data_type = observation.get("data_type")
+    policy = resolve_freshness_policy(metadata.get("source_id"), data_type)
+    if policy is None:
+        return {
+            "status": "unknown",
+            "read_only": True,
+            "checks_performed": False,
+            "metadata": metadata,
+            "freshness": {"freshness": "unknown", "age_seconds": None,
+                          "reason": "source_data_type_policy_not_configured"},
+            "freshness_policy": {
+                "selection": "source_data_type_registry",
+                "configured": False,
+                "source_id": metadata.get("source_id"),
+                "data_type": data_type if isinstance(data_type, str) else None,
+            },
+            "note": (
+                "No exact CIN source/data-type freshness policy is configured. "
+                "Caller-provided age limits are not accepted; no threshold was guessed. "
+                "Source authenticity and provider availability are not verified."
+            ),
         }
 
     freshness = assess_timestamp_freshness(
         metadata["observed_at"],
         now=now,
-        max_age_seconds=request.max_age_seconds,
+        max_age_seconds=policy.max_age_seconds,
+        future_tolerance_seconds=policy.future_tolerance_seconds,
     )
     return {
         "status": freshness["freshness"],
@@ -188,11 +211,15 @@ def assess_source_observation_freshness(request: SourceFreshnessRequest) -> dict
         "metadata": metadata,
         "freshness": freshness,
         "freshness_policy": {
-            "max_age_seconds": request.max_age_seconds,
-            "selection": "caller_supplied_not_source_specific",
+            "selection": "source_data_type_registry",
+            "configured": True,
+            "source_id": policy.source_id,
+            "data_type": policy.data_type,
+            "max_age_seconds": policy.max_age_seconds,
+            "future_tolerance_seconds": policy.future_tolerance_seconds,
         },
         "note": (
-            "Timestamp age is assessed against the caller-supplied limit, not a CIN-enforced "
-            "source-specific policy; source authenticity and provider availability are not verified."
+            "Timestamp age was evaluated against the configured source/data-type policy. "
+            "This does not verify source authenticity, market correctness, or provider availability."
         ),
     }
