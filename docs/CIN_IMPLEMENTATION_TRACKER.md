@@ -925,3 +925,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Added four offline tests covering non-English suppression, unknown-language status, English locale normalization, and parser-to-classifier propagation.
 - Updated `docs/CIN_PUBLIC_NEWS_SENTIMENT.md` and the master roadmap with English-only scope and remaining multilingual limitations.
 - Remaining acceptance: multilingual model/translation and mixed-language evaluation, context/negation handling, and authorized live GDELT/RSS validation. Step 19 remains Partial.
+
+
+## Step 20 — authorized social-source ingestion design (2026-10-30)
+
+- Added `docs/CIN_SOCIAL_SOURCE_INGESTION_POLICY.md` with provider-specific X, Reddit, and Telegram authorization boundaries and a common ingestion/provenance contract.
+- Defined explicit approval gates, official/authorized API access, least-privilege scopes, provider access-tier/terms review, rate limits, deletion/retention obligations, privacy minimization, secret/log redaction, timestamp provenance, record deduplication, and release checklist.
+- Prohibited unauthorized scraping/access-control bypass, private/restricted Telegram collection without permission, outbound Telegram messaging, unsupported identity/whale attribution, and any trade/wallet/funds capability.
+- Step 20 remains Partial. No social API credentials, connectors, collection jobs, or live provider calls were added; provider authorization and implementation remain outstanding.
