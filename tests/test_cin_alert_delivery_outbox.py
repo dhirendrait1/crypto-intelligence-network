@@ -1,5 +1,6 @@
 """Offline tests for CIN's durable notification outbox state machine."""
 from concurrent.futures import ThreadPoolExecutor
+import sqlite3
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -165,3 +166,48 @@ def test_uncertain_resolution_rejects_invalid_or_repeated_resolution(tmp_path):
     resolve_uncertain_alert_delivery(path, item["idempotency_key"], resolution="sent", now=NOW)
     with pytest.raises(ValueError):
         resolve_uncertain_alert_delivery(path, item["idempotency_key"], resolution="sent", now=NOW)
+
+
+def test_legacy_database_migrates_status_constraint_and_preserves_rows(tmp_path):
+    path = tmp_path / "legacy-alerts.sqlite3"
+    legacy_schema = """
+    CREATE TABLE alert_delivery_outbox (
+        idempotency_key TEXT PRIMARY KEY,
+        rule_id TEXT NOT NULL,
+        observation_id TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('pending','sending','sent','failed','dead')),
+        attempts INTEGER NOT NULL DEFAULT 0,
+        next_attempt_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        last_error_code TEXT
+    );
+    CREATE INDEX idx_alert_outbox_due ON alert_delivery_outbox(status, next_attempt_at);
+    """
+    with sqlite3.connect(path) as db:
+        db.executescript(legacy_schema)
+        timestamp = NOW.isoformat()
+        db.execute(
+            """INSERT INTO alert_delivery_outbox
+            (idempotency_key,rule_id,observation_id,payload_json,status,attempts,
+             next_attempt_at,created_at,updated_at,last_error_code)
+            VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            ("r1:legacy", "r1", "legacy", '{"text":"keep me"}', "sending", 1,
+             timestamp, timestamp, timestamp, None),
+        )
+
+    # Opening through the current implementation migrates the legacy CHECK
+    # constraint without dropping existing outbox records.
+    assert claim_due_alerts(path, now=NOW + timedelta(seconds=300)) == []
+    uncertain = list_uncertain_alert_deliveries(path)
+    assert len(uncertain) == 1
+    assert uncertain[0]["idempotency_key"] == "r1:legacy"
+    assert uncertain[0]["payload"] == {"text": "keep me"}
+    assert uncertain[0]["status"] == "uncertain"
+    with sqlite3.connect(path) as db:
+        schema = db.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='alert_delivery_outbox'"
+        ).fetchone()[0]
+        assert "uncertain" in schema
+        assert db.execute("SELECT COUNT(*) FROM alert_delivery_outbox").fetchone()[0] == 1
