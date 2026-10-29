@@ -115,13 +115,14 @@ def process_due_telegram_alerts(
         lease_seconds=lease_seconds, max_attempts=max_attempts,
     )
     results = []
+    acknowledgement_clock = clock or (lambda: datetime.now(timezone.utc))
     for item in claimed:
         try:
             sent = send_telegram_notification(item["payload"])
             try:
                 state = mark_alert_sent(
                     database_path, item["idempotency_key"],
-                    now=now, claim_attempt=item["attempts"], lease_seconds=lease_seconds,
+                    now=acknowledgement_clock(), claim_attempt=item["attempts"], lease_seconds=lease_seconds,
                 )
             except ValueError:
                 # A newer claim may own the row now. Do not overwrite its state
