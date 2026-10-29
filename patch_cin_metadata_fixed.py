@@ -24,6 +24,7 @@ MODULES = (
     "cin_public_market_candles_api.py",
     "cin_derivatives_market_data_api.py",
     "cin_public_news_sentiment_api.py",
+    "cin_monitoring_status.py",
     "cin_monitoring_status_api.py",
     "cin_source_observation_contract.py",
 )
