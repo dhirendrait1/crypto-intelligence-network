@@ -131,7 +131,7 @@ class DashboardPreviewTests(unittest.TestCase):
         self.assertIn('kpis[1].textContent=meta.latencyMs+" ms"', self.html)
         self.assertIn('data.data.length+"/"+data.count+" candles"', self.html)
         self.assertIn('data.latest_closed_candle_age_seconds', self.html)
-        self.assertIn('tag.textContent="API-REPORTED / MEASURED"', self.html)
+        self.assertIn('tag.textContent=state==="available"?"API-REPORTED / MEASURED":"UNVERIFIED"', self.html)
         self.assertIn('tag.textContent="UNVERIFIED"', self.html)
         self.assertIn('if(state!=="available")', self.html)
         self.assertIn('if(kpis[2]) kpis[2].textContent="UNKNOWN"', self.html)
