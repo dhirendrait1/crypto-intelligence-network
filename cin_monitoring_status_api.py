@@ -1,3 +1,4 @@
+import math
 """Read-only API contract for caller-supplied CIN service monitoring snapshots."""
 from datetime import datetime
 from typing import Any
@@ -112,8 +113,11 @@ def assess_timestamp_freshness(
     age_seconds = (now.astimezone(parsed.tzinfo) - parsed).total_seconds()
     if age_seconds < -future_tolerance_seconds:
         return {"freshness": "unknown", "age_seconds": None, "reason": "timestamp_too_far_in_future"}
-    age_seconds = max(0, int(age_seconds))
+    age_seconds = max(0, age_seconds)
+    # Compare the unrounded duration to avoid treating 300.5 seconds as fresh
+    # under a 300-second policy. Report fractional ages rounded up to seconds.
+    reported_age_seconds = math.ceil(age_seconds)
     if age_seconds > max_age_seconds:
-        return {"freshness": "stale", "age_seconds": age_seconds, "reason": "age_exceeds_limit"}
-    return {"freshness": "fresh", "age_seconds": age_seconds, "reason": "within_limit"}
+        return {"freshness": "stale", "age_seconds": reported_age_seconds, "reason": "age_exceeds_limit"}
+    return {"freshness": "fresh", "age_seconds": reported_age_seconds, "reason": "within_limit"}
 
