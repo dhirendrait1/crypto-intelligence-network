@@ -47,7 +47,12 @@ def _migrate_outbox_schema(connection: sqlite3.Connection) -> None:
     row = connection.execute(
         "SELECT sql FROM sqlite_master WHERE type='table' AND name='alert_delivery_outbox'"
     ).fetchone()
-    if not row or "uncertain" in (row[0] or "").lower():
+    if not row:
+        return
+    schema_sql = (row[0] or "").lower()
+    # Upgrade either legacy constraint independently: an intermediate schema
+    # may already allow 'uncertain' but still permit negative attempt counts.
+    if "uncertain" in schema_sql and "check (attempts >= 0)" in schema_sql:
         return
 
     # SQLite cannot alter a CHECK constraint in place. Rebuild transactionally,
