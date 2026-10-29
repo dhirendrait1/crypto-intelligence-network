@@ -119,7 +119,17 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             result = await api.get_market_candles("BTCUSDT", "1h", 50)
         self.assertEqual(result["mode"], "read_only")
         self.assertEqual(result["source"], "Binance public market-data API")
+        self.assertEqual(result["source_id"], "binance_public")
+        self.assertEqual(result["quote_currency"], "USDT")
+        self.assertEqual(result["requested_quote_currency"], "USDT")
+        self.assertEqual(result["pair_metadata_status"], "identified")
         self.assertEqual(result["count"], 50)
+        metadata = result["data"][0]["observation_metadata"]
+        self.assertEqual(metadata["source_id"], "binance_public")
+        self.assertEqual(metadata["quote_currency"], "USDT")
+        self.assertEqual(metadata["interval"], "1h")
+        self.assertFalse(metadata["freshness_assessed"])
+        self.assertFalse(metadata["source_authenticity_verified"])
         self.assertIn("open_time_utc", result["data"][0])
         self.assertIn("close_time_utc", result["data"][0])
         self.assertIn("retrieved_at", result)
@@ -131,8 +141,33 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["input"]["symbol"], "BTCUSDT")
         self.assertEqual(result["input"]["timeframe"], "1h")
         self.assertEqual(result["input"]["source"], "Binance public market-data API")
+        self.assertEqual(result["input"]["source_id"], "binance_public")
+        self.assertEqual(result["input"]["quote_currency"], "USDT")
+        self.assertEqual(result["input"]["requested_quote_currency"], "USDT")
+        self.assertEqual(result["input"]["pair_metadata_status"], "identified")
         self.assertEqual(result["input"]["candle_count"], 50)
         self.assertTrue(any("not independently audited" in item for item in result["limitations"]))
+
+    async def test_coinbase_usdt_mismatch_endpoint_does_not_claim_usd_quote(self):
+        rows = [dict(row, _source="Coinbase Exchange public candles API (fallback after Binance HTTP 451)",
+                     _source_endpoint=api.COINBASE_CANDLES_URL) for row in SAMPLE]
+        with patch.object(api, "_load", return_value=rows):
+            result = await api.get_market_candles("BTCUSDT", "1h", 50)
+        self.assertEqual(result["source_id"], "coinbase_public")
+        self.assertEqual(result["requested_quote_currency"], "USDT")
+        self.assertIsNone(result["quote_currency"])
+        self.assertEqual(result["pair_metadata_status"], "quote_mismatch")
+        self.assertIsNone(result["data"][0]["observation_metadata"]["quote_currency"])
+
+    async def test_coinbase_usdt_mismatch_analysis_does_not_claim_usd_quote(self):
+        rows = [dict(row, _source="Coinbase Exchange public candles API (fallback after Binance HTTP 451)",
+                     _source_endpoint=api.COINBASE_CANDLES_URL) for row in SAMPLE]
+        with patch.object(api, "_load", return_value=rows):
+            result = await api.analyze_public_market("BTCUSDT", "1h", 50)
+        self.assertEqual(result["input"]["source_id"], "coinbase_public")
+        self.assertEqual(result["input"]["requested_quote_currency"], "USDT")
+        self.assertIsNone(result["input"]["quote_currency"])
+        self.assertEqual(result["input"]["pair_metadata_status"], "quote_mismatch")
 
     async def test_market_analysis_excludes_forming_candles_and_reports_freshness(self):
         now_ms = int(api.datetime.now(api.timezone.utc).timestamp() * 1000)
