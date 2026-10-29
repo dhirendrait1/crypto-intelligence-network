@@ -84,13 +84,24 @@
 
 **Exit gate:** test evidence, live checks, deployed revision, known limitations, and rollback steps are documented; PR #8 remains unmerged until the user authorizes the release path.
 
-## Current checkpoint (2026-10-25)
+## Consolidated implementation and verification record (2026-10-30)
 
-- Latest CI-verified code/documentation checkpoint before this tracker clarification: `1b847b843c14e0929f9ec972fbc36af14b70a356`.
-- All four workflows passed on that checkpoint: CIN Automated Tests (`40142830679`), CIN screening checks (`40142830668`), CIN Technical Analysis Tests (`40142830721`), and CIN evidence ingestion API checks (`40142830681`). A later tracker-only clarification records remaining live and interval-boundary acceptance gaps.
-- The CI results establish automated test success only; they do not establish live-provider correctness or deployed service health.
-- PR #8 is Draft and unmerged. No Render changes or deployment were performed.
-- **Do not report a single completion percentage:** step statuses mix implemented modules, partial acceptance work, future capabilities, and an approval-blocked release gate. Count by status only after refreshing this roadmap against the current head and CI evidence.
+This section replaces superseded checkpoint narratives that separately described intermediate commits as pending CI. Historical commit IDs remain in the implementation tracker; current status is governed by the numbered steps above and exact-head CI records below.
+
+- **Current verified documentation head:** `92075a147bc64c0af3860b18ed01f821d1708232`. All four configured workflows passed on this exact head: CIN Technical Analysis Tests (`40970157697`), CIN Automated Tests (`40970157850`), CIN evidence ingestion API checks (`40970157709`), and CIN screening checks (`40970157715`).
+- **Candle validation evidence:** PR #27 remains the offline interval-boundary test branch; latest known head `23c6489121664d766c44de98ea40833f55a44e4e` passed all four workflows. Kraken compatibility is tested with mocked timestamp fixtures only; live exchange behavior remains unverified.
+- **Screening cache evidence:** PR #65 adds exact fresh-cache and stale-cache boundary tests. The PR remains Draft/open/unmerged; tests are offline.
+- **Market-data provenance evidence:** PR #66 records provider identity and provider retrieval time per row and verifies endpoint serialization. Its latest documentation head is the current checkpoint above; all four workflows passed. This does not establish live provider correctness.
+- **Release controls:** PR #8, #65 and #66 remain Draft/open/unmerged. PR #11 was merged on 2026-10-26. Render remains user-managed; no deployment was performed.
+- **Verification boundary:** passing GitHub Actions means the configured automated checks passed on the exact listed commit. It does not establish live provider availability, production response behavior, or the currently deployed Render revision.
+
+## Step 5 reconciliation notes (2026-10-30)
+
+- The seven-stage / 35-step numbering in this document is the sole active roadmap baseline. Do not create parallel step numbering in status updates or treat historical implementation-log headings as roadmap steps.
+- Historical intermediate CI entries that said “pending” or “must be refreshed” have been consolidated above; their old commit-specific results remain in `CIN_IMPLEMENTATION_TRACKER.md`.
+- The tracker is the detailed implementation evidence ledger; this roadmap is the authoritative numbered scope/status view. Architecture status is a high-level architecture register, not a second roadmap.
+- PR state is recorded in the repository reconciliation section below and should be refreshed from GitHub before future status claims.
+- Step 5 remains Partial only for any remaining legacy references or duplicate milestone narratives outside this consolidated roadmap/tracker relationship. No release or live-provider work is implied.
 
 ## Operating rule
 
