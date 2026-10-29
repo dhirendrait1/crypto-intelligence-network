@@ -182,13 +182,18 @@ def test_crash_before_send_leaves_claim_recoverable_only_after_lease_expiry(tmp_
         now=NOW,
     )
 
+    # Credentials are fake test values; the provider call is fully mocked.
     # Simulate abrupt process termination before the provider call completes.
-    with patch(
-        "cin_alert_telegram_delivery.send_telegram_notification",
-        side_effect=SystemExit("simulated process crash"),
-    ):
-        with pytest.raises(SystemExit, match="simulated process crash"):
-            process_due_telegram_alerts(str(path), now=NOW)
+    with patch.dict(os.environ, {
+        "CIN_TELEGRAM_BOT_TOKEN": "fake-test-token",
+        "CIN_TELEGRAM_CHAT_ID": "fake-test-chat",
+    }):
+        with patch(
+            "cin_alert_telegram_delivery.send_telegram_notification",
+            side_effect=SystemExit("simulated process crash"),
+        ):
+            with pytest.raises(SystemExit, match="simulated process crash"):
+                process_due_telegram_alerts(str(path), now=NOW)
 
     assert claim_due_alerts(
         path, now=NOW + __import__("datetime").timedelta(seconds=299)
