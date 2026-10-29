@@ -419,3 +419,51 @@ def test_expired_claim_cannot_acknowledge_before_lease_recovery(tmp_path, acknow
     assert len(uncertain) == 1
     assert uncertain[0]["idempotency_key"] == item["idempotency_key"]
     assert uncertain[0]["status"] == "uncertain"
+
+
+
+def test_lowered_retry_cap_does_not_send_an_already_exhausted_failed_item(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    item = enqueue_alert_delivery(
+        path, rule_id="r1", observation_id="cap-change", payload={}, now=NOW,
+    )
+    claim_due_alerts(path, now=NOW, max_attempts=3)
+    failed = mark_alert_failed(
+        path, item["idempotency_key"], now=NOW, error_code="temporary_error",
+        retry_delay_seconds=1, max_attempts=3, claim_attempt=1,
+    )
+    assert failed["status"] == "failed"
+
+    # If deployment configuration is lowered between attempts, the next
+    # worker must dead-letter the exhausted item rather than send it again.
+    assert claim_due_alerts(
+        path, now=NOW + timedelta(seconds=1), max_attempts=1,
+    ) == []
+    with sqlite3.connect(path) as db:
+        row = db.execute(
+            "SELECT status,last_error_code FROM alert_delivery_outbox WHERE idempotency_key=?",
+            (item["idempotency_key"],),
+        ).fetchone()
+    assert row == ("dead", "max_attempts_reached")
+
+
+def test_operator_authorized_uncertain_retry_can_override_retry_cap_once(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    item = enqueue_alert_delivery(
+        path, rule_id="r1", observation_id="manual-retry-cap", payload={}, now=NOW,
+    )
+    claim_due_alerts(path, now=NOW, max_attempts=5)
+    claim_due_alerts(
+        path, now=NOW + timedelta(seconds=300), lease_seconds=300, max_attempts=5,
+    )
+    resolved = resolve_uncertain_alert_delivery(
+        path, item["idempotency_key"], resolution="retry_authorized",
+        now=NOW + timedelta(seconds=301),
+    )
+    assert resolved["status"] == "pending"
+    retry = claim_due_alerts(
+        path, now=NOW + timedelta(seconds=302), max_attempts=1,
+    )
+    assert len(retry) == 1
+    assert retry[0]["attempts"] == 2
+    assert retry[0]["status"] == "sending"
