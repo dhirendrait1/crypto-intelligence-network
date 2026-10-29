@@ -216,6 +216,8 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
         metricLine(metrics,"Confidence",summary.confidence);
         metricLine(metrics,"Articles returned",data.count);
         metricLine(metrics,"Provider timestamp quality",JSON.stringify(data.data_quality&&data.data_quality.provider_timestamp_quality_counts||{}));
+        metricLine(metrics,"Sentiment method warning",summary.warning);
+        metricLine(metrics,"Coverage limitation","Headline-only public news; no X, Reddit, or Telegram ingestion.");
         (Array.isArray(data.articles)?data.articles:[]).slice(0,3).forEach((article,i)=>metricLine(metrics,safeText(article.title||("Headline "+(i+1))),article.provider_seen_at||article.published_at||"time unknown"));
       }else if(name==="Derivatives snapshot"){
         const d=data.data||{},q=data.data_quality||{},book=data.order_book||{};
@@ -223,7 +225,11 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
         metricLine(metrics,"Open interest (contracts)",d.open_interest_contracts);
         metricLine(metrics,"Mark price",d.mark_price);
         metricLine(metrics,"Order-book spread (%)",book.spread_percent);
+        metricLine(metrics,"Bid/ask notional imbalance",book.bid_ask_notional_imbalance);
+        metricLine(metrics,"Open-interest value change (4h %)",d.open_interest_value_change_4h_percent);
         metricLine(metrics,"Freshness",q.freshness_status);
+        metricLine(metrics,"Analysis eligibility",q.analysis_eligibility);
+        metricLine(metrics,"Timestamp checks",JSON.stringify(data.timestamp_quality||{}));
         metricLine(metrics,"Liquidations",data.liquidations&&data.liquidations.status||"unknown");
       }
     }
