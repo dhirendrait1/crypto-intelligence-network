@@ -79,5 +79,16 @@ class DashboardPreviewTests(unittest.TestCase):
         self.assertIn("not data correctness, freshness, or source authenticity", self.html)
 
 
+    def test_reference_inspired_dark_terminal_layout_is_present(self):
+        self.assertIn("terminal-layout", self.html)
+        self.assertIn("particle-stage", self.html)
+        self.assertIn("CIN intelligence field", self.html)
+        self.assertIn("visual concept / not a live network map", self.html)
+        self.assertIn("Illustrative chart only", self.html)
+        self.assertIn("System status / read-only", self.html)
+        self.assertIn("@media(max-width:560px)", self.html)
+        self.assertIn("Execution capability", self.html)
+
+
 if __name__ == "__main__":
     unittest.main()
