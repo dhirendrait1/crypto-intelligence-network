@@ -178,12 +178,31 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
         metricLine(metrics,"Provider",data.source);
       }else if(name==="Technical analysis"){
         const summary=data.market_structure||data.summary||data.analysis||{};
+        const indicators=data.indicators||{};
         const input=data.input||{};
-        metricLine(metrics,"Analysis candles",input.analysis_candle_count);
+        const levels=data.liquidity_reference_levels||{};
+        const scenarios=data.scenario_targets||{};
+        metricLine(metrics,"Analysis candles",input.analysis_candle_count??input.candle_count);
         metricLine(metrics,"Forming candles excluded",input.forming_candle_excluded_count);
         metricLine(metrics,"Last closed candle",input.last_candle_close_time_utc);
         metricLine(metrics,"Provider",input.source);
-        for(const [label,value] of Object.entries(summary).slice(0,3)) metricLine(metrics,label,value);
+        metricLine(metrics,"Directional bias",summary.directional_bias||summary.trend||summary.bias);
+        metricLine(metrics,"Structure event",summary.structure_event);
+        metricLine(metrics,"Swing high pattern",summary.swing_high_pattern);
+        metricLine(metrics,"Swing low pattern",summary.swing_low_pattern);
+        metricLine(metrics,"RSI (14)",indicators.rsi_14??summary.rsi_14??summary.rsi);
+        metricLine(metrics,"MACD line",indicators.macd_line);
+        metricLine(metrics,"MACD signal",indicators.macd_signal);
+        metricLine(metrics,"MACD histogram",indicators.macd_histogram);
+        metricLine(metrics,"ATR (14)",indicators.atr_14);
+        metricLine(metrics,"Latest close",input.last_close);
+        metricLine(metrics,"Buy-side swing reference",levels.buy_side_reference);
+        metricLine(metrics,"Sell-side swing reference",levels.sell_side_reference);
+        metricLine(metrics,"Scenario targets status",scenarios.status);
+        if(scenarios.targets&&typeof scenarios.targets==="object"){
+          for(const [label,value] of Object.entries(scenarios.targets)) metricLine(metrics,"Illustrative "+label,value);
+        }
+        if(Array.isArray(data.limitations)) metricLine(metrics,"Analysis limitations",data.limitations.join(" "));
       }else if(name==="Coin screening"){
         const rows=Array.isArray(data.data)?data.data:[];
         metricLine(metrics,"Assets returned",data.count);
