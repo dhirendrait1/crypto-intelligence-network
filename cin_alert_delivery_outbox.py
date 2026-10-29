@@ -229,6 +229,8 @@ def claim_due_alerts(
 
 
 def mark_alert_sent(database_path: str | Path, idempotency_key: str, *, now: datetime | str, claim_attempt: int) -> dict[str, Any]:
+    if isinstance(claim_attempt, bool) or not isinstance(claim_attempt, int) or claim_attempt < 1:
+        raise ValueError("claim_attempt must be a positive integer")
     current = _timestamp(now, "now").isoformat()
     with _connect(database_path) as db:
         db.execute("BEGIN IMMEDIATE")
@@ -266,6 +268,8 @@ def mark_alert_failed(
 ) -> dict[str, Any]:
     """Record a bounded retry schedule for the current claim only."""
     current_dt = _timestamp(now, "now")
+    if isinstance(claim_attempt, bool) or not isinstance(claim_attempt, int) or claim_attempt < 1:
+        raise ValueError("claim_attempt must be a positive integer")
     if not isinstance(error_code, str) or not error_code or len(error_code) > 80:
         raise ValueError("error_code must be a non-empty sanitized code of at most 80 characters")
     if isinstance(retry_delay_seconds, bool) or not isinstance(retry_delay_seconds, int) or not 1 <= retry_delay_seconds <= 86400:
