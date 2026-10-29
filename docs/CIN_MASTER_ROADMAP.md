@@ -44,7 +44,7 @@
 15. **[Implemented — offline-tested]** Maintain derivatives snapshot validation for open interest, funding, mark/index price, and provider timestamps.
 16. **[Partial]** Validate order-book depth quality, spread/imbalance methodology, and slippage-aware interpretation.
 17. **[Implemented — offline-tested]** Expand indicator edge-case tests and make indicator limitations and signal uncertainty clear to consumers.
-18. **[Partial]** Add explicit cross-source conflict handling and evidence confidence rules where the same metric differs by source. The initial caller-supplied comparison helper and offline tests exist; API integration, live-source validation, and broader metric-specific tolerances remain outstanding.
+18. **[Partial]** Add explicit cross-source conflict handling and evidence confidence rules where the same metric differs by source. Caller-supplied comparison logic, a read-only API route, scaffold registration, and offline tests exist; live-source validation and metric-specific tolerance calibration remain outstanding.
 
 **Exit gate:** outputs are reproducible, provenance-backed, and avoid presenting incomplete data as confirmed signals.
 
@@ -151,3 +151,12 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - Added eight offline regression tests covering agreement, material disagreement, duplicate URLs, timestamp windows, unit separation, malformed/non-finite values, invalid tolerance configuration, and the exact tolerance boundary.
 - All four workflows passed on exact code/documentation head `f42634ea7b55f66db472bc73505184d337dd0846`: evidence ingestion API `40972958485`, technical analysis `40972958481`, automated tests `40972958476`, screening `40972958628`.
 - Step 18 remains Partial: this increment is a reusable comparison primitive and is not yet integrated into production metric APIs or validated against live sources.
+
+
+### Step 18 API integration follow-up
+
+- Added `POST /cross-source-evidence-comparison` with bounded caller-supplied observations and validated tolerance/time-window controls.
+- Updated the idempotent deployment-scaffold patch to copy both comparison modules and register the router; scaffold tests now verify module presence and route registration.
+- Added five API contract tests for agreement/conflict output, limited-corroboration labeling, batch limits, unknown fields, and tolerance/window validation.
+- All four workflows passed on exact integration head `ba69aec7750099913ec52a4687dc3af74a9883d1`: technical analysis `40973205679`, evidence API `40973205697`, automated tests `40973205857`, screening `40973206105`.
+- Step 18 remains Partial pending live-source validation and metric-specific tolerance calibration. No Render deployment was performed.
