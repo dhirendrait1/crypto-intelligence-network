@@ -295,3 +295,31 @@ def test_invalid_source_urls_do_not_count_toward_source_host_diversity():
     assert coverage["distinct_source_host_count"] == 0
     assert coverage["source_host_diversity"] == "no_valid_hosts"
     assert coverage["source_independence_verified"] is False
+
+def test_source_roles_are_normalized_and_explicitly_unauthenticated():
+    evidence = [
+        valid_item(source_role=" Issuer "),
+        valid_item(source_role="auditor", source_name="Audit firm", source_url="https://audit.example/report", published_at="2026-10-02T00:00:00Z"),
+    ]
+    result = assess_commodity_asset("PAXG", evidence, now=NOW)
+    rows = result["evidence"]
+    assert rows[0]["source_role"] == "issuer"
+    assert rows[1]["source_role"] == "auditor"
+    assert all(row["source_role_authenticated"] is False for row in rows)
+    counts = result["evidence_coverage"]["reserve_attestation"]["source_role_counts_self_reported"]
+    assert counts["issuer"] == 1 and counts["auditor"] == 1
+    assert result["evidence_coverage"]["reserve_attestation"]["source_roles_authenticated"] is False
+
+def test_unknown_source_role_is_reported_as_unspecified():
+    result = assess_commodity_asset("PAXG", [valid_item(source_role="government-approved")], now=NOW)
+    row = result["evidence"][0]
+    assert row["source_role"] == "unspecified"
+    assert row["source_role_is_self_reported"] is True
+    assert row["source_role_authenticated"] is False
+
+def test_missing_source_role_is_unspecified_without_claiming_self_report():
+    result = assess_commodity_asset("PAXG", [valid_item()], now=NOW)
+    row = result["evidence"][0]
+    assert row["source_role"] == "unspecified"
+    assert row["source_role_is_self_reported"] is False
+    assert row["source_role_authenticated"] is False
