@@ -2,8 +2,8 @@
 
 **Scope:** Crypto Intelligence Network (CIN), read-only research, analysis, forecasting, monitoring, and alerts. This tracker records what is supported by repository evidence; it is not a claim that CIN is production-complete.
 
-**Branch:** `feat/cin-architecture-audit`  
-**Release controls (updated 2026-10-26):** PR #6 is merged and its deployment-aligned CI passes on main. PR #11 integrates additional read-only research modules and must pass all current-head workflows before merge. PR #7 and PR #8 remain unmerged audit branches; do not merge them wholesale because PR #8 predates the Coinbase fallback and conflicts with the current candle-provider module. `render.yaml` enables automatic deployment on main updates, so a merge may trigger Render deployment; confirm the deployed revision and live health/readiness/routes before calling the release complete. No order execution, wallet control, private keys, or fund movement.
+**Branch:** `feat/cin-market-data-row-provenance` (current evidence update; this tracker is also referenced by the architecture-audit branch).  
+**Release controls (reconciled 2026-10-30):** PR #6 and PR #11 are merged. PR #8 remains Draft/open as an audit branch; PR #65 and PR #66 remain Draft/open and unmerged. PR #7’s current state is not asserted here. PR #11’s merge on 2026-10-26 integrated additional read-only research modules. `render.yaml` enables automatic deployment on main updates, so any merge to main may trigger Render deployment; Render changes/deployments remain user-managed and require fresh explicit approval. No order execution, wallet control, private keys, or fund movement.
 
 ## Status definitions
 
@@ -884,3 +884,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Added an offline test that verifies both providers are bounded and their oversized bodies become structured invalid-response failures.
 - Source commit: `92e6277f04d1f83cf59ebbefee2c80afc31fd78f`; test commit: `b8017ae026cd7758108590a81a3fa68f95935eef`.
 - CI for current head is pending. CIN remains read-only; no deployment changes.
+
+
+## Repository release-control reconciliation (2026-10-30)
+
+- PR #11 is merged (2026-10-26); it is no longer awaiting CI/merge.
+- PR #8 is Draft/open; PR #65 and PR #66 are Draft/open and unmerged.
+- PR #66 adds row-level market-data provider and retrieval-time provenance. Its roadmap update commit `8ea7709c5f170a8161d819f08e177e15fe7d34d7` passed all four repository workflows. This is offline CI evidence only.
+- Historical entries below retain their original commit-specific results and should not be interpreted as the latest repository state unless they identify the current head explicitly.
