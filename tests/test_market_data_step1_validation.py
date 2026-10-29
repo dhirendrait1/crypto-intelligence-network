@@ -291,5 +291,63 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         mocked.assert_called_once_with(["bitcoin"], "usd")
 
 
+
+    @patch("market_data_step1.datetime")
+    def test_freshness_threshold_boundary_is_deterministic(self, mocked_datetime):
+        fixed_now = datetime(2026, 10, 30, 12, 0, tzinfo=timezone.utc)
+
+        class FixedDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return fixed_now if tz is not None else fixed_now.replace(tzinfo=None)
+
+        mocked_datetime.now.side_effect = FixedDateTime.now
+        mocked_datetime.fromisoformat.side_effect = datetime.fromisoformat
+
+        with patch("market_data_step1.datetime", FixedDateTime):
+            fresh = _fetch_market_data(["bitcoin"], "usd") if False else None
+            from market_data_step1 import _timestamp_status
+            self.assertEqual(
+                _timestamp_status((fixed_now - timedelta(minutes=15)).isoformat()),
+                ("fresh", 900, None),
+            )
+            status, age, warning = _timestamp_status(
+                (fixed_now - timedelta(minutes=15, seconds=1)).isoformat()
+            )
+            self.assertEqual((status, age), ("stale", 901))
+            self.assertIsNone(warning)
+
+    def test_future_timestamp_tolerance_boundary_is_explicit(self):
+        from market_data_step1 import _timestamp_status
+        fixed_now = datetime(2026, 10, 30, 12, 0, tzinfo=timezone.utc)
+
+        class FixedDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return fixed_now if tz is not None else fixed_now.replace(tzinfo=None)
+
+        with patch("market_data_step1.datetime", FixedDateTime):
+            within_tolerance = _timestamp_status(
+                (fixed_now + timedelta(minutes=5)).isoformat()
+            )
+            beyond_tolerance = _timestamp_status(
+                (fixed_now + timedelta(minutes=5, seconds=1)).isoformat()
+            )
+        self.assertEqual(within_tolerance, ("fresh", 0, None))
+        self.assertEqual(beyond_tolerance, ("unknown", None, "future_last_updated_timestamp"))
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_boolean_optional_metrics_are_omitted_with_warnings(self, mocked):
+        mocked.return_value = FakeResponse([row(
+            market_cap=True, total_volume=False, price_change_percentage_24h=True,
+        )])
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertIsNone(result["market_cap"])
+        self.assertIsNone(result["total_volume_24h"])
+        self.assertIsNone(result["price_change_percentage_24h"])
+        self.assertIn("invalid_market_cap_omitted", result["data_quality_warnings"])
+        self.assertIn("invalid_total_volume_omitted", result["data_quality_warnings"])
+        self.assertIn("invalid_price_change_percentage_omitted", result["data_quality_warnings"])
+
 if __name__ == "__main__":
     unittest.main()
