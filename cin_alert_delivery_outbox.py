@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS alert_delivery_outbox (
     observation_id TEXT NOT NULL,
     payload_json TEXT NOT NULL,
     status TEXT NOT NULL CHECK(status IN ('pending','sending','sent','failed','dead','uncertain')),
-    attempts INTEGER NOT NULL DEFAULT 0,
+    attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
     next_attempt_at TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
@@ -55,6 +55,7 @@ def _migrate_outbox_schema(connection: sqlite3.Connection) -> None:
     connection.execute("BEGIN IMMEDIATE")
     try:
         connection.execute("DROP INDEX IF EXISTS idx_alert_outbox_due")
+        connection.execute("DROP INDEX IF EXISTS idx_alert_delivery_outbox_due")
         connection.execute(
             """CREATE TABLE alert_delivery_outbox_new (
                 idempotency_key TEXT PRIMARY KEY,
@@ -81,6 +82,10 @@ def _migrate_outbox_schema(connection: sqlite3.Connection) -> None:
         connection.execute("ALTER TABLE alert_delivery_outbox_new RENAME TO alert_delivery_outbox")
         connection.execute(
             "CREATE INDEX idx_alert_outbox_due ON alert_delivery_outbox(status, next_attempt_at)"
+        )
+        # Preserve the index created by the state-store schema as well.
+        connection.execute(
+            "CREATE INDEX idx_alert_delivery_outbox_due ON alert_delivery_outbox(status, next_attempt_at)"
         )
         connection.execute("COMMIT")
     except Exception:
