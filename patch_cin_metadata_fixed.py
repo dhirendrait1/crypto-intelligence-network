@@ -97,9 +97,9 @@ registrations = [
     ),
     (
         "cin_cross_source_evidence_router",
-        "\\n# CIN: caller-supplied cross-source metric comparison (read-only)\\n"
-        "from app.cross_source_evidence_api import router as cin_cross_source_evidence_router\\n"
-        "app.include_router(cin_cross_source_evidence_router)\\n",
+        "\n# CIN: caller-supplied cross-source metric comparison (read-only)\n"
+        "from app.cross_source_evidence_api import router as cin_cross_source_evidence_router\n"
+        "app.include_router(cin_cross_source_evidence_router)\n",
     ),
 ]
 # Insert registrations before a direct-execution guard so routes are ready
