@@ -323,3 +323,22 @@ def test_missing_source_role_is_unspecified_without_claiming_self_report():
     assert row["source_role"] == "unspecified"
     assert row["source_role_is_self_reported"] is False
     assert row["source_role_authenticated"] is False
+
+def test_conflict_details_preserve_each_source_without_selecting_a_winner():
+    result = assess_commodity_asset(
+        "PAXG",
+        [
+            valid_item(status="verified", source_role="issuer", source_name="Issuer"),
+            valid_item(status="unverified", source_role="auditor", source_name="Auditor", source_url="https://audit.example/report", published_at="2026-10-02T00:00:00Z"),
+        ],
+        now=NOW,
+    )
+    coverage = result["evidence_coverage"]["reserve_attestation"]
+    assert coverage["status"] == "conflicting"
+    assert coverage["status_counts"]["verified"] == 1
+    assert coverage["status_counts"]["unverified"] == 1
+    assert {item["source_role"] for item in coverage["conflict_evidence"]} == {"issuer", "auditor"}
+    assert {item["source_name"] for item in coverage["conflict_evidence"]} == {"Issuer", "Auditor"}
+    assert all(item["source_role_authenticated"] is False for item in coverage["conflict_evidence"])
+    assert coverage["conflict_resolution"] == "manual_review_required"
+    assert coverage["preferred_source_selected"] is False
