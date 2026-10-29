@@ -21,6 +21,8 @@ MODULES = (
     "cin_public_market_candles_api.py",
     "cin_derivatives_market_data_api.py",
     "cin_public_news_sentiment_api.py",
+    "cross_source_evidence.py",
+    "cross_source_evidence_api.py",
 )
 
 
@@ -77,6 +79,7 @@ class DeploymentPatchTests(unittest.TestCase):
             "cin_public_market_candles_router",
             "cin_derivatives_market_data_router",
             "cin_public_news_sentiment_router",
+            "cin_cross_source_evidence_router",
         ):
             with self.subTest(router=router):
                 self.assertEqual(second_text.count(f"app.include_router({router})"), 1)
