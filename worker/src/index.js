@@ -114,7 +114,10 @@ async function handle(env, op, p) {
       return (rows.results || []).map(r => JSON.parse(r.payload_json));
     }
     case "list_evaluations": {
-      const limit = Math.max(1, Math.min(500, Number(p.limit || 100)));
+      const requested = p.limit === undefined ? 100 : Number(p.limit);
+      if (!Number.isInteger(requested) || requested < 1 || requested > 500)
+        throw new Error("invalid list limit");
+      const limit = requested;
       const rows = p.asset_id
         ? await db.prepare("SELECT e.result_json FROM cin_forecast_evaluations e JOIN cin_forecasts f ON f.forecast_id=e.forecast_id WHERE f.asset_id=? ORDER BY e.evaluated_at DESC,e.forecast_id LIMIT ?").bind(p.asset_id, limit).all()
         : await db.prepare("SELECT result_json FROM cin_forecast_evaluations ORDER BY evaluated_at DESC,forecast_id LIMIT ?").bind(limit).all();
