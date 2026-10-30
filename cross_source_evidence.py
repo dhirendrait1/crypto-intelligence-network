@@ -34,8 +34,18 @@ def _source_identity(value: Any) -> str | None:
             return None
         port = parsed.port
         scheme = parsed.scheme.lower()
-        host = parsed.hostname.lower()
-        if port is not None and not ((scheme == "https" and port == 443) or (scheme == "http" and port == 80)):
+        raw_host = parsed.hostname
+        # Canonicalize DNS names (IDNA and terminal root dot); preserve IP literals.
+        try:
+            import ipaddress
+            address = ipaddress.ip_address(raw_host)
+            host = f"[{address.compressed}]" if address.version == 6 else address.compressed
+        except ValueError:
+            host = raw_host.encode("idna").decode("ascii").lower().rstrip(".")
+            if not host:
+                return None
+        default_port = (scheme == "https" and port == 443) or (scheme == "http" and port == 80)
+        if port is not None and not default_port:
             host = f"{host}:{port}"
         # Keep scheme and authority: HTTP and HTTPS are distinct URI origins.
         # Paths and query variants within one origin remain one source identity.
