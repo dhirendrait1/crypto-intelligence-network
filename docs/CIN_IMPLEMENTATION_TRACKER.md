@@ -964,3 +964,11 @@ This checkpoint validates configured offline automation only. It does not establ
 - Preserved claim text independently from source name/URL and publication/check timestamps; included it in normalized metadata fingerprints so edits are detectable.
 - Added offline tests for claim preservation, fingerprint changes, and API field-size validation.
 - A submitted claim is not supporting proof. CIN still does not retrieve source documents or independently verify issuer statements, reserves, custody, audits, revenue, adoption, or other fundamentals. Step 22 remains Partial.
+
+
+### Step 23 claim/evidence migration contract (2026-10-30)
+
+- Added `docs/CIN_STEP23_CLAIM_EVIDENCE_MIGRATION.md` as the first concrete migration contract for commodity-backing and growth-fundamentals evidence.
+- Mapped existing evidence IDs, module-specific evidence types/categories, source metadata, publication/check times, caller-supplied claim text, metadata fingerprints, and freshness fields to the common evidence model.
+- Identified the principal schema gap: neither module yet emits a first-class stable CIN `claim_id` or explicit claim-evidence relationship object with relationship type, rationale, and review status.
+- Defined additive compatibility rules and acceptance gates for the next code increment. This documentation change does not alter API/runtime behavior and does not imply persistence, source retrieval, authentication, or independent verification. Step 23 remains Partial.
