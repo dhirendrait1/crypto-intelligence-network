@@ -354,3 +354,10 @@ When continuing work, choose the earliest unfinished step that can be completed 
 
 - Added docs/CIN_DASHBOARD_DATA_INTEGRATION_AND_ASSESSMENT_PRESENTATION_ARCHITECTURE_V1.md defining mobile-first navigation, API-to-screen mapping, a semantics-preserving client data model, refresh/cache/low-bandwidth policy, loading/empty/not-assessed/partial/stale/conflicting/unavailable/error/unknown states, visualization rules, alert delivery-state presentation, security, accessibility and implementation acceptance sequence.
 - Repository tree review found no independently maintained dashboard/frontend/static/template source tree; current implementation tracker marks dashboard/mobile UX as not established. F-20 is architecture-only; Stage 6 Steps 30–33 remain pending. No frontend, API, provider, persistence, deployment or configuration changed. Numbered roadmap remains 7 stages / 35 steps.
+
+
+### F-21 — Frontend implementation readiness and technology decision (2026-10-31)
+
+- Selected React + TypeScript + Vite for a separate static frontend, with Cloudflare Pages Free as a proposed target subject to account/plan review and explicit deployment approval. Keep FastAPI as a separate API origin.
+- Defined proposed repository layout, dependency policy, public API base URL handling, CORS prerequisites, mobile visual/accessibility requirements, security constraints, initial vertical slice, and CI/release acceptance gates. Evaluated Next.js, Streamlit, backend templates and plain HTML/JS.
+- No frontend directory, package/dependency, API/CORS change, Cloudflare project, DNS, Render setting or deployment was changed. F-21 is a technology decision only. Next increment: F-22 minimal frontend scaffold and CI build/typecheck.
