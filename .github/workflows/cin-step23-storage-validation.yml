@@ -46,3 +46,6 @@ jobs:
 
       - name: Run evidence persistence orchestration tests
         run: python -m unittest discover -s tests -p "test_cin_evidence_persistence_orchestration.py" -v
+
+      - name: Run real SQLite persistence integration tests
+        run: python -m unittest discover -s tests -p "test_cin_evidence_persistence_sqlite_integration.py" -v
