@@ -281,3 +281,9 @@ When continuing work, choose the earliest unfinished step that can be completed 
 
 - Added `docs/CIN_STEP23_ACCESS_CONTROL_AND_AUTHORIZATION_READINESS_V1.md` and recorded F-09 in the privacy audit and persistence lifecycle. It distinguishes input validation/dependency injection from identity and authorization, defines proposed least-privilege controls, and records implementation acceptance gates.
 - Authentication, role matrix, privileged-action approval, audit storage, and deployment identity remain unresolved. No schema/runtime/deployment change was made. F-09 remains Open; Step 23 remains Partial.
+
+
+### Step 23 F-10 public endpoint abuse and rate-limit readiness increment (2026-10-31)
+
+- Added `docs/CIN_STEP23_PUBLIC_ENDPOINT_ABUSE_AND_RATE_LIMIT_READINESS_V1.md` documenting existing request/source/timeout/response-size controls and the evidence gap for per-caller/global quotas, concurrency/backpressure, cooldowns, provider-429 handling, and abuse telemetry.
+- No runtime middleware, rate-limit package, edge rule, Render/Cloudflare configuration, provider quota, or deployment was changed. F-10 remains Open; Step 23 remains Partial.
