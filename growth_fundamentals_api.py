@@ -16,9 +16,12 @@ router = APIRouter(tags=["growth fundamentals"])
 class GrowthEvidenceRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
     category: str = Field(min_length=1, max_length=80)
+    evidence_id: str | None = Field(default=None, max_length=128)
+    source_role: str | None = Field(default=None, max_length=40)
     source_name: str | None = Field(default=None, max_length=200)
     source_url: str | None = Field(default=None, max_length=2048)
     published_at: str | None = Field(default=None, max_length=64)
+    checked_at: str | None = Field(default=None, max_length=64)
     status: Literal["verified", "unverified", "stale", "unavailable"] = "unverified"
     notes: str | None = Field(default=None, max_length=2000)
 
