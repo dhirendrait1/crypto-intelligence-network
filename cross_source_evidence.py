@@ -95,7 +95,7 @@ def compare_metric_observations(
         comparable = [row for row in rows if (latest - row["observed_at"]).total_seconds() <= comparison_window_seconds]
         unique_sources: dict[str, dict[str, Any]] = {}
         duplicate_source_observations = 0
-        for row in sorted(comparable, key=lambda r: r["observed_at"]):
+        for row in sorted(comparable, key=lambda r: r["observed_at"], reverse=True):
             if row["source_identity"] in unique_sources:
                 duplicate_source_observations += 1
                 continue
