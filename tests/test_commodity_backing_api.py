@@ -210,3 +210,17 @@ def test_request_rejects_unsupported_evidence_status():
             symbol="PAXG",
             evidence=[{"evidence_type": "reserve_attestation", "status": "confirmed"}],
         )
+
+
+
+def test_request_accepts_claim_text_and_rejects_oversized_claim_text():
+    request = CommodityBackingAssessmentRequest(
+        symbol="PAXG",
+        evidence=[{"evidence_type": "reserve_attestation", "claim_text": "Issuer-reported reserve claim"}],
+    )
+    assert request.evidence[0].claim_text == "Issuer-reported reserve claim"
+    with pytest.raises(ValidationError):
+        CommodityBackingAssessmentRequest(
+            symbol="PAXG",
+            evidence=[{"evidence_type": "reserve_attestation", "claim_text": "x" * 4001}],
+        )
