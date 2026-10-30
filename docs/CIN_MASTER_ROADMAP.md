@@ -376,3 +376,12 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - Added reusable fresh/stale/partial/conflicting/unavailable/unknown/error state presentation and source/retrieval metadata slots.
 - Deliberately did not wire market-data/screening endpoints because their checked-in provider behavior is CoinGecko/CoinPaprika and conflicts with the saved Coinbase-first / exclude-CoinGecko preference. No live market values or provider assumptions were introduced. See `docs/CIN_F23_API_CLIENT_AND_DATA_STATE_IMPLEMENTATION.md`.
 - CI verification, committed npm lockfile, deployed health/readiness payload validation and Coinbase-aligned market contracts remain outstanding. No backend/CORS/provider/deployment changes. F-23 remains Partial.
+
+
+### F-24 — Coinbase-first market provider contract audit (2026-10-31)
+
+- Audited the current market-data implementation and repository tree. The candle path is Binance-primary/Kraken-fallback, derivatives use Binance USDⓈ-M public endpoints, and no Coinbase-specific adapter or contract tests are present.
+- Recorded the provider mismatch and explicit dashboard integration block in `docs/CIN_F24_COINBASE_FIRST_MARKET_PROVIDER_CONTRACT_AUDIT.md`.
+- The frontend remains demo-only; no market, screening, derivatives, or cached provider values are presented as Coinbase data.
+- F-24 is Partial: provider mismatch audit is complete; Coinbase adapter, fixture tests, API contract, frontend integration, and limited live read-only validation remain.
+- No provider routes, CORS, Render, Cloudflare, DNS, persistence activation, or deployment were changed.
