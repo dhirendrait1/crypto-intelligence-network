@@ -70,6 +70,48 @@ class TestLocalSQLiteEvidenceRepository(unittest.TestCase):
         self.assertEqual(self.db.execute("SELECT COUNT(*) FROM cin_claims").fetchone()[0], 1)
         self.assertEqual(self.db.execute("SELECT COUNT(*) FROM cin_claim_evidence_relationships").fetchone()[0], 1)
 
+
+    def test_assessment_events_are_append_only_and_preserve_history(self):
+        result = self._store()
+        first = self.db.execute(
+            "SELECT claim_status FROM cin_claim_assessment_events WHERE claim_id=?",
+            (result["claim_id"],),
+        ).fetchone()[0]
+        event_id = self.repo.append_assessment_event(
+            claim_id=result["claim_id"], claim_status="mixed",
+            assessed_at="2026-10-30T13:00:00+01:00",
+            methodology_version="evidence-rules-1.1",
+            assessor_type="human_reviewer",
+            rationale="Conflicting observations require a mixed assessment.",
+        )
+        self.assertTrue(event_id.startswith("cin-assessment-"))
+        rows = self.db.execute(
+            """SELECT claim_status, assessed_at, methodology_version, assessor_type
+               FROM cin_claim_assessment_events WHERE claim_id=? ORDER BY assessed_at""",
+            (result["claim_id"],),
+        ).fetchall()
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0][0], first)
+        self.assertEqual(tuple(rows[1]), (
+            "mixed", "2026-10-30T12:00:00Z", "evidence-rules-1.1", "human_reviewer"
+        ))
+
+    def test_assessment_event_rejects_unknown_claim_and_invalid_values(self):
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.repo.append_assessment_event(
+                claim_id="missing-claim", claim_status="supported",
+                assessed_at="2026-10-30T12:00:00Z",
+                methodology_version="method-1", assessor_type="human_reviewer",
+                rationale="No matching claim.",
+            )
+        with self.assertRaises(ValueError):
+            self.repo.append_assessment_event(
+                claim_id=self.claim["claim_id"], claim_status="verified",
+                assessed_at="2026-10-30T12:00:00Z",
+                methodology_version="method-1", assessor_type="human_reviewer",
+                rationale="Invalid vocabulary.",
+            )
+
     def test_invalid_naive_timestamp_is_rejected_before_write(self):
         with self.assertRaises(ValueError):
             self.repo.store_bundle(
