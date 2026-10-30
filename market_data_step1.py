@@ -113,7 +113,11 @@ def _fetch_market_data(ids: list[str], vs_currency: str) -> list[dict[str, Any]]
         change = None
         open_value = _provider_number(open_price, minimum=0)
         if open_value is not None and open_value > 0:
-            change = (price_value / open_value - 1.0) * 100.0
+            calculated_change = (price_value / open_value - 1.0) * 100.0
+            if math.isfinite(calculated_change):
+                change = calculated_change
+            else:
+                warnings.append("invalid_price_change_percentage_omitted")
         else:
             warnings.append("price_change_unavailable")
         last_updated = ticker.get("time")
