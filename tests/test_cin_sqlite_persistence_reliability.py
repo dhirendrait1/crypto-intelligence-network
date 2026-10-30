@@ -264,5 +264,42 @@ class TestSQLitePersistenceReliability(unittest.TestCase):
             finally:
                 verification.close()
 
+    def test_assessment_events_are_appended_without_overwriting_prior_history(self):
+        stored = self._store()
+        first_event_id = self.repo.append_assessment_event(
+            claim_id=stored["claim_id"],
+            claim_status="supported",
+            assessed_at="2026-10-30T12:01:00Z",
+            methodology_version="reliability-test-v1",
+            assessor_type="automated_rule",
+            rationale="First isolated assessment event for history integrity testing.",
+        )
+        second_event_id = self.repo.append_assessment_event(
+            claim_id=stored["claim_id"],
+            claim_status="mixed",
+            assessed_at="2026-10-30T12:02:00Z",
+            methodology_version="reliability-test-v2",
+            assessor_type="human_reviewer",
+            rationale="Second event must coexist with the earlier assessment.",
+        )
+
+        rows = self.db.execute(
+            "SELECT assessment_event_id, claim_status, methodology_version "
+            "FROM cin_claim_assessment_events WHERE claim_id=? ORDER BY assessed_at",
+            (stored["claim_id"],),
+        ).fetchall()
+        self.assertEqual(
+            [row["assessment_event_id"] for row in rows],
+            [rows[0]["assessment_event_id"], first_event_id, second_event_id],
+        )
+        self.assertEqual(
+            [row["claim_status"] for row in rows],
+            ["not_assessed", "supported", "mixed"],
+        )
+        self.assertEqual(
+            [row["methodology_version"] for row in rows],
+            ["initial-unassessed-v1", "reliability-test-v1", "reliability-test-v2"],
+        )
+
 if __name__ == "__main__":
     unittest.main()
