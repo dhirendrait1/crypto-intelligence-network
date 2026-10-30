@@ -27,8 +27,8 @@ FORECAST = {
     "value": 70000,
     "unit": "USD",
     "source_id": "cin-model-v1",
-    "created_at": "2026-10-30T10:00:00Z",
-    "target_at": "2026-10-30T11:00:00Z",
+    "created_at": "2026-10-30T10:00:00+00:00",
+    "target_at": "2026-10-30T11:00:00+00:00",
     "invalidation_conditions": {"below": 68000},
 }
 OBSERVATION = {
