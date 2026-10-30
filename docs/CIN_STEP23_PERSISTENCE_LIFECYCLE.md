@@ -218,3 +218,8 @@ See docs/CIN_STEP23_DISASTER_RECOVERY_AND_SERVICE_CONTINUITY_READINESS_V1.md for
 ## 21. Provider governance and source-of-truth integrity readiness (2026-10-31)
 
 See docs/CIN_STEP23_PROVIDER_GOVERNANCE_AND_SOURCE_OF_TRUTH_READINESS_V1.md for the provider registry contract, metric-specific source precedence, fallback eligibility, provenance preservation, conflict handling, and acceptance tests. This is a governance/readiness design, not a runtime registry or provider certification. The current GitHub evidence connector remains narrowly allowlisted, bounded, and explicitly unverified; its 7-day activity freshness threshold is not a universal metric freshness policy. No provider, fallback, cache, retry, source priority, or live retrieval was changed. Cross-provider governance remains open.
+
+
+## 22. Claim conflict and review-state readiness (2026-10-31)
+
+See docs/CIN_STEP23_CLAIM_CONFLICT_AND_REVIEW_STATE_READINESS_V1.md for the distinction between relationship vocabulary validation and actual conflict detection/adjudication. The shared primitives validate relationship/review-status values but do not authenticate reviewers, compare evidence, execute state transitions, or persist review events. No claim was adjudicated or status promoted. Conflict detection, authenticated review, and durable resolution history remain unimplemented.
