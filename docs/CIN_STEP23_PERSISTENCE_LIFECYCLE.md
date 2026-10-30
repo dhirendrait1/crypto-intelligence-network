@@ -107,3 +107,8 @@ Offline tests cover successful atomic writes, duplicate external identity rollba
 The local SQLite adapter now exposes append_assessment_event(...). It inserts a new claim assessment event with an explicit assessment timestamp, methodology version, assessor type, status, and rationale. It never updates or deletes an earlier event. The operation validates the status and assessor vocabularies, requires a timezone-aware timestamp and bounded rationale, and relies on the claim foreign key. Tests verify a second assessment leaves the initial event intact and rejects an unknown claim or unsupported status.
 
 This remains local development/test functionality. It is not connected to a user-facing assessment workflow, does not establish that a human reviewer identity is authenticated, and does not authorize status promotion without a governed review process.
+
+
+## 11. Append-only lifecycle operations (2026-10-30)
+
+The local-only adapter now supports appending a new observation to an existing CIN evidence record and appending claim assessment events without updating prior rows. New observation writes validate timezone-aware timestamps, JSON-serialize finite metadata, compute a normalized metadata fingerprint, and rely on the database foreign key to reject unknown evidence IDs. Regression tests verify historical observations remain unchanged, UTC normalization is applied, and invalid writes do not add rows. These operations remain local SQLite development/test functionality only; there is no API wiring, retention worker, or production durability.
