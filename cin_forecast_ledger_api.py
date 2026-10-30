@@ -130,7 +130,14 @@ class EvaluationInput(BaseModel):
 
 
 def _payload(model: BaseModel) -> dict[str, Any]:
-    return model.model_dump(mode="json")
+    """Serialize API timestamps as UTC for chronological D1 ISO-text comparisons."""
+    payload = model.model_dump(mode="python")
+    for key, value in payload.items():
+        if isinstance(value, datetime):
+            if value.tzinfo is None or value.utcoffset() is None:
+                raise HTTPException(status_code=422, detail=f"{key} must include a timezone")
+            payload[key] = value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    return payload
 
 
 def _translate_value_error(fn, *args, **kwargs):
