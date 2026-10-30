@@ -106,10 +106,10 @@ Before any production persistence is proposed, require:
 
 | Finding | Disposition |
 |---|---|
-| F-01 Arbitrary metadata shape | Open — define allowlists and recursive limits |
+| F-01 Arbitrary metadata shape | Partially mitigated in local SQLite adapter: GitHub namespace allowlists plus recursive JSON depth/node/string/collection bounds. Other namespaces have structural bounds but no source-specific semantic allowlist; production enforcement remains open. |
 | F-02 Free-text sensitivity | Partially mitigated in local SQLite adapter — conservative marker/length checks; full content classification and production controls remain open |
 | F-03 Missing classification/retention class | Design proposal documented in `CIN_STEP23_DATA_CLASSIFICATION_AND_RETENTION_CLASSES_V1.md`; policy approval and future schema implementation remain open |
-| F-04 Missing repository payload byte ceiling | Open — implement and test before persistence expansion |
+| F-04 Missing repository payload byte ceiling | Implemented and tested in local SQLite adapter: canonical metadata is capped at 64 KiB before writes, including appended observations. This is not a provider-ingestion response limit or production storage guarantee. |
 | F-05 Retention semantics | Clock/expiry design documented in `CIN_STEP23_RETENTION_CLOCKS_AND_EXPIRY_RULES_V1.md`; provider-specific terms, durations, approval and implementation remain open |
 | F-06 Error disclosure regression protection | API boundary now returns one stable generic 502 detail for both known and unexpected provider failures; regression tests inject raw body, credential, token, and sensitive URL markers and assert they are not exposed. No raw exception logging was added. |
 | F-07 Hash lifecycle | Derived-data lifecycle documented in `CIN_STEP23_DERIVED_DATA_HASH_AND_FINGERPRINT_LIFECYCLE_V1.md`; lineage, policy approval and implementation remain open |
@@ -135,3 +135,10 @@ Added `docs/CIN_STEP23_DERIVED_DATA_HASH_AND_FINGERPRINT_LIFECYCLE_V1.md`. It re
 - Provider exception text is no longer passed through to API clients. The API does not log raw exception objects or provider payloads.
 - Added regression coverage injecting raw provider-body markers, GitHub-style token markers, Bearer credentials, URL query credentials, and sensitive provider URLs into provider exception text. The tests assert a stable response and no marker disclosure.
 - This protects the API response boundary only; it does not establish comprehensive log redaction, hosting-platform log controls, or production security certification. The endpoint remains read-only and persistence remains unwired.
+
+
+### F-01 / F-04 audit status reconciliation (2026-10-31)
+
+- F-01: the local SQLite adapter has a GitHub-specific top-level and nested-value allowlist, plus recursive bounds for JSON depth, node count, string length, and collection size. This partially mitigates F-01 for the implemented GitHub namespace. It does not create allowlists for every possible source namespace and is not production enforcement.
+- F-04: the local SQLite adapter canonicalizes metadata and rejects payloads above 64 KiB before evidence-bundle or observation writes. Regression tests cover oversized initial metadata and oversized appended observations. This is a repository-level local adapter ceiling, not a provider HTTP response-byte ceiling or production guarantee.
+- The earlier disposition table incorrectly left both findings fully Open; it now reflects the implemented scope and remaining limitations. No runtime code or data was changed in this reconciliation.
