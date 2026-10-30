@@ -65,3 +65,13 @@ The adapter:
 - Filters malformed/non-finite/impossible rows, sorts chronologically, and de-duplicates identical timestamps.
 
 **Gate A status: implemented in an isolated adapter; awaiting CI evidence and live read-only smoke validation.** It is not registered as a production API route and is not connected to the dashboard. The existing Binance/Kraken route is unchanged; no claim is made that the current dashboard is Coinbase-powered.
+
+
+### Gate A/B verification evidence
+
+- The storage-boundary workflow now compiles the adapter and runs its dedicated offline test module on every push to this work branch.
+- GitHub Actions run [#41146066687](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/41146066687) completed successfully.
+- All 9 Coinbase adapter contract tests passed, including fixed-host request construction, USD-only product identity, unsupported granularity, 300-candle bound, timestamp validation, response-shape validation, OHLCV normalization, malformed-row rejection, chronological sorting and duplicate timestamp handling.
+- The existing storage-boundary regression tests also passed in the same workflow.
+
+**Gate A: implemented and CI-verified. Gate B: initial offline adapter contract suite implemented and CI-verified.** This is not a live provider smoke test and does not yet register or expose the adapter through the production API.
