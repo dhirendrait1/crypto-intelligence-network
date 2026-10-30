@@ -92,5 +92,30 @@ CREATE TABLE IF NOT EXISTS cin_evidence_conflict_observations (
     PRIMARY KEY(conflict_id, observation_id)
 );
 
+-- Enforce immutable history at the database boundary, not only in adapter methods.
+CREATE TRIGGER IF NOT EXISTS trg_cin_evidence_observations_no_update
+BEFORE UPDATE ON cin_evidence_observations
+BEGIN
+    SELECT RAISE(ABORT, 'evidence observations are append-only');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_cin_evidence_observations_no_delete
+BEFORE DELETE ON cin_evidence_observations
+BEGIN
+    SELECT RAISE(ABORT, 'evidence observations are append-only');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_cin_claim_assessment_events_no_update
+BEFORE UPDATE ON cin_claim_assessment_events
+BEGIN
+    SELECT RAISE(ABORT, 'claim assessment events are append-only');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_cin_claim_assessment_events_no_delete
+BEFORE DELETE ON cin_claim_assessment_events
+BEGIN
+    SELECT RAISE(ABORT, 'claim assessment events are append-only');
+END;
+
 INSERT OR IGNORE INTO cin_schema_migrations(version, applied_at)
 VALUES ('1.0', 'REFERENCE_ONLY_NOT_APPLIED');
