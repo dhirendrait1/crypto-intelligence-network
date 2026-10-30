@@ -957,3 +957,10 @@ This checkpoint validates configured offline automation only. It does not establ
 - Added `docs/CIN_VERIFIABLE_EVIDENCE_MODEL.md` defining claim, evidence-record, and claim-evidence relationship fields; source provenance; distinct publication/observation/provider-seen/retrieval/check/valid times; descriptive confidence states; conflict handling; freshness/completeness; and audit/versioning requirements.
 - Explicitly distinguishes source assertions from CIN verification, prohibits treating missing evidence as zero, and rejects numeric confidence probabilities without a calibrated model and validation data.
 - Step 23 remains Partial. No persistent evidence store, versioned claim API, or cross-module migration was implemented by this specification.
+
+## Step 22 — explicit claim/evidence separation (2026-10-30)
+
+- Added optional caller-supplied `claim_text` to commodity-backed and growth-fundamentals evidence records and their API request schemas (maximum 4,000 characters).
+- Preserved claim text independently from source name/URL and publication/check timestamps; included it in normalized metadata fingerprints so edits are detectable.
+- Added offline tests for claim preservation, fingerprint changes, and API field-size validation.
+- A submitted claim is not supporting proof. CIN still does not retrieve source documents or independently verify issuer statements, reserves, custody, audits, revenue, adoption, or other fundamentals. Step 22 remains Partial.
