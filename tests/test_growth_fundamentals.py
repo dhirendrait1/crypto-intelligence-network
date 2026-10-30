@@ -139,3 +139,44 @@ def test_growth_claim_text_is_separate_from_evidence_and_fingerprinted():
     changed = {**record, "claim_text": "Protocol revenue increased 30% quarter over quarter."}
     changed_row = assess_growth_fundamentals("ABC", [changed], now=now)["evidence"][0]
     assert row["record_fingerprint_sha256"] != changed_row["record_fingerprint_sha256"]
+
+
+def test_growth_claim_is_linked_as_context_only_and_not_assessed_as_true():
+    now = datetime(2026, 10, 24, tzinfo=timezone.utc)
+    row = assess_growth_fundamentals("ABC", [{
+        "category": "fees_and_revenue", "evidence_id": "revenue-report-1",
+        "claim_text": "Protocol revenue increased 20% quarter over quarter.",
+        "source_name": "Project issuer", "source_url": "https://example.com/report",
+        "published_at": "2026-10-01T00:00:00Z", "checked_at": "2026-10-20T00:00:00Z",
+        "status": "unverified",
+    }], now=now)["evidence"][0]
+    claim = row["claim"]
+    relationship = row["claim_evidence_relationship"]
+    assert claim["subject"] == "ABC"
+    assert claim["predicate"] == "fees_and_revenue"
+    assert claim["claim_status"] == "not_assessed"
+    assert claim["claim_id_is_truth_proof"] is False
+    assert relationship["claim_id"] == claim["claim_id"]
+    assert relationship["evidence_id"] == "revenue-report-1"
+    assert relationship["relationship"] == "context_only"
+    assert relationship["review_status"] == "automated_candidate"
+    assert relationship["relationship_is_persisted"] is False
+
+
+def test_growth_claim_without_evidence_id_is_not_linked():
+    now = datetime(2026, 10, 24, tzinfo=timezone.utc)
+    row = assess_growth_fundamentals("ABC", [{
+        "category": "token_utility",
+        "claim_text": "The token is required for protocol access.",
+    }], now=now)["evidence"][0]
+    assert row["claim"] is not None
+    assert row["claim_evidence_relationship"] is None
+
+
+def test_growth_evidence_without_claim_text_has_no_claim_object():
+    now = datetime(2026, 10, 24, tzinfo=timezone.utc)
+    row = assess_growth_fundamentals("ABC", [{
+        "category": "token_utility", "evidence_id": "utility-1",
+    }], now=now)["evidence"][0]
+    assert row["claim"] is None
+    assert row["claim_evidence_relationship"] is None
