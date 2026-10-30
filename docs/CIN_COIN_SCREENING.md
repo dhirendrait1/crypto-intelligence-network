@@ -25,7 +25,7 @@ The `commodity_backed` filter uses the public CoinPaprika ticker endpoint and cl
 - `returned_count`: matching rows returned after `per_page`.
 - `status`: `matches_found` or `no_matches_in_scanned_universe`.
 
-This is still only the provider's returned ticker universe, not every token in existence. Classification is heuristic and can miss assets. A zero-match response means no matches were identified in the scanned provider response; it does not prove no commodity-backed tokens exist. This category-specific path uses CoinPaprika data and has a 20-second provider timeout.
+CoinPaprika's published API page states that the unauthenticated `/v1/tickers` list covers the top 2,000 coins; CIN therefore scans only the rows returned by that public list, not the provider's entire active-coin catalogue or every token in existence. This coverage boundary can omit smaller or unranked assets. This is still only the provider's returned ticker universe, not every token in existence. Classification is heuristic and can miss assets. A zero-match response means no matches were identified in the scanned provider response; it does not prove no commodity-backed tokens exist. This category-specific path uses CoinPaprika data and has a 20-second provider timeout. The response body is read with the same 5 MB maximum as the standard screening request; oversized payloads are rejected before JSON parsing.
 
 ## Score and interpretation
 
@@ -62,3 +62,20 @@ Financial magnitude inputs (market cap, volume, FDV, circulating supply, and tot
 ## Provider identity and deterministic row handling
 
 Before scoring, CIN requires each market row to have a non-empty string provider ID. Rows without an ID are discarded, and duplicate IDs are collapsed case-insensitively by keeping the first row in provider input order. The response `data_quality` object reports input rows, identity-less rows, duplicate IDs, and unique accepted identities. This prevents duplicate provider records from inflating result counts and makes identity cleanup visible. The policy is deterministic for a given provider response, but it does not prove that provider IDs are globally canonical or that two distinct IDs cannot refer to the same underlying asset.
+
+
+## Screening market-data provider policy
+
+The broad `/coin-screening` market universe uses the public CoinPaprika ticker endpoint as its sole market-universe provider. Provider failure returns a structured error or uses an eligible cached response under the existing cache policy; it does not silently switch to another source.
+
+Coinbase remains the preferred public source for exact USD-quoted exchange candles in the market-candles module. Coinbase Exchange product and candle data is not a complete global market-cap-ranked token universe, so it is not substituted for CoinPaprika in broad-universe screening. Provider identity and quote currency are retained on each screening row. CoinPaprika market data is not independently verified issuer or project evidence.
+
+
+## Manual live-provider smoke check
+
+Run `python scripts/cin_coinpaprika_smoke.py` from the repository root when outbound network access is available. The script makes one unauthenticated GET request to `/v1/tickers?quotes=USD`, enforces a 12-second timeout and 5 MB response cap, and validates the returned ticker-list shape plus Bitcoin USD price, market cap, 24-hour volume, and timezone-aware source timestamp. It prints a compact JSON report and exits nonzero on failure. It does not require an API key, make paid calls, or perform any trading or wallet operation. A successful run validates only the provider response at that time; it does not validate complete asset coverage or independently verify market data.
+
+
+## Free-tier quota and usage-rights boundary
+
+CoinPaprika's published API documentation currently describes keyless access as 20,000 calls per month per IP address, with a rate limit of 10 requests per second. The public API is described as free for personal use; the provider's published FAQ says commercial use starts on a paid plan. CIN must therefore treat the keyless endpoint as a personal/research-only dependency unless the provider confirms in writing that the intended CIN deployment and audience are permitted under the free tier. Do not add a paid key, upgrade, or incur charges as part of this project. Monitor request volume and avoid unnecessary polling; each HTTP request counts as one call.
