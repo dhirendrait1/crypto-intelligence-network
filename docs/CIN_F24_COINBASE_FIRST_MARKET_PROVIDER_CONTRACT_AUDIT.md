@@ -91,3 +91,18 @@ GitHub Actions [run #41146284133](https://github.com/dhirendrait1/crypto-intelli
 **Gate C status: isolated router and contract tests implemented and CI-verified; production application registration remains blocked.** The audited feature branch does not contain an independently maintained FastAPI application entrypoint/router registry (the Render deployment app is packaged separately in the scaffold archive). This route has therefore not been mounted into the running service or exposed publicly. No archive, Render service, or deployment was changed.
 
 F-24 remains Partial. Remaining work includes safe integration into the actual deployment application source, API-level live read-only smoke validation, and dashboard wiring only after the deployed contract is verified.
+
+
+### Gate C — Render build-time router registration verified (2026-10-31)
+
+The deployment path has now been traced end-to-end:
+- `render.yaml` extracts `cin_step203_scaffold_fixed.zip`, runs `patch_cin_metadata_fixed.py`, installs `cin/requirements.txt`, and starts `uvicorn app.main:app --app-dir cin`.
+- The patch script now copies the Coinbase adapter and API router into the packaged `cin/app` directory and registers the router on the FastAPI application.
+- The storage-validation workflow installs the same packaged runtime requirements, runs the patch script against an extracted archive, imports `app.main`, and asserts that `/coinbase/market-candles` appears in the mounted application routes.
+
+Verification:
+- [Storage validation #41146868606](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/41146868606) — success.
+- [Storage validation #41146874005](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/41146874005) — success.
+- [Frontend CI #41146873995](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/41146873995) — success.
+
+**Gate C status: build-time route registration and packaged-app import verified in CI.** This does not mean the Render service has been deployed with the change. No deployment, Render configuration, or live service was modified. Live public Coinbase validation remains pending.
