@@ -288,9 +288,16 @@ class TestSQLitePersistenceReliability(unittest.TestCase):
             "FROM cin_claim_assessment_events WHERE claim_id=? ORDER BY assessed_at",
             (stored["claim_id"],),
         ).fetchall()
+        initial_event_id = rows[0]["assessment_event_id"]
+        self.assertTrue(initial_event_id)
         self.assertEqual(
             [row["assessment_event_id"] for row in rows],
-            [rows[0]["assessment_event_id"], first_event_id, second_event_id],
+            [initial_event_id, first_event_id, second_event_id],
+        )
+        self.assertEqual(
+            len({row["assessment_event_id"] for row in rows}),
+            3,
+            "each assessment event must have a distinct identifier",
         )
         self.assertEqual(
             [row["claim_status"] for row in rows],
