@@ -22,7 +22,15 @@ class FakeStore:
         if self.raise_identity_conflict:
             self.raise_identity_conflict = False
             self.identity = (kwargs["source_namespace"], kwargs["external_evidence_id"])
-            raise sqlite3.IntegrityError("unique provider identity")
+            connection = sqlite3.connect(":memory:")
+            try:
+                connection.execute("CREATE TABLE identity (value TEXT UNIQUE)")
+                connection.execute("INSERT INTO identity VALUES ('same')")
+                connection.execute("INSERT INTO identity VALUES ('same')")
+            except sqlite3.IntegrityError as exc:
+                raise exc
+            finally:
+                connection.close()
         self.identity = (kwargs["source_namespace"], kwargs["external_evidence_id"])
         return {
             "cin_evidence_id": "cin-evidence-created",
@@ -85,6 +93,32 @@ class TestEvidencePersistenceOrchestration(unittest.TestCase):
 
         with self.assertRaisesRegex(sqlite3.IntegrityError, "unrelated constraint"):
             persist_evidence_snapshot(BrokenStore(), **self.common)
+
+    def test_unrelated_integrity_error_is_not_recovered_even_if_identity_exists(self):
+        class BrokenStore(FakeStore):
+            def store_bundle(self, **kwargs):
+                self.identity = (kwargs["source_namespace"], kwargs["external_evidence_id"])
+                connection = sqlite3.connect(":memory:")
+                try:
+                    connection.execute("CREATE TABLE parent (id INTEGER PRIMARY KEY)")
+                    connection.execute(
+                        "CREATE TABLE child (parent_id INTEGER REFERENCES parent(id))"
+                    )
+                    connection.execute("PRAGMA foreign_keys = ON")
+                    connection.execute("INSERT INTO child VALUES (999)")
+                except sqlite3.IntegrityError as exc:
+                    raise exc
+                finally:
+                    connection.close()
+
+        broken = BrokenStore()
+        with self.assertRaises(sqlite3.IntegrityError) as caught:
+            persist_evidence_snapshot(broken, **self.common)
+        self.assertEqual(
+            caught.exception.sqlite_errorcode,
+            sqlite3.SQLITE_CONSTRAINT_FOREIGNKEY,
+        )
+        self.assertEqual(broken.observation_calls, [])
 
     def test_non_integrity_persistence_failure_is_not_swallowed(self):
         class BrokenStore(FakeStore):
