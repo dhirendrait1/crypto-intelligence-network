@@ -37,7 +37,8 @@ def _source_identity(value: Any) -> str | None:
         host = parsed.hostname.lower()
         if port is not None and not ((scheme == "https" and port == 443) or (scheme == "http" and port == 80)):
             host = f"{host}:{port}"
-        return f"{scheme}://{host}{parsed.path.rstrip('/') or '/'}" + (f"?{parsed.query}" if parsed.query else "")
+        # Treat paths and query variants on the same origin as one source endpoint.
+        return f"{scheme}://{host}"
     except ValueError:
         return None
 
