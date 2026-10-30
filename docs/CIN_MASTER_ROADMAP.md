@@ -385,3 +385,6 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - The frontend remains demo-only; no market, screening, derivatives, or cached provider values are presented as Coinbase data.
 - F-24 is Partial: provider mismatch audit is complete; Coinbase adapter, fixture tests, API contract, frontend integration, and limited live read-only validation remain.
 - No provider routes, CORS, Render, Cloudflare, DNS, persistence activation, or deployment were changed.
+
+
+- **F-24 follow-through:** Coinbase public candle adapter and nine dedicated offline contract tests are now implemented and passed GitHub Actions run [#41146066687](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/41146066687). The adapter is isolated, fixed-host, USD-product explicit, 300-candle bounded, and not yet exposed as a registered API route. F-24 remains Partial; API route integration, provider policy for fallback pairs, frontend integration, and live read-only validation remain.
