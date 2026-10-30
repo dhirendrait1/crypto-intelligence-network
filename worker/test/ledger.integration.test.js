@@ -40,6 +40,7 @@ function makeD1({ failBatchAt = -1 } = {}) {
         return results;
       } catch (error) {
         db.exec("ROLLBACK");
+        console.error("D1 test harness batch failure:", error?.stack || error);
         throw error;
       }
     },
