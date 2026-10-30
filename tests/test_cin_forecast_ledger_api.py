@@ -137,8 +137,8 @@ def test_api_normalizes_offset_timestamps_to_utc(tmp_path, monkeypatch):
     }
     response = c.post("/forecasts", json=offset_forecast, headers=auth())
     assert response.status_code == 201
-    assert response.json()["created_at"] == "2026-10-30T10:00:00Z"
-    assert response.json()["target_at"] == "2026-10-30T11:00:00Z"
+    assert response.json()["created_at"] == "2026-10-30T10:00:00+00:00"
+    assert response.json()["target_at"] == "2026-10-30T11:00:00+00:00"
 
 
 def test_api_rejects_naive_timestamps(tmp_path, monkeypatch):
