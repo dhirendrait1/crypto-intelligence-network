@@ -61,8 +61,8 @@ async function insertImmutable(env, table, idColumn, id, item) {
     ).bind(id, item.asset_id, item.metric, item.unit, item.created_at, payload).run();
   } else {
     await env.CIN_FORECAST_DB.prepare(
-      "INSERT OR IGNORE INTO cin_forecast_observations (observation_id, payload_json) VALUES (?, ?)"
-    ).bind(id, payload).run();
+      "INSERT OR IGNORE INTO cin_forecast_observations (observation_id, asset_id, metric, unit, observed_at, payload_json) VALUES (?, ?, ?, ?, ?, ?)"
+    ).bind(id, item.asset_id, item.metric, item.unit, item.observed_at, payload).run();
   }
   const saved = await env.CIN_FORECAST_DB.prepare(
     `SELECT payload_json FROM ${table} WHERE ${idColumn} = ?`
@@ -118,20 +118,20 @@ async function handle(env, op, p) {
       const prior = await db.prepare("SELECT result_json FROM cin_forecast_evaluations WHERE forecast_id=?")
         .bind(p.forecast_id).first();
       if (prior) return JSON.parse(prior.result_json);
-      const candidates = await db.prepare(
-        "SELECT payload_json FROM cin_forecast_observations WHERE asset_id=? AND metric=? AND unit=? AND observed_at>=? AND observed_at<=? ORDER BY observed_at,observation_id LIMIT 500"
-      ).bind(f.asset_id, f.metric, f.unit, f.target_at, new Date(target + lag * 1000).toISOString()).all();
-      const rows = (candidates.results || []).map(r => JSON.parse(r.payload_json));
-      rows.sort((a,b) => Math.abs(Date.parse(a.observed_at)-target)-Math.abs(Date.parse(b.observed_at)-target) ||
-        a.observed_at.localeCompare(b.observed_at) || a.observation_id.localeCompare(b.observation_id));
-      if (!rows.length) return { forecast_id:p.forecast_id, status:"not_evaluable",
+      const candidate = await db.prepare(
+        "SELECT payload_json FROM cin_forecast_observations WHERE asset_id=? AND metric=? AND unit=? AND observed_at>=? AND observed_at<=? ORDER BY ABS(julianday(observed_at)-julianday(?)), observed_at, observation_id LIMIT 1"
+      ).bind(f.asset_id, f.metric, f.unit, f.target_at, new Date(target + lag * 1000).toISOString(), f.target_at).first();
+      const o = candidate ? JSON.parse(candidate.payload_json) : null;
+      if (!o) return { forecast_id:p.forecast_id, status:"not_evaluable",
         reason:"no_matching_observation_within_horizon_tolerance", target_at:f.target_at,
         max_observation_lag_seconds:lag };
-      const o = rows[0], error = o.value - f.value;
-      const result = { forecast_id:f.forecast_id, status:"evaluated", metric:f.metric,
+      const error = o.value - f.value;
+      const result = { forecast_id:f.forecast_id, status:"evaluated", reason:"horizon_observation_comparable", metric:f.metric,
         unit:f.unit, predicted_value:f.value, actual_value:o.value, error,
         absolute_error:Math.abs(error),
-        absolute_percentage_error:o.value === 0 ? null : Math.abs(error/o.value)*100,
+        absolute_percentage_error:o.value === 0 ? null : Math.abs(error/Math.abs(o.value))*100,
+        percentage_error_reason:o.value === 0 ? "actual_value_is_zero" : undefined,
+        target_at:f.target_at,
         observation_id:o.observation_id, source_id:o.source_id, observed_at:o.observed_at,
         evaluated_at:p.evaluated_at, asset_id:f.asset_id,
         observation_retrieved_at:o.retrieved_at, max_observation_lag_seconds:lag };
