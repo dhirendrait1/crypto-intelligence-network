@@ -36,6 +36,25 @@ class LocalSQLiteEvidenceRepository:
         self.connection.execute("PRAGMA foreign_keys = ON")
 
 
+    def find_evidence_id(
+        self,
+        *,
+        source_namespace: str,
+        external_evidence_id: str,
+    ) -> str | None:
+        """Read an existing evidence ID by its unique provider identity."""
+        if not isinstance(source_namespace, str) or not source_namespace.strip():
+            raise ValueError("source_namespace must be non-empty")
+        if not isinstance(external_evidence_id, str) or not external_evidence_id.strip():
+            raise ValueError("external_evidence_id must be non-empty")
+        row = self.connection.execute(
+            """SELECT cin_evidence_id
+               FROM cin_evidence_records
+               WHERE source_namespace = ? AND external_evidence_id = ?""",
+            (source_namespace.strip(), external_evidence_id.strip()),
+        ).fetchone()
+        return row["cin_evidence_id"] if row is not None else None
+
     def append_assessment_event(
         self,
         *,
