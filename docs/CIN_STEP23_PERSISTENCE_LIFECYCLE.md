@@ -183,3 +183,8 @@ The following are intentionally not guessed or implemented:
 ## 14. Derived hash and fingerprint lifecycle design gate (2026-10-31)
 
 See `docs/CIN_STEP23_DERIVED_DATA_HASH_AND_FINGERPRINT_LIFECYCLE_V1.md` for the detailed F-07 proposal. Current behavior is limited: the local adapter stores SHA-256 fingerprints of canonicalized allowlisted metadata; the optional content-hash column is currently populated with NULL. Neither is proof of authenticity or anonymity. Default future treatment is to inherit source classification, policy version, lineage, and expiry; source erasure triggers a dependency review and removal of derived descendants unless a narrow, independently approved retention exception is fully justified. Missing lineage fails closed. No current hash is changed or deleted; no new hash computation, lineage schema, retention worker, or production persistence is enabled. This is a design gate only.
+
+
+## 15. Classification implementation-readiness gate (2026-10-31)
+
+See `docs/CIN_STEP23_F03_CLASSIFICATION_IMPLEMENTATION_READINESS_V1.md` for the field-level candidate mapping, proposed schema-v2 policy registry contract, fail-closed semantics, migration/backfill sequence, acceptance tests, and unresolved approval register. This plan is non-executable design guidance: no classification or retention labels are present in schema v1.0, no rows are backfilled, and no policy duration, legal basis, source permission, or legal-hold authority is approved by this document. Schema-v2 implementation remains blocked until each required decision has explicit evidence and the migration receives separate review and project approval.
