@@ -941,3 +941,12 @@ This checkpoint validates configured offline automation only. It does not establ
 - Specified evidence tiers for exchange labels, chain-specific/time-bounded provenance, gross inflow/outflow/net-flow definitions, event exclusions and double-counting controls, coverage/finality metadata, and uncertainty output.
 - Explicitly prohibits personal deanonymization, unsupported beneficial-owner/whale claims, inferring intent from transfers, wallet control, signing, broadcasting, and fund movement.
 - Step 21 remains Partial. No chain indexer, exchange-label registry, flow API, provider dependency, or live integration was added. Provider access-tier, free-plan/payment, licensing, and data-quality review must precede implementation.
+
+
+## Step 22 — commodity and growth evidence provenance increment (2026-10-30)
+
+- Extended growth-fundamentals evidence records with optional caller-supplied `evidence_id` and `source_role`, explicit unauthenticated-role flags, required check timestamps for supplied `verified` statuses, future/check-before-publication chronology checks, and deterministic SHA-256 fingerprints over normalized supplied metadata.
+- Extended growth and commodity API request models to accept the optional evidence identity and source-role fields. Updated documentation, including correction of the growth `max_age_days` range to 0–3650.
+- Added four growth-assessment regression tests covering missing check time, future/impossible chronology, role/fingerprint disclosure, and metadata fingerprint change detection.
+- Fingerprints are not document hashes, signatures, trusted timestamps, or authenticity proof. Source roles remain caller supplied and unauthenticated.
+- Step 22 remains Partial: source documents are not fetched and issuer/reserve/custody/audit/fundamental claims are not independently verified. Live source validation is outstanding.
