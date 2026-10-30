@@ -138,7 +138,7 @@ class TestEvidencePersistenceSQLiteIntegration(unittest.TestCase):
             reopened_connection = sqlite3.connect(database_path)
             reopened_repository = LocalSQLiteEvidenceRepository(reopened_connection)
             repeated = dict(self.arguments)
-            repeated["metadata"] = {"stars": 111, "forks": 22}
+            repeated["metadata"] = {"value": {"stargazers_count": 111, "forks_count": 22}}
             repeated["observed_at"] = "2026-10-30T12:15:00Z"
             repeated["retrieved_at"] = "2026-10-30T12:15:00Z"
             second = persist_evidence_snapshot(reopened_repository, **repeated)
@@ -193,7 +193,7 @@ class TestEvidencePersistenceSQLiteIntegration(unittest.TestCase):
                     return self.delegate.append_assessment_event(**kwargs)
 
             second_arguments = dict(self.arguments)
-            second_arguments["metadata"] = {"stars": 120, "forks": 25}
+            second_arguments["metadata"] = {"value": {"stargazers_count": 120, "forks_count": 25}}
             second_arguments["observed_at"] = "2026-10-30T12:20:00Z"
             second_arguments["retrieved_at"] = "2026-10-30T12:20:00Z"
             second = persist_evidence_snapshot(
@@ -259,7 +259,7 @@ class TestEvidencePersistenceSQLiteIntegration(unittest.TestCase):
                 try:
                     repository = SynchronizedLookupRepository(connection)
                     arguments = dict(self.arguments)
-                    arguments["metadata"] = {"stars": stars, "forks": 30}
+                    arguments["metadata"] = {"value": {"stargazers_count": stars, "forks_count": 30}}
                     arguments["observed_at"] = f"2026-10-30T12:{minute:02d}:00Z"
                     arguments["retrieved_at"] = f"2026-10-30T12:{minute:02d}:00Z"
                     value = persist_evidence_snapshot(repository, **arguments)
@@ -327,7 +327,7 @@ class TestEvidencePersistenceSQLiteIntegration(unittest.TestCase):
             """.replace("?", "'never-match'")
         )
         changed = dict(self.arguments)
-        changed["metadata"] = {"stars": 999}
+        changed["metadata"] = {"value": {"stargazers_count": 999}}
         changed["observed_at"] = "2026-10-30T12:10:00Z"
         with self.assertRaisesRegex(sqlite3.IntegrityError, "injected observation failure"):
             persist_evidence_snapshot(self.repository, **changed)
