@@ -12,6 +12,15 @@ from typing import Any, Mapping, Protocol, runtime_checkable
 class EvidenceStore(Protocol):
     """Structural contract for append-oriented CIN evidence persistence."""
 
+    def find_evidence_id(
+        self,
+        *,
+        source_namespace: str,
+        external_evidence_id: str,
+    ) -> str | None:
+        """Return the existing evidence ID for a provider identity, or None."""
+        ...
+
     def store_bundle(
         self,
         *,
