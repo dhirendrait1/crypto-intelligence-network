@@ -69,6 +69,9 @@ jobs:
               "/growth-fundamentals-assessment",
               "/derivatives/market-snapshot",
               "/news-sentiment",
+              "/forecasts",
+              "/forecasts/observations",
+              "/forecasts/scorecards/summary",
           }
           missing = sorted(required - paths)
           print("Registered CIN routes:")
