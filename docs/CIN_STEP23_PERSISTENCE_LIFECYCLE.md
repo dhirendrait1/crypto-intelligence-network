@@ -223,3 +223,8 @@ See docs/CIN_STEP23_PROVIDER_GOVERNANCE_AND_SOURCE_OF_TRUTH_READINESS_V1.md for 
 ## 22. Claim conflict and review-state readiness (2026-10-31)
 
 See docs/CIN_STEP23_CLAIM_CONFLICT_AND_REVIEW_STATE_READINESS_V1.md for the distinction between relationship vocabulary validation and actual conflict detection/adjudication. The shared primitives validate relationship/review-status values but do not authenticate reviewers, compare evidence, execute state transitions, or persist review events. No claim was adjudicated or status promoted. Conflict detection, authenticated review, and durable resolution history remain unimplemented.
+
+
+## 23. Evidence completeness and coverage readiness (2026-10-31)
+
+See docs/CIN_STEP23_EVIDENCE_COMPLETENESS_AND_COVERAGE_READINESS_V1.md for the expected-source manifest, source/entity/metric/time/field/pagination/provenance coverage dimensions, scan-gap accounting, assessment status rules, and acceptance tests. The common evidence model specifies completeness fields, while the reviewed GitHub connector has only source-specific missing-field/freshness reporting and the cross-source comparator accepts caller-supplied observations without an expected coverage denominator. No general coverage evaluator, scheduler, pagination client, provider query, API, schema, or persistence activation was added. Runtime completeness enforcement remains open.
