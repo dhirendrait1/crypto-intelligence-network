@@ -982,3 +982,17 @@ This checkpoint validates configured offline automation only. It does not establ
 - Added the module to `patch_cin_metadata_fixed.py` and its deployment-scaffold regression fixture so the scaffold copies it into `cin/app`. No router or public endpoint was added.
 - Integrated the shared builders into commodity and growth assessment evidence rows as additive `claim` and `claim_evidence_relationship` fields. Claims are emitted only from non-empty caller-supplied `claim_text`, use the asset/project symbol as subject and the existing evidence type/category as predicate, and remain `not_assessed`. Relationships are emitted only when a caller-supplied stable `evidence_id` exists and are always `context_only` / `automated_candidate`; rationale states that neither claim nor source was independently verified.
 - Added offline regressions for both modules, missing evidence IDs, and absent claim text. Legacy fields and existing assessment scoring/status logic are unchanged. No persistence, source retrieval/authentication, or public relationship API was added. Step 23 remains Partial.
+
+
+## Claim/evidence persistence lifecycle design (2026-10-30)
+
+- [x] Add design-only persistence contract in docs/CIN_STEP23_PERSISTENCE_LIFECYCLE.md.
+- [x] Separate CIN evidence identity from caller-supplied external evidence IDs.
+- [x] Define immutable evidence observations and keep published, observed, retrieved, and checked timestamps distinct.
+- [x] Define append-only claim assessment events and explicit many-to-many claim/evidence relationships.
+- [x] Define conflict preservation, metadata/content hash limitations, idempotency, and transaction requirements.
+- [x] Define retention, deletion, licensing, privacy, authorization, and backup acceptance gates before persistence is enabled.
+- [x] Explicitly reject ephemeral filesystem/SQLite as durable production storage; SQLite is permitted only for local deterministic development/tests until durable storage is selected.
+- [ ] Implement durable persistence, migrations, transactional writes, deletion/retention jobs, and API authorization.
+- [ ] Validate provider licensing/authorization and any source-fetch SSRF protections before retrieval.
+- **Boundary:** this is architecture documentation only. No database, migration, source collector, persistence API, or Render change was created. Step 23 remains Partial.
