@@ -48,6 +48,48 @@ jobs:
           cp patch_cin_metadata_fixed.py "$staging/"
           (cd "$staging" && python patch_cin_metadata_fixed.py)
           PYTHONPATH="$staging/cin" python -c "from app.main import app; paths={route.path for route in app.routes}; assert '/coinbase/market-candles' in paths, paths; print('Coinbase route mounted in packaged Render app')"
+          PYTHONPATH="$staging/cin" python - <<'PY'
+          import asyncio
+          from unittest.mock import patch
+          from fastapi import HTTPException
+          from app.main import app
+          import app.cin_coinbase_market_data_api as api
+
+          paths = {route.path for route in app.routes}
+          assert "/coinbase/market-candles" in paths
+
+          fixture = [{
+              "open_time": 1700000000000,
+              "close_time": 1700003599999,
+              "open": 100.0, "high": 103.0, "low": 99.0,
+              "close": 102.0, "volume": 12.5,
+          }]
+          with patch.object(api, "fetch_candles", return_value=fixture) as fetch:
+              body = asyncio.run(api.get_coinbase_market_candles(
+                  product_id="BTC-USD", granularity="1h",
+                  start=1700000000, end=1700003600,
+              ))
+          assert body["source"] == "Coinbase Exchange public candles API"
+          assert body["product_id"] == "BTC-USD"
+          assert body["quote_currency"] == "USD"
+          assert body["mode"] == "read_only"
+          assert body["count"] == 1 and body["data"][0]["open"] == 100.0
+          assert body["data"][0]["open_time_utc"].endswith("+00:00")
+          fetch.assert_called_once()
+
+          with patch.object(api, "fetch_candles", side_effect=RuntimeError("private provider detail")):
+              try:
+                  asyncio.run(api.get_coinbase_market_candles(
+                      product_id="BTC-USD", granularity="1h",
+                      start=1700000000, end=1700003600,
+                  ))
+              except HTTPException as exc:
+                  assert exc.status_code == 503
+                  assert "private" not in exc.detail
+              else:
+                  raise AssertionError("provider failure did not return HTTP 503")
+          print("Packaged Coinbase endpoint response and provider-error contract verified with mocked provider; no external request made")
+          PY
           python -m compileall -q "$staging/cin/app"
 
       - name: Compile CIN modules and tests
