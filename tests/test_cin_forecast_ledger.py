@@ -79,3 +79,11 @@ def test_concurrent_duplicate_forecast_inserts_once(tmp_path):
         list(pool.map(lambda _:record_forecast(p,F,recorded_at=NOW),range(4)))
     with sqlite3.connect(p) as db:
         assert db.execute("SELECT COUNT(*) FROM cin_forecasts").fetchone()[0]==1
+
+
+def test_tolerance_parameter_is_bounded(tmp_path):
+    p=tmp_path/"f.db"
+    record_forecast(p,F,recorded_at=NOW)
+    with pytest.raises(ValueError,match="0 through 604800"):
+        evaluate_and_record_forecast(p,F["forecast_id"],evaluated_at=NOW,
+                                     max_observation_lag_seconds=604801)
