@@ -103,6 +103,31 @@ jobs:
       - name: Run Coinbase public candles API tests
         run: python -m unittest discover -s tests -p "test_cin_coinbase_market_data_api.py" -v
 
+      - name: Live Coinbase public BTC-USD read-only smoke check
+        run: |
+          python - <<'PY'
+          import time
+          from datetime import datetime, timezone
+          from cin_coinbase_public_market_data import fetch_candles
+
+          # Request the most recently completed one-hour UTC interval.
+          end = (int(time.time()) // 3600) * 3600
+          start = end - 3600
+          rows = fetch_candles("BTC-USD", "1h", start, end)
+          assert rows, "Coinbase returned no candles for the last completed hour"
+          assert all(row["close"] > 0 and row["high"] >= row["low"] for row in rows)
+          print({
+              "provider": "Coinbase Exchange public API",
+              "product_id": "BTC-USD",
+              "granularity": "1h",
+              "requested_start_utc": datetime.fromtimestamp(start, timezone.utc).isoformat(),
+              "requested_end_utc": datetime.fromtimestamp(end, timezone.utc).isoformat(),
+              "returned_candles": len(rows),
+              "latest_close": rows[-1]["close"],
+              "mode": "read_only",
+          })
+          PY
+
       - name: Run SQLite persistence reliability tests
         run: python -m unittest discover -s tests -p "test_cin_sqlite_persistence_reliability.py" -v
 
