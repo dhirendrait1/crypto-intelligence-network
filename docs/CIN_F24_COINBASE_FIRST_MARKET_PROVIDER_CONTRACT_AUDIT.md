@@ -50,3 +50,18 @@ No exchange account authentication, private API keys, order endpoints, order exe
 ## 6. Current disposition
 
 F-24 is **not complete**. The audit has established the provider mismatch and prevented unsafe dashboard wiring. The next implementation increment is Gate A: a Coinbase public-data adapter with fixture-driven tests, after confirming current Coinbase public API contract details. No existing Binance/Kraken route has been modified by this audit.
+
+
+## 7. Gate A implementation increment (2026-10-31)
+
+Added `cin_coinbase_public_market_data.py` as a separate, bounded Coinbase Exchange public-candle adapter and `tests/test_cin_coinbase_public_market_data.py` for offline contract tests.
+
+The adapter:
+- Uses the fixed public Coinbase Exchange host and GET-only candle path; no API key or account access.
+- Requires an explicit USD-quoted product ID (for example `BTC-USD`); it rejects `BTC-USDT` rather than silently substituting a USD market.
+- Allows only documented candle granularities: 1m, 5m, 15m, 1h, 6h and 1d.
+- Enforces a maximum 300-candle time window per request and a bounded response body.
+- Normalizes Coinbase's `[time, low, high, open, close, volume]` row shape into CIN OHLCV with UTC millisecond open/close times.
+- Filters malformed/non-finite/impossible rows, sorts chronologically, and de-duplicates identical timestamps.
+
+**Gate A status: implemented in an isolated adapter; awaiting CI evidence and live read-only smoke validation.** It is not registered as a production API route and is not connected to the dashboard. The existing Binance/Kraken route is unchanged; no claim is made that the current dashboard is Coinbase-powered.
