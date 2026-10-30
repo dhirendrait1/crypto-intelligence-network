@@ -39,6 +39,16 @@ jobs:
           sed -n '1,260p' /tmp/cin-deployment-audit/cin/app/main.py
           python -m compileall -q /tmp/cin-deployment-audit/cin/app
 
+      - name: Verify Render patch installs Coinbase router
+        run: |
+          staging="$(mktemp -d)"
+          python -m zipfile -e cin_step203_scaffold_fixed.zip "$staging"
+          cp ./*.py "$staging/"
+          cp patch_cin_metadata_fixed.py "$staging/"
+          (cd "$staging" && python patch_cin_metadata_fixed.py)
+          PYTHONPATH="$staging/cin" python -c "from app.main import app; paths={route.path for route in app.routes}; assert '/coinbase/market-candles' in paths, paths; print('Coinbase route mounted in packaged Render app')"
+          python -m compileall -q "$staging/cin/app"
+
       - name: Compile CIN modules and tests
         run: |
           python -m compileall -q tests
