@@ -1027,3 +1027,13 @@ This checkpoint validates configured offline automation only. It does not establ
 - [x] Add tests proving assessment history is append-only and invalid/unknown claim assessments are rejected.
 - [ ] Run all four GitHub Actions workflows on the latest branch head.
 - **Boundary:** no authenticated reviewer identity, production workflow, API integration, or durable production database is implemented.
+
+
+## Append-only evidence lifecycle increment (2026-10-30)
+
+- [x] Add explicit append_observation operation for existing CIN evidence records.
+- [x] Preserve prior observations; append a new immutable observation with separate timestamps, source status, normalized metadata and SHA-256 metadata fingerprint.
+- [x] Add regression tests for history preservation, timezone normalization, missing-record foreign-key rejection, and non-finite JSON rejection.
+- [x] Keep claim assessment history append-only through append_assessment_event; no prior assessment is overwritten.
+- [ ] Verify all four GitHub Actions workflows on latest branch head.
+- **Boundary:** local SQLite adapter only; no API integration, retention worker, production database, or Render deployment.
