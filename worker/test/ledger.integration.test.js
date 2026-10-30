@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import worker from "../src/index.js";
 
-function makeD1() {
+function makeD1({ failBatchAt = -1 } = {}) {
   const db = new DatabaseSync(":memory:");
   db.exec(readFileSync("worker/migrations/0001_forecast_ledger.sql", "utf8"));
   return {
@@ -30,7 +30,11 @@ function makeD1() {
     batch(statements) {
       db.exec("BEGIN");
       try {
-        const results = statements.map(statement => statement.batchResult());
+        const results = [];
+        for (let i = 0; i < statements.length; i++) {
+          if (i === failBatchAt) throw new Error("simulated D1 batch statement failure");
+          results.push(statements[i].batchResult());
+        }
         db.exec("COMMIT");
         return results;
       } catch (error) {
@@ -326,6 +330,31 @@ test("concurrent evaluations persist one immutable result and return the winning
     max_observation_lag_seconds: 3600,
   });
   assert.deepEqual(replay.body.result, stored.body.result);
+  db.close();
+});
+
+test("rolls back an insert when a later statement in the D1 batch fails", async () => {
+  const db = makeD1({ failBatchAt: 1 });
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const forecast = {
+    forecast_id: "fc-batch-rollback", asset_id: "BTC-USD", metric: "price",
+    value: 70000, unit: "USD", source_id: "test",
+    created_at: "2026-10-30T10:00:00Z",
+    target_at: "2026-10-30T11:00:00Z",
+  };
+  const failed = await call(env, "create_forecast", {
+    forecast, recorded_at: "2026-10-30T10:00:01Z",
+  });
+  assert.equal(failed.status, 503);
+  assert.match(failed.body.error, /temporarily unavailable/);
+
+  // A fresh non-faulting adapter over the same database would be required to
+  // inspect state; makeD1 exposes this read-only test helper for that purpose.
+  const remaining = await call(env, "get_forecast", {
+    forecast_id: forecast.forecast_id,
+  });
+  assert.equal(remaining.status, 200);
+  assert.equal(remaining.body.result, null);
   db.close();
 });
 
