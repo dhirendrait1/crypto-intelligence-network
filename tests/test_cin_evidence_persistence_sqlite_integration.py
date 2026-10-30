@@ -196,10 +196,15 @@ class TestEvidencePersistenceSQLiteIntegration(unittest.TestCase):
             class SynchronizedLookupRepository:
                 def __init__(self, connection):
                     self.delegate = LocalSQLiteEvidenceRepository(connection)
+                    self.first_lookup = True
 
                 def find_evidence_id(self, **kwargs):
-                    # Release both workers before either performs its first lookup.
-                    lookup_barrier.wait(timeout=10)
+                    # Synchronize only the initial lookup. A worker resolving a
+                    # uniqueness race performs a second lookup after the winner
+                    # has committed and must not wait at the barrier again.
+                    if self.first_lookup:
+                        self.first_lookup = False
+                        lookup_barrier.wait(timeout=10)
                     return self.delegate.find_evidence_id(**kwargs)
 
                 def store_bundle(self, **kwargs):
