@@ -30,6 +30,15 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install "fastapi>=0.115,<1" "pydantic>=2,<3"
 
+      - name: Inspect packaged Render application entrypoint (read-only)
+        run: |
+          python -m zipfile -e cin_step203_scaffold_fixed.zip /tmp/cin-deployment-audit
+          echo "Packaged application files:"
+          find /tmp/cin-deployment-audit/cin -maxdepth 3 -type f | sort
+          echo "Packaged app/main.py:"
+          sed -n '1,260p' /tmp/cin-deployment-audit/cin/app/main.py
+          python -m compileall -q /tmp/cin-deployment-audit/cin/app
+
       - name: Compile CIN modules and tests
         run: |
           python -m compileall -q tests
