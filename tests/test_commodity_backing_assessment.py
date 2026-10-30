@@ -443,3 +443,37 @@ def test_commodity_claim_without_caller_evidence_id_has_no_relationship():
     )["evidence"][0]
     assert result_row["claim"] is not None
     assert result_row["claim_evidence_relationship"] is None
+
+
+def test_caller_claim_is_linked_as_context_only_without_verification():
+    item = valid_item(
+        evidence_id="reserve-doc-17",
+        claim_text="Issuer states each token is backed by one unit of gold.",
+    )
+    row = assess_commodity_asset("PAXG", [item], now=NOW)["evidence"][0]
+    claim = row["claim"]
+    link = row["claim_evidence_relationship"]
+    assert claim["subject"] == "PAXG"
+    assert claim["predicate"] == "reserve_attestation"
+    assert claim["claim_status"] == "not_assessed"
+    assert claim["claim_id_is_truth_proof"] is False
+    assert link["claim_id"] == claim["claim_id"]
+    assert link["evidence_id"] == "reserve-doc-17"
+    assert link["relationship"] == "context_only"
+    assert link["review_status"] == "automated_candidate"
+    assert link["relationship_is_persisted"] is False
+    assert "not independently verified" in link["rationale"]
+
+
+def test_commodity_claim_without_caller_evidence_id_has_no_relationship():
+    row = assess_commodity_asset(
+        "PAXG", [valid_item(claim_text="Issuer statement.")], now=NOW
+    )["evidence"][0]
+    assert row["claim"] is not None
+    assert row["claim_evidence_relationship"] is None
+
+
+def test_commodity_record_without_claim_text_has_no_claim_objects():
+    row = assess_commodity_asset("PAXG", [valid_item()], now=NOW)["evidence"][0]
+    assert row["claim"] is None
+    assert row["claim_evidence_relationship"] is None
