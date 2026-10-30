@@ -129,5 +129,51 @@ class TestSQLitePersistenceReliability(unittest.TestCase):
         )
 
 
+
+    def test_foreign_keys_reject_observations_without_parent_evidence(self):
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.repo.append_observation(
+                cin_evidence_id="missing-parent-evidence",
+                metadata={"metric": "commits", "count": 4},
+                observed_at="2026-10-30T12:00:00Z",
+                source_status="caller_supplied",
+            )
+
+        self.assertEqual(
+            self.db.execute("SELECT COUNT(*) FROM cin_evidence_observations").fetchone()[0],
+            0,
+        )
+
+    def test_observations_are_appended_as_distinct_history_rows(self):
+        stored = self._store()
+        first_id = self.repo.append_observation(
+            cin_evidence_id=stored["cin_evidence_id"],
+            metadata={"metric": "commits", "count": 5},
+            observed_at="2026-10-30T12:01:00Z",
+            source_status="caller_supplied",
+        )
+        second_id = self.repo.append_observation(
+            cin_evidence_id=stored["cin_evidence_id"],
+            metadata={"metric": "commits", "count": 6},
+            observed_at="2026-10-30T12:02:00Z",
+            source_status="caller_supplied",
+        )
+
+        rows = self.db.execute(
+            "SELECT observation_id, metadata_json FROM cin_evidence_observations "
+            "WHERE cin_evidence_id=? ORDER BY observed_at",
+            (stored["cin_evidence_id"],),
+        ).fetchall()
+        self.assertEqual(
+            [row["observation_id"] for row in rows],
+            [stored["observation_id"], first_id, second_id],
+        )
+        self.assertEqual(
+            [row["metadata_json"] for row in rows],
+            ['{"count":4,"metric":"commits"}',
+             '{"count":5,"metric":"commits"}',
+             '{"count":6,"metric":"commits"}'],
+        )
+
 if __name__ == "__main__":
     unittest.main()
