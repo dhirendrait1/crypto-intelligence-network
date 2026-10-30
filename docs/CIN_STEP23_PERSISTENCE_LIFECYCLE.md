@@ -188,3 +188,8 @@ See `docs/CIN_STEP23_DERIVED_DATA_HASH_AND_FINGERPRINT_LIFECYCLE_V1.md` for the 
 ## 15. Classification implementation-readiness gate (2026-10-31)
 
 See `docs/CIN_STEP23_F03_CLASSIFICATION_IMPLEMENTATION_READINESS_V1.md` for the field-level candidate mapping, proposed schema-v2 policy registry contract, fail-closed semantics, migration/backfill sequence, acceptance tests, and unresolved approval register. This plan is non-executable design guidance: no classification or retention labels are present in schema v1.0, no rows are backfilled, and no policy duration, legal basis, source permission, or legal-hold authority is approved by this document. Schema-v2 implementation remains blocked until each required decision has explicit evidence and the migration receives separate review and project approval.
+
+
+## 16. Backup, export, replica, and restore readiness gate (2026-10-31)
+
+See `docs/CIN_STEP23_BACKUP_EXPORT_REPLICA_RESTORE_READINESS_V1.md` for the asset/control matrix, copy-manifest contract, restore quarantine and erasure-replay sequence, export/support-bundle boundaries, acceptance tests, and evidence gaps. This review found no repository evidence of an operational CIN backup job, replica inventory, governed export workflow, or restore-time erasure replay. Provider-managed copies were not independently verified; this is an evidence gap, not a claim that hosting providers keep no backups. No copy, export, backup, restore, data, or deployment was changed. Operational lifecycle remains unverified and production persistence remains unauthorized.
