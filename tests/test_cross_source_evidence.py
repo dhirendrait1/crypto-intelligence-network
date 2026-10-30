@@ -153,3 +153,34 @@ def test_http_and_https_origins_remain_distinct_source_identities():
         "http://alpha.example",
         "https://beta.example",
     }
+
+
+
+def test_source_identity_normalizes_idn_and_terminal_dns_dot():
+    result = compare_metric_observations([
+        observation("Unicode host", 100.0, source_url="https://bücher.example./price"),
+        observation("ASCII host", 100.0, source_url="https://xn--bcher-kva.example/api"),
+        observation("Beta", 100.0),
+    ])
+
+    item = result["results"][0]
+    assert item["comparable_source_count"] == 2
+    assert item["duplicate_source_observation_count"] == 1
+    assert "https://xn--bcher-kva.example" in {
+        row["source_url"] for row in item["source_observations"]
+    }
+
+
+def test_source_identity_formats_ipv6_authorities_with_brackets():
+    result = compare_metric_observations([
+        observation("IPv6 one", 100.0, source_url="https://[2001:0db8::1]:443/price"),
+        observation("IPv6 two", 100.0, source_url="https://[2001:db8:0:0::1]/api"),
+        observation("Beta", 100.0),
+    ])
+
+    item = result["results"][0]
+    assert item["comparable_source_count"] == 2
+    assert item["duplicate_source_observation_count"] == 1
+    assert "https://[2001:db8::1]" in {
+        row["source_url"] for row in item["source_observations"]
+    }
