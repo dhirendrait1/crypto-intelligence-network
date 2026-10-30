@@ -21,7 +21,8 @@ def test_forecast_persists_and_reopens(tmp_path):
 
 def test_forecast_idempotency_and_conflict(tmp_path):
     p=tmp_path/"f.db"
-    assert record_forecast(p,F,recorded_at=NOW)==record_forecast(p,F,recorded_at=NOW)
+    first=record_forecast(p,F,recorded_at=NOW)
+    assert first==record_forecast(p,F,recorded_at="2026-10-30T12:05:00Z")
     with pytest.raises(ValueError,match="different content"):
         record_forecast(p,{**F,"value":71000},recorded_at=NOW)
 
