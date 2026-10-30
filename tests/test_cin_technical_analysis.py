@@ -93,9 +93,6 @@ class TechnicalAnalysisTests(unittest.TestCase):
             TechnicalAnalysisRequest.model_validate(dict(payload, order_side="BUY"))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
     def test_rsi_constant_series_is_neutral(self):
         self.assertEqual(module._rsi([100.0] * 15), 50.0)
 
@@ -135,3 +132,7 @@ if __name__ == "__main__":
         short = module.analyze_ohlc(candles_from_closes(closes[:-1]))
         self.assertIsNotNone(short["indicators"]["macd_line"])
         self.assertIsNone(short["indicators"]["macd_signal"])
+
+
+if __name__ == "__main__":
+    unittest.main()
