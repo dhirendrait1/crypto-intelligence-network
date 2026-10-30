@@ -2,8 +2,10 @@
 import re
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from cin_evidence_store import EvidenceStore
 
 try:
     from app.cin_evidence_ingestion import (
@@ -21,6 +23,11 @@ except ModuleNotFoundError as exc:
     )
 
 router = APIRouter(tags=["public evidence ingestion"])
+
+
+def get_evidence_store(request: Request) -> EvidenceStore | None:
+    """Return an explicitly configured application store; never create one."""
+    return getattr(request.app.state, "cin_evidence_store", None)
 
 
 class PublicEvidenceRequest(BaseModel):
@@ -44,8 +51,11 @@ class PublicEvidenceRequest(BaseModel):
 
 
 @router.post("/public-evidence-ingestion")
-def public_evidence_ingestion(request: PublicEvidenceRequest) -> dict[str, Any]:
-    """Fetch only allowlisted public GitHub metadata; never marks claims verified."""
+def public_evidence_ingestion(
+    request: PublicEvidenceRequest,
+    store: EvidenceStore | None = Depends(get_evidence_store),
+) -> dict[str, Any]:
+    """Fetch metadata; injected storage remains unused pending reviewed mapping."""
     if request.symbol.strip().upper() != "ETH":
         raise HTTPException(status_code=400, detail="Milestone 2 currently supports ETH only")
     if request.repository not in ALLOWED_REPOSITORIES:
