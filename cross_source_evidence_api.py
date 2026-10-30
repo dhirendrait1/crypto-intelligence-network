@@ -16,7 +16,7 @@ class MetricObservation(BaseModel):
     model_config = ConfigDict(extra="forbid")
     metric: str = Field(min_length=1, max_length=100)
     unit: str = Field(min_length=1, max_length=40)
-    value: float = Field(strict=True)
+    value: float = Field(strict=True, allow_inf_nan=False)
     source_name: str = Field(min_length=1, max_length=200)
     source_url: str = Field(min_length=1, max_length=2048)
     observed_at: str = Field(min_length=1, max_length=64)
@@ -25,8 +25,8 @@ class MetricObservation(BaseModel):
 class CrossSourceComparisonRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     observations: list[MetricObservation] = Field(min_length=1, max_length=500)
-    absolute_tolerance: float = Field(default=0.0, ge=0)
-    relative_tolerance: float = Field(default=0.01, ge=0, le=1)
+    absolute_tolerance: float = Field(default=0.0, ge=0, allow_inf_nan=False)
+    relative_tolerance: float = Field(default=0.01, ge=0, le=1, allow_inf_nan=False)
     comparison_window_seconds: int = Field(default=300, strict=True, ge=0, le=86400)
 
 
