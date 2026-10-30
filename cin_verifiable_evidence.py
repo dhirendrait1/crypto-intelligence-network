@@ -47,7 +47,7 @@ def create_claim(
     subject_value = _required_text(subject, "subject", 512)
     predicate_value = _required_text(predicate, "predicate", 128).lower()
     statement_value = _required_text(statement, "statement", 4000)
-    if claim_status not in CLAIM_STATUSES:
+    if not isinstance(claim_status, str) or claim_status not in CLAIM_STATUSES:
         raise ValueError("claim_status is not a supported CIN claim status")
     unit_value = None if unit is None else _required_text(unit, "unit", 64)
     start = _aware_iso(valid_time_start, "valid_time_start") if valid_time_start is not None else None
@@ -89,9 +89,9 @@ def create_claim_evidence_relationship(
     claim = _required_text(claim_id, "claim_id", 128)
     evidence = _required_text(evidence_id, "evidence_id", 128)
     reason = _required_text(rationale, "rationale", 2000)
-    if relationship not in RELATIONSHIPS:
+    if not isinstance(relationship, str) or relationship not in RELATIONSHIPS:
         raise ValueError("relationship must be supports, contradicts, qualifies, or context_only")
-    if review_status not in REVIEW_STATUSES:
+    if not isinstance(review_status, str) or review_status not in REVIEW_STATUSES:
         raise ValueError("review_status is not a supported CIN review status")
     return {
         "claim_id": claim,
