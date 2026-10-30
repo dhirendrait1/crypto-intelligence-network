@@ -44,6 +44,7 @@ jobs:
           staging="$(mktemp -d)"
           python -m zipfile -e cin_step203_scaffold_fixed.zip "$staging"
           cp ./*.py "$staging/"
+          python -m pip install -r "$staging/cin/requirements.txt"
           cp patch_cin_metadata_fixed.py "$staging/"
           (cd "$staging" && python patch_cin_metadata_fixed.py)
           PYTHONPATH="$staging/cin" python -c "from app.main import app; paths={route.path for route in app.routes}; assert '/coinbase/market-candles' in paths, paths; print('Coinbase route mounted in packaged Render app')"
