@@ -169,7 +169,7 @@ export default {
     try { return json({ result: await handle(env, body.operation, body.payload) }); }
     catch (error) {
       const message = String(error?.message || "ledger operation failed");
-      const status = /not found/.test(message) ? 404 : /already exists|invalid|horizon/.test(message) ? 422 : 500;
+      const status = /not found/.test(message) ? 404 : /already exists|invalid|horizon|unsupported/.test(message) ? 422 : 500;
       return bad(message, status);
     }
   }
