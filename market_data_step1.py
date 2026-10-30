@@ -1,13 +1,13 @@
-"""CIN Step 1: read-only public market data from CoinGecko.
+"""CIN Step 1: read-only Coinbase Exchange public market data.
 
-No API key, wallet access, or trade execution is used.
+Only explicitly mapped USD-quoted Coinbase products are supported. Market
+capitalization is not supplied by this exchange endpoint and remains null.
 """
 from __future__ import annotations
 
 import asyncio
 import json
 import urllib.error
-import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 import math
@@ -17,7 +17,11 @@ from fastapi import APIRouter, HTTPException, Query
 
 router = APIRouter(tags=["market-data"])
 
-COINGECKO_URL = "https://api.coingecko.com/api/v3/coins/markets"
+COINBASE_API = "https://api.exchange.coinbase.com"
+COINBASE_ASSETS = {
+    "bitcoin": ("BTC", "Bitcoin"),
+    "ethereum": ("ETH", "Ethereum"),
+}
 MARKET_DATA_MAX_AGE = timedelta(minutes=15)
 FUTURE_TIMESTAMP_TOLERANCE = timedelta(minutes=5)
 MAX_PROVIDER_RESPONSE_BYTES = 2_000_000
@@ -52,126 +56,96 @@ def _timestamp_status(value: Any) -> tuple[str, int | None, str | None]:
     return ("fresh" if age <= MARKET_DATA_MAX_AGE.total_seconds() else "stale"), age, None
 
 
-def _fetch_market_data(ids: list[str], vs_currency: str) -> list[dict[str, Any]]:
-    params = urllib.parse.urlencode({
-        "vs_currency": vs_currency,
-        "ids": ",".join(ids),
-        "price_change_percentage": "24h",
-    })
+def _coinbase_json(path: str) -> dict[str, Any]:
     request = urllib.request.Request(
-        f"{COINGECKO_URL}?{params}",
-        headers={
-            "accept": "application/json",
-            "user-agent": "CIN-Research-API/0.1.0",
-        },
+        f"{COINBASE_API}{path}",
+        headers={"accept": "application/json", "user-agent": "CIN-Research-API/0.1.0"},
         method="GET",
     )
     with urllib.request.urlopen(request, timeout=12) as response:
         if response.status != 200:
-            raise ValueError(f"Provider returned unexpected HTTP status {response.status}")
+            raise ValueError(f"Coinbase returned unexpected HTTP status {response.status}")
         raw = response.read(MAX_PROVIDER_RESPONSE_BYTES + 1)
     if len(raw) > MAX_PROVIDER_RESPONSE_BYTES:
-        raise ValueError("CoinGecko response exceeded the configured size limit")
+        raise ValueError("Coinbase response exceeded the configured size limit")
     payload = json.loads(raw.decode("utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("Coinbase response was not an object")
+    return payload
 
-    if not isinstance(payload, list):
-        raise ValueError("Provider response was not a list")
 
+def _fetch_market_data(ids: list[str], vs_currency: str) -> list[dict[str, Any]]:
+    if vs_currency.lower() != "usd":
+        raise ValueError("Coinbase market-data route supports USD quotes only")
     normalized = []
-    requested_ids = set(ids)
-    seen_ids: set[str] = set()
-    for coin in payload:
-        if not isinstance(coin, dict):
+    for coin_id in ids:
+        asset = COINBASE_ASSETS.get(coin_id)
+        if asset is None:
             continue
-        coin_id = coin.get("id")
-        if not isinstance(coin_id, str) or not coin_id or len(coin_id) > 100 or coin_id not in requested_ids:
+        symbol, name = asset
+        product_id = f"{symbol}-USD"
+        stats = _coinbase_json(f"/products/{product_id}/stats")
+        ticker = _coinbase_json(f"/products/{product_id}/ticker")
+        price = stats.get("last")
+        volume = stats.get("volume")
+        open_price = stats.get("open")
+        if not _finite_number(price, minimum=0):
             continue
-        price = coin.get("current_price")
-        if not _finite_number(price, minimum=0) or coin_id in seen_ids:
-            continue
-        seen_ids.add(coin_id)
         warnings = []
-        symbol = coin.get("symbol")
-        if not isinstance(symbol, str) or not symbol.strip() or len(symbol) > 32 or any(ord(char) < 32 or ord(char) == 127 for char in symbol):
-            symbol = None
-            warnings.append("invalid_symbol_omitted")
-        else:
-            symbol = symbol.strip().upper()
-        name = coin.get("name")
-        if not isinstance(name, str) or not name.strip() or len(name) > 200 or any(ord(char) < 32 or ord(char) == 127 for char in name):
-            name = None
-            warnings.append("invalid_name_omitted")
-        else:
-            name = name.strip()
-        market_cap = coin.get("market_cap")
-        if market_cap is not None and not _finite_number(market_cap, minimum=0):
-            market_cap = None
-            warnings.append("invalid_market_cap_omitted")
-        elif market_cap is not None:
-            market_cap = float(market_cap)
-        volume = coin.get("total_volume")
-        if volume is not None and not _finite_number(volume, minimum=0):
-            volume = None
+        volume_value = float(volume) if _finite_number(volume, minimum=0) else None
+        if volume_value is None:
             warnings.append("invalid_total_volume_omitted")
-        elif volume is not None:
-            volume = float(volume)
-        change = coin.get("price_change_percentage_24h")
-        if change is not None and not _finite_number(change):
-            change = None
-            warnings.append("invalid_price_change_percentage_omitted")
-        elif change is not None:
-            change = float(change)
-        last_updated = coin.get("last_updated")
+        change = None
+        if _finite_number(open_price, minimum=0) and float(open_price) > 0:
+            change = (float(price) / float(open_price) - 1.0) * 100.0
+        else:
+            warnings.append("price_change_unavailable")
+        last_updated = ticker.get("time")
         freshness_status, freshness_age_seconds, timestamp_warning = _timestamp_status(last_updated)
         if timestamp_warning:
             warnings.append(timestamp_warning)
         if freshness_status == "stale":
             warnings.append("market_data_older_than_15_minutes")
-        price = float(price)
-        market_cap_status = "missing" if market_cap is None else ("zero" if market_cap == 0 else "reported_positive")
-        volume_status = "missing" if volume is None else ("zero" if volume == 0 else "reported_positive")
-        if market_cap_status == "missing":
-            warnings.append("market_cap_unavailable")
-        elif market_cap_status == "zero":
-            warnings.append("zero_market_cap_not_liquidity_evidence")
-        if volume_status == "missing":
-            warnings.append("volume_24h_unavailable")
-        elif volume_status == "zero":
-            warnings.append("zero_volume_not_liquidity_evidence")
-        if price == 0:
+        price_value = float(price)
+        if price_value == 0:
             warnings.append("zero_price_not_suitable_for_analysis")
-        analysis_eligible = freshness_status == "fresh" and price > 0
+        if volume_value is None:
+            warnings.append("volume_24h_unavailable")
+        elif volume_value == 0:
+            warnings.append("zero_volume_not_liquidity_evidence")
+        warnings.append("market_cap_unavailable_from_coinbase_exchange")
         normalized.append({
             "id": coin_id,
             "symbol": symbol,
             "name": name,
-            "currency": vs_currency.upper(),
-            "price": price,
-            "market_cap": market_cap,
-            "market_cap_status": market_cap_status,
-            "total_volume_24h": volume,
-            "volume_24h_status": volume_status,
+            "currency": "USD",
+            "price": price_value,
+            "market_cap": None,
+            "market_cap_status": "unavailable",
+            "total_volume_24h": volume_value,
+            "volume_24h_status": "missing" if volume_value is None else ("zero" if volume_value == 0 else "reported_positive"),
             "price_change_percentage_24h": change,
             "last_updated": last_updated,
             "freshness_status": freshness_status,
             "freshness_age_seconds": freshness_age_seconds,
-            "analysis_eligible": analysis_eligible,
+            "analysis_eligible": freshness_status == "fresh" and price_value > 0,
             "data_quality_warnings": warnings,
+            "product_id": product_id,
         })
     return normalized
 
 
 @router.get("/market-data")
 async def get_public_market_data(
-    coins: str = Query(default="bitcoin,ethereum", description="Comma-separated CoinGecko coin IDs"),
+    coins: str = Query(default="bitcoin,ethereum", description="Comma-separated supported CIN asset IDs (bitcoin, ethereum)"),
     vs_currency: str = Query(default="usd", min_length=2, max_length=10),
 ) -> dict[str, Any]:
     """Fetch normalized public market data. Read-only; never places trades."""
     ids = list(dict.fromkeys(item.strip().lower() for item in coins.split(",") if item.strip()))
     if not ids or len(ids) > 10:
-        raise HTTPException(status_code=400, detail="Provide between 1 and 10 coin IDs.")
+        raise HTTPException(status_code=400, detail="Provide between 1 and 10 asset IDs.")
     if any(not item.replace("-", "").isalnum() for item in ids):
-        raise HTTPException(status_code=400, detail="Coin IDs may contain letters, numbers, and hyphens only.")
+        raise HTTPException(status_code=400, detail="Asset IDs may contain letters, numbers, and hyphens only.")
     currency = vs_currency.strip().lower()
     if not 2 <= len(currency) <= 10 or not currency.isascii() or not currency.isalpha():
         raise HTTPException(
@@ -187,7 +161,7 @@ async def get_public_market_data(
         if exc.code == 400:
             raise HTTPException(
                 status_code=400,
-                detail="Currency or market-data request is not supported by the provider.",
+                detail="Coinbase market-data route supports USD quotes only.",
             ) from exc
         raise HTTPException(status_code=502, detail=f"Market-data provider returned HTTP {exc.code}.") from exc
     except (urllib.error.URLError, TimeoutError, OSError):
@@ -202,13 +176,13 @@ async def get_public_market_data(
         ) from None
 
     if not rows:
-        raise HTTPException(status_code=502, detail="No valid market data was returned for the requested coin IDs.")
+        raise HTTPException(status_code=502, detail="No supported Coinbase USD market data was returned for the requested asset IDs.")
 
     returned_ids = {row["id"] for row in rows}
     missing_ids = [coin_id for coin_id in ids if coin_id not in returned_ids]
     return {
         "service": "cin",
-        "source": "CoinGecko public API",
+        "source": "Coinbase Exchange public API",
         "mode": "read_only",
         "retrieved_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "freshness_policy": "row is fresh when provider last_updated is no more than 15 minutes old; stale beyond 15 minutes; unknown when timestamp is missing or invalid",
@@ -217,5 +191,6 @@ async def get_public_market_data(
         "count": len(rows),
         "partial_result": bool(missing_ids),
         "missing_coins": missing_ids,
+        "provider_limitations": ["Coinbase Exchange does not provide market capitalization through these endpoints.", "Only explicitly mapped Coinbase USD products are supported."],
         "data": rows,
     }
