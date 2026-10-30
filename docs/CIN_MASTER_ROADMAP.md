@@ -348,3 +348,9 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - Added docs/CIN_STEP23_ASSESSMENT_API_CONTRACTS_AND_CONSUMER_SAFETY_READINESS_V1.md defining a common response envelope, entity identity, distinct source/observation/retrieval/assessment clocks, provenance, coverage and uncertainty semantics, module-specific output requirements, API contract tests, dashboard safety and stable error handling.
 - Reviewed commodity-backing, growth-fundamentals and cross-source API models/tests plus coin-screening provider/fallback output. Existing strict request validation and module-specific safety caveats are meaningful; no shared versioned response envelope or cross-module conformance suite is evidenced. Caller-supplied `verified` status is not authenticated CIN verification.
 - No runtime response model, route, formula, provider, schema, persistence wiring, dashboard or deployment changed. F-19 readiness design is documented; shared contract implementation remains open. Step 23 remains Partial.
+
+
+### F-20 — Dashboard data integration and assessment presentation architecture (2026-10-31)
+
+- Added docs/CIN_DASHBOARD_DATA_INTEGRATION_AND_ASSESSMENT_PRESENTATION_ARCHITECTURE_V1.md defining mobile-first navigation, API-to-screen mapping, a semantics-preserving client data model, refresh/cache/low-bandwidth policy, loading/empty/not-assessed/partial/stale/conflicting/unavailable/error/unknown states, visualization rules, alert delivery-state presentation, security, accessibility and implementation acceptance sequence.
+- Repository tree review found no independently maintained dashboard/frontend/static/template source tree; current implementation tracker marks dashboard/mobile UX as not established. F-20 is architecture-only; Stage 6 Steps 30–33 remain pending. No frontend, API, provider, persistence, deployment or configuration changed. Numbered roadmap remains 7 stages / 35 steps.
