@@ -198,9 +198,9 @@ class TestEvidencePersistenceSQLiteIntegration(unittest.TestCase):
                     self.delegate = LocalSQLiteEvidenceRepository(connection)
 
                 def find_evidence_id(self, **kwargs):
-                    found = self.delegate.find_evidence_id(**kwargs)
+                    # Release both workers before either performs its first lookup.
                     lookup_barrier.wait(timeout=10)
-                    return found
+                    return self.delegate.find_evidence_id(**kwargs)
 
                 def store_bundle(self, **kwargs):
                     return self.delegate.store_bundle(**kwargs)
