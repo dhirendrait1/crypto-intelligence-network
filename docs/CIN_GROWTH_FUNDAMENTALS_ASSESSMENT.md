@@ -9,7 +9,7 @@ Request fields:
 - `evidence`: optional list (up to 200) of caller-supplied records.
 - `max_age_days`: freshness threshold from 0 to 3650 days; defaults to 90.
 
-Each record accepts `category`, optional caller-supplied `evidence_id` and `source_role`, `source_name`, `source_url`, `published_at`, `checked_at`, `status`, and optional `notes`. A `verified` record requires valid publication and check timestamps; future timestamps and a check time preceding publication downgrade it to unverified. Source roles are unauthenticated caller metadata. Each normalized record carries a metadata SHA-256 fingerprint; this is not a document hash, signature, or proof of authenticity.
+Each record accepts `category`, optional caller-supplied `evidence_id`, `source_role`, and `claim_text`, `source_name`, `source_url`, `published_at`, `checked_at`, `status`, and optional `notes`. `claim_text` records the assertion being assessed; the linked source metadata is a separate evidence reference. Claim text is caller-supplied and is not itself verified by CIN. A `verified` record requires valid publication and check timestamps; future timestamps and a check time preceding publication downgrade it to unverified. A `verified` record requires valid publication and check timestamps; future timestamps and a check time preceding publication downgrade it to unverified. Source roles are unauthenticated caller metadata. Each normalized record carries a metadata SHA-256 fingerprint; this is not a document hash, signature, or proof of authenticity.
 
 The assessment remains metadata-only: CIN does not fetch or independently audit the cited material. The coverage score is not a quality score or investment recommendation.
 
