@@ -250,3 +250,16 @@ def test_growth_api_exposes_additive_claim_and_context_link_fields():
     assert row["claim_evidence_relationship"]["relationship"] == "context_only"
     assert result["evidence_source_mode"] == "caller_supplied_metadata"
     assert result["source_documents_fetched_by_cin"] is False
+
+
+def test_growth_non_string_claim_text_is_not_coerced_into_a_claim():
+    now = datetime(2026, 10, 24, tzinfo=timezone.utc)
+    for supplied in (None, 7, {"statement": "not a string"}, ["not", "a", "string"]):
+        row = assess_growth_fundamentals("ABC", [{
+            "category": "fees_and_revenue", "evidence_id": "e-1",
+            "claim_text": supplied,
+        }], now=now)["evidence"][0]
+        assert row["claim_text"] is None
+        assert row["claim_text_is_caller_supplied"] is False
+        assert row["claim"] is None
+        assert row["claim_evidence_relationship"] is None
