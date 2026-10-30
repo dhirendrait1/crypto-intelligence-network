@@ -12,6 +12,87 @@ import sqlite3
 from typing import Any
 from uuid import uuid4
 
+MAX_METADATA_BYTES = 64 * 1024
+MAX_METADATA_DEPTH = 8
+MAX_METADATA_NODES = 2048
+MAX_METADATA_STRING_CHARS = 8192
+MAX_METADATA_COLLECTION_ITEMS = 256
+
+# Exact source schema for the only connector currently approved for evidence
+# mapping. Other namespaces receive structural/size validation but no claim of
+# source authenticity or semantic approval.
+SOURCE_METADATA_ALLOWLISTS = {
+    "github_public_repository_api": {
+        "symbol", "category", "metric", "source_name", "source_url",
+        "repository", "published_at", "retrieved_at", "measurement_period",
+        "value", "unit", "retrieval_status", "validation_status",
+        "missing_fields", "freshness_status", "freshness_age_seconds",
+        "freshness_policy", "claim_verification_status",
+        "independently_verified", "provenance", "limitations",
+    }
+}
+GITHUB_VALUE_ALLOWLIST = {
+    "default_branch", "pushed_at", "updated_at", "stargazers_count",
+    "forks_count", "open_issues_count", "archived",
+}
+
+
+def _serialize_metadata(metadata: dict[str, Any], source_namespace: str) -> str:
+    """Validate source shape and resource bounds before canonical JSON encoding."""
+    if not isinstance(metadata, dict):
+        raise ValueError("metadata must be a JSON object")
+
+    allowed = SOURCE_METADATA_ALLOWLISTS.get(source_namespace)
+    if allowed is not None:
+        unknown = set(metadata) - allowed
+        if unknown:
+            raise ValueError("metadata contains fields outside the source allowlist")
+        nested_value = metadata.get("value")
+        if nested_value is not None:
+            if not isinstance(nested_value, dict) or set(nested_value) - GITHUB_VALUE_ALLOWLIST:
+                raise ValueError("metadata value contains fields outside the source allowlist")
+
+    nodes = 0
+
+    def inspect(value: Any, depth: int = 0) -> None:
+        nonlocal nodes
+        nodes += 1
+        if nodes > MAX_METADATA_NODES:
+            raise ValueError("metadata exceeds the maximum JSON node count")
+        if depth > MAX_METADATA_DEPTH:
+            raise ValueError("metadata exceeds the maximum JSON nesting depth")
+        if isinstance(value, str):
+            if len(value) > MAX_METADATA_STRING_CHARS:
+                raise ValueError("metadata string exceeds the maximum length")
+        elif isinstance(value, dict):
+            if len(value) > MAX_METADATA_COLLECTION_ITEMS:
+                raise ValueError("metadata object exceeds the maximum field count")
+            for key, child in value.items():
+                if not isinstance(key, str) or len(key) > 128:
+                    raise ValueError("metadata object keys must be strings of at most 128 characters")
+                inspect(child, depth + 1)
+        elif isinstance(value, list):
+            if len(value) > MAX_METADATA_COLLECTION_ITEMS:
+                raise ValueError("metadata array exceeds the maximum item count")
+            for child in value:
+                inspect(child, depth + 1)
+        elif value is None or isinstance(value, (bool, int, float)):
+            return
+        else:
+            raise ValueError("metadata contains an unsupported JSON value")
+
+    inspect(metadata)
+    try:
+        encoded = json.dumps(
+            metadata, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False,
+        )
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("metadata must contain finite JSON-compatible values") from exc
+    if len(encoded.encode("utf-8")) > MAX_METADATA_BYTES:
+        raise ValueError("metadata exceeds the 65536-byte storage limit")
+    return encoded
+
 
 def _utc_timestamp(value: str, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
@@ -123,10 +204,16 @@ class LocalSQLiteEvidenceRepository:
         retrieved = _utc_timestamp(retrieved_at, "retrieved_at") if retrieved_at is not None else None
         published = _utc_timestamp(published_at, "published_at") if published_at is not None else None
         checked = _utc_timestamp(checked_at, "checked_at") if checked_at is not None else None
-        metadata_json = json.dumps(
-            metadata, sort_keys=True, separators=(",", ":"),
-            ensure_ascii=False, allow_nan=False,
-        )
+        namespace_row = self.connection.execute(
+            "SELECT source_namespace FROM cin_evidence_records WHERE cin_evidence_id = ?",
+            (cin_evidence_id,),
+        ).fetchone()
+        if namespace_row is None:
+            # Preserve the database FK as the authoritative unknown-record error.
+            source_namespace = ""
+        else:
+            source_namespace = namespace_row["source_namespace"]
+        metadata_json = _serialize_metadata(metadata, source_namespace)
         fingerprint = sha256(metadata_json.encode("utf-8")).hexdigest()
         observation_id = "cin-observation-" + uuid4().hex
         with self.connection:
@@ -199,7 +286,7 @@ class LocalSQLiteEvidenceRepository:
             raise ValueError("unsupported relationship review status")
         relationship_created = _utc_timestamp(relationship["created_at"], "relationship.created_at")
 
-        metadata_json = json.dumps(metadata, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
+        metadata_json = _serialize_metadata(metadata, source_namespace.strip())
         fingerprint = sha256(metadata_json.encode("utf-8")).hexdigest()
         cin_evidence_id = "cin-evidence-" + uuid4().hex
         observation_id = "cin-observation-" + uuid4().hex
