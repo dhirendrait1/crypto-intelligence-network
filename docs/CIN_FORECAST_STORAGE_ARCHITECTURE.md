@@ -12,6 +12,7 @@ Do not connect FastAPI directly to D1's administrative REST query endpoint for n
 
 - D1 Free currently includes 5 GB total account storage, 5 million rows read/day, and 100,000 rows written/day.
 - The current D1 Free per-database size limit is 500 MB; total account storage is 5 GB.
+- Workers Free also has a shared 100,000 incoming Worker requests/day limit and 10 ms CPU time per request.
 - Free-plan limits are hard stops: queries fail after daily read/write limits are reached, and writes/schema changes stop when storage is full until data is removed or the plan changes.
 - D1 Free currently provides 7 days of Time Travel history. This is not a substitute for an independent export/backup policy.
 - Render Free's local filesystem is ephemeral: SQLite data is lost on restart, redeploy, or spin-down. Render Free web services cannot attach persistent disks. Render Free Postgres expires after 30 days, so it is not a durable permanent-history solution.
@@ -58,7 +59,15 @@ Use parameterized SQL for every value. Enforce payload size and list limits at t
 
 ## $0 and account requirements
 
-D1 is documented as part of the Workers Free plan. This confirms a free usage tier, not that every account onboarding or payment-verification flow is guaranteed to be card-free. Check the user's Cloudflare dashboard's current signup/payment prompts before creating resources; do not add a payment method or enable a paid plan for CIN.
+Cloudflare's current Workers product page advertises starting on the Free plan with no credit card required. D1 is included in Workers Free. The published limits are 5 million rows read/day, 100,000 rows written/day, 5 GB total account storage, and 500 MB per database; the Worker itself is limited to 100,000 requests/day and 10 ms CPU per request. Cloudflare states that D1 queries fail when daily read/write quotas are exceeded, and writes/schema changes stop when storage is full. These limits reset or require cleanup; they do not justify enabling a paid plan. CIN must remain on Free and must not add a payment method or upgrade to a paid plan.
+
+## Current implementation gaps (must close before staging)
+
+- The current Worker is an initial development adapter. It has an operation allowlist and prepared statements, but its read-then-write paths are not yet covered by real D1 concurrency tests.
+- D1 `batch()` transaction semantics have not yet been implemented or verified for multi-statement ledger operations.
+- List endpoints enforce a maximum row limit but do not yet provide cursor pagination.
+- Worker-side tests currently cover authentication, path/method restrictions, operation allowlisting, payload size, and malformed payload/limit rejection. They do not yet exercise successful CRUD/evaluation against a D1-compatible test database.
+- Error mapping, quota exhaustion, export/restore, and persistence across Worker/Render restarts remain unverified.
 
 ## Explicit non-actions
 
