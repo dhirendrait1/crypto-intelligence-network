@@ -53,7 +53,7 @@
 19. **[Partial]** Complete public news search and low-confidence headline sentiment with multilingual/context limitations documented. English-only language gating and explicit unknown-language status are now implemented and offline-tested; multilingual sentiment and live provider validation remain outstanding.
 20. **[Partial]** Design authorized social-source ingestion for X, Reddit, and Telegram, respecting platform access limits. Provider authorization, access-tier, privacy, retention, provenance, and release-gate requirements are documented; actual connectors remain unimplemented.
 21. **[Partial]** Define evidence-backed exchange-flow and whale-attribution methodology with clear identity uncertainty. Read-only transfer taxonomy, exchange-label evidence tiers, flow definitions, uncertainty rules, quality controls, and provider acceptance gates are documented; chain-data implementation and live validation remain outstanding.
-22. **[Partial]** Build source ingestion for commodity backing and growth fundamentals; distinguish claims from independently verified evidence.
+22. **[Partial]** Build source ingestion for commodity backing and growth fundamentals; distinguish claims from independently verified evidence. Commodity and growth evidence APIs now accept caller-supplied evidence IDs and source roles; growth evidence also validates check-time chronology and fingerprints normalized metadata. Source retrieval and independent verification remain outstanding.
 23. **[Pending]** Define a verifiable evidence model for claims, citations, observation time, retrieval time, conflicts, and confidence.
 
 **Exit gate:** CIN does not claim social sentiment, whale attribution, backing, or fundamentals are verified until sources and methods substantiate those claims.
@@ -183,3 +183,11 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - Defined chain-specific, time-bounded exchange-label tiers; gross inflow/outflow and net-flow semantics; treatment of exchange-to-exchange, bridge, internal, mint/burn and duplicate events; and required coverage/finality/provenance metadata.
 - Explicitly prohibits personal deanonymization, unsupported beneficial-owner claims, inferring intent from deposits/withdrawals, wallet control, signing, broadcasting, or fund movement.
 - Step 21 remains Partial: no chain indexer, label registry, flow endpoint, or live provider integration was implemented. Provider free-tier and data-rights checks are prerequisites before choosing a source.
+
+### Step 22 evidence-provenance increment (2026-10-30)
+
+- Extended the growth-fundamentals assessment to retain caller-supplied evidence IDs and source roles, validate publication/check timestamps, require check timestamps for a supplied `verified` status, and flag future or impossible timestamp chronology.
+- Added deterministic SHA-256 fingerprints over normalized supplied metadata. Fingerprints are change-detection aids only, not document hashes, signatures, or authenticity proofs. Source roles remain self-reported and unauthenticated.
+- Exposed optional `evidence_id` and `source_role` through the growth and commodity assessment API request models; corrected the growth API documentation freshness range to 0–3650 days.
+- Added offline tests for required check timestamps, chronology failures, source-role disclosure, and metadata fingerprint changes.
+- Step 22 remains Partial: APIs still assess caller-supplied metadata; CIN does not fetch issuer, reserve, custody, audit, tokenomics, or growth documents, and does not independently verify their claims.
