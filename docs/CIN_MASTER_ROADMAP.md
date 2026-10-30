@@ -269,3 +269,9 @@ When continuing work, choose the earliest unfinished step that can be completed 
 
 - Linked the F-03 implementation-readiness specification from the privacy audit and persistence lifecycle document. The audit now accurately distinguishes documented planning from approved policy or runtime enforcement.
 - F-03 remains Open pending explicit classification/source-policy/legal/privacy/retention approvals and a separately reviewed schema-v2 migration. No schema-v1 changes, backfill, deletion, retention worker, or production activation occurred. Step 23 remains Partial.
+
+
+### Step 23 F-08 backup/export/replica/restore readiness increment (2026-10-31)
+
+- Added `docs/CIN_STEP23_BACKUP_EXPORT_REPLICA_RESTORE_READINESS_V1.md` and recorded F-08 in the privacy/data-minimization audit. The design specifies copy lineage manifests, export restrictions, restore quarantine, erasure replay, residual scans, and acceptance gates.
+- Operational backup, replica, export, cache, and restore controls are not evidenced in the reviewed repository; hosting-provider-managed copies remain unverified. No operational configuration or data was changed. F-08 remains Open; Step 23 remains Partial.
