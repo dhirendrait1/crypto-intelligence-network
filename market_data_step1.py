@@ -163,6 +163,9 @@ async def get_public_market_data(
             detail="Currency must be a 2-10 character ASCII alphabetic code.",
         )
 
+    if currency != "usd":
+        raise HTTPException(status_code=400, detail="Coinbase market-data route supports USD quotes only.")
+
     try:
         rows = await asyncio.to_thread(_fetch_market_data, ids, currency)
     except urllib.error.HTTPError as exc:
