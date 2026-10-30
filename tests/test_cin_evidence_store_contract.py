@@ -34,6 +34,51 @@ class TestEvidenceStoreContract(unittest.TestCase):
         self.assertFalse(hasattr(EvidenceStore, "delete_assessment_event"))
 
 
+    def test_provider_namespace_case_is_preserved(self):
+        from datetime import datetime, timezone
+        from cin_verifiable_evidence import create_claim, create_claim_evidence_relationship
+
+        connection = sqlite3.connect(":memory:")
+        try:
+            connection.executescript(SCHEMA.read_text(encoding="utf-8"))
+            repository = LocalSQLiteEvidenceRepository(connection)
+            now = datetime(2026, 10, 30, 12, 0, tzinfo=timezone.utc)
+
+            def bundle(namespace, suffix):
+                claim = create_claim(
+                    subject="ETH", predicate=f"namespace_case_{suffix}",
+                    statement="Namespace case must remain provider-defined.", created_at=now,
+                )
+                relationship = create_claim_evidence_relationship(
+                    claim_id=claim["claim_id"], evidence_id=f"namespace-case-{suffix}",
+                    relationship="context_only", rationale="Traceability only.",
+                    created_at=now,
+                )
+                return repository.store_bundle(
+                    source_namespace=namespace, external_evidence_id="same-object",
+                    evidence_type="provider_record", metadata={"variant": suffix},
+                    observed_at="2026-10-30T12:00:00Z", claim=claim,
+                    relationship=relationship,
+                )
+
+            upper = bundle("Provider", "upper")
+            lower = bundle("provider", "lower")
+            self.assertNotEqual(upper["cin_evidence_id"], lower["cin_evidence_id"])
+            self.assertEqual(
+                repository.find_evidence_id(
+                    source_namespace="Provider", external_evidence_id="same-object"
+                ),
+                upper["cin_evidence_id"],
+            )
+            self.assertEqual(
+                repository.find_evidence_id(
+                    source_namespace="provider", external_evidence_id="same-object"
+                ),
+                lower["cin_evidence_id"],
+            )
+        finally:
+            connection.close()
+
     def test_identity_lookup_returns_none_for_missing_provider_identity(self):
         connection = sqlite3.connect(":memory:")
         try:
