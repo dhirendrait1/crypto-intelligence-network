@@ -210,3 +210,38 @@ def test_request_rejects_unsupported_evidence_status():
             symbol="PAXG",
             evidence=[{"evidence_type": "reserve_attestation", "status": "confirmed"}],
         )
+
+
+
+def test_request_accepts_claim_text_and_rejects_oversized_claim_text():
+    request = CommodityBackingAssessmentRequest(
+        symbol="PAXG",
+        evidence=[{"evidence_type": "reserve_attestation", "claim_text": "Issuer-reported reserve claim"}],
+    )
+    assert request.evidence[0].claim_text == "Issuer-reported reserve claim"
+    with pytest.raises(ValidationError):
+        CommodityBackingAssessmentRequest(
+            symbol="PAXG",
+            evidence=[{"evidence_type": "reserve_attestation", "claim_text": "x" * 4001}],
+        )
+
+
+def test_endpoint_exposes_additive_claim_and_context_link_fields():
+    result = commodity_backing_assessment_endpoint(
+        CommodityBackingAssessmentRequest(
+            symbol="PAXG",
+            evidence=[{
+                "evidence_type": "reserve_attestation",
+                "evidence_id": "reserve-55",
+                "claim_text": "Issuer reports one unit of gold per token.",
+                "source_name": "Issuer", "source_url": "https://example.com/reserves",
+                "published_at": "2026-10-01T00:00:00Z",
+                "checked_at": "2026-10-24T00:00:00Z", "status": "unverified",
+            }],
+        )
+    )
+    row = result["evidence"][0]
+    assert row["claim"]["claim_status"] == "not_assessed"
+    assert row["claim_evidence_relationship"]["relationship"] == "context_only"
+    assert result["evidence_source_mode"] == "caller_supplied_metadata"
+    assert result["source_documents_fetched_by_cin"] is False

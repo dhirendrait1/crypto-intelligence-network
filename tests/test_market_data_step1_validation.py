@@ -42,6 +42,14 @@ def row(**overrides):
 
 class MarketDataStep1ValidationTests(unittest.TestCase):
     @patch("market_data_step1.urllib.request.urlopen")
+    def test_valid_row_includes_provider_and_retrieval_provenance(self, mocked):
+        mocked.return_value = FakeResponse([row()])
+        result = _fetch_market_data(["bitcoin"], "usd")
+        self.assertEqual(result[0]["provider"], "CoinGecko")
+        retrieved_at = datetime.fromisoformat(result[0]["provider_retrieved_at"].replace("Z", "+00:00"))
+        self.assertEqual(retrieved_at.tzinfo, timezone.utc)
+
+    @patch("market_data_step1.urllib.request.urlopen")
     def test_valid_row_includes_freshness_metadata(self, mocked):
         mocked.return_value = FakeResponse([row()])
         result = _fetch_market_data(["bitcoin"], "usd")
@@ -100,6 +108,47 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         self.assertIn("invalid_market_cap_omitted", result["data_quality_warnings"])
         self.assertIn("invalid_total_volume_omitted", result["data_quality_warnings"])
         self.assertIn("invalid_price_change_percentage_omitted", result["data_quality_warnings"])
+
+    def test_provider_timestamp_exact_freshness_boundary_is_fresh(self):
+        from market_data_step1 import _timestamp_status
+
+        now = datetime(2026, 10, 30, 12, 0, tzinfo=timezone.utc)
+        timestamp = (now - timedelta(minutes=15)).isoformat()
+        self.assertEqual(_timestamp_status(timestamp, now=now), ("fresh", 900, None))
+
+    def test_provider_timestamp_one_second_past_freshness_boundary_is_stale(self):
+        from market_data_step1 import _timestamp_status
+
+        now = datetime(2026, 10, 30, 12, 0, tzinfo=timezone.utc)
+        timestamp = (now - timedelta(minutes=15, seconds=1)).isoformat()
+        self.assertEqual(_timestamp_status(timestamp, now=now), ("stale", 901, None))
+
+    def test_provider_timestamp_exact_future_tolerance_is_fresh(self):
+        from market_data_step1 import _timestamp_status
+
+        now = datetime(2026, 10, 30, 12, 0, tzinfo=timezone.utc)
+        timestamp = (now + timedelta(minutes=5)).isoformat()
+        self.assertEqual(_timestamp_status(timestamp, now=now), ("fresh", 0, None))
+
+    def test_provider_timestamp_one_second_beyond_future_tolerance_is_unknown(self):
+        from market_data_step1 import _timestamp_status
+
+        now = datetime(2026, 10, 30, 12, 0, tzinfo=timezone.utc)
+        timestamp = (now + timedelta(minutes=5, seconds=1)).isoformat()
+        self.assertEqual(
+            _timestamp_status(timestamp, now=now),
+            ("unknown", None, "future_last_updated_timestamp"),
+        )
+
+    def test_naive_assessment_clock_is_unknown(self):
+        from market_data_step1 import _timestamp_status
+
+        now = datetime(2026, 10, 30, 12, 0)
+        timestamp = "2026-10-30T12:00:00+00:00"
+        self.assertEqual(
+            _timestamp_status(timestamp, now=now),
+            ("unknown", None, "invalid_assessment_clock"),
+        )
 
     @patch("market_data_step1.urllib.request.urlopen")
     def test_old_provider_timestamp_is_stale(self, mocked):
@@ -243,6 +292,31 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         self.assertEqual(result["count"], 1)
         self.assertTrue(result["partial_result"])
         self.assertEqual(result["missing_coins"], ["ethereum"])
+
+    @patch("market_data_step1._fetch_market_data")
+    def test_endpoint_preserves_row_provider_provenance(self, mocked):
+        provider_retrieved_at = "2026-10-30T12:34:56Z"
+        mocked.return_value = [{
+            "id": "bitcoin",
+            "symbol": "BTC",
+            "name": "Bitcoin",
+            "currency": "USD",
+            "provider": "CoinGecko",
+            "provider_retrieved_at": provider_retrieved_at,
+            "price": 100.0,
+            "market_cap": 1000.0,
+            "total_volume_24h": 100.0,
+            "price_change_percentage_24h": 1.5,
+            "last_updated": "2026-10-30T12:34:00Z",
+            "freshness_status": "fresh",
+            "freshness_age_seconds": 56,
+            "analysis_eligible": True,
+            "data_quality_warnings": [],
+        }]
+        result = asyncio.run(get_public_market_data("bitcoin", "usd"))
+        self.assertEqual(result["data"][0]["provider"], "CoinGecko")
+        self.assertEqual(result["data"][0]["provider_retrieved_at"], provider_retrieved_at)
+        self.assertNotEqual(result["retrieved_at"], provider_retrieved_at)
 
     @patch("market_data_step1._fetch_market_data")
     def test_endpoint_deduplicates_requested_coin_ids(self, mocked):

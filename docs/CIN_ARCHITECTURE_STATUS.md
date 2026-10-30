@@ -1,6 +1,6 @@
 # CIN Architecture & Completion Register
 
-Last reviewed: 2026-10-24  
+Last reviewed: 2026-10-30  
 Repository: `dhirendrait1/crypto-intelligence-network`  
 Status: working register; not a release certification.
 
@@ -152,3 +152,8 @@ The allowlisted GitHub repository connector now validates timestamps as timezone
 - Missing optional metadata is reported as metadata_partial with a missing_fields list; malformed field values produce EvidenceSourceError.
 
 This freshness status describes the selected repository timestamp only. It is not proof of ecosystem-wide development, source truth, investment merit, or independent claim verification. Regression tests are mocked/offline. The exact test commit is 97729aa2d421fcd8fc07cc6a8f277b9d19741fc2; all four GitHub Actions workflows passed for that commit. No live provider check, merge, or production deployment is implied.
+## Current repository reconciliation (2026-10-30)
+
+- PR #11 is merged; PR #8 remains Draft/open; PR #65 and PR #66 remain Draft/open and unmerged.
+- PR #66 records row-level CoinGecko provider identity and provider retrieval time in normalized market-data rows, with endpoint serialization regression coverage. Its roadmap update commit `8ea7709c5f170a8161d819f08e177e15fe7d34d7` passed all four CI workflows. These are offline tests, not live-provider or deployed-service validation.
+- Render configuration and deployments remain outside this audit; no deployment is implied by GitHub CI.

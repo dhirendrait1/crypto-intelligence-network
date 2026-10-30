@@ -7,10 +7,15 @@ that backing exists.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from hashlib import sha256
+import json
 from typing import Any
 from urllib.parse import urlsplit
 
+from cin_verifiable_evidence import create_claim, create_claim_evidence_relationship
+
 VALID_STATUSES = {"verified", "unverified", "stale", "unavailable"}
+VALID_SOURCE_ROLES = {"issuer", "custodian", "auditor", "regulator", "exchange", "independent_research", "other"}
 REQUIRED_EVIDENCE_FIELDS = (
     "evidence_type",
     "source_name",
@@ -90,6 +95,17 @@ def _canonical_source_url(value: Any) -> str:
         return value.strip()
 
 
+
+def _source_host(value: Any) -> str | None:
+    """Return normalized hostname for source-diversity diagnostics only."""
+    if not _is_http_url(value):
+        return None
+    try:
+        return (urlsplit(value.strip()).hostname or "").lower() or None
+    except ValueError:
+        return None
+
+
 def _timestamp_identity(value: Any) -> str | None:
     parsed = _parse_timestamp(value)
     return parsed.isoformat() if parsed is not None else None
@@ -118,12 +134,26 @@ def normalize_evidence(item: Any, *, now: datetime | None = None,
             "missing_fields": list(REQUIRED_EVIDENCE_FIELDS),
             "timestamp_validation_errors": [],
             "source_url_valid": False,
+            "source_host": None,
             "freshness_threshold_days": max_age_days,
             "assessment_clock_valid": assessment_clock_valid,
             "invalid_record": True,
         }
 
     record = {field: item.get(field) for field in REQUIRED_EVIDENCE_FIELDS}
+    raw_evidence_id = item.get("evidence_id")
+    record["evidence_id"] = raw_evidence_id.strip() if isinstance(raw_evidence_id, str) and 0 < len(raw_evidence_id.strip()) <= 128 else None
+    record["evidence_id_is_caller_supplied"] = record["evidence_id"] is not None
+    raw_source_role = item.get("source_role")
+    normalized_source_role = raw_source_role.strip().lower() if isinstance(raw_source_role, str) else None
+    if normalized_source_role not in VALID_SOURCE_ROLES:
+        normalized_source_role = "unspecified"
+    record["source_role"] = normalized_source_role
+    record["source_role_is_self_reported"] = raw_source_role is not None
+    record["source_role_authenticated"] = False
+    raw_claim_text = item.get("claim_text")
+    record["claim_text"] = raw_claim_text.strip() or None if isinstance(raw_claim_text, str) else None
+    record["claim_text_is_caller_supplied"] = record["claim_text"] is not None
     record["notes"] = str(item.get("notes", "")).strip() or None
     record["invalid_record"] = False
     status = str(record.get("status") or "unverified").lower()
@@ -175,14 +205,87 @@ def normalize_evidence(item: Any, *, now: datetime | None = None,
             record["status_reason"] = f"Publication is older than the {max_age_days}-day freshness threshold."
 
     record["status"] = status
+    record["source_host"] = _source_host(record.get("source_url"))
     record["publication_age_days"] = age_days
     record["missing_fields"] = missing
     record["timestamp_validation_errors"] = timestamp_errors
     record["source_url_valid"] = url_valid
     record["freshness_threshold_days"] = max_age_days
     record["assessment_clock_valid"] = assessment_clock_valid
+    fingerprint_fields = {
+        field: record.get(field)
+        for field in (*REQUIRED_EVIDENCE_FIELDS, "evidence_id", "source_role", "claim_text", "notes")
+    }
+    canonical_payload = json.dumps(
+        fingerprint_fields, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str
+    ).encode("utf-8")
+    record["record_fingerprint_sha256"] = sha256(canonical_payload).hexdigest()
+    record["fingerprint_scope"] = "normalized_supplied_metadata"
+    record["fingerprint_is_authenticity_proof"] = False
     return record
 
+
+def compare_evidence_snapshots(previous: list[dict[str, Any]], current: list[dict[str, Any]], *, now: datetime | None = None, max_age_days: int = 90) -> dict[str, Any]:
+    """Compare caller-supplied snapshots by stable evidence_id; persist nothing."""
+    if not isinstance(previous, list) or not isinstance(current, list):
+        raise ValueError("previous and current snapshots must both be lists")
+
+    def index_snapshot(items):
+        indexed = {}
+        duplicates = set()
+        untracked = 0
+        for item in items:
+            normalized = normalize_evidence(item, now=now, max_age_days=max_age_days)
+            evidence_id = normalized.get("evidence_id")
+            if not evidence_id:
+                untracked += 1
+                continue
+            if evidence_id in indexed:
+                duplicates.add(evidence_id)
+                indexed.pop(evidence_id, None)
+                continue
+            if evidence_id not in duplicates:
+                indexed[evidence_id] = normalized
+        return indexed, duplicates, untracked
+
+    previous_index, previous_duplicates, previous_untracked = index_snapshot(previous)
+    current_index, current_duplicates, current_untracked = index_snapshot(current)
+    ambiguous_ids = sorted(previous_duplicates | current_duplicates)
+    changes = []
+    for evidence_id in sorted((set(previous_index) | set(current_index)) - set(ambiguous_ids)):
+        before = previous_index.get(evidence_id)
+        after = current_index.get(evidence_id)
+        if before is None:
+            change_type = "added"
+        elif after is None:
+            change_type = "removed"
+        elif before.get("record_fingerprint_sha256") != after.get("record_fingerprint_sha256"):
+            change_type = "changed"
+        else:
+            change_type = "unchanged"
+        changes.append({
+            "evidence_id": evidence_id,
+            "change_type": change_type,
+            "previous_fingerprint_sha256": before.get("record_fingerprint_sha256") if before else None,
+            "current_fingerprint_sha256": after.get("record_fingerprint_sha256") if after else None,
+        })
+
+    return {
+        "comparison_mode": "caller_supplied_snapshots",
+        "history_persisted": False,
+        "change_count": len(changes),
+        "counts": {kind: sum(1 for item in changes if item["change_type"] == kind) for kind in ("added", "removed", "changed", "unchanged")},
+        "changes": changes,
+        "ambiguous_evidence_ids": ambiguous_ids,
+        "untracked_previous_record_count": previous_untracked,
+        "untracked_current_record_count": current_untracked,
+        "limitations": [
+            "CIN compares only snapshots supplied in this request; no history is stored.",
+            "Stable evidence_id values are caller-supplied and are not authenticated by CIN.",
+            "Fingerprints cover normalized metadata, not source-document contents or authenticity.",
+            "Ambiguous duplicate IDs are excluded from change classification.",
+        ],
+    }
 
 def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
                            now: datetime | None = None,
@@ -203,6 +306,32 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
     ]
     for row in normalized:
         row["assessment_clock_valid"] = assessment_clock_valid
+        claim_text = row.get("claim_text")
+        claim = None
+        relationship = None
+        if isinstance(claim_text, str) and claim_text.strip():
+            claim = create_claim(
+                subject=str(symbol or "").strip().upper(),
+                predicate=str(row.get("evidence_type") or "unspecified_evidence"),
+                statement=claim_text,
+                created_at=current,
+                claim_status="not_assessed",
+            )
+            evidence_id = row.get("evidence_id")
+            if evidence_id:
+                relationship = create_claim_evidence_relationship(
+                    claim_id=claim["claim_id"],
+                    evidence_id=evidence_id,
+                    relationship="context_only",
+                    rationale=(
+                        "Caller-supplied claim text is linked for traceability only; "
+                        "CIN has not independently verified the claim or source."
+                    ),
+                    review_status="automated_candidate",
+                    created_at=current,
+                )
+        row["claim"] = claim
+        row["claim_evidence_relationship"] = relationship
     by_type: dict[str, list[dict[str, Any]]] = {kind: [] for kind in required_types}
     for item in normalized:
         kind = item.get("evidence_type")
@@ -231,11 +360,39 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
             )
             for record in records
         }
+        source_hosts = sorted({record.get("source_host") for record in records if record.get("source_host")})
+        role_counts = {role: sum(1 for record in records if record.get("source_role") == role) for role in sorted(VALID_SOURCE_ROLES | {"unspecified"})}
+        status_counts = {status: sum(1 for record in records if record.get("status") == status) for status in sorted(VALID_STATUSES)}
+        conflict_evidence = []
+        if state == "conflicting":
+            conflict_evidence = [
+                {
+                    "status": record.get("status"),
+                    "source_role": record.get("source_role", "unspecified"),
+                    "source_role_authenticated": False,
+                    "source_name": record.get("source_name"),
+                    "source_url": record.get("source_url"),
+                }
+                for record in records
+            ]
         coverage[kind] = {
             "status": state,
             "evidence_count": len(identities),
             "duplicate_record_count": max(0, len(records) - len(identities)),
             "conflict_detected": state == "conflicting",
+            "distinct_source_host_count": len(source_hosts),
+            "source_host_diversity": (
+                "multiple_hosts" if len(source_hosts) > 1
+                else "single_host" if source_hosts
+                else "no_valid_hosts"
+            ),
+            "source_independence_verified": False,
+            "source_role_counts_self_reported": role_counts,
+            "source_roles_authenticated": False,
+            "status_counts": status_counts,
+            "conflict_evidence": conflict_evidence,
+            "conflict_resolution": "manual_review_required" if state == "conflicting" else "not_applicable",
+            "preferred_source_selected": False,
         }
 
     statuses = [value["status"] for value in coverage.values()]

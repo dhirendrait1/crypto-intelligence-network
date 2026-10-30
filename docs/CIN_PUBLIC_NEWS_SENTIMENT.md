@@ -30,3 +30,10 @@ Timestamps more than 60 seconds ahead of CIN's UTC clock are labeled `future_dat
 ## Aggregate timestamp-quality metadata
 
 The response exposes `data_quality.provider_timestamp_quality_counts` with counts for `valid`, `missing`, `invalid_timezone`, `invalid`, and `future_dated` provider seen times. These counts refer to GDELT indexing/seen times and do not verify original publication time. For backward-compatible behavior, the headline sentiment aggregate still includes every accepted article regardless of timestamp status; consumers must inspect the quality counts before using timestamps for time-sensitive evidence.
+
+
+## Language-scope and multilingual limitations
+
+The current sentiment lexicon is English-only. If GDELT supplies a non-English language tag, CIN returns `label: unavailable`, a null score, and `confidence: unsupported_language`; it does not mislabel the headline as neutral. English locale tags such as `en-US` are normalized to English. When the provider omits language metadata, CIN retains the legacy low-confidence keyword result but marks `language_status: language_unverified`; consumers must not assume that the headline is English.
+
+This is not multilingual sentiment analysis. CIN does not translate headlines, infer language, detect mixed-language text, resolve entity-specific meaning, or understand negation and sarcasm. RSS fallback language metadata may be absent, so those headlines can remain unverified. A future multilingual model requires language-specific validation datasets and evaluation before its scores can be trusted.

@@ -4,12 +4,13 @@
 **Purpose:** A single numbered acceptance roadmap reconciled to the implementation evidence tracker.  
 **Scope boundary:** Read-only public crypto intelligence, research, technical analysis, screening, forecasting, monitoring and alerts. No order execution, wallet control, private keys, or fund movement.  
 **Working baseline:** 7 stages / 35 numbered steps. This is a practical delivery baseline, not a claim that every future product requirement has been exhaustively discovered. New requirements should be added explicitly rather than silently inflating progress counts.  
-**Branch:** `feat/cin-architecture-audit`  
-**Release gate:** PR #8 stays Draft/unmerged; no Render changes or deployment without fresh explicit approval.
+**Active work branch:** `feat/cin-market-data-row-provenance` (PR #66); the architecture-audit branch remains a separate Draft PR #8.  
+**Release gate:** PRs #8, #65, and #66 remain open/unmerged; PR #11 was merged on 2026-10-26. No Render changes or deployment without fresh explicit user approval.
 
 ## Status meanings
 
 - **Implemented — offline-tested:** code and automated tests exist; live-provider or production behavior is not implied.
+- **Implemented — reconciled:** repository documentation and status controls are consolidated; this does not imply code, live-provider, or deployment validation.
 - **Partial:** some implementation exists, with acceptance work still outstanding.
 - **Pending:** capability or acceptance work is not established as complete.
 - **Release-blocked:** requires live environment access and/or explicit deployment approval.
@@ -20,7 +21,7 @@
 2. **[Implemented — offline-tested]** Keep public-data interfaces separate from exchange account/order capabilities.
 3. **[Implemented — offline-tested]** Add controlled API errors and input validation for the existing public endpoints.
 4. **[Implemented — offline-tested]** Maintain regression tests and the implementation evidence tracker.
-5. **[Partial]** Reconcile all legacy step references, duplicate roadmap notes, and acceptance evidence into this master roadmap.
+5. **[Implemented — reconciled]** Establish one numbered roadmap, consolidate superseded checkpoint narratives, and distinguish the historical evidence ledger from current status.
 
 **Exit gate:** all active modules remain read-only; no secrets, wallet control, or order execution are introduced.
 
@@ -42,18 +43,18 @@
 14. **[Implemented — offline-tested]** Maintain coin-screening identity deduplication, invalid-ID accounting, deterministic ranking, and numeric arithmetic guards.
 15. **[Implemented — offline-tested]** Maintain derivatives snapshot validation for open interest, funding, mark/index price, and provider timestamps.
 16. **[Partial]** Validate order-book depth quality, spread/imbalance methodology, and slippage-aware interpretation.
-17. **[Partial]** Expand indicator edge-case tests and make indicator limitations and signal uncertainty clear to consumers.
-18. **[Pending]** Add explicit cross-source conflict handling and evidence confidence rules where the same metric differs by source.
+17. **[Implemented — offline-tested]** Expand indicator edge-case tests and make indicator limitations and signal uncertainty clear to consumers.
+18. **[Partial]** Add explicit cross-source conflict handling and evidence confidence rules where the same metric differs by source. Caller-supplied comparison logic, a read-only API route, scaffold registration, and offline tests exist; live-source validation and metric-specific tolerance calibration remain outstanding.
 
 **Exit gate:** outputs are reproducible, provenance-backed, and avoid presenting incomplete data as confirmed signals.
 
 ## Stage 4 — Intelligence coverage and research evidence
 
-19. **[Partial]** Complete public news search and low-confidence headline sentiment with multilingual/context limitations documented.
-20. **[Pending]** Design authorized social-source ingestion for X, Reddit, and Telegram, respecting platform access limits.
-21. **[Pending]** Define evidence-backed exchange-flow and whale-attribution methodology with clear identity uncertainty.
-22. **[Partial]** Build source ingestion for commodity backing and growth fundamentals; distinguish claims from independently verified evidence.
-23. **[Pending]** Define a verifiable evidence model for claims, citations, observation time, retrieval time, conflicts, and confidence.
+19. **[Partial]** Complete public news search and low-confidence headline sentiment with multilingual/context limitations documented. English-only language gating and explicit unknown-language status are now implemented and offline-tested; multilingual sentiment and live provider validation remain outstanding.
+20. **[Partial]** Design authorized social-source ingestion for X, Reddit, and Telegram, respecting platform access limits. Provider authorization, access-tier, privacy, retention, provenance, and release-gate requirements are documented; actual connectors remain unimplemented.
+21. **[Partial]** Define evidence-backed exchange-flow and whale-attribution methodology with clear identity uncertainty. Read-only transfer taxonomy, exchange-label evidence tiers, flow definitions, uncertainty rules, quality controls, and provider acceptance gates are documented; chain-data implementation and live validation remain outstanding.
+22. **[Partial]** Build source ingestion for commodity backing and growth fundamentals; distinguish claims from independently verified evidence. Commodity and growth evidence APIs now accept caller-supplied evidence IDs, source roles, and explicit claim text separate from source references; growth evidence also validates check-time chronology and fingerprints normalized metadata. Source retrieval and independent verification remain outstanding.
+23. **[Partial]** Define and incrementally implement a verifiable evidence model for claims, citations, observation time, retrieval time, conflicts, and confidence. The common schema and migration contract are documented; shared deterministic claim/relationship builders are integrated additively into commodity and growth assessment evidence rows when caller-supplied claim text exists. Links are context-only, claims remain not_assessed, and no persistence or source authentication is implied. A design-only persistence/lifecycle contract and SQLite reference DDL now specify separate evidence records, immutable observations, append-only claim assessments, many-to-many relationships, conflict preservation, idempotency, and retention/deletion gates. In-memory SQLite schema tests cover constraints and relationships. The DDL is not wired to application startup or an API and is not production persistence. Source retrieval/authentication and a dedicated relationship API remain outstanding.
 
 **Exit gate:** CIN does not claim social sentiment, whale attribution, backing, or fundamentals are verified until sources and methods substantiate those claims.
 
@@ -84,60 +85,139 @@
 
 **Exit gate:** test evidence, live checks, deployed revision, known limitations, and rollback steps are documented; PR #8 remains unmerged until the user authorizes the release path.
 
-## Current checkpoint (2026-10-25)
+## Consolidated implementation and verification record (2026-10-30)
 
-- Latest CI-verified code/documentation checkpoint before this tracker clarification: `1b847b843c14e0929f9ec972fbc36af14b70a356`.
-- All four workflows passed on that checkpoint: CIN Automated Tests (`40142830679`), CIN screening checks (`40142830668`), CIN Technical Analysis Tests (`40142830721`), and CIN evidence ingestion API checks (`40142830681`). A later tracker-only clarification records remaining live and interval-boundary acceptance gaps.
-- The CI results establish automated test success only; they do not establish live-provider correctness or deployed service health.
-- PR #8 is Draft and unmerged. No Render changes or deployment were performed.
-- **Do not report a single completion percentage:** step statuses mix implemented modules, partial acceptance work, future capabilities, and an approval-blocked release gate. Count by status only after refreshing this roadmap against the current head and CI evidence.
+This section replaces superseded checkpoint narratives that separately described intermediate commits as pending CI. Historical commit IDs remain in the implementation tracker; current status is governed by the numbered steps above and exact-head CI records below.
+
+- **Latest verified feature head:** `9de32c047ef87acde481da46bb702c83d545fb89`. All four configured workflows passed on this exact head: CIN Technical Analysis Tests (`40972458689`), CIN Automated Tests (`40972458409`), CIN evidence ingestion API checks (`40972458435`), and CIN screening checks (`40972458395`).
+- **Candle validation evidence:** PR #27 remains the offline interval-boundary test branch; latest known head `23c6489121664d766c44de98ea40833f55a44e4e` passed all four workflows. Kraken compatibility is tested with mocked timestamp fixtures only; live exchange behavior remains unverified.
+- **Screening cache evidence:** PR #65 adds exact fresh-cache and stale-cache boundary tests. The PR remains Draft/open/unmerged; tests are offline.
+- **Market-data provenance evidence:** PR #66 records provider identity and provider retrieval time per row and verifies endpoint serialization. Its latest documentation head is the current checkpoint above; all four workflows passed. This does not establish live provider correctness.
+- **Release controls:** PR #8, #65 and #66 remain Draft/open/unmerged. PR #11 was merged on 2026-10-26. Render remains user-managed; no deployment was performed.
+- **Verification boundary:** passing GitHub Actions means the configured automated checks passed on the exact listed commit. It does not establish live provider availability, production response behavior, or the currently deployed Render revision.
+
+## Step 5 reconciliation notes (2026-10-30)
+
+- The seven-stage / 35-step numbering in this document is the sole active roadmap baseline. Do not create parallel step numbering in status updates or treat historical implementation-log headings as roadmap steps.
+- Historical intermediate CI entries that said “pending” or “must be refreshed” have been consolidated above; their old commit-specific results remain in `CIN_IMPLEMENTATION_TRACKER.md`.
+- The tracker is the detailed implementation evidence ledger; this roadmap is the authoritative numbered scope/status view. Architecture status is a high-level architecture register, not a second roadmap.
+- PR state is recorded in the repository reconciliation section below and should be refreshed from GitHub before future status claims.
+- **Step 5 is Implemented — reconciled.** The roadmap, historical tracker, and architecture register have distinct roles and a single active numbering source. This documentation closure does not imply live-provider validation or release readiness.
 
 ## Operating rule
 
-When continuing work, choose the earliest unfinished step that can be completed safely in the repository without deployment approval. Update the relevant tests and implementation evidence, refresh latest-head CI, then update this roadmap. Do not mark live or release checks complete based on offline tests.
+When continuing work, choose the earliest unfinished step that can be completed safely in the repository without deployment approval. Update relevant tests and implementation evidence, refresh latest-head CI, then update this roadmap. Do not mark live or release checks complete based on offline tests.
+
+## Current verification and evidence index (2026-10-30)
+
+- **Current branch:** `feat/cin-market-data-row-provenance` (Draft PR #66).
+- **Current verified head:** `6670db058163176fdc7d4222aa8fe2a62ccd2300`.
+- **Exact-head CI:** all four configured workflows passed on this SHA: CIN Technical Analysis Tests (`40970346455`), CIN Automated Tests (`40970346454`), CIN screening checks (`40970346496`), and CIN evidence ingestion API checks (`40970346495`).
+- **Step 6 increment:** deterministic provider-timestamp boundary tests cover 900/901-second freshness and 300/301-second future tolerance. This is offline evidence only; Step 6 remains Partial pending live-provider/deployed response verification.
+- **Step 9:** candle interval/close-time and Kraken timestamp normalization regression work is recorded in Draft PR #27. Latest known PR head `23c6489121664d766c44de98ea40833f55a44e4e` passed its four configured workflows. Live Kraken compatibility remains unverified.
+- **Step 10:** screening cache boundary tests are recorded in Draft PR #65; row-level provider/retrieval provenance is recorded in Draft PR #66. Live provider/cache behavior and deployed response metadata remain unverified.
+- **Release controls:** PR #8, #65 and #66 remain Draft/open/unmerged; PR #11 is merged. Render is user-managed and was not changed or deployed.
+
+## Historical evidence policy and Step 5 reconciliation (2026-10-30)
+
+- The former dated checkpoint blocks have been removed from this active roadmap because they repeated superseded “pending CI” statements and obscured the current state.
+- Detailed commit-by-commit history remains in `CIN_IMPLEMENTATION_TRACKER.md`. A historical “CI pending” entry describes only the state at the time it was written; it is not a current failure or current release status.
+- This file is the only numbered roadmap (7 stages / 35 steps). The tracker is the detailed evidence ledger. `CIN_ARCHITECTURE_STATUS.md` is an architecture register, not a parallel roadmap.
+- The active PR state and latest-head CI must be refreshed from GitHub before any future status report.
+- **Step 5 reconciliation is complete:** the repository now has one authoritative numbered roadmap, the tracker is explicitly historical, and the architecture status is a register rather than a competing roadmap. The dated historical entries remain available as evidence but no longer act as current status. This documentation closure does not imply live validation or release readiness.
+
+## Step 11 commodity evidence contract clarification (2026-10-30)
+
+- Corrected the commodity-backed evidence API documentation to match the implemented and tested `max_age_days` contract: the accepted range is **0–3650 days**, not 1–3650.
+- Existing offline API tests already cover the zero-day threshold, maximum threshold, strict integer typing, and invalid values.
+- Step 11 remains Partial: CIN currently validates caller-supplied evidence metadata and freshness; it does not fetch issuer/reserve/custody documents or independently verify the underlying claims.
 
 
-## CI evidence refresh (2026-10-25)
+## Step 16 visible-depth methodology increment (2026-10-30)
 
-All four configured workflows passed on checkpoint `1b847b843c14e0929f9ec972fbc36af14b70a356`. The tracker was subsequently clarified in commit `a9f7e96b4a86e7c139806feca312e407ecc32505`; CI on that new head must be refreshed. Live-provider behavior and production health remain unverified.
-
-
-## Latest automated verification (2026-10-25)
-
-All four configured workflows passed on code/documentation checkpoint `2c1f816d59bc4fa6aa1c31ce2ee01228cd46f29b`. The tracker was subsequently updated in commit `9a4dea4b00afe3fcf22d1335b8fc957539c6aad2` to record those results and the monthly-candle calendar-boundary caveat. CI must be refreshed for that newer tracker-only commit. Live-provider and deployment checks remain incomplete.
-
-## Monthly candle freshness fix (2026-10-25)
-
-- Implemented calendar-aware monthly duration for freshness thresholds using the latest closed candle open timestamp.
-- Regression coverage includes leap-year February, common-year February, 30/31-day months, December year rollover, and the derived freshness threshold.
-- Code: `5259bc9500068d577cba6bc617b9083ae92fdbc3`; tests: `b4d55897b08dc788e848b9273e4277dc31550702`; tracker: `59c421c11aad40c85ecf6263a8e70a76bdf102f9`.
-- Latest-head CI is not yet verified. Open-time alignment, close-time consistency, live-provider behavior, and deployment checks remain unfinished.
-
-## Candle boundary validation increment (2026-10-25)
-
-- Binance candle boundary validation now checks close-time consistency, weekly Monday UTC anchoring, and monthly calendar boundaries; deterministic regression tests were added.
-- Fixed-interval epoch alignment is not assumed without provider-specific evidence, 3-day anchoring remains provider-specific, and Kraken enforcement is deferred pending a compatibility pass.
-- Code commits: `56b9578bba9df3b77168acf7051445ec924bfb15`, `0cb4e6efb60f4228142ceca005279afca54f3f39`; tests: `46e14b24f6c1ad98bb567bb4967242b41dd29f73`; tracker: `fd0f9c1b93c8f431ef679dc455df7d5e9b943366`.
-- Latest-head CI is pending; live-provider and deployment checks remain outstanding.
-
-## Latest-head CI and interval matrix verification (2026-10-25)
-
-- Verified all four configured workflows passed on current Draft PR head `6367afc875e2084dbf25053aed8a0d23badc4227`:
-  - CIN Technical Analysis Tests: [40143588595](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40143588595)
-  - CIN evidence ingestion API checks: [40143588598](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40143588598)
-  - CIN Automated Tests: [40143588591](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40143588591)
-  - CIN screening checks: [40143588616](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40143588616)
-- This head includes deterministic weekly Monday-UTC boundary tests and 3-day candle duration tests that intentionally avoid an unsupported epoch anchor assumption.
-- These results establish offline CI only. Kraken boundary enforcement/compatibility, live provider behavior, and deployed service health remain unverified. PR #8 remains Draft and unmerged; no deployment or trading execution was performed.
+- Added bid/ask visible-book sweep estimates at fixed 10,000 / 50,000 / 100,000 USDT reference notionals.
+- Reports visible-depth coverage and adverse slippage basis points only when the full reference notional fits within returned levels; insufficient depth returns null slippage and average price rather than extrapolating.
+- Added offline regression coverage for bid/ask adverse slippage, insufficient depth, invalid parameters, and snapshot serialization.
+- Explicit limitations: no fees, latency, hidden liquidity, queue position, market impact beyond displayed levels, or execution outcome is modeled. This is analysis only; no orders are placed or routed.
+- Step 16 remains Partial pending broader methodology review, multi-exchange coverage, and live snapshot validation. Latest head `ad0899433985b9c80e710fde8bcfd209d65a254c` has four workflows in progress at this checkpoint.
 
 
-## Latest-head verification refresh (2026-10-25)
+## Step 18 cross-source comparison increment (2026-10-30)
 
-- All four configured PR workflows passed on code/documentation head `540c886ef6b7dd2b07c4ff27cf8500070b4d58b7`:
-  - CIN screening checks: [40146915587](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40146915587)
-  - CIN Automated Tests: [40146915579](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40146915579)
-  - CIN Technical Analysis Tests: [40146915637](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40146915637)
-  - CIN evidence ingestion API checks: [40146915576](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/40146915576)
-- The head includes CoinGecko unexpected provider/parser failure containment and offline API regression tests.
-- This verification is for the exact listed head only. It does not establish live-provider correctness or Render health. Any subsequent commit requires a fresh latest-head CI check.
-- PR #8 remains Draft and unmerged. No Render configuration or deployment was changed.
+- Added `cross_source_evidence.py`: groups caller-supplied observations by exact metric and unit, validates finite numeric values and timezone-aware timestamps, deduplicates normalized source URLs, and compares observations within a configurable time window.
+- Explicit states: `agreement_observed`, `conflicting`, and `insufficient_independent_source_count`; confidence classes are descriptive evidence labels, not numeric probabilities.
+- Agreement tolerance defaults to 1% relative spread (0 absolute tolerance); thresholds are configurable and explicitly documented as heuristics. Observations outside the 5-minute default time window and duplicate URLs are not treated as separate corroboration.
+- No source ranking or winner selection; source independence and role authentication remain false. No fetching, persistence, certification, trade execution, or investment recommendation.
+- Added eight offline regression tests covering agreement, material disagreement, duplicate URLs, timestamp windows, unit separation, malformed/non-finite values, invalid tolerance configuration, and the exact tolerance boundary.
+- All four workflows passed on exact code/documentation head `f42634ea7b55f66db472bc73505184d337dd0846`: evidence ingestion API `40972958485`, technical analysis `40972958481`, automated tests `40972958476`, screening `40972958628`.
+- Step 18 remains Partial: this increment is a reusable comparison primitive and is not yet integrated into production metric APIs or validated against live sources.
+
+
+### Step 18 API integration follow-up
+
+- Added `POST /cross-source-evidence-comparison` with bounded caller-supplied observations and validated tolerance/time-window controls.
+- Updated the idempotent deployment-scaffold patch to copy both comparison modules and register the router; scaffold tests now verify module presence and route registration.
+- Added five API contract tests for agreement/conflict output, limited-corroboration labeling, batch limits, unknown fields, and tolerance/window validation.
+- All four workflows passed on exact integration head `ba69aec7750099913ec52a4687dc3af74a9883d1`: technical analysis `40973205679`, evidence API `40973205697`, automated tests `40973205857`, screening `40973206105`.
+- Step 18 remains Partial pending live-source validation and metric-specific tolerance calibration. No Render deployment was performed.
+
+
+### Step 19 language-scope increment (2026-10-30)
+
+- Headline sentiment now accepts provider language metadata. English locale tags are normalized; provider-declared non-English headlines return unavailable/null sentiment instead of a misleading neutral score.
+- Missing language metadata is explicitly labeled `language_unverified`; the existing low-confidence keyword score is retained for backward compatibility, with a warning not to assume English.
+- Added four offline regression tests for non-English suppression, unknown-language status, English locale normalization, and article parser/classifier integration.
+- Multilingual translation/modeling, mixed-language detection, context/negation handling, and live GDELT/RSS validation remain outstanding. Step 19 remains Partial.
+
+
+### Step 20 social-source authorization design (2026-10-30)
+
+- Added `docs/CIN_SOCIAL_SOURCE_INGESTION_POLICY.md` defining authorization gates and provider-specific boundaries for X, Reddit, and Telegram.
+- Specified official/authorized access only, least-privilege scopes, platform rate/retention/deletion requirements, provenance fields, timestamp semantics, deduplication, language/sentiment uncertainty, privacy, secret handling, and release acceptance checks.
+- Explicitly excludes unauthorized scraping, private/restricted chat collection without permission, Telegram outbound messaging, identity/whale attribution from usernames, and any trade/wallet/funds functionality.
+- Step 20 remains Partial: this is a design specification; no social connector or live provider access is implemented or authorized.
+
+### Step 21 exchange-flow methodology (2026-10-30)
+
+- Added `docs/CIN_EXCHANGE_FLOW_AND_WHALE_ATTRIBUTION.md` defining the distinction between observed transfers, exchange-associated flows, address attribution, and unverified whale claims.
+- Defined chain-specific, time-bounded exchange-label tiers; gross inflow/outflow and net-flow semantics; treatment of exchange-to-exchange, bridge, internal, mint/burn and duplicate events; and required coverage/finality/provenance metadata.
+- Explicitly prohibits personal deanonymization, unsupported beneficial-owner claims, inferring intent from deposits/withdrawals, wallet control, signing, broadcasting, or fund movement.
+- Step 21 remains Partial: no chain indexer, label registry, flow endpoint, or live provider integration was implemented. Provider free-tier and data-rights checks are prerequisites before choosing a source.
+
+### Step 22 evidence-provenance increment (2026-10-30)
+
+- Extended the growth-fundamentals assessment to retain caller-supplied evidence IDs and source roles, validate publication/check timestamps, require check timestamps for a supplied `verified` status, and flag future or impossible timestamp chronology.
+- Added deterministic SHA-256 fingerprints over normalized supplied metadata. Fingerprints are change-detection aids only, not document hashes, signatures, or authenticity proofs. Source roles remain self-reported and unauthenticated.
+- Exposed optional `evidence_id` and `source_role` through the growth and commodity assessment API request models; corrected the growth API documentation freshness range to 0–3650 days.
+- Added offline tests for required check timestamps, chronology failures, source-role disclosure, and metadata fingerprint changes.
+- Step 22 remains Partial: APIs still assess caller-supplied metadata; CIN does not fetch issuer, reserve, custody, audit, tokenomics, or growth documents, and does not independently verify their claims.
+
+### Step 23 common evidence-model specification (2026-10-30)
+
+- Added `docs/CIN_VERIFIABLE_EVIDENCE_MODEL.md` defining claim, evidence record, and claim-evidence relationship objects; distinct published/observed/provider-seen/retrieved/checked/valid times; source provenance and independence; descriptive confidence states; conflict handling; freshness/completeness; and audit/versioning requirements.
+- The specification explicitly distinguishes source assertions from CIN verification, prohibits treating missing evidence as zero, and disallows numeric confidence probabilities without calibration evidence.
+- Step 23 remains Partial: this is a design specification. Persistent evidence storage, versioned claim APIs, and migration of existing modules are not implemented.
+
+### Step 23 status reconciliation (2026-10-30)
+
+- Reconciled the roadmap with the existing common evidence-model specification and implementation tracker: Step 23 is Partial, not Pending.
+- The specification is documentation only. It does not imply a persistent evidence store, a versioned claim API, or migration of existing assessment APIs.
+
+- Step 22 claim/evidence separation increment (2026-10-30): commodity-backed and growth-fundamentals records now preserve caller-submitted claim text separately from source name/URL and publication/check timestamps. Claim text is included in metadata fingerprints; API request schemas bound it to 4,000 characters. Offline tests cover claim preservation, fingerprint change detection, and API limits. This does not authenticate the claim or verify the linked source.
+
+
+### Step 23 claim/evidence migration contract (2026-10-30)
+
+- Added `docs/CIN_STEP23_CLAIM_EVIDENCE_MIGRATION.md` mapping the current commodity/growth evidence fields to the common model and identifying the missing first-class claim ID and claim-evidence relationship layer.
+- Defined additive migration rules: preserve legacy API fields, keep claim identity separate from evidence identity, do not infer relationships from source URLs, preserve timestamp semantics, and keep metadata fingerprints distinct from content hashes/authenticity proof.
+- Specified deterministic acceptance gates for relationship types/review states, duplicate IDs, missing claims, timestamp/freshness/conflict cases, scaffold registration, and offline CI.
+- Documentation-only increment; no API or runtime behavior changed. Step 23 remains Partial.
+
+
+### Step 23 shared claim/evidence primitives (2026-10-30)
+
+- Added `cin_verifiable_evidence.py` with a deterministic SHA-256-derived CIN claim ID based on canonical claim identity (subject, predicate, statement, typed value/unit, and valid-time bounds); creation time is intentionally excluded from identity.
+- Added validated claim-evidence relationship construction for `supports`, `contradicts`, `qualifies`, and `context_only`, with explicit `automated_candidate`, `human_reviewed`, and `rejected` review states.
+- Added offline tests for deterministic identity, identity changes, typed values, timezone-aware and ordered valid times, allowed statuses, malformed values, relationship types, and review states.
+- Added the shared module to the Render scaffold copy list and scaffold regression fixture. No Render deployment was performed.
+- These are in-memory construction/validation primitives only: no persistence, source retrieval/authentication, relationship API, or automatic claim inference. Step 23 remains Partial.

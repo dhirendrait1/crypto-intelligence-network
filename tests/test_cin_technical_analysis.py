@@ -93,5 +93,46 @@ class TechnicalAnalysisTests(unittest.TestCase):
             TechnicalAnalysisRequest.model_validate(dict(payload, order_side="BUY"))
 
 
+    def test_rsi_constant_series_is_neutral(self):
+        self.assertEqual(module._rsi([100.0] * 15), 50.0)
+
+    def test_rsi_monotonic_series_reaches_expected_bounds(self):
+        self.assertEqual(module._rsi([float(i) for i in range(15)]), 100.0)
+        self.assertEqual(module._rsi([float(15 - i) for i in range(15)]), 0.0)
+
+    def test_rsi_requires_more_observations_than_its_period(self):
+        self.assertIsNone(module._rsi([float(i) for i in range(14)]))
+        self.assertIsNotNone(module._rsi([float(i) for i in range(15)]))
+
+    def test_ema_seed_appears_at_exact_period_boundary(self):
+        self.assertEqual(module._ema([1.0] * 11, 12), [None] * 11)
+        result = module._ema([1.0] * 12, 12)
+        self.assertEqual(result[:11], [None] * 11)
+        self.assertEqual(result[11], 1.0)
+
+    def test_atr_requires_period_plus_one_candles(self):
+        bars = candles_from_closes([100.0 + i for i in range(15)])
+        self.assertIsNone(module._atr(bars[:14]))
+        self.assertIsNotNone(module._atr(bars[:15]))
+
+    def test_zero_prior_volume_baseline_does_not_emit_relative_volume(self):
+        bars = candles_from_closes([100.0 + i for i in range(25)])
+        for bar in bars:
+            bar["volume"] = 0.0
+        bars[-1]["volume"] = 10.0
+        result = module.analyze_ohlc(bars)
+        self.assertEqual(result["indicators"]["volume_average_20"], 0.0)
+        self.assertIsNone(result["indicators"]["relative_volume_20"])
+
+    def test_macd_signal_line_boundary_is_deterministic(self):
+        closes = [100 + i * 0.5 + ((i % 3) - 1) * 0.2 for i in range(34)]
+        result = module.analyze_ohlc(candles_from_closes(closes))
+        self.assertIsNotNone(result["indicators"]["macd_line"])
+        self.assertIsNotNone(result["indicators"]["macd_signal"])
+        short = module.analyze_ohlc(candles_from_closes(closes[:-1]))
+        self.assertIsNotNone(short["indicators"]["macd_line"])
+        self.assertIsNone(short["indicators"]["macd_signal"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -78,6 +78,54 @@ def _timestamp_quality(value: Any, now: datetime, stale_after_seconds: int, futu
         "future_tolerance_seconds": future_tolerance_seconds,
     }
 
+def _depth_impact_estimates(
+    levels: list[tuple[float, float]],
+    *,
+    side: str,
+    midpoint: float,
+    quote_notionals: tuple[float, ...] = (10_000.0, 50_000.0, 100_000.0),
+) -> list[dict[str, Any]]:
+    """Estimate visible-book sweep capacity; never submits or routes an order."""
+    if side not in ("bid", "ask") or not math.isfinite(midpoint) or midpoint <= 0:
+        raise ValueError("Invalid side or midpoint for depth impact estimate")
+    ordered = sorted(levels, key=lambda level: level[0], reverse=(side == "bid"))
+    results = []
+    for target in quote_notionals:
+        if not math.isfinite(target) or target <= 0:
+            raise ValueError("Reference quote notionals must be finite and positive")
+        remaining = target
+        filled_quote = 0.0
+        filled_base = 0.0
+        for price, quantity in ordered:
+            available_quote = price * quantity
+            if not math.isfinite(available_quote) or available_quote <= 0:
+                continue
+            used_quote = min(remaining, available_quote)
+            filled_quote += used_quote
+            filled_base += used_quote / price
+            remaining -= used_quote
+            if remaining <= max(1e-9, target * 1e-12):
+                remaining = 0.0
+                break
+        complete = remaining == 0.0 and filled_base > 0
+        average_price = filled_quote / filled_base if filled_base > 0 else None
+        slippage_bps = None
+        if complete and average_price is not None:
+            slippage_bps = ((average_price / midpoint) - 1.0) * 10_000.0
+            if side == "bid":
+                slippage_bps = -slippage_bps
+            if not math.isfinite(slippage_bps):
+                raise ValueError("Depth impact estimate exceeded finite numeric limits")
+        results.append({
+            "reference_quote_notional": target,
+            "status": "estimated_full_visible_depth" if complete else "insufficient_visible_depth",
+            "filled_quote_notional": round(filled_quote, 4),
+            "visible_depth_coverage_ratio": round(min(1.0, filled_quote / target), 8),
+            "volume_weighted_average_price": round(average_price, 10) if complete and average_price is not None else None,
+            "estimated_adverse_slippage_bps": round(max(0.0, slippage_bps), 6) if slippage_bps is not None else None,
+        })
+    return results
+
 def _validate_payloads(open_interest: Any, premium: Any, history: Any, symbol: str) -> None:
     if not isinstance(open_interest, dict) or open_interest.get("symbol") != symbol:
         raise ValueError("Unexpected open-interest provider payload")
@@ -236,6 +284,12 @@ def _snapshot(symbol: str) -> dict[str, Any]:
             "bid_notional_quote_approx": round(bid_notional, 4),
             "ask_notional_quote_approx": round(ask_notional, 4),
             "bid_ask_notional_imbalance": round(depth_imbalance, 8) if depth_imbalance is not None else None,
+            "visible_depth_impact_estimates": {
+                "reference_quote_currency": "USDT",
+                "bid_side": _depth_impact_estimates(bids, side="bid", midpoint=midpoint),
+                "ask_side": _depth_impact_estimates(asks, side="ask", midpoint=midpoint),
+                "note": "Hypothetical visible-book sweep estimates at fixed quote-notional references; incomplete depth returns no slippage estimate. Excludes fees, latency, hidden liquidity, market impact beyond displayed levels, and execution outcomes.",
+            },
             "note": "Snapshot only; depth changes rapidly and excludes retail price-improvement orders not exposed by this endpoint.",
         },
         "data": {

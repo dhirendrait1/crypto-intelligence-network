@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from commodity_backing_assessment import assess_commodity_asset, normalize_evidence
+from commodity_backing_assessment import assess_commodity_asset, compare_evidence_snapshots, normalize_evidence
 
 
 NOW = datetime(2026, 10, 24, tzinfo=timezone.utc)
@@ -269,3 +269,221 @@ def test_invalid_ports_in_source_urls_are_rejected():
         result = normalize_evidence(valid_item(source_url=url), now=NOW)
         assert result["source_url_valid"] is False
         assert result["status"] == "unverified"
+
+
+def test_source_host_diversity_is_reported_without_claiming_independence():
+    evidence = [
+        valid_item(source_url="https://issuer.example/reserves"),
+        valid_item(
+            source_url="https://auditor.example/attestation",
+            source_name="Auditor",
+            published_at="2026-10-02T00:00:00Z",
+        ),
+    ]
+    result = assess_commodity_asset("PAXG", evidence, now=NOW)
+    coverage = result["evidence_coverage"]["reserve_attestation"]
+    assert coverage["distinct_source_host_count"] == 2
+    assert coverage["source_host_diversity"] == "multiple_hosts"
+    assert coverage["source_independence_verified"] is False
+
+
+def test_invalid_source_urls_do_not_count_toward_source_host_diversity():
+    result = assess_commodity_asset(
+        "PAXG", [valid_item(source_url="javascript:alert(1)")], now=NOW
+    )
+    coverage = result["evidence_coverage"]["reserve_attestation"]
+    assert coverage["distinct_source_host_count"] == 0
+    assert coverage["source_host_diversity"] == "no_valid_hosts"
+    assert coverage["source_independence_verified"] is False
+
+def test_source_roles_are_normalized_and_explicitly_unauthenticated():
+    evidence = [
+        valid_item(source_role=" Issuer "),
+        valid_item(source_role="auditor", source_name="Audit firm", source_url="https://audit.example/report", published_at="2026-10-02T00:00:00Z"),
+    ]
+    result = assess_commodity_asset("PAXG", evidence, now=NOW)
+    rows = result["evidence"]
+    assert rows[0]["source_role"] == "issuer"
+    assert rows[1]["source_role"] == "auditor"
+    assert all(row["source_role_authenticated"] is False for row in rows)
+    counts = result["evidence_coverage"]["reserve_attestation"]["source_role_counts_self_reported"]
+    assert counts["issuer"] == 1 and counts["auditor"] == 1
+    assert result["evidence_coverage"]["reserve_attestation"]["source_roles_authenticated"] is False
+
+def test_unknown_source_role_is_reported_as_unspecified():
+    result = assess_commodity_asset("PAXG", [valid_item(source_role="government-approved")], now=NOW)
+    row = result["evidence"][0]
+    assert row["source_role"] == "unspecified"
+    assert row["source_role_is_self_reported"] is True
+    assert row["source_role_authenticated"] is False
+
+def test_missing_source_role_is_unspecified_without_claiming_self_report():
+    result = assess_commodity_asset("PAXG", [valid_item()], now=NOW)
+    row = result["evidence"][0]
+    assert row["source_role"] == "unspecified"
+    assert row["source_role_is_self_reported"] is False
+    assert row["source_role_authenticated"] is False
+
+def test_conflict_details_preserve_each_source_without_selecting_a_winner():
+    result = assess_commodity_asset(
+        "PAXG",
+        [
+            valid_item(status="verified", source_role="issuer", source_name="Issuer"),
+            valid_item(status="unverified", source_role="auditor", source_name="Auditor", source_url="https://audit.example/report", published_at="2026-10-02T00:00:00Z"),
+        ],
+        now=NOW,
+    )
+    coverage = result["evidence_coverage"]["reserve_attestation"]
+    assert coverage["status"] == "conflicting"
+    assert coverage["status_counts"]["verified"] == 1
+    assert coverage["status_counts"]["unverified"] == 1
+    assert {item["source_role"] for item in coverage["conflict_evidence"]} == {"issuer", "auditor"}
+    assert {item["source_name"] for item in coverage["conflict_evidence"]} == {"Issuer", "Auditor"}
+    assert all(item["source_role_authenticated"] is False for item in coverage["conflict_evidence"])
+    assert coverage["conflict_resolution"] == "manual_review_required"
+    assert coverage["preferred_source_selected"] is False
+
+def test_evidence_record_fingerprint_is_deterministic_for_same_metadata():
+    first = normalize_evidence(valid_item(source_role="issuer"), now=NOW)
+    second = normalize_evidence(valid_item(source_role="issuer"), now=NOW)
+    assert first["record_fingerprint_sha256"] == second["record_fingerprint_sha256"]
+    assert len(first["record_fingerprint_sha256"]) == 64
+    assert first["fingerprint_scope"] == "normalized_supplied_metadata"
+    assert first["fingerprint_is_authenticity_proof"] is False
+
+def test_evidence_record_fingerprint_changes_when_supplied_metadata_changes():
+    first = normalize_evidence(valid_item(source_role="issuer"), now=NOW)
+    changed = normalize_evidence(valid_item(source_role="auditor"), now=NOW)
+    assert first["record_fingerprint_sha256"] != changed["record_fingerprint_sha256"]
+
+def test_snapshot_comparison_classifies_added_removed_changed_and_unchanged():
+    previous = [
+        valid_item(evidence_id="same", notes="unchanged"),
+        valid_item(evidence_id="changed", notes="before"),
+        valid_item(evidence_id="removed"),
+    ]
+    current = [
+        valid_item(evidence_id="same", notes="unchanged"),
+        valid_item(evidence_id="changed", notes="after"),
+        valid_item(evidence_id="added"),
+    ]
+    result = compare_evidence_snapshots(previous, current, now=NOW)
+    assert result["counts"] == {"added": 1, "removed": 1, "changed": 1, "unchanged": 1}
+    assert result["history_persisted"] is False
+    assert {item["evidence_id"]: item["change_type"] for item in result["changes"]} == {
+        "same": "unchanged", "changed": "changed", "removed": "removed", "added": "added"
+    }
+
+def test_snapshot_comparison_excludes_duplicate_stable_ids_as_ambiguous():
+    previous = [valid_item(evidence_id="duplicate"), valid_item(evidence_id="duplicate", notes="second") ]
+    current = [valid_item(evidence_id="duplicate")]
+    result = compare_evidence_snapshots(previous, current, now=NOW)
+    assert result["ambiguous_evidence_ids"] == ["duplicate"]
+    assert result["changes"] == []
+
+def test_snapshot_comparison_counts_records_without_stable_ids_as_untracked():
+    result = compare_evidence_snapshots([valid_item()], [valid_item()], now=NOW)
+    assert result["untracked_previous_record_count"] == 1
+    assert result["untracked_current_record_count"] == 1
+    assert result["change_count"] == 0
+
+def test_snapshot_comparison_requires_two_lists():
+    import pytest
+    with pytest.raises(ValueError):
+        compare_evidence_snapshots([], "not-a-list", now=NOW)
+
+
+
+def test_commodity_claim_text_is_caller_supplied_and_included_in_fingerprint():
+    original = normalize_evidence(
+        valid_item(claim_text="Issuer states each token is backed by one unit."),
+        now=NOW,
+    )
+    revised = normalize_evidence(
+        valid_item(claim_text="Issuer states each token is backed by two units."),
+        now=NOW,
+    )
+    assert original["claim_text_is_caller_supplied"] is True
+    assert original["claim_text"] == "Issuer states each token is backed by one unit."
+    assert original["fingerprint_is_authenticity_proof"] is False
+    assert original["record_fingerprint_sha256"] != revised["record_fingerprint_sha256"]
+
+
+def test_commodity_claim_is_linked_as_context_only_without_asserting_truth():
+    row = assess_commodity_asset(
+        "PAXG",
+        [valid_item(
+            evidence_id="reserve-doc-1",
+            claim_text="Issuer states each token is backed by one troy ounce.",
+        )],
+        now=NOW,
+    )["evidence"][0]
+    claim = row["claim"]
+    relationship = row["claim_evidence_relationship"]
+    assert claim["subject"] == "PAXG"
+    assert claim["predicate"] == "reserve_attestation"
+    assert claim["claim_status"] == "not_assessed"
+    assert claim["claim_id_is_truth_proof"] is False
+    assert relationship["claim_id"] == claim["claim_id"]
+    assert relationship["evidence_id"] == "reserve-doc-1"
+    assert relationship["relationship"] == "context_only"
+    assert relationship["review_status"] == "automated_candidate"
+    assert relationship["relationship_is_persisted"] is False
+
+
+def test_commodity_claim_without_caller_evidence_id_has_no_relationship():
+    row = normalize_evidence(
+        valid_item(claim_text="Issuer states each token is backed."),
+        now=NOW,
+    )
+    # Normalization alone has no asset subject and therefore creates no claim object.
+    assert "claim" not in row
+    result_row = assess_commodity_asset(
+        "PAXG", [valid_item(claim_text="Issuer states each token is backed.")], now=NOW
+    )["evidence"][0]
+    assert result_row["claim"] is not None
+    assert result_row["claim_evidence_relationship"] is None
+
+
+def test_caller_claim_is_linked_as_context_only_without_verification():
+    item = valid_item(
+        evidence_id="reserve-doc-17",
+        claim_text="Issuer states each token is backed by one unit of gold.",
+    )
+    row = assess_commodity_asset("PAXG", [item], now=NOW)["evidence"][0]
+    claim = row["claim"]
+    link = row["claim_evidence_relationship"]
+    assert claim["subject"] == "PAXG"
+    assert claim["predicate"] == "reserve_attestation"
+    assert claim["claim_status"] == "not_assessed"
+    assert claim["claim_id_is_truth_proof"] is False
+    assert link["claim_id"] == claim["claim_id"]
+    assert link["evidence_id"] == "reserve-doc-17"
+    assert link["relationship"] == "context_only"
+    assert link["review_status"] == "automated_candidate"
+    assert link["relationship_is_persisted"] is False
+    assert "not independently verified" in link["rationale"]
+
+
+def test_commodity_claim_without_caller_evidence_id_has_no_relationship():
+    row = assess_commodity_asset(
+        "PAXG", [valid_item(claim_text="Issuer statement.")], now=NOW
+    )["evidence"][0]
+    assert row["claim"] is not None
+    assert row["claim_evidence_relationship"] is None
+
+
+def test_commodity_record_without_claim_text_has_no_claim_objects():
+    row = assess_commodity_asset("PAXG", [valid_item()], now=NOW)["evidence"][0]
+    assert row["claim"] is None
+    assert row["claim_evidence_relationship"] is None
+
+
+def test_non_string_claim_text_is_not_coerced_into_a_claim():
+    for supplied in (None, 7, {"statement": "not a string"}, ["not", "a", "string"]):
+        row = assess_commodity_asset(
+            "PAXG", [valid_item(evidence_id="e-1", claim_text=supplied)], now=NOW
+        )["evidence"][0]
+        assert row["claim_text"] is None
+        assert row["claim"] is None
+        assert row["claim_evidence_relationship"] is None

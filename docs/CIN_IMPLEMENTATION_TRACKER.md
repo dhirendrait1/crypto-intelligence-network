@@ -1,9 +1,12 @@
 # CIN Implementation Evidence Tracker
 
+> **Historical-log interpretation (reconciled 2026-10-30):** This file is an append-only implementation evidence ledger, not the active roadmap or a live status dashboard. Dated entries containing “CI pending”, “awaiting CI”, or “not yet verified” describe the checkpoint at the time of that entry; they must not be read as current workflow status. For current step status, use `docs/CIN_MASTER_ROADMAP.md`. For current CI, inspect the exact current PR head and its workflow runs in GitHub. The roadmap is the sole 7-stage / 35-step numbering source; historical tracker headings are not additional steps.
+
+
 **Scope:** Crypto Intelligence Network (CIN), read-only research, analysis, forecasting, monitoring, and alerts. This tracker records what is supported by repository evidence; it is not a claim that CIN is production-complete.
 
-**Branch:** `feat/cin-architecture-audit`  
-**Release controls (updated 2026-10-26):** PR #6 is merged and its deployment-aligned CI passes on main. PR #11 integrates additional read-only research modules and must pass all current-head workflows before merge. PR #7 and PR #8 remain unmerged audit branches; do not merge them wholesale because PR #8 predates the Coinbase fallback and conflicts with the current candle-provider module. `render.yaml` enables automatic deployment on main updates, so a merge may trigger Render deployment; confirm the deployed revision and live health/readiness/routes before calling the release complete. No order execution, wallet control, private keys, or fund movement.
+**Branch:** `feat/cin-market-data-row-provenance` (current evidence update; this tracker is also referenced by the architecture-audit branch).  
+**Release controls (reconciled 2026-10-30):** PR #6 and PR #11 are merged. PR #8 remains Draft/open as an audit branch; PR #65 and PR #66 remain Draft/open and unmerged. PR #7’s current state is not asserted here. PR #11’s merge on 2026-10-26 integrated additional read-only research modules. `render.yaml` enables automatic deployment on main updates, so any merge to main may trigger Render deployment; Render changes/deployments remain user-managed and require fresh explicit approval. No order execution, wallet control, private keys, or fund movement.
 
 ## Status definitions
 
@@ -884,3 +887,153 @@ This checkpoint validates configured offline automation only. It does not establ
 - Added an offline test that verifies both providers are bounded and their oversized bodies become structured invalid-response failures.
 - Source commit: `92e6277f04d1f83cf59ebbefee2c80afc31fd78f`; test commit: `b8017ae026cd7758108590a81a3fa68f95935eef`.
 - CI for current head is pending. CIN remains read-only; no deployment changes.
+
+
+## Repository release-control reconciliation (2026-10-30)
+
+- PR #11 is merged (2026-10-26); it is no longer awaiting CI/merge.
+- PR #8 is Draft/open; PR #65 and PR #66 are Draft/open and unmerged.
+- PR #66 adds row-level market-data provider and retrieval-time provenance. Its roadmap update commit `8ea7709c5f170a8161d819f08e177e15fe7d34d7` passed all four repository workflows. This is offline CI evidence only.
+- Historical entries below retain their original commit-specific results and should not be interpreted as the latest repository state unless they identify the current head explicitly.
+
+
+## Technical-analysis and order-book depth validation increment (2026-10-30)
+
+- **Step 17 — implemented, offline-tested:** deterministic tests now cover RSI flat input (50), monotonic gain/loss bounds (100/0), minimum observation count, EMA seed boundary, ATR minimum history, MACD signal-line availability boundary, and zero prior-volume baseline behavior. Indicator documentation states the availability and edge-case semantics.
+- All four workflows passed on exact code head `9de32c047ef87acde481da46bb702c83d545fb89`: Technical Analysis Tests `40972458689`, Automated Tests `40972458409`, Evidence Ingestion API `40972458435`, Screening Checks `40972458395`.
+- **Step 16 — partial increment:** derivatives snapshots now expose bid/ask visible-book sweep estimates for 10k/50k/100k USDT reference notionals. Complete visible depth reports a volume-weighted average price and adverse slippage basis points; insufficient depth reports coverage only and leaves slippage/average price null. Regression tests cover both sides, insufficient depth, invalid parameters, and response serialization.
+- All four workflows passed on exact code head `ad0899433985b9c80e710fde8bcfd209d65a254c`: Technical Analysis Tests `40972666017`, Evidence Ingestion API `40972666026`, Screening Checks `40972666110`, Automated Tests `40972666015`.
+- **Boundary:** slippage references are hypothetical displayed-book calculations, not execution forecasts or instructions. They exclude fees, latency, hidden liquidity, queue position, and impact beyond returned levels. Step 16 remains Partial pending broader methodology review, multi-exchange coverage, and live snapshot validation. Step 17 offline tests do not establish live-provider behavior.
+
+
+## Step 18 — cross-source metric conflict and confidence increment (2026-10-30)
+
+- Added `cross_source_evidence.py` as a reusable, read-only comparison primitive for caller-supplied metric observations. It validates metric/unit/value/source/timestamp fields, groups only exact metric+unit pairs, applies a configurable observation-time window, and deduplicates normalized source URLs.
+- Confidence semantics: fewer than two distinct URLs => `insufficient_evidence`; values within the configured spread tolerance => `limited_corroboration`; values outside tolerance => `low_confidence_conflict`. No numeric probability, source ranking, or preferred source is produced.
+- Defaults: 300-second comparison window; 1% relative tolerance; zero absolute tolerance. These are explicit heuristics and require metric-specific calibration before production use.
+- Source independence and role authentication are always false. Distinct URLs/hosts are not proof of independent ownership or authorship. The helper does not fetch, persist, certify, or execute.
+- Eight offline tests passed with all four configured workflows on code/documentation head `f42634ea7b55f66db472bc73505184d337dd0846` (run IDs: `40972958485`, `40972958481`, `40972958476`, `40972958628`).
+- API integration follow-up: added `POST /cross-source-evidence-comparison`, bounded request models, idempotent scaffold module-copy/router registration, and five endpoint contract tests. The scaffold regression tests also verify the new router is registered once and copied into the application.
+- All four workflows passed on integration head `ba69aec7750099913ec52a4687dc3af74a9883d1` (run IDs: `40973205679`, `40973205697`, `40973205857`, `40973206105`).
+- Remaining acceptance: metric-specific tolerance calibration, provider-specific tests, and authorized live-source validation. Step 18 is Partial, not complete.
+
+
+## Step 19 — public news language-scope increment (2026-10-30)
+
+- Updated `_headline_sentiment` to consume provider language metadata. Explicit non-English tags return `unavailable` / null score / `unsupported_language` rather than being scored by the English keyword lexicon or mislabeled neutral.
+- English locale tags (for example `en-US`) normalize to supported English. Missing language metadata retains the existing low-confidence keyword result but is marked `language_unverified`.
+- Added four offline tests covering non-English suppression, unknown-language status, English locale normalization, and parser-to-classifier propagation.
+- Updated `docs/CIN_PUBLIC_NEWS_SENTIMENT.md` and the master roadmap with English-only scope and remaining multilingual limitations.
+- Remaining acceptance: multilingual model/translation and mixed-language evaluation, context/negation handling, and authorized live GDELT/RSS validation. Step 19 remains Partial.
+
+
+## Step 20 — authorized social-source ingestion design (2026-10-30)
+
+- Added `docs/CIN_SOCIAL_SOURCE_INGESTION_POLICY.md` with provider-specific X, Reddit, and Telegram authorization boundaries and a common ingestion/provenance contract.
+- Defined explicit approval gates, official/authorized API access, least-privilege scopes, provider access-tier/terms review, rate limits, deletion/retention obligations, privacy minimization, secret/log redaction, timestamp provenance, record deduplication, and release checklist.
+- Prohibited unauthorized scraping/access-control bypass, private/restricted Telegram collection without permission, outbound Telegram messaging, unsupported identity/whale attribution, and any trade/wallet/funds capability.
+- Step 20 remains Partial. No social API credentials, connectors, collection jobs, or live provider calls were added; provider authorization and implementation remain outstanding.
+
+
+## Step 21 — exchange-flow and whale-attribution methodology (2026-10-30)
+
+- Added `docs/CIN_EXCHANGE_FLOW_AND_WHALE_ATTRIBUTION.md` defining observed on-chain transfer vs exchange-associated flow vs entity attribution vs whale claim.
+- Specified evidence tiers for exchange labels, chain-specific/time-bounded provenance, gross inflow/outflow/net-flow definitions, event exclusions and double-counting controls, coverage/finality metadata, and uncertainty output.
+- Explicitly prohibits personal deanonymization, unsupported beneficial-owner/whale claims, inferring intent from transfers, wallet control, signing, broadcasting, and fund movement.
+- Step 21 remains Partial. No chain indexer, exchange-label registry, flow API, provider dependency, or live integration was added. Provider access-tier, free-plan/payment, licensing, and data-quality review must precede implementation.
+
+
+## Step 22 — commodity and growth evidence provenance increment (2026-10-30)
+
+- Extended growth-fundamentals evidence records with optional caller-supplied `evidence_id` and `source_role`, explicit unauthenticated-role flags, required check timestamps for supplied `verified` statuses, future/check-before-publication chronology checks, and deterministic SHA-256 fingerprints over normalized supplied metadata.
+- Extended growth and commodity API request models to accept the optional evidence identity and source-role fields. Updated documentation, including correction of the growth `max_age_days` range to 0–3650.
+- Added four growth-assessment regression tests covering missing check time, future/impossible chronology, role/fingerprint disclosure, and metadata fingerprint change detection.
+- Fingerprints are not document hashes, signatures, trusted timestamps, or authenticity proof. Source roles remain caller supplied and unauthenticated.
+- Step 22 remains Partial: source documents are not fetched and issuer/reserve/custody/audit/fundamental claims are not independently verified. Live source validation is outstanding.
+
+
+## Step 23 — common verifiable evidence model specification (2026-10-30)
+
+- Added `docs/CIN_VERIFIABLE_EVIDENCE_MODEL.md` defining claim, evidence-record, and claim-evidence relationship fields; source provenance; distinct publication/observation/provider-seen/retrieval/check/valid times; descriptive confidence states; conflict handling; freshness/completeness; and audit/versioning requirements.
+- Explicitly distinguishes source assertions from CIN verification, prohibits treating missing evidence as zero, and rejects numeric confidence probabilities without a calibrated model and validation data.
+- Step 23 remains Partial. No persistent evidence store, versioned claim API, or cross-module migration was implemented by this specification.
+
+## Step 22 — explicit claim/evidence separation (2026-10-30)
+
+- Added optional caller-supplied `claim_text` to commodity-backed and growth-fundamentals evidence records and their API request schemas (maximum 4,000 characters).
+- Preserved claim text independently from source name/URL and publication/check timestamps; included it in normalized metadata fingerprints so edits are detectable.
+- Added offline tests for claim preservation, fingerprint changes, and API field-size validation.
+- A submitted claim is not supporting proof. CIN still does not retrieve source documents or independently verify issuer statements, reserves, custody, audits, revenue, adoption, or other fundamentals. Step 22 remains Partial.
+
+
+### Step 23 claim/evidence migration contract (2026-10-30)
+
+- Added `docs/CIN_STEP23_CLAIM_EVIDENCE_MIGRATION.md` as the first concrete migration contract for commodity-backing and growth-fundamentals evidence.
+- Mapped existing evidence IDs, module-specific evidence types/categories, source metadata, publication/check times, caller-supplied claim text, metadata fingerprints, and freshness fields to the common evidence model.
+- Identified the principal schema gap: neither module yet emits a first-class stable CIN `claim_id` or explicit claim-evidence relationship object with relationship type, rationale, and review status.
+- Defined additive compatibility rules and acceptance gates for the next code increment. This documentation change does not alter API/runtime behavior and does not imply persistence, source retrieval, authentication, or independent verification. Step 23 remains Partial.
+
+
+### Step 23 shared claim/evidence primitives (2026-10-30)
+
+- Added `cin_verifiable_evidence.py` with deterministic content-derived claim IDs, typed claim values/units, valid-time bounds, timezone-aware creation time, explicit claim status, and schema version.
+- Added validated claim-evidence relationship objects with the four documented relationship types and three review states. Creation time is excluded from claim identity; identity fields are canonicalized and hashed. IDs/fingerprints are not truth or authenticity proofs.
+- Added offline tests covering stable identity, identity changes, valid-time ordering, timezone awareness, finite JSON-compatible values, allowed status vocabularies, malformed inputs, relationship types, and review states.
+- Added the module to `patch_cin_metadata_fixed.py` and its deployment-scaffold regression fixture so the scaffold copies it into `cin/app`. No router or public endpoint was added.
+- Integrated the shared builders into commodity and growth assessment evidence rows as additive `claim` and `claim_evidence_relationship` fields. Claims are emitted only from non-empty caller-supplied `claim_text`, use the asset/project symbol as subject and the existing evidence type/category as predicate, and remain `not_assessed`. Relationships are emitted only when a caller-supplied stable `evidence_id` exists and are always `context_only` / `automated_candidate`; rationale states that neither claim nor source was independently verified.
+- Added offline regressions for both modules, missing evidence IDs, and absent claim text. Legacy fields and existing assessment scoring/status logic are unchanged. No persistence, source retrieval/authentication, or public relationship API was added. Step 23 remains Partial.
+
+
+## Claim/evidence persistence lifecycle design (2026-10-30)
+
+- [x] Add design-only persistence contract in docs/CIN_STEP23_PERSISTENCE_LIFECYCLE.md.
+- [x] Separate CIN evidence identity from caller-supplied external evidence IDs.
+- [x] Define immutable evidence observations and keep published, observed, retrieved, and checked timestamps distinct.
+- [x] Define append-only claim assessment events and explicit many-to-many claim/evidence relationships.
+- [x] Define conflict preservation, metadata/content hash limitations, idempotency, and transaction requirements.
+- [x] Define retention, deletion, licensing, privacy, authorization, and backup acceptance gates before persistence is enabled.
+- [x] Explicitly reject ephemeral filesystem/SQLite as durable production storage; SQLite is permitted only for local deterministic development/tests until durable storage is selected.
+- [ ] Implement durable persistence, migrations, transactional writes, deletion/retention jobs, and API authorization.
+- [ ] Validate provider licensing/authorization and any source-fetch SSRF protections before retrieval.
+- **Boundary:** this is architecture documentation only. No database, migration, source collector, persistence API, or Render change was created. Step 23 remains Partial.
+
+
+## Claim/evidence reference schema increment (2026-10-30)
+
+- [x] Add SQLite reference DDL at database/migrations/0001_claim_evidence_schema_v1.sql for local development/test schema review.
+- [x] Add in-memory SQLite tests for schema objects/indexes, namespaced external-ID uniqueness, foreign keys, claim status constraints, and JSON validity.
+- [x] Keep the reference DDL out of application startup and API execution; no migration runner or persistence adapter is introduced.
+- [ ] Run and verify all four GitHub Actions workflows on the latest branch head.
+- [ ] Select and implement a durable production database only after deployment topology, cost, backup/restore, retention, deletion, and authorization requirements are approved.
+- **Boundary:** SQLite DDL/tests do not constitute durable persistence. No records are stored by CIN through this change, and no Render changes were made.
+
+
+## Local claim/evidence repository adapter increment (2026-10-30)
+
+- [x] Add explicit-connection SQLite adapter for local development/tests; no implicit DB creation or migration execution.
+- [x] Persist evidence record, immutable observation, claim, initial assessment event, and relationship atomically in one transaction.
+- [x] Keep caller external evidence IDs namespaced and separate from CIN-owned evidence IDs.
+- [x] Preserve caller-supplied provenance (retrieved_at remains null; source_status remains caller_supplied).
+- [x] Add offline tests for successful bundle persistence, duplicate-identity rollback, timezone validation, and non-finite JSON rejection.
+- [ ] Run all four GitHub Actions workflows on the latest branch head.
+- [ ] Implement durable production storage only after the hosting, cost, backup/restore, retention, deletion, and authorization gates are approved.
+- **Boundary:** adapter is not wired to API/application startup and is not production durability. No Render changes.
+
+
+## Append-only assessment history increment (2026-10-30)
+
+- [x] Add append_assessment_event to the local-only repository adapter; preserve earlier assessment events.
+- [x] Validate claim status, assessor type, methodology version, rationale, and timezone-aware assessment timestamp.
+- [x] Add tests proving assessment history is append-only and invalid/unknown claim assessments are rejected.
+- [ ] Run all four GitHub Actions workflows on the latest branch head.
+- **Boundary:** no authenticated reviewer identity, production workflow, API integration, or durable production database is implemented.
+
+
+## Append-only evidence lifecycle increment (2026-10-30)
+
+- [x] Add explicit append_observation operation for existing CIN evidence records.
+- [x] Preserve prior observations; append a new immutable observation with separate timestamps, source status, normalized metadata and SHA-256 metadata fingerprint.
+- [x] Add regression tests for history preservation, timezone normalization, missing-record foreign-key rejection, and non-finite JSON rejection.
+- [x] Keep claim assessment history append-only through append_assessment_event; no prior assessment is overwritten.
+- [ ] Verify all four GitHub Actions workflows on latest branch head.
+- **Boundary:** local SQLite adapter only; no API integration, retention worker, production database, or Render deployment.

@@ -14,6 +14,7 @@ class GrowthFundamentalsValidationTests(unittest.TestCase):
             "source_name": "Example source",
             "source_url": "https://example.com/report",
             "published_at": "2026-10-01T00:00:00Z",
+            "checked_at": "2026-10-20T00:00:00Z",
             "status": "verified",
         }
         item.update(overrides)
@@ -37,7 +38,7 @@ class GrowthFundamentalsValidationTests(unittest.TestCase):
         self.assertIsNone(result["evidence"][0]["publication_age_days"])
         self.assertEqual(
             result["evidence"][0]["timestamp_validation_errors"],
-            ["published_at_is_in_the_future"],
+            ["published_at_is_in_the_future", "checked_at_precedes_published_at"],
         )
         self.assertFalse(result["cin_independently_verified_claims"])
 
@@ -147,7 +148,7 @@ class GrowthFundamentalsValidationTests(unittest.TestCase):
         self.assertIsNone(result["evidence"][0]["publication_age_days"])
         self.assertEqual(
             result["evidence"][0]["timestamp_validation_errors"],
-            ["published_at_is_in_the_future"],
+            ["published_at_is_in_the_future", "checked_at_precedes_published_at"],
         )
 
     def test_invalid_assessment_clock_falls_back_and_is_reported(self):
