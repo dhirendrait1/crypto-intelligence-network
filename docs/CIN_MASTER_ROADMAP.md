@@ -250,3 +250,10 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - The public evidence ingestion API now maps both known provider errors and unexpected provider exceptions to one stable generic HTTP 502 response. Raw provider exception text is not returned to clients.
 - Added regression tests with injected raw response-body, token, Bearer credential, and sensitive URL/query markers; assertions verify none appear in the client-facing detail.
 - This is an API response-boundary control only. It does not prove comprehensive log redaction or production security, and the endpoint remains read-only with persistence unwired. Step 23 remains Partial.
+
+
+### Step 23 privacy-audit status reconciliation (2026-10-31)
+
+- Reconciled F-01 and F-04 dispositions against the existing local SQLite adapter and regression tests. F-01 is partially mitigated for the GitHub namespace and structurally bounded for other namespaces; universal source-specific allowlists and production enforcement remain open. F-04's 64 KiB canonical metadata ceiling is implemented and tested for bundle and appended-observation writes in the local adapter only.
+- F-06 validation is confirmed successful on PR #70 head `da1fa72b904d9364a280fe0f43a67f848697589b` (GitHub Actions runs 41140427820 and 41140425052).
+- F-03, F-05, and F-07 remain design-documented, with policy approval and separately reviewed implementation outstanding. Step 23 remains Partial; no production persistence or deployment is authorized by these changes.
