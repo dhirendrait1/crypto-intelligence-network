@@ -69,8 +69,12 @@ def persist_evidence_snapshot(
             checked_at=checked_at,
         )
         return {**result, "operation": "bundle_created"}
-    except sqlite3.IntegrityError:
-        # A concurrent first-ingestion may have won the unique identity race.
+    except sqlite3.IntegrityError as exc:
+        # Recover only the provider-identity UNIQUE violation. Other integrity
+        # failures (FK, CHECK, NOT NULL, PK, etc.) must remain visible even if
+        # a matching provider identity happens to exist.
+        if getattr(exc, "sqlite_errorcode", None) != sqlite3.SQLITE_CONSTRAINT_UNIQUE:
+            raise
         winning_id = store.find_evidence_id(**identity)
         if winning_id is None:
             raise
