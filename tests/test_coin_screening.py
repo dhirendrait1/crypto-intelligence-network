@@ -748,6 +748,27 @@ class MarketProviderResponseSizeTests(unittest.TestCase):
         self.assertEqual(caught.exception.fallback_kind, "not_attempted")
 
 
+    def test_commodity_scan_provider_body_is_bounded(self):
+        class OversizedResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self, size=-1):
+                self.requested_size = size
+                return b"x" * size
+
+        response = OversizedResponse()
+        with patch.object(MODULE.urllib.request, "urlopen", return_value=response) as request:
+            with self.assertRaises(ValueError):
+                MODULE._fetch_commodity_markets("usd", 5)
+
+        self.assertEqual(response.requested_size, MODULE._MAX_MARKET_PROVIDER_RESPONSE_BYTES + 1)
+        self.assertEqual(request.call_args.kwargs["timeout"], 20)
+
+
 class CoinPaprikaRequestContractTests(unittest.TestCase):
     def test_request_uses_requested_quote_currency_and_bounded_timeout(self):
         response = MagicMock()
