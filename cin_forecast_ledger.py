@@ -9,6 +9,7 @@ import json
 import math
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from contextlib import closing
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -52,9 +53,15 @@ def _text(value: Any, field: str, maximum: int=160) -> str:
     return value.strip()
 
 def _number(value: Any, field: str) -> float:
-    if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value):
+    if isinstance(value,bool) or not isinstance(value,(int,float)):
         raise ValueError(f"{field} must be a finite number")
-    return float(value)
+    try:
+        result=float(value)
+    except (OverflowError,ValueError):
+        raise ValueError(f"{field} must be a finite number")
+    if not math.isfinite(result):
+        raise ValueError(f"{field} must be a finite number")
+    return result
 
 def _json(value: Any, field: str) -> str:
     try: return json.dumps(value,sort_keys=True,separators=(",",":"),allow_nan=False)
@@ -91,12 +98,18 @@ def record_forecast(database_path: str | Path, forecast: Mapping[str,Any], *, re
     """Insert a forecast once. Repeated identical IDs are idempotent; conflicting reuse fails."""
     item=_forecast_payload(forecast,_time(recorded_at,"recorded_at").isoformat())
     encoded=_json(item,"forecast")
-    with _connect(database_path) as db:
+    with closing(_connect(database_path)) as db:
         db.execute("BEGIN IMMEDIATE")
         try:
             old=db.execute("SELECT payload_json FROM cin_forecasts WHERE forecast_id=?",(item["forecast_id"],)).fetchone()
-            if old and old[0]!=encoded: raise ValueError("forecast_id already exists with different content")
-            if not old:
+            if old:
+                existing=json.loads(old[0])
+                comparable=dict(item)
+                existing.pop("recorded_at",None)
+                comparable.pop("recorded_at",None)
+                if existing!=comparable: raise ValueError("forecast_id already exists with different content")
+                item=json.loads(old[0])
+            else:
                 db.execute("""INSERT INTO cin_forecasts VALUES(?,?,?,?,?,?,?,?,?,?,?)""",(
                   item["forecast_id"],item["asset_id"],item["metric"],item["value"],item["unit"],
                   item["source_id"],item["created_at"],item["target_at"],
@@ -123,7 +136,7 @@ def record_forecast_observation(database_path: str | Path, observation: Mapping[
     }
     if item["retrieved_at"]<item["observed_at"]: raise ValueError("retrieved_at cannot precede observed_at")
     encoded=_json(item,"observation")
-    with _connect(database_path) as db:
+    with closing(_connect(database_path)) as db:
         db.execute("BEGIN IMMEDIATE")
         try:
             old=db.execute("SELECT payload_json FROM cin_forecast_observations WHERE observation_id=?",(item["observation_id"],)).fetchone()
@@ -140,7 +153,7 @@ def record_forecast_observation(database_path: str | Path, observation: Mapping[
 
 def get_forecast(database_path: str | Path, forecast_id: str) -> dict[str,Any] | None:
     key=_text(forecast_id,"forecast_id")
-    with _connect(database_path) as db:
+    with closing(_connect(database_path)) as db:
         row=db.execute("SELECT payload_json FROM cin_forecasts WHERE forecast_id=?",(key,)).fetchone()
     return json.loads(row[0]) if row else None
 
@@ -150,7 +163,7 @@ def list_forecasts(database_path: str | Path, *, asset_id: str | None=None, limi
     args: tuple[Any,...]=()
     if asset_id is not None: sql+=" WHERE asset_id=?"; args=(_text(asset_id,"asset_id"),)
     sql+=" ORDER BY created_at DESC,forecast_id LIMIT ?"; args+=(limit,)
-    with _connect(database_path) as db: rows=db.execute(sql,args).fetchall()
+    with closing(_connect(database_path)) as db: rows=db.execute(sql,args).fetchall()
     return [json.loads(r[0]) for r in rows]
 
 def evaluate_and_record_forecast(
@@ -162,7 +175,7 @@ def evaluate_and_record_forecast(
     if isinstance(max_observation_lag_seconds,bool) or not isinstance(max_observation_lag_seconds,int) or not 0<=max_observation_lag_seconds<=604800:
         raise ValueError("max_observation_lag_seconds must be an integer from 0 through 604800")
     now=_time(evaluated_at,"evaluated_at")
-    with _connect(database_path) as db:
+    with closing(_connect(database_path)) as db:
         db.execute("BEGIN IMMEDIATE")
         try:
             prior=db.execute("SELECT result_json FROM cin_forecast_evaluations WHERE forecast_id=?",(key,)).fetchone()
@@ -198,7 +211,7 @@ def evaluate_and_record_forecast(
 
 def get_forecast_evaluation(database_path: str | Path, forecast_id: str) -> dict[str,Any] | None:
     key=_text(forecast_id,"forecast_id")
-    with _connect(database_path) as db:
+    with closing(_connect(database_path)) as db:
         row=db.execute("SELECT result_json FROM cin_forecast_evaluations WHERE forecast_id=?",(key,)).fetchone()
     return json.loads(row[0]) if row else None
 
@@ -209,5 +222,5 @@ def list_forecast_evaluations(database_path: str | Path, *, asset_id: str | None
     args: tuple[Any,...]=()
     if asset_id is not None: sql+=" WHERE f.asset_id=?"; args=(_text(asset_id,"asset_id"),)
     sql+=" ORDER BY e.evaluated_at DESC,e.forecast_id LIMIT ?"; args+=(limit,)
-    with _connect(database_path) as db: rows=db.execute(sql,args).fetchall()
+    with closing(_connect(database_path)) as db: rows=db.execute(sql,args).fetchall()
     return [json.loads(r[0]) for r in rows]
