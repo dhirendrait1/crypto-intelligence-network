@@ -190,13 +190,15 @@ def assess_growth_fundamentals(
             "assessment_clock_valid": assessment_clock_valid,
             "status": status,
             "missing_fields": missing,
+            "claim_text": str(item.get("claim_text", "")).strip() or None,
+            "claim_text_is_caller_supplied": bool(str(item.get("claim_text", "")).strip()),
             "notes": str(item.get("notes", "")).strip() or None,
             "cin_independently_verified": False,
             "invalid_record": False,
         }
         fingerprint_fields = {key: record.get(key) for key in (
             "category", "evidence_id", "source_role", "source_name", "source_url",
-            "published_at", "checked_at", "status", "notes"
+            "published_at", "checked_at", "status", "claim_text", "notes"
         )}
         canonical_payload = json.dumps(fingerprint_fields, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str).encode("utf-8")
         record["record_fingerprint_sha256"] = sha256(canonical_payload).hexdigest()
