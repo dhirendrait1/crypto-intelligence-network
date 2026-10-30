@@ -361,3 +361,10 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - Selected React + TypeScript + Vite for a separate static frontend, with Cloudflare Pages Free as a proposed target subject to account/plan review and explicit deployment approval. Keep FastAPI as a separate API origin.
 - Defined proposed repository layout, dependency policy, public API base URL handling, CORS prerequisites, mobile visual/accessibility requirements, security constraints, initial vertical slice, and CI/release acceptance gates. Evaluated Next.js, Streamlit, backend templates and plain HTML/JS.
 - No frontend directory, package/dependency, API/CORS change, Cloudflare project, DNS, Render setting or deployment was changed. F-21 is a technology decision only. Next increment: F-22 minimal frontend scaffold and CI build/typecheck.
+
+
+### F-22 — Initial frontend foundation (2026-10-31)
+
+- Added a standalone React 18 + TypeScript + Vite app shell under `frontend/`, responsive dark-first styling, explicit demo-only/no-live-data disclosure, read-only scope, and navigation that labels unimplemented modules.
+- Added Vitest/Testing Library checks and `.github/workflows/cin-frontend-ci.yml` for Node 22 typecheck, tests and production build. Workflow result remains pending until Actions completes.
+- Added implementation record at `docs/CIN_F22_FRONTEND_FOUNDATION_IMPLEMENTATION_RECORD.md`. A committed npm lockfile is still missing, so transitive dependency reproducibility is an open acceptance gap. API integration, real dashboard panels, accessibility/browser tests and deployment remain pending. No backend/API, CORS, persistence, Render, Cloudflare, DNS or production deployment changed.
