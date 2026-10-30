@@ -111,7 +111,7 @@ Before any production persistence is proposed, require:
 | F-03 Missing classification/retention class | Design proposal documented in `CIN_STEP23_DATA_CLASSIFICATION_AND_RETENTION_CLASSES_V1.md`; policy approval and future schema implementation remain open |
 | F-04 Missing repository payload byte ceiling | Open — implement and test before persistence expansion |
 | F-05 Retention semantics | Clock/expiry design documented in `CIN_STEP23_RETENTION_CLOCKS_AND_EXPIRY_RULES_V1.md`; provider-specific terms, durations, approval and implementation remain open |
-| F-06 Error disclosure regression protection | Partially mitigated; add regression tests before API expansion |
+| F-06 Error disclosure regression protection | API boundary now returns one stable generic 502 detail for both known and unexpected provider failures; regression tests inject raw body, credential, token, and sensitive URL markers and assert they are not exposed. No raw exception logging was added. |
 | F-07 Hash lifecycle | Derived-data lifecycle documented in `CIN_STEP23_DERIVED_DATA_HASH_AND_FINGERPRINT_LIFECYCLE_V1.md`; lineage, policy approval and implementation remain open |
 
 **Overall:** source review completed; privacy/data-minimization readiness is not yet established. These findings do not authorize production storage. The API remains read-only, SQLite remains a local reference implementation, and no deployment or paid service change is included.
@@ -127,3 +127,11 @@ Added `docs/CIN_STEP23_RETENTION_CLOCKS_AND_EXPIRY_RULES_V1.md`. It defines dist
 ### F-07 design increment — derived hash and fingerprint lifecycle (2026-10-31)
 
 Added `docs/CIN_STEP23_DERIVED_DATA_HASH_AND_FINGERPRINT_LIFECYCLE_V1.md`. It records the current adapter behavior accurately (SHA-256 over canonical metadata; optional content-hash column currently written as NULL), explains linkability and known-content confirmation risks, requires exact source lineage and algorithm versioning, defaults derived expiry to source expiry, and defines a narrow independently approved retention exception. No current hash was changed/deleted; no content hashing, lineage schema, API, worker, or production persistence was added. F-07 is design-documented only and remains open pending approval and implementation.
+
+
+### F-06 API error-disclosure regression increment (2026-10-31)
+
+- Changed `POST /public-evidence-ingestion` so both expected `EvidenceSourceError` failures and unexpected provider exceptions return the same stable client-facing HTTP 502 detail: `Public evidence provider is temporarily unavailable`.
+- Provider exception text is no longer passed through to API clients. The API does not log raw exception objects or provider payloads.
+- Added regression coverage injecting raw provider-body markers, GitHub-style token markers, Bearer credentials, URL query credentials, and sensitive provider URLs into provider exception text. The tests assert a stable response and no marker disclosure.
+- This protects the API response boundary only; it does not establish comprehensive log redaction, hosting-platform log controls, or production security certification. The endpoint remains read-only and persistence remains unwired.
