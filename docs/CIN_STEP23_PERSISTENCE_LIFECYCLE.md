@@ -84,3 +84,10 @@ All timestamps must be timezone-aware UTC instants. Keep source publication time
 This design does not authenticate issuers, auditors, custodians, reserve reports, or source URLs; prove claims; certify commodity backing; infer investment quality; crawl arbitrary links; store full documents by default; execute trades; control wallets; or move funds.
 
 **Current implementation status:** shared claim builders and additive in-memory assessment response objects exist. Persistence and this lifecycle are design-only. Step 23 remains Partial.
+
+
+## 9. Reference schema increment (2026-10-30)
+
+A SQLite DDL reference migration is now present at database/migrations/0001_claim_evidence_schema_v1.sql, with in-memory schema tests in tests/test_cin_evidence_schema_v1.py. The tests exercise entity/index creation, namespaced external-ID uniqueness, foreign-key enforcement, constrained assessment vocabulary, and JSON validation.
+
+This file is a **reference schema for local development/tests only**. It is not applied by application startup, is not connected to an API or repository adapter, and is not a production persistence implementation. The SQL uses SQLite JSON functions and must not be assumed portable to another database engine. Before adoption, validate timestamp normalization, migration runner behavior, transactional semantics, backup/restore, retention/deletion, and the selected durable production database.
