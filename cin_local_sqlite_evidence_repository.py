@@ -74,6 +74,46 @@ class LocalSQLiteEvidenceRepository:
             )
         return event_id
 
+    def append_observation(
+        self,
+        *,
+        cin_evidence_id: str,
+        metadata: dict[str, Any],
+        observed_at: str,
+        source_status: str,
+        retrieved_at: str | None = None,
+        published_at: str | None = None,
+        checked_at: str | None = None,
+    ) -> str:
+        """Append an immutable observation to an existing CIN evidence record."""
+        if not isinstance(cin_evidence_id, str) or not cin_evidence_id.strip():
+            raise ValueError("cin_evidence_id must be non-empty")
+        if not isinstance(metadata, dict):
+            raise ValueError("metadata must be a JSON object")
+        if source_status not in {"caller_supplied", "cin_observed", "cin_retrieved", "unavailable", "invalid"}:
+            raise ValueError("unsupported source_status")
+        observed = _utc_timestamp(observed_at, "observed_at")
+        retrieved = _utc_timestamp(retrieved_at, "retrieved_at") if retrieved_at is not None else None
+        published = _utc_timestamp(published_at, "published_at") if published_at is not None else None
+        checked = _utc_timestamp(checked_at, "checked_at") if checked_at is not None else None
+        metadata_json = json.dumps(
+            metadata, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False,
+        )
+        fingerprint = sha256(metadata_json.encode("utf-8")).hexdigest()
+        observation_id = "cin-observation-" + uuid4().hex
+        with self.connection:
+            self.connection.execute(
+                """INSERT INTO cin_evidence_observations
+                   (observation_id, cin_evidence_id, observed_at, retrieved_at, published_at,
+                    checked_at, metadata_json, metadata_fingerprint_sha256,
+                    content_hash_sha256, source_status, schema_version)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)""",
+                (observation_id, cin_evidence_id, observed, retrieved, published,
+                 checked, metadata_json, fingerprint, source_status, "1.0"),
+            )
+        return observation_id
+
     def store_bundle(
         self,
         *,
