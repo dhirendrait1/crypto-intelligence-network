@@ -2,6 +2,8 @@
 from datetime import datetime, timezone
 from pathlib import Path
 import sqlite3
+import tempfile
+import threading
 import unittest
 
 from cin_local_sqlite_evidence_repository import LocalSQLiteEvidenceRepository
@@ -174,6 +176,93 @@ class TestSQLitePersistenceReliability(unittest.TestCase):
              '{"count":5,"metric":"commits"}',
              '{"count":6,"metric":"commits"}'],
         )
+
+
+    def test_concurrent_duplicate_ingestion_keeps_exactly_one_record(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database_path = Path(temp_dir) / "cin-concurrency.sqlite3"
+            initializer = sqlite3.connect(database_path, timeout=10)
+            initializer.executescript(SCHEMA.read_text(encoding="utf-8"))
+            initializer.close()
+
+            start = threading.Barrier(2)
+            outcomes = []
+            outcomes_lock = threading.Lock()
+
+            def ingest(worker_number):
+                connection = sqlite3.connect(database_path, timeout=10)
+                try:
+                    repository = LocalSQLiteEvidenceRepository(connection)
+                    claim = create_claim(
+                        subject=f"ETH-worker-{worker_number}",
+                        predicate="developer_activity",
+                        statement=f"Independent caller metadata from worker {worker_number}",
+                        created_at=NOW,
+                    )
+                    relationship = create_claim_evidence_relationship(
+                        claim_id=claim["claim_id"],
+                        evidence_id=f"external-worker-{worker_number}",
+                        relationship="context_only",
+                        rationale="Concurrency regression test; not a truth assertion.",
+                        created_at=NOW,
+                    )
+                    start.wait(timeout=5)
+                    repository.store_bundle(
+                        source_namespace="concurrency-test",
+                        external_evidence_id="same-external-id",
+                        evidence_type="caller_metadata",
+                        metadata={"worker": worker_number},
+                        observed_at="2026-10-30T12:00:00Z",
+                        claim=claim,
+                        relationship=relationship,
+                    )
+                    outcome = "stored"
+                except sqlite3.IntegrityError:
+                    outcome = "duplicate_rejected"
+                except Exception as exc:
+                    outcome = f"unexpected:{type(exc).__name__}:{exc}"
+                finally:
+                    connection.close()
+                with outcomes_lock:
+                    outcomes.append(outcome)
+
+            workers = [
+                threading.Thread(target=ingest, args=(worker_number,))
+                for worker_number in (1, 2)
+            ]
+            for worker in workers:
+                worker.start()
+            for worker in workers:
+                worker.join(timeout=15)
+
+            self.assertTrue(all(not worker.is_alive() for worker in workers),
+                            "concurrent ingestion worker did not finish")
+            self.assertCountEqual(outcomes, ["stored", "duplicate_rejected"])
+
+            verification = sqlite3.connect(database_path)
+            try:
+                self.assertEqual(
+                    verification.execute(
+                        "SELECT COUNT(*) FROM cin_evidence_records "
+                        "WHERE source_namespace=? AND external_evidence_id=?",
+                        ("concurrency-test", "same-external-id"),
+                    ).fetchone()[0],
+                    1,
+                )
+                self.assertEqual(
+                    verification.execute("SELECT COUNT(*) FROM cin_evidence_observations").fetchone()[0],
+                    1,
+                )
+                self.assertEqual(
+                    verification.execute("SELECT COUNT(*) FROM cin_claims").fetchone()[0],
+                    1,
+                )
+                self.assertEqual(
+                    verification.execute("SELECT COUNT(*) FROM cin_claim_evidence_relationships").fetchone()[0],
+                    1,
+                )
+            finally:
+                verification.close()
 
 if __name__ == "__main__":
     unittest.main()
