@@ -79,6 +79,68 @@ class TestEvidenceStoreContract(unittest.TestCase):
         finally:
             connection.close()
 
+    def test_invalid_provider_identity_components_are_rejected_before_write(self):
+        from datetime import datetime, timezone
+        from cin_verifiable_evidence import create_claim, create_claim_evidence_relationship
+
+        connection = sqlite3.connect(":memory:")
+        try:
+            connection.executescript(SCHEMA.read_text(encoding="utf-8"))
+            repository = LocalSQLiteEvidenceRepository(connection)
+            now = datetime(2026, 10, 30, 12, 0, tzinfo=timezone.utc)
+
+            invalid_cases = [
+                ("", "valid-id"),
+                ("   ", "valid-id"),
+                ("x" * 129, "valid-id"),
+                ("valid-provider", "   "),
+                ("valid-provider", "x" * 257),
+            ]
+            for index, (namespace, external_id) in enumerate(invalid_cases):
+                with self.subTest(namespace_length=len(namespace), external_id_length=len(external_id)):
+                    claim = create_claim(
+                        subject="ETH", predicate=f"invalid_provider_identity_{index}",
+                        statement="Invalid provider identity must not be persisted.", created_at=now,
+                    )
+                    relationship = create_claim_evidence_relationship(
+                        claim_id=claim["claim_id"], evidence_id=f"invalid-identity-{index}",
+                        relationship="context_only", rationale="Validation boundary test.",
+                        created_at=now,
+                    )
+                    with self.assertRaises(ValueError):
+                        repository.store_bundle(
+                            source_namespace=namespace, external_evidence_id=external_id,
+                            evidence_type="provider_record", metadata={"case": index},
+                            observed_at="2026-10-30T12:00:00Z", claim=claim,
+                            relationship=relationship,
+                        )
+
+            self.assertEqual(
+                connection.execute("SELECT COUNT(*) FROM cin_evidence_records").fetchone()[0],
+                0,
+            )
+            self.assertEqual(
+                connection.execute("SELECT COUNT(*) FROM cin_claims").fetchone()[0],
+                0,
+            )
+        finally:
+            connection.close()
+
+    def test_identity_lookup_rejects_blank_components(self):
+        connection = sqlite3.connect(":memory:")
+        try:
+            connection.executescript(SCHEMA.read_text(encoding="utf-8"))
+            repository = LocalSQLiteEvidenceRepository(connection)
+            for namespace, external_id in (("", "id"), ("provider", "  ")):
+                with self.subTest(namespace=namespace, external_id=external_id):
+                    with self.assertRaises(ValueError):
+                        repository.find_evidence_id(
+                            source_namespace=namespace,
+                            external_evidence_id=external_id,
+                        )
+        finally:
+            connection.close()
+
     def test_identity_lookup_returns_none_for_missing_provider_identity(self):
         connection = sqlite3.connect(":memory:")
         try:
