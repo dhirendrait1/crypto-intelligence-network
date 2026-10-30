@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import sqlite3
 import tempfile
+import threading
 import unittest
 
 from cin_evidence_persistence import persist_evidence_snapshot
@@ -179,6 +180,96 @@ class TestEvidencePersistenceSQLiteIntegration(unittest.TestCase):
             )
             first_connection.close()
             second_connection.close()
+
+    def test_simultaneous_first_ingestion_from_two_connections(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "cin-simultaneous-race.sqlite3"
+            setup = sqlite3.connect(database_path)
+            setup.executescript(SCHEMA.read_text(encoding="utf-8"))
+            setup.close()
+
+            lookup_barrier = threading.Barrier(2)
+            results = []
+            errors = []
+            result_lock = threading.Lock()
+
+            class SynchronizedLookupRepository:
+                def __init__(self, connection):
+                    self.delegate = LocalSQLiteEvidenceRepository(connection)
+
+                def find_evidence_id(self, **kwargs):
+                    found = self.delegate.find_evidence_id(**kwargs)
+                    lookup_barrier.wait(timeout=10)
+                    return found
+
+                def store_bundle(self, **kwargs):
+                    return self.delegate.store_bundle(**kwargs)
+
+                def append_observation(self, **kwargs):
+                    return self.delegate.append_observation(**kwargs)
+
+                def append_assessment_event(self, **kwargs):
+                    return self.delegate.append_assessment_event(**kwargs)
+
+            def ingest(stars, minute):
+                connection = sqlite3.connect(database_path, timeout=15)
+                try:
+                    repository = SynchronizedLookupRepository(connection)
+                    arguments = dict(self.arguments)
+                    arguments["metadata"] = {"stars": stars, "forks": 30}
+                    arguments["observed_at"] = f"2026-10-30T12:{minute:02d}:00Z"
+                    arguments["retrieved_at"] = f"2026-10-30T12:{minute:02d}:00Z"
+                    value = persist_evidence_snapshot(repository, **arguments)
+                    with result_lock:
+                        results.append(value)
+                except BaseException as exc:
+                    with result_lock:
+                        errors.append(exc)
+                finally:
+                    connection.close()
+
+            threads = [
+                threading.Thread(target=ingest, args=(130, 21)),
+                threading.Thread(target=ingest, args=(131, 22)),
+            ]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=20)
+
+            self.assertTrue(all(not thread.is_alive() for thread in threads))
+            self.assertEqual(errors, [])
+            self.assertEqual(len(results), 2)
+            self.assertEqual(
+                len({item["cin_evidence_id"] for item in results}), 1
+            )
+            self.assertEqual(
+                sum(item["operation"] == "bundle_created" for item in results), 1
+            )
+            self.assertEqual(
+                sum(
+                    item["operation"] in {
+                        "observation_appended",
+                        "observation_appended_after_identity_race",
+                    }
+                    for item in results
+                ),
+                1,
+            )
+            verification = sqlite3.connect(database_path)
+            self.assertEqual(
+                verification.execute(
+                    "SELECT COUNT(*) FROM cin_evidence_records"
+                ).fetchone()[0],
+                1,
+            )
+            self.assertEqual(
+                verification.execute(
+                    "SELECT COUNT(*) FROM cin_evidence_observations"
+                ).fetchone()[0],
+                2,
+            )
+            verification.close()
 
     def test_existing_identity_is_not_mutated_when_observation_append_fails(self):
         first = persist_evidence_snapshot(self.repository, **self.arguments)
