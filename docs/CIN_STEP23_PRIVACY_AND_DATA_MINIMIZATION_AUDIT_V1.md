@@ -71,6 +71,12 @@ No evidence from this source review establishes that sensitive data has been dis
 
 **Recommendation:** classify hashes as derived data, document their purpose, and include them in retention/erasure decisions. Retain a hash after payload deletion only where a documented purpose and approved policy permit it.
 
+### F-02 implementation note — local persistence boundary
+
+The local SQLite reference adapter now applies field-specific maximum lengths and conservative pattern screening before opening write transactions for claim subject/predicate/statement/unit/identifier method, relationship rationale, assessment methodology version, and assessment rationale. It rejects recognizable PEM private-key headers, Bearer credential strings, selected common provider-token prefixes, and explicit secret/recovery-phrase labels. Nested claim values also reject sensitive key names such as `api_key`, `private_key`, `seed_phrase`, `mnemonic`, `authorization`, and `token`.
+
+Regression tests cover rejection before writes, field-length enforcement, assessment history preservation, and acceptance of ordinary research rationale text. The checks are defense-in-depth only: they are not a general DLP engine, do not identify every credential format, and do not reliably detect an unlabeled mnemonic or arbitrary personal data. No claim text is sent to an external scanning service. These checks apply only to the explicit local SQLite adapter; they do not establish API write authorization or production enforcement.
+
 ## 3. Controls already present (do not overstate)
 
 - Public GitHub retrieval uses a fixed API root and three-repository allowlist; arbitrary URL fetching is not supported by this connector.
@@ -101,7 +107,7 @@ Before any production persistence is proposed, require:
 | Finding | Disposition |
 |---|---|
 | F-01 Arbitrary metadata shape | Open — define allowlists and recursive limits |
-| F-02 Free-text sensitivity | Open — define field content policy and validation |
+| F-02 Free-text sensitivity | Partially mitigated in local SQLite adapter — conservative marker/length checks; full content classification and production controls remain open |
 | F-03 Missing classification/retention class | Open — design for a future schema version |
 | F-04 Missing repository payload byte ceiling | Open — implement and test before persistence expansion |
 | F-05 Retention semantics | Open — resolve with retention policy |
