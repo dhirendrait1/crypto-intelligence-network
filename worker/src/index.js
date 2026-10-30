@@ -29,7 +29,8 @@ async function observation(env, id) {
 function validateForecast(f, recordedAt) {
   if (!f || !text(f.forecast_id) || !text(f.asset_id) || !text(f.metric) ||
       !finite(f.value) || !text(f.unit, 40) || !text(f.source_id) ||
-      !iso(f.created_at) || !iso(f.target_at) || Date.parse(f.target_at) <= Date.parse(f.created_at))
+      !iso(f.created_at) || !iso(f.target_at) || !iso(recordedAt) ||
+      Date.parse(f.target_at) <= Date.parse(f.created_at))
     throw new Error("invalid forecast payload");
   return { ...f, recorded_at: recordedAt };
 }
@@ -92,14 +93,21 @@ async function handle(env, op, p) {
       const item = validateObservation(p.observation);
       return insertImmutable(env, "cin_forecast_observations", "observation_id", item.observation_id, item);
     }
-    case "get_forecast": return forecast(env, p.forecast_id);
+    case "get_forecast": {
+      if (!text(p.forecast_id)) throw new Error("invalid forecast_id");
+      return forecast(env, p.forecast_id);
+    }
     case "get_evaluation": {
+      if (!text(p.forecast_id)) throw new Error("invalid forecast_id");
       const row = await db.prepare("SELECT result_json FROM cin_forecast_evaluations WHERE forecast_id = ?")
         .bind(p.forecast_id).first();
       return row ? JSON.parse(row.result_json) : null;
     }
     case "list_forecasts": {
-      const limit = Math.max(1, Math.min(500, Number(p.limit || 100)));
+      const requested = p.limit === undefined ? 100 : Number(p.limit);
+      if (!Number.isInteger(requested) || requested < 1 || requested > 500)
+        throw new Error("invalid list limit");
+      const limit = requested;
       const rows = p.asset_id
         ? await db.prepare("SELECT payload_json FROM cin_forecasts WHERE asset_id = ? ORDER BY created_at DESC, forecast_id LIMIT ?").bind(p.asset_id, limit).all()
         : await db.prepare("SELECT payload_json FROM cin_forecasts ORDER BY created_at DESC, forecast_id LIMIT ?").bind(limit).all();
@@ -113,6 +121,8 @@ async function handle(env, op, p) {
       return (rows.results || []).map(r => JSON.parse(r.result_json));
     }
     case "evaluate_forecast": {
+      if (!text(p.forecast_id) || !iso(p.evaluated_at))
+        throw new Error("invalid evaluation payload");
       const f = await forecast(env, p.forecast_id);
       if (!f) throw new Error("forecast_id not found");
       const target = Date.parse(f.target_at), now = Date.parse(p.evaluated_at);
