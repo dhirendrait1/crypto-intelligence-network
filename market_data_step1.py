@@ -86,22 +86,6 @@ def _coinbase_json(path: str) -> dict[str, Any]:
     return payload
 
 
-def _coinbase_json(path: str) -> dict[str, Any]:
-    request = urllib.request.Request(
-        f"{COINBASE_API}{path}",
-        headers={"accept": "application/json", "user-agent": "CIN-Research-API/0.1.0"},
-        method="GET",
-    )
-    with urllib.request.urlopen(request, timeout=12) as response:
-        if response.status != 200:
-            raise ValueError(f"Coinbase returned unexpected HTTP status {response.status}")
-        raw = response.read(MAX_PROVIDER_RESPONSE_BYTES + 1)
-    if len(raw) > MAX_PROVIDER_RESPONSE_BYTES:
-        raise ValueError("Coinbase response exceeded the configured size limit")
-    payload = json.loads(raw.decode("utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError("Coinbase response was not an object")
-    return payload
 
 
 def _fetch_market_data(ids: list[str], vs_currency: str) -> list[dict[str, Any]]:
@@ -149,6 +133,8 @@ def _fetch_market_data(ids: list[str], vs_currency: str) -> list[dict[str, Any]]
             "id": coin_id, "symbol": symbol, "name": name, "currency": "USD",
             "price": price_value, "market_cap": None, "market_cap_status": "unavailable",
             "total_volume_24h": volume_value,
+            "total_volume_24h_unit": symbol,
+            "volume_24h_currency": symbol,
             "volume_24h_status": "missing" if volume_value is None else ("zero" if volume_value == 0 else "reported_positive"),
             "price_change_percentage_24h": change, "last_updated": last_updated,
             "freshness_status": freshness_status, "freshness_age_seconds": freshness_age_seconds,
@@ -217,7 +203,10 @@ async def get_public_market_data(
         "count": len(rows),
         "partial_result": bool(missing_ids),
         "missing_coins": missing_ids,
-        "provider_limitations": ["Coinbase Exchange does not provide market capitalization through these endpoints.", "Only explicitly mapped Coinbase USD products are supported."],
-        "provider_limitations": ["Coinbase Exchange does not provide market capitalization through these endpoints.", "Only explicitly mapped Coinbase USD products are supported."],
+        "provider_limitations": [
+            "Coinbase Exchange does not provide market capitalization through these endpoints.",
+            "Only explicitly mapped Coinbase USD products are supported.",
+            "Coinbase 24-hour stats volume is denominated in the base asset, not USD quote turnover.",
+        ],
         "data": rows,
     }
