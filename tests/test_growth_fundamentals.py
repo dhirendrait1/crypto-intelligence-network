@@ -180,3 +180,53 @@ def test_growth_evidence_without_claim_text_has_no_claim_object():
     }], now=now)["evidence"][0]
     assert row["claim"] is None
     assert row["claim_evidence_relationship"] is None
+
+
+def test_growth_claim_is_linked_as_context_only_without_verification():
+    now = datetime(2026, 10, 24, tzinfo=timezone.utc)
+    record = {
+        "category": "fees_and_revenue", "evidence_id": "revenue-report-9",
+        "claim_text": "Protocol revenue increased 20% quarter over quarter.",
+        "source_name": "Project issuer", "source_url": "https://example.com/report",
+        "published_at": "2026-10-01T00:00:00Z", "checked_at": "2026-10-20T00:00:00Z",
+        "status": "unverified",
+    }
+    row = assess_growth_fundamentals("ABC", [record], now=now)["evidence"][0]
+    claim = row["claim"]
+    link = row["claim_evidence_relationship"]
+    assert claim["subject"] == "ABC"
+    assert claim["predicate"] == "fees_and_revenue"
+    assert claim["claim_status"] == "not_assessed"
+    assert claim["claim_id_is_truth_proof"] is False
+    assert link["claim_id"] == claim["claim_id"]
+    assert link["evidence_id"] == "revenue-report-9"
+    assert link["relationship"] == "context_only"
+    assert link["review_status"] == "automated_candidate"
+    assert link["relationship_is_persisted"] is False
+
+
+def test_growth_claim_without_evidence_id_is_not_linked():
+    now = datetime(2026, 10, 24, tzinfo=timezone.utc)
+    record = {
+        "category": "fees_and_revenue",
+        "claim_text": "Caller supplied claim.",
+        "source_name": "Example", "source_url": "https://example.com/report",
+        "published_at": "2026-10-01T00:00:00Z", "checked_at": "2026-10-20T00:00:00Z",
+        "status": "unverified",
+    }
+    row = assess_growth_fundamentals("ABC", [record], now=now)["evidence"][0]
+    assert row["claim"] is not None
+    assert row["claim_evidence_relationship"] is None
+
+
+def test_growth_evidence_without_claim_text_has_no_claim_objects():
+    now = datetime(2026, 10, 24, tzinfo=timezone.utc)
+    record = {
+        "category": "fees_and_revenue", "evidence_id": "evidence-1",
+        "source_name": "Example", "source_url": "https://example.com/report",
+        "published_at": "2026-10-01T00:00:00Z", "checked_at": "2026-10-20T00:00:00Z",
+        "status": "unverified",
+    }
+    row = assess_growth_fundamentals("ABC", [record], now=now)["evidence"][0]
+    assert row["claim"] is None
+    assert row["claim_evidence_relationship"] is None
