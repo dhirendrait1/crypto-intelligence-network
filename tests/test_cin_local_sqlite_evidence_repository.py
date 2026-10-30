@@ -246,5 +246,88 @@ class TestLocalSQLiteEvidenceRepository(unittest.TestCase):
         )
 
 
+    def test_claim_statement_rejects_known_secret_markers_before_any_write(self):
+        for secret in (
+            "Authorization: Bearer abcdefghijklmnop",
+            "-----BEGIN PRIVATE KEY-----",
+            "Use token=ghp_abcdefghijklmnopqrstuvwxyz123456",
+            "recovery phrase: alpha beta gamma",
+        ):
+            claim = dict(self.claim, statement=secret)
+            with self.subTest(secret=secret), self.assertRaisesRegex(ValueError, "prohibited"):
+                self.repo.store_bundle(
+                    source_namespace="test-provider", evidence_type="caller_metadata",
+                    metadata={"metric": "commits"}, observed_at="2026-10-30T12:00:00Z",
+                    claim=claim, relationship=self.relationship,
+                )
+            self.assertEqual(self.db.execute("SELECT COUNT(*) FROM cin_evidence_records").fetchone()[0], 0)
+
+    def test_claim_text_fields_enforce_field_specific_lengths(self):
+        claim = dict(self.claim, subject="S" * 513)
+        with self.assertRaisesRegex(ValueError, "at most 512"):
+            self.repo.store_bundle(
+                source_namespace="test-provider", evidence_type="caller_metadata",
+                metadata={}, observed_at="2026-10-30T12:00:00Z",
+                claim=claim, relationship=self.relationship,
+            )
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM cin_evidence_records").fetchone()[0], 0)
+
+    def test_relationship_rationale_rejects_secret_and_preserves_empty_store(self):
+        relationship = dict(self.relationship, rationale="Bearer abcdefghijklmnop")
+        with self.assertRaisesRegex(ValueError, "prohibited"):
+            self.repo.store_bundle(
+                source_namespace="test-provider", evidence_type="caller_metadata",
+                metadata={}, observed_at="2026-10-30T12:00:00Z",
+                claim=self.claim, relationship=relationship,
+            )
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM cin_evidence_records").fetchone()[0], 0)
+
+    def test_claim_value_rejects_sensitive_key_names(self):
+        claim = dict(self.claim, value={"metric": "commits", "api_key": "not-a-real-key"})
+        with self.assertRaisesRegex(ValueError, "sensitive field"):
+            self.repo.store_bundle(
+                source_namespace="test-provider", evidence_type="caller_metadata",
+                metadata={}, observed_at="2026-10-30T12:00:00Z",
+                claim=claim, relationship=self.relationship,
+            )
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM cin_evidence_records").fetchone()[0], 0)
+
+    def test_assessment_rationale_and_methodology_reject_secret_markers(self):
+        stored = self._store()
+        with self.assertRaisesRegex(ValueError, "prohibited"):
+            self.repo.append_assessment_event(
+                claim_id=stored["claim_id"], claim_status="mixed",
+                assessed_at="2026-10-30T13:00:00Z",
+                methodology_version="method-1", assessor_type="human_reviewer",
+                rationale="Authorization: Bearer abcdefghijklmnop",
+            )
+        with self.assertRaisesRegex(ValueError, "prohibited"):
+            self.repo.append_assessment_event(
+                claim_id=stored["claim_id"], claim_status="mixed",
+                assessed_at="2026-10-30T13:00:00Z",
+                methodology_version="api_key=abcdef0123456789",
+                assessor_type="human_reviewer", rationale="Normal review rationale.",
+            )
+        self.assertEqual(
+            self.db.execute("SELECT COUNT(*) FROM cin_claim_assessment_events WHERE claim_id=?", (stored["claim_id"],)).fetchone()[0],
+            1,
+        )
+
+    def test_normal_claim_and_rationale_text_remain_accepted(self):
+        result = self._store()
+        event_id = self.repo.append_assessment_event(
+            claim_id=result["claim_id"], claim_status="mixed",
+            assessed_at="2026-10-30T13:00:00Z",
+            methodology_version="evidence-rules-1.2",
+            assessor_type="human_reviewer",
+            rationale="Two public observations differ; retain both and request review.",
+        )
+        self.assertTrue(event_id.startswith("cin-assessment-"))
+        self.assertEqual(
+            self.db.execute("SELECT COUNT(*) FROM cin_claim_assessment_events WHERE claim_id=?", (result["claim_id"],)).fetchone()[0],
+            2,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
