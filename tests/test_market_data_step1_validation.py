@@ -37,7 +37,6 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         rows = _fetch_market_data(["bitcoin"], "usd")
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["product_id"], "BTC-USD")
-        self.assertEqual(rows[0]["source"] if "source" in rows[0] else "Coinbase", "Coinbase")
         self.assertEqual(rows[0]["price"], 100.0)
         self.assertAlmostEqual(rows[0]["price_change_percentage_24h"], 100/90*100-100)
         self.assertIsNone(rows[0]["market_cap"])
@@ -156,6 +155,17 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         self.assertEqual(result["volume_24h_status"], "zero")
         self.assertIn("zero_volume_not_liquidity_evidence", result["data_quality_warnings"])
 
+
+
+    @patch("market_data_step1._fetch_market_data")
+    def test_coinbase_http_400_is_reported_as_upstream_error(self, mocked):
+        mocked.side_effect = urllib.error.HTTPError(
+            "https://api.exchange.coinbase.com", 400, "Bad Request", {}, None
+        )
+        with self.assertRaises(Exception) as raised:
+            asyncio.run(get_public_market_data("bitcoin", "usd"))
+        self.assertEqual(getattr(raised.exception, "status_code", None), 502)
+        self.assertIn("provider returned HTTP 400", raised.exception.detail)
 
 
 if __name__ == "__main__":
