@@ -60,7 +60,10 @@ async function call(env, operation, payload) {
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
     body: JSON.stringify({ operation, payload }),
   }), env);
-  return { status: response.status, body: await response.json() };
+  const body = await response.json();
+  if (response.status >= 500)
+    console.error("D1 integration response failure:", operation, response.status, body);
+  return { status: response.status, body };
 }
 
 test("persists immutable forecasts and observations and evaluates the nearest horizon observation once", async () => {
