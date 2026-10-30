@@ -101,3 +101,20 @@ def test_exact_tolerance_boundary_is_agreement():
         observation("Beta", 101.0),
     ], relative_tolerance=0.01)
     assert result["results"][0]["status"] == "agreement_observed"
+
+
+def test_latest_observation_per_source_is_used_for_comparison():
+    result = compare_metric_observations([
+        observation("Alpha", 100.0, observed_at="2026-10-30T10:00:00Z"),
+        observation("Alpha latest", 104.0, source_url="https://alpha.example/market/",
+                    observed_at="2026-10-30T10:04:00Z"),
+        observation("Beta", 104.0, observed_at="2026-10-30T10:04:00Z"),
+    ], comparison_window_seconds=300, relative_tolerance=0.01)
+
+    item = result["results"][0]
+    assert item["status"] == "agreement_observed"
+    assert item["comparable_source_count"] == 2
+    assert item["duplicate_source_observation_count"] == 1
+    alpha = next(row for row in item["source_observations"] if row["source_url"] == "https://alpha.example/market")
+    assert alpha["value"] == 104.0
+    assert alpha["observed_at"] == "2026-10-30T10:04:00+00:00"
