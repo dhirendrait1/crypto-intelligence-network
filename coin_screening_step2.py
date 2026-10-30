@@ -141,7 +141,7 @@ def _asset_type(coin: dict[str, Any]) -> tuple[str, str]:
 
 
 def _request_markets(vs_currency: str, per_page: int) -> list[dict[str, Any]]:
-    """Use CoinPaprika for broad-universe screening; never call CoinGecko.
+    """Use CoinPaprika for broad-universe screening; single-source provider; no alternate source is queried.
 
     Coinbase remains the preferred source for exact USD-quoted exchange candles.
     It is not a like-for-like source for a global market-cap-ranked asset universe.
@@ -548,12 +548,12 @@ async def coin_screening(
             raw, data_mode, provider_error_code, provider_error_details = await asyncio.to_thread(_fetch_markets, currency, per_page)
     except MarketDataProviderFailure as exc:
         status_code = 503 if (
-            exc.primary_status == 429 or exc.fallback_status == 429
-            or exc.primary_kind == "network_error" or exc.fallback_kind == "network_error"
+            exc.primary_status == 429
+            or exc.primary_kind == "network_error"
         ) else 502
         raise HTTPException(status_code=status_code, detail={
-            "message": "Both market-data providers failed; no cached data is available.",
-            "primary_provider": "CoinGecko",
+            "message": "CoinPaprika market data failed; no cached data is available.",
+            "primary_provider": "CoinPaprika",
             "primary_error": exc.primary_kind,
             "primary_http_status": exc.primary_status,
             "fallback_provider": "CoinPaprika",
@@ -572,32 +572,32 @@ async def coin_screening(
             }) from exc
         if exc.code == 429:
             raise HTTPException(status_code=503, detail={
-                "message": "CoinGecko rate-limited; fallback provider did not return usable data.",
-                "primary_provider": "CoinGecko",
+                "message": "CoinPaprika rate-limited; no fallback provider was attempted.",
+                "primary_provider": "CoinPaprika",
                 "primary_error": "http_error",
                 "primary_http_status": exc.code,
-                "fallback_provider": "CoinPaprika",
-                "fallback_error": "not_usable",
+                "fallback_provider": None,
+                "fallback_error": "not_attempted",
             }) from exc
         raise HTTPException(status_code=502, detail={
-            "message": "CoinGecko HTTP error and no fallback result was available.",
-            "primary_provider": "CoinGecko",
+            "message": "CoinPaprika HTTP error; no fallback provider was attempted.",
+            "primary_provider": "CoinPaprika",
             "primary_error": "http_error",
             "primary_http_status": exc.code,
             "fallback_provider": "CoinPaprika",
             "fallback_error": "not_usable",
         }) from exc
     except (urllib.error.URLError, TimeoutError) as exc:
-        provider = "CoinPaprika" if asset_type == "commodity_backed" else "CoinGecko"
+        provider = "CoinPaprika"
         raise HTTPException(status_code=503, detail={
             "message": f"{provider} market-data network failure; no cached data is available.",
             "primary_provider": provider,
             "primary_error": "network_error",
         }) from exc
     except (ValueError, json.JSONDecodeError) as exc:
-        provider = "CoinPaprika" if asset_type == "commodity_backed" else "CoinGecko"
+        provider = "CoinPaprika"
         raise HTTPException(status_code=502, detail={
-            "message": f"{provider} market-data response could not be parsed and no fallback result was available.",
+            "message": f"{provider} market-data response could not be parsed.",
             "primary_provider": provider,
             "primary_error": "invalid_response",
         }) from exc
@@ -655,7 +655,7 @@ async def coin_screening(
         "asset_classification": "Heuristic symbol/name/ID classification; validate independently before research decisions",
         "universe_scan": commodity_scan,
         "limitations": [
-            "Initial screen covers the top market-cap assets returned by CoinGecko, not every token.",
+            "Initial screen covers the market-cap-ranked assets returned by CoinPaprika, not every token.",
             "A missing value receives no points and generates a warning.",
             "Stablecoin, wrapped/staked, and commodity-backed labels are heuristics and may misclassify assets.",
             "The growth filter excludes assets heuristically classified as stablecoins, wrapped/staked tokens, or commodity-backed tokens; remaining assets are not verified growth investments.",
