@@ -219,5 +219,49 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
 
 
 
+    def test_endpoint_rejects_malformed_currency_codes(self):
+        for currency in ("u", "usd!", "us d", "１２３", "abcdefghijk"):
+            with self.subTest(currency=currency):
+                with self.assertRaises(Exception) as raised:
+                    asyncio.run(get_public_market_data("bitcoin", currency))
+                self.assertEqual(getattr(raised.exception, "status_code", None), 400)
+
+    @patch("market_data_step1._fetch_market_data")
+    def test_endpoint_deduplicates_requested_asset_ids(self, mocked):
+        mocked.return_value = [{
+            "id": "bitcoin", "symbol": "BTC", "name": "Bitcoin", "currency": "USD",
+            "price": 100.0, "market_cap": None, "market_cap_status": "unavailable",
+            "total_volume_24h": 12.0, "volume_24h_status": "reported_positive",
+            "price_change_percentage_24h": 1.0, "last_updated": datetime.now(timezone.utc).isoformat(),
+            "freshness_status": "fresh", "freshness_age_seconds": 0, "analysis_eligible": True,
+            "data_quality_warnings": [],
+        }]
+        result = asyncio.run(get_public_market_data("bitcoin,bitcoin", "usd"))
+        self.assertEqual(result["requested_count"], 1)
+        self.assertFalse(result["partial_result"])
+        self.assertEqual(result["missing_coins"], [])
+        mocked.assert_called_once_with(["bitcoin"], "usd")
+
+    @patch("market_data_step1._fetch_market_data", side_effect=RuntimeError("sensitive provider internals"))
+    def test_unexpected_provider_runtime_error_is_sanitized(self, mocked):
+        with self.assertRaises(Exception) as raised:
+            asyncio.run(get_public_market_data("bitcoin", "usd"))
+        self.assertEqual(getattr(raised.exception, "status_code", None), 502)
+        self.assertEqual(
+            raised.exception.detail,
+            "Market-data provider returned an unexpected response.",
+        )
+        self.assertNotIn("sensitive provider internals", raised.exception.detail)
+        mocked.assert_called_once_with(["bitcoin"], "usd")
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_zero_price_is_preserved_but_not_analysis_eligible(self, mocked):
+        self._responses(mocked, stats={"last": "0", "open": "90", "volume": "12"})
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertEqual(result["price"], 0)
+        self.assertFalse(result["analysis_eligible"])
+        self.assertIn("zero_price_not_suitable_for_analysis", result["data_quality_warnings"])
+
+
 if __name__ == "__main__":
     unittest.main()
