@@ -45,18 +45,17 @@ The evidence relationship must be `context_only`, with review status `automated_
 
 Do not use `supports` for a claim about ETH adoption, network health, token valuation, project quality, or developer activity based solely on stars, forks, open issues, or timestamps.
 
-## 4. Critical repeat-ingestion blocker
+## 4. Implemented mapping and repeat-ingestion boundary
 
-The current `EvidenceStore` protocol has append methods but no lookup method for resolving an existing evidence record by `source_namespace` and `external_evidence_id`.
+`cin_github_evidence_mapping.py` now provides a pure mapping function from a successful connector result to the explicit `persist_evidence_snapshot` argument contract. It performs no I/O and is not called by the public API.
 
-The SQLite schema has a unique partial index on that pair. Calling `store_bundle` again for the same repository therefore cannot safely create another record; it will conflict. A correct repeat-ingestion flow must first resolve the existing `cin_evidence_id`, then call `append_observation`. It must never overwrite the earlier observation.
+The mapping rejects unsuccessful retrievals, non-allowlisted repositories, noncanonical source URLs, verification-promoted payloads, and timestamps without timezone information. It preserves the complete normalized connector payload as observation metadata, uses retrieval time as both `observed_at` and `retrieved_at`, and includes `published_at` only when supplied.
 
-Before API persistence is implemented, the storage contract needs a reviewed identity-resolution method (or a separate repository query interface), plus tests for:
-- first retrieval creates one record and one observation;
-- repeated retrieval appends one observation to that same record;
-- concurrent duplicate first-ingestion attempts are handled deterministically;
-- provider failures create no successful evidence bundle;
-- persistence failures are not reported as successful persistence.
+The generated claim is limited to `public_metadata_snapshot_retrieved`, remains `not_assessed`, and records the unverified status. Its relationship is `context_only`; GitHub activity counts are not promoted to adoption, quality, health, or investment claims.
+
+The storage contract includes provider-identity lookup. The opt-in persistence helper creates the first bundle, appends later observations to the same evidence record, and recovers only a confirmed SQLite UNIQUE identity race. Existing SQLite integration tests cover first/repeat ingestion, provenance preservation, reopen behavior, and concurrent identity conflicts. Mapping-specific tests cover the allowlist, failed retrieval rejection, timestamp validation, and claim/relationship semantics.
+
+Failed connector results cannot be passed through the mapping function, so they do not produce successful persistence arguments. The API remains read-only and does not invoke this mapping or persistence helper.
 
 ## 5. Safety and rollout boundary
 
