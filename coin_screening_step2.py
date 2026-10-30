@@ -15,7 +15,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 router = APIRouter(tags=["coin-screening"])
-URL = "https://api.coingecko.com/api/v3/coins/markets"
+COINPAPRIKA_TICKERS_URL = "https://api.coinpaprika.com/v1/tickers"
 _CACHE_TTL_SECONDS = 90
 _STALE_CACHE_MAX_SECONDS = 900
 _MAX_MARKET_PROVIDER_RESPONSE_BYTES = 5_000_000
@@ -37,7 +37,7 @@ COMMODITY_BACKED_SYMBOLS = {"XAUT", "PAXG"}
 
 
 class MarketDataProviderFailure(Exception):
-    """Structured provider failure preserving primary and fallback attribution."""
+    """Structured CoinPaprika provider failure; no disallowed provider fallback is attempted."""
 
     def __init__(
         self, *, primary_kind: str, primary_status: int | None,
@@ -48,10 +48,8 @@ class MarketDataProviderFailure(Exception):
         self.fallback_kind = fallback_kind
         self.fallback_status = fallback_status
         super().__init__(
-            f"CoinGecko {primary_kind}"
+            f"CoinPaprika {primary_kind}"
             + (f" (HTTP {primary_status})" if primary_status is not None else "")
-            + f"; CoinPaprika fallback {fallback_kind}"
-            + (f" (HTTP {fallback_status})" if fallback_status is not None else "")
         )
 
 
@@ -143,17 +141,15 @@ def _asset_type(coin: dict[str, Any]) -> tuple[str, str]:
 
 
 def _request_markets(vs_currency: str, per_page: int) -> list[dict[str, Any]]:
-    """Try CoinGecko first, then map CoinPaprika tickers into the same screening schema."""
-    params = urllib.parse.urlencode({
-        "vs_currency": vs_currency,
-        "order": "market_cap_desc",
-        "per_page": per_page,
-        "page": 1,
-        "sparkline": "false",
-        "price_change_percentage": "24h",
-    })
+    """Use CoinPaprika for broad-universe screening; never call CoinGecko.
+
+    Coinbase remains the preferred source for exact USD-quoted exchange candles.
+    It is not a like-for-like source for a global market-cap-ranked asset universe.
+    """
+    quote_key = vs_currency.upper()
+    url = f"{COINPAPRIKA_TICKERS_URL}?quotes=" + urllib.parse.quote(quote_key)
     req = urllib.request.Request(
-        f"{URL}?{params}",
+        url,
         headers={"accept": "application/json", "user-agent": "CIN-Research-API/0.4.0"},
         method="GET",
     )
@@ -161,94 +157,64 @@ def _request_markets(vs_currency: str, per_page: int) -> list[dict[str, Any]]:
         with urllib.request.urlopen(req, timeout=12) as response:
             raw = response.read(_MAX_MARKET_PROVIDER_RESPONSE_BYTES + 1)
         if len(raw) > _MAX_MARKET_PROVIDER_RESPONSE_BYTES:
-            raise ValueError("CoinGecko response exceeded the configured size limit")
+            raise ValueError("CoinPaprika response exceeded the configured size limit")
         payload = json.loads(raw.decode("utf-8"))
         if not isinstance(payload, list):
-            raise ValueError("Unexpected CoinGecko market-data response")
-        rows = [row for row in payload if isinstance(row, dict)]
-        for row in rows:
-            row["_cin_provider"] = "CoinGecko"
-            row["_cin_quote_currency"] = vs_currency.upper()
-        if rows:
-            return rows
-        raise ValueError("CoinGecko returned no market rows")
-    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError) as primary_error:
-        # CoinPaprika's public tickers endpoint is an independent fallback.
-        fallback_url = "https://api.coinpaprika.com/v1/tickers?quotes=" + urllib.parse.quote(vs_currency.upper())
-        fallback_req = urllib.request.Request(
-            fallback_url,
-            headers={"accept": "application/json", "user-agent": "CIN-Research-API/0.4.0"},
-            method="GET",
-        )
-        try:
-            with urllib.request.urlopen(fallback_req, timeout=12) as response:
-                fallback_raw = response.read(_MAX_MARKET_PROVIDER_RESPONSE_BYTES + 1)
-            if len(fallback_raw) > _MAX_MARKET_PROVIDER_RESPONSE_BYTES:
-                raise ValueError("CoinPaprika response exceeded the configured size limit")
-            fallback_payload = json.loads(fallback_raw.decode("utf-8"))
-            if not isinstance(fallback_payload, list):
-                raise ValueError("Unexpected CoinPaprika ticker response")
-            quote_key = vs_currency.upper()
-            mapped: list[dict[str, Any]] = []
-            for row in fallback_payload:
-                if not isinstance(row, dict):
-                    continue
-                quotes = row.get("quotes")
-                if not isinstance(quotes, dict):
-                    continue
-                quote = quotes.get(quote_key)
-                if not isinstance(quote, dict):
-                    continue
-                # Normalize provider numeric fields before arithmetic or sorting.
-                # Invalid/negative values become missing evidence, never rank keys.
-                price_raw = _number(quote.get("price"))
-                price = price_raw if price_raw is not None and price_raw >= 0 else None
-                market_cap_raw = _number(quote.get("market_cap"))
-                market_cap = market_cap_raw if market_cap_raw is not None and market_cap_raw >= 0 else None
-                volume_raw = _number(quote.get("volume_24h"))
-                volume = volume_raw if volume_raw is not None and volume_raw >= 0 else None
-                circulating_raw = _number(row.get("circulating_supply"))
-                circulating = circulating_raw if circulating_raw is not None and circulating_raw >= 0 else None
-                total_supply_raw = _number(row.get("total_supply"))
-                total_supply = total_supply_raw if total_supply_raw is not None and total_supply_raw >= 0 else None
-                max_supply_raw = _number(row.get("max_supply"))
-                max_supply = max_supply_raw if max_supply_raw is not None and max_supply_raw > 0 else None
-                # Derive FDV only from a finite price and known positive max supply.
-                fdv = None
-                if price is not None and max_supply is not None:
-                    candidate_fdv = price * max_supply
-                    if math.isfinite(candidate_fdv) and candidate_fdv >= 0:
-                        fdv = candidate_fdv
-                change_raw = _number(quote.get("percent_change_24h"))
-                change = change_raw if change_raw is not None else None
-                mapped.append({
-                    "id": row.get("id"),
-                    "symbol": row.get("symbol"),
-                    "name": row.get("name"),
-                    "current_price": price,
-                    "market_cap": market_cap,
-                    "total_volume": volume,
-                    "fully_diluted_valuation": fdv,
-                    "circulating_supply": circulating,
-                    "total_supply": total_supply,
-                    "price_change_percentage_24h": change,
-                    "last_updated": row.get("last_updated"),
-                    "_cin_provider": "CoinPaprika",
-                    "_cin_quote_currency": quote_key,
-                })
-            mapped.sort(key=lambda item: item["market_cap"] if item["market_cap"] is not None else -1, reverse=True)
-            if not mapped:
-                raise ValueError("CoinPaprika returned no usable ticker rows")
-            return mapped[:per_page]
-        except Exception as fallback_error:
-            primary_kind, primary_status = _failure_kind(primary_error)
-            fallback_kind, fallback_status = _failure_kind(fallback_error)
-            raise MarketDataProviderFailure(
-                primary_kind=primary_kind,
-                primary_status=primary_status,
-                fallback_kind=fallback_kind,
-                fallback_status=fallback_status,
-            ) from fallback_error
+            raise ValueError("Unexpected CoinPaprika ticker response")
+        mapped: list[dict[str, Any]] = []
+        for row in payload:
+            if not isinstance(row, dict):
+                continue
+            quotes = row.get("quotes")
+            if not isinstance(quotes, dict):
+                continue
+            quote = quotes.get(quote_key)
+            if not isinstance(quote, dict):
+                continue
+            price_raw = _number(quote.get("price"))
+            price = price_raw if price_raw is not None and price_raw >= 0 else None
+            market_cap_raw = _number(quote.get("market_cap"))
+            market_cap = market_cap_raw if market_cap_raw is not None and market_cap_raw >= 0 else None
+            volume_raw = _number(quote.get("volume_24h"))
+            volume = volume_raw if volume_raw is not None and volume_raw >= 0 else None
+            circulating_raw = _number(row.get("circulating_supply"))
+            circulating = circulating_raw if circulating_raw is not None and circulating_raw >= 0 else None
+            total_supply_raw = _number(row.get("total_supply"))
+            total_supply = total_supply_raw if total_supply_raw is not None and total_supply_raw >= 0 else None
+            max_supply_raw = _number(row.get("max_supply"))
+            max_supply = max_supply_raw if max_supply_raw is not None and max_supply_raw > 0 else None
+            fdv = None
+            if price is not None and max_supply is not None:
+                candidate_fdv = price * max_supply
+                if math.isfinite(candidate_fdv) and candidate_fdv >= 0:
+                    fdv = candidate_fdv
+            change_raw = _number(quote.get("percent_change_24h"))
+            change = change_raw if change_raw is not None else None
+            mapped.append({
+                "id": row.get("id"),
+                "symbol": row.get("symbol"),
+                "name": row.get("name"),
+                "current_price": price,
+                "market_cap": market_cap,
+                "total_volume": volume,
+                "fully_diluted_valuation": fdv,
+                "circulating_supply": circulating,
+                "total_supply": total_supply,
+                "price_change_percentage_24h": change,
+                "last_updated": row.get("last_updated"),
+                "_cin_provider": "CoinPaprika",
+                "_cin_quote_currency": quote_key,
+            })
+        mapped.sort(key=lambda item: item["market_cap"] if item["market_cap"] is not None else -1, reverse=True)
+        if not mapped:
+            raise ValueError("CoinPaprika returned no usable ticker rows")
+        return mapped[:per_page]
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError) as error:
+        kind, status = _failure_kind(error)
+        raise MarketDataProviderFailure(
+            primary_kind=kind, primary_status=status,
+            fallback_kind="not_attempted", fallback_status=None,
+        ) from error
 
 
 def _fetch_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]], str, int, dict[str, Any] | None]:
@@ -270,25 +236,25 @@ def _fetch_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]
         if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
             # Preserve an HTTP status when either provider supplied one; 0 means no HTTP status.
             return cached[1], "stale_cache", exc.fallback_status or exc.primary_status or 0, {
-                "primary_provider": "CoinGecko", "primary_error": exc.primary_kind,
-                "primary_http_status": exc.primary_status, "fallback_provider": "CoinPaprika",
-                "fallback_error": exc.fallback_kind, "fallback_http_status": exc.fallback_status,
+                "primary_provider": "CoinPaprika", "primary_error": exc.primary_kind,
+                "primary_http_status": exc.primary_status, "fallback_provider": None,
+                "fallback_error": "not_attempted", "fallback_http_status": None,
             }
         raise
     except urllib.error.HTTPError as exc:
         if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
             return cached[1], "stale_cache", exc.code, {
-                "primary_provider": "CoinGecko", "primary_error": "http_error",
-                "primary_http_status": exc.code, "fallback_provider": "CoinPaprika",
-                "fallback_error": "not_usable", "fallback_http_status": None,
+                "primary_provider": "CoinPaprika", "primary_error": "http_error",
+                "primary_http_status": exc.code, "fallback_provider": None,
+                "fallback_error": "not_attempted", "fallback_http_status": None,
             }
         raise
     except (urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError):
         if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
             return cached[1], "stale_cache", 0, {
-                "primary_provider": "CoinGecko", "primary_error": "network_or_response_error",
-                "primary_http_status": None, "fallback_provider": "CoinPaprika",
-                "fallback_error": "not_usable", "fallback_http_status": None,
+                "primary_provider": "CoinPaprika", "primary_error": "network_or_response_error",
+                "primary_http_status": None, "fallback_provider": None,
+                "fallback_error": "not_attempted", "fallback_http_status": None,
             }
         raise
 
