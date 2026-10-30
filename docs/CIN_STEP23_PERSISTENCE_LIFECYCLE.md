@@ -253,3 +253,8 @@ See docs/CIN_STEP23_ASSESSMENT_API_CONTRACTS_AND_CONSUMER_SAFETY_READINESS_V1.md
 ## 28. Dashboard data integration and assessment presentation architecture (F-20, 2026-10-31)
 
 See docs/CIN_DASHBOARD_DATA_INTEGRATION_AND_ASSESSMENT_PRESENTATION_ARCHITECTURE_V1.md. Repository inventory review found no independently maintained dashboard/frontend/static/template source tree; the implementation tracker also records mobile dashboard UX as not established. F-20 defines mobile-first navigation, API-to-screen mapping, provenance/status semantics, refresh/cache policy, independent panel failure handling, visualization caveats, alert-state presentation, accessibility and acceptance sequence. This is architecture only: no frontend, API integration, route, schema, chart, alert engine, provider, persistence or deployment was changed. Stage 6 Steps 30–33 remain pending until implementation and tests exist.
+
+
+## 29. Dashboard frontend technology readiness (F-21, 2026-10-31)
+
+See docs/CIN_FRONTEND_IMPLEMENTATION_READINESS_AND_TECHNOLOGY_DECISION_V1.md. Selected a separate React + TypeScript + Vite static frontend, with Cloudflare Pages Free as a proposed hosting target and the existing FastAPI API retained as a separate origin. Defined dependency, API client, public configuration, CORS, security, responsive/accessibility, build/test and release gates. Repository deployment evidence shows the current Render manifest starts the FastAPI scaffold; this review found no independently maintained frontend. No frontend code, dependency, CORS, Cloudflare project, DNS, Render setting or deployment was changed. F-21 is design only; actual scaffold implementation remains open.
