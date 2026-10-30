@@ -230,3 +230,23 @@ def test_growth_evidence_without_claim_text_has_no_claim_objects():
     row = assess_growth_fundamentals("ABC", [record], now=now)["evidence"][0]
     assert row["claim"] is None
     assert row["claim_evidence_relationship"] is None
+
+
+def test_growth_api_exposes_additive_claim_and_context_link_fields():
+    result = growth_fundamentals_assessment_endpoint(
+        GrowthFundamentalsRequest(
+            symbol="ABC",
+            evidence=[{
+                "category": "fees_and_revenue", "evidence_id": "revenue-55",
+                "claim_text": "Protocol revenue increased 20% quarter over quarter.",
+                "source_name": "Issuer", "source_url": "https://example.com/revenue",
+                "published_at": "2026-10-01T00:00:00Z",
+                "checked_at": "2026-10-24T00:00:00Z", "status": "unverified",
+            }],
+        )
+    )
+    row = result["evidence"][0]
+    assert row["claim"]["claim_status"] == "not_assessed"
+    assert row["claim_evidence_relationship"]["relationship"] == "context_only"
+    assert result["evidence_source_mode"] == "caller_supplied_metadata"
+    assert result["source_documents_fetched_by_cin"] is False
