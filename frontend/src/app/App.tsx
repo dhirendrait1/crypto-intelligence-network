@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";\nimport { cinApi, type ApiResult } from "../lib/api";\nimport { DataStatePanel } from "../components/DataState";
 
 const sections = ["Overview", "Markets", "Screening", "Analysis", "Research", "News", "Alerts", "System Health"] as const;
 type Section = typeof sections[number];
 
 function App() {
-  const [active, setActive] = useState<Section>("Overview");
+  const [active, setActive] = useState<Section>("Overview");\n  const [health, setHealth] = useState<ApiResult<Record<string, unknown>> | null>(null);\n  const [readiness, setReadiness] = useState<ApiResult<Record<string, unknown>> | null>(null);\n\n  useEffect(() => {\n    if (!cinApi.configured) return;\n    let mounted = true;\n    Promise.all([cinApi.getHealth(), cinApi.getReadiness()]).then(([healthResult, readyResult]) => {\n      if (mounted) { setHealth(healthResult); setReadiness(readyResult); }\n    });\n    return () => { mounted = false; };\n  }, []);
 
   return (
     <div className="app-shell">
@@ -19,7 +19,7 @@ function App() {
             </button>
           ))}
         </nav>
-        <div className="sidebar-foot"><span className="status-dot" /> API integration not connected</div>
+        <div className="sidebar-foot"><span className="status-dot" /> {cinApi.configured ? "API health check enabled" : "API base URL not configured"}</div>
       </aside>
 
       <main className="main-content">
@@ -43,7 +43,7 @@ function App() {
               <article className="metric-card"><span>DATA SOURCES</span><strong>0 <em>/ 0</em></strong><small>Provider health unavailable</small></article>
               <article className="metric-card"><span>ACTIVE ALERTS</span><strong>—</strong><small>Alert service not implemented</small></article>
             </div>
-            <div className="content-grid">
+            {cinApi.configured && <div className="content-grid"><article className="panel"><DataStatePanel state={health?.state ?? "unknown"} message={health?.message ?? "Checking CIN service health…"} /></article><article className="panel"><DataStatePanel state={readiness?.state ?? "unknown"} message={readiness?.message ?? "Checking CIN service readiness…"} /></article></div>}\n            <div className="content-grid">
               <article className="panel"><div className="panel-head"><div><span className="eyebrow">SYSTEM STATUS</span><h3>Data availability</h3></div><span className="state-pill neutral">NOT CONNECTED</span></div><div className="empty-state"><span className="empty-symbol">⌁</span><strong>Waiting for verified API connection</strong><p>Provider status, freshness and coverage will appear here after contract validation.</p></div></article>
               <article className="panel"><div className="panel-head"><div><span className="eyebrow">RESEARCH FEED</span><h3>Latest intelligence</h3></div><span className="state-pill neutral">NOT AVAILABLE</span></div><div className="empty-state"><span className="empty-symbol">◷</span><strong>No assessments loaded</strong><p>Assessment history is not connected in this preview.</p></div></article>
             </div>
