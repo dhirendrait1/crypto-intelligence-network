@@ -213,3 +213,8 @@ See docs/CIN_STEP23_OPERATIONAL_LOGGING_MONITORING_INCIDENT_RESPONSE_READINESS_V
 ## 20. Disaster recovery and service continuity readiness gate (2026-10-31)
 
 See docs/CIN_STEP23_DISASTER_RECOVERY_AND_SERVICE_CONTINUITY_READINESS_V1.md for service-tier RTO/RPO decision requirements, provider/platform/release/overload failure scenarios, safe degradation, staged recovery sequence, and continuity test gates. This is distinct from the backup/export/replica/restore lifecycle: it addresses service availability and controlled restoration of service. No RTO/RPO targets, standby, failover, monitor, release gate, retry loop, hosting configuration, or deployment was changed. Operational recovery remains unimplemented and unverified.
+
+
+## 21. Provider governance and source-of-truth integrity readiness (2026-10-31)
+
+See docs/CIN_STEP23_PROVIDER_GOVERNANCE_AND_SOURCE_OF_TRUTH_READINESS_V1.md for the provider registry contract, metric-specific source precedence, fallback eligibility, provenance preservation, conflict handling, and acceptance tests. This is a governance/readiness design, not a runtime registry or provider certification. The current GitHub evidence connector remains narrowly allowlisted, bounded, and explicitly unverified; its 7-day activity freshness threshold is not a universal metric freshness policy. No provider, fallback, cache, retry, source priority, or live retrieval was changed. Cross-provider governance remains open.
