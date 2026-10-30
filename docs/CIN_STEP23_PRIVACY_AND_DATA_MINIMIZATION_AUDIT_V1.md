@@ -171,3 +171,12 @@ Added `docs/CIN_STEP23_DERIVED_DATA_HASH_AND_FINGERPRINT_LIFECYCLE_V1.md`. It re
 - No per-caller quota, global request budget, concurrency ceiling, cooldown, explicit provider-429 retry policy, or rate-limit telemetry was evidenced in the reviewed route/connector. The Render manifest does not document an edge rate-limit policy; this does not prove the hosting platform has no external controls.
 - Added `docs/CIN_STEP23_PUBLIC_ENDPOINT_ABUSE_AND_RATE_LIMIT_READINESS_V1.md` with threat scenarios, minimum control contract, safe implementation sequence, acceptance gates, and explicit non-actions.
 - No runtime code, middleware, package, edge rule, Render/Cloudflare setting, provider quota, or deployment was changed. F-10 remains Open; the route remains read-only and Step 23 remains Partial.
+
+
+### F-11 operational logging, monitoring, and incident-response readiness finding (2026-10-31)
+
+- Reviewed the Step 23 API/connector, relevant offline CI workflows, access-control and rate-limit readiness documents, and Render manifest.
+- Existing evidence: generic sanitized provider HTTP 502 responses and regression tests against provider-body/token/Bearer/URL marker leakage; CI validates offline API and local persistence boundaries.
+- No application-level structured operational event contract, correlation-ID contract, service metrics/SLO thresholds, alert routing, incident runbook, accountable on-call ownership, or log access/retention policy was evidenced in the reviewed paths. The bundled application entry point was not independently inspected in this pass; its middleware/logging behavior remains not assessed.
+- Added docs/CIN_STEP23_OPERATIONAL_LOGGING_MONITORING_INCIDENT_RESPONSE_READINESS_V1.md with a minimized telemetry contract, monitoring requirements, incident runbook requirements, acceptance gates, and explicit evidence limitations.
+- No runtime logging, middleware, dashboard, alert, incident automation, log shipper, retention policy, or deployment setting was changed. F-11 remains Open; Step 23 remains Partial.
