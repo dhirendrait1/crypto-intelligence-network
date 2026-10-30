@@ -243,3 +243,10 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - Added `docs/CIN_STEP23_DERIVED_DATA_HASH_AND_FINGERPRINT_LIFECYCLE_V1.md` defining default source-linked expiry for metadata fingerprints, content hashes, and future derived indicators; exact lineage/version requirements; linkability and known-content confirmation risks; and a narrow independent-retention exception requiring explicit policy approval.
 - Recorded current implementation accurately: local adapter stores SHA-256 fingerprints of canonical metadata; optional content-hash column is currently NULL. Hashes are not authenticity proof or automatically anonymous.
 - No current hash or record was changed/deleted. No content-hash computation, lineage schema, API exposure, worker, or production persistence was implemented. F-07 is design-documented only; Step 23 remains Partial.
+
+
+### Step 23 F-06 API error-disclosure regression increment (2026-10-31)
+
+- The public evidence ingestion API now maps both known provider errors and unexpected provider exceptions to one stable generic HTTP 502 response. Raw provider exception text is not returned to clients.
+- Added regression tests with injected raw response-body, token, Bearer credential, and sensitive URL/query markers; assertions verify none appear in the client-facing detail.
+- This is an API response-boundary control only. It does not prove comprehensive log redaction or production security, and the endpoint remains read-only with persistence unwired. Step 23 remains Partial.
