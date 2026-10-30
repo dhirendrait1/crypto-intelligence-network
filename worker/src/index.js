@@ -131,6 +131,7 @@ async function handle(env, op, p) {
     case "evaluate_forecast": {
       if (!text(p.forecast_id) || !iso(p.evaluated_at))
         throw new Error("invalid evaluation payload");
+      p.evaluated_at = utc(p.evaluated_at);
       const f = await forecast(env, p.forecast_id);
       if (!f) throw new Error("forecast_id not found");
       const target = Date.parse(f.target_at), now = Date.parse(p.evaluated_at);
