@@ -108,10 +108,14 @@ Before any production persistence is proposed, require:
 |---|---|
 | F-01 Arbitrary metadata shape | Open — define allowlists and recursive limits |
 | F-02 Free-text sensitivity | Partially mitigated in local SQLite adapter — conservative marker/length checks; full content classification and production controls remain open |
-| F-03 Missing classification/retention class | Open — design for a future schema version |
+| F-03 Missing classification/retention class | Design proposal documented in `CIN_STEP23_DATA_CLASSIFICATION_AND_RETENTION_CLASSES_V1.md`; policy approval and future schema implementation remain open |
 | F-04 Missing repository payload byte ceiling | Open — implement and test before persistence expansion |
 | F-05 Retention semantics | Open — resolve with retention policy |
 | F-06 Error disclosure regression protection | Partially mitigated; add regression tests before API expansion |
 | F-07 Hash lifecycle | Open — include in retention and erasure policy |
 
 **Overall:** source review completed; privacy/data-minimization readiness is not yet established. These findings do not authorize production storage. The API remains read-only, SQLite remains a local reference implementation, and no deployment or paid service change is included.
+
+### F-03 design increment — classification and retention classes (2026-10-31)
+
+Added `docs/CIN_STEP23_DATA_CLASSIFICATION_AND_RETENTION_CLASSES_V1.md`. It defines separate sensitivity classifications and lifecycle retention classes, maps evidence/claims/rationales/hashes/logs/exports/backups to proposed defaults, and specifies fail-closed handling for unknown classifications and policy versions. It also defines a future policy-version contract and implementation acceptance gates. This is a design proposal only: no durations, legal basis, source authorization, or legal-hold authority were invented; schema v1.0 and all existing data remain unchanged. F-03 is design-documented but remains open pending policy approval and a separately reviewed schema version. F-05 and F-07 remain open.
