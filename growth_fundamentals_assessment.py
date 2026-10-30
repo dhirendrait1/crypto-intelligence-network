@@ -6,6 +6,8 @@ CIN does not fetch source documents or independently certify claims in this modu
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from hashlib import sha256
+import json
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -20,6 +22,7 @@ CATEGORIES = {
     "ecosystem_and_competition": "Ecosystem traction, integrations, and competitive context",
 }
 VALID_STATUSES = {"verified", "unverified", "stale", "unavailable"}
+VALID_SOURCE_ROLES = {"issuer", "custodian", "auditor", "regulator", "exchange", "independent_research", "other"}
 
 
 def _parse_date(value: Any) -> datetime | None:
@@ -131,9 +134,16 @@ def assess_growth_fundamentals(
         if status not in VALID_STATUSES:
             status = "unverified"
         published = _parse_date(item.get("published_at"))
+        checked = _parse_date(item.get("checked_at"))
         source_name = item.get("source_name")
         source_url = item.get("source_url")
         source_url_valid = _is_http_url(source_url)
+        raw_evidence_id = item.get("evidence_id")
+        evidence_id = raw_evidence_id.strip() if isinstance(raw_evidence_id, str) and 0 < len(raw_evidence_id.strip()) <= 128 else None
+        raw_source_role = item.get("source_role")
+        source_role = raw_source_role.strip().lower() if isinstance(raw_source_role, str) else None
+        if source_role not in VALID_SOURCE_ROLES:
+            source_role = "unspecified"
         missing = []
         if kind not in CATEGORIES:
             missing.append("recognized_category")
@@ -143,22 +153,38 @@ def assess_growth_fundamentals(
             missing.append("source_url")
         if published is None:
             missing.append("published_at")
+        if checked is None:
+            missing.append("checked_at")
         future_publication = published is not None and published > current
+        future_check = checked is not None and checked > current
+        check_precedes_publication = published is not None and checked is not None and checked < published
         age = (current - published).days if published is not None and not future_publication else None
-        timestamp_validation_errors = ["published_at_is_in_the_future"] if future_publication else []
-        if future_publication and status == "verified":
+        timestamp_validation_errors = []
+        if future_publication:
+            timestamp_validation_errors.append("published_at_is_in_the_future")
+        if future_check:
+            timestamp_validation_errors.append("checked_at_is_in_the_future")
+        if check_precedes_publication:
+            timestamp_validation_errors.append("checked_at_precedes_published_at")
+        if timestamp_validation_errors and status == "verified":
             status = "unverified"
         if status == "verified" and missing:
             status = "unverified"
         if status == "verified" and age is not None and age > max_age_days:
             status = "stale"
-        normalized.append({
+        record = {
             "category": kind,
             "category_description": CATEGORIES.get(kind, "Unknown category"),
+            "evidence_id": evidence_id,
+            "evidence_id_is_caller_supplied": evidence_id is not None,
+            "source_role": source_role,
+            "source_role_is_self_reported": raw_source_role is not None,
+            "source_role_authenticated": False,
             "source_name": source_name,
             "source_url": source_url,
             "source_url_valid": source_url_valid,
             "published_at": item.get("published_at"),
+            "checked_at": item.get("checked_at"),
             "publication_age_days": age,
             "timestamp_validation_errors": timestamp_validation_errors,
             "assessment_clock_valid": assessment_clock_valid,
@@ -167,7 +193,16 @@ def assess_growth_fundamentals(
             "notes": str(item.get("notes", "")).strip() or None,
             "cin_independently_verified": False,
             "invalid_record": False,
-        })
+        }
+        fingerprint_fields = {key: record.get(key) for key in (
+            "category", "evidence_id", "source_role", "source_name", "source_url",
+            "published_at", "checked_at", "status", "notes"
+        )}
+        canonical_payload = json.dumps(fingerprint_fields, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str).encode("utf-8")
+        record["record_fingerprint_sha256"] = sha256(canonical_payload).hexdigest()
+        record["fingerprint_scope"] = "normalized_supplied_metadata"
+        record["fingerprint_is_authenticity_proof"] = False
+        normalized.append(record)
 
     coverage = {}
     for category, description in CATEGORIES.items():
@@ -239,6 +274,7 @@ def assess_growth_fundamentals(
         "limitations": [
             "Coverage score measures supplied evidence metadata coverage only; it is not a project quality score.",
             "CIN does not fetch source documents or independently verify claims in this endpoint.",
+            "Source roles and evidence IDs are caller-supplied metadata; roles are unauthenticated and fingerprints detect metadata changes only.",
             "Missing evidence is unknown, not proof of strength, weakness, legitimacy, or fraud.",
             "A source URL or recent publication does not guarantee data accuracy or investment performance.",
             "Token unlock schedules, contract permissions, holder concentration, and on-chain metrics require source-specific review.",
