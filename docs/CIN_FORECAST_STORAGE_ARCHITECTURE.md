@@ -66,7 +66,7 @@ Cloudflare's current Workers product page advertises starting on the Free plan w
 - The current Worker is an initial development adapter. It has an operation allowlist and prepared statements, but its read-then-write paths are not yet covered by real D1 concurrency tests.
 - D1 `batch()` transaction semantics have not yet been implemented or verified for multi-statement ledger operations.
 - List endpoints enforce a maximum row limit but do not yet provide cursor pagination.
-- Worker-side tests currently cover authentication, path/method restrictions, operation allowlisting, payload size, and malformed payload/limit rejection. They do not yet exercise successful CRUD/evaluation against a D1-compatible test database.
+- Worker-side tests cover authentication, path/method restrictions, operation allowlisting, payload size, malformed payload/limit rejection, and a Node SQLite compatibility harness for forecast/observation CRUD, idempotency, nearest-observation evaluation, and readback. This is a local SQL compatibility test, not a real Cloudflare D1 integration test.
 - Error mapping, quota exhaustion, export/restore, and persistence across Worker/Render restarts remain unverified.
 
 ## Explicit non-actions
