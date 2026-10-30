@@ -126,3 +126,55 @@ These guards apply even when SQL is issued outside the repository adapter. Regre
 **Important retention/deletion interaction:** the v1.0 reference triggers intentionally block deletion of observations and assessment events. This is an integrity safeguard for local tests, not an approved permanent-retention policy. It currently means a retention or erasure workflow cannot delete those rows through this schema. Before any real persistence is enabled, CIN must define the applicable retention, privacy, legal-erasure, backup-expiry, and audit requirements, then design and test an explicitly versioned retention mechanism. Do not silently disable these triggers or treat append-only storage as overriding a valid deletion obligation.
 
 **Current implementation boundary:** the triggers and tests apply only to the local SQLite reference migration. They do not establish production durability, authenticated reviewer identity, source authenticity, API write authorization, or a production retention policy. The API remains read-only and persistence remains opt-in/local-only.
+
+
+## 13. Retention and erasure design gate (2026-10-30)
+
+**Decision: no deletion migration or retention worker is authorized by the current project requirements.** The v1.0 append-only triggers remain unchanged. A retention duration, legal basis, data classification, source licence, and backup-expiry requirement must be approved before implementation; inventing a universal retention period would create an unsupported compliance and data-loss policy.
+
+### 13.1 Separate the data lifecycle classes
+
+| Data class | Proposed treatment | Required decision before implementation |
+|---|---|---|
+| Raw/normalized provider metadata payload | Eligible for policy-driven purge or redaction | Provider terms, permitted retention, and maximum age |
+| Derived metadata fingerprint/content hash | Retain only if it cannot reasonably reconstruct or identify erased content and policy permits it | Privacy review and hash-retention rationale |
+| Evidence record identity and provenance pointer | Retain a minimal tombstone only where lawful and necessary | Audit purpose, legal basis, and minimum fields |
+| Observation history | Append-only during its approved retention window; expiry handled by a versioned controlled process | Per-source retention class and deletion scope |
+| Claim assessment events | Preserve decision history only as long as justified; erase or pseudonymize reviewer data when required | Reviewer privacy and audit requirements |
+| Claim/evidence relationships and conflicts | Remove or detach references when the underlying evidence is erased, without leaving misleading active relationships | Referential-integrity and conflict-history policy |
+| Backups and replicas | Expire erased data through documented backup rotation; disclose the maximum residual period | Backup schedule, restore procedure, and expiry SLA |
+
+### 13.2 Required deletion workflow
+
+A future retention implementation must be a separately versioned migration and controlled application operation, not a general-purpose DELETE method on the evidence repository.
+
+1. Identify records by approved retention class and policy version; support legal holds and explicit exemptions.
+2. Produce a dry-run manifest containing record IDs, data classes, age basis, and intended action. Do not include payload contents.
+3. Require an authorized operator or approved policy engine to approve the manifest; record the policy version and authorization context.
+4. In one database transaction, mark the record as pending erasure, remove or redact eligible payload fields, and deactivate dependent relationships/conflict references as specified by policy.
+5. Retain only the minimum permitted tombstone/deletion event: opaque record reference, policy version, completion timestamp, action category, and non-sensitive outcome. Never copy erased payload into the audit event.
+6. Verify postconditions by querying for residual payload and active references; report exceptions rather than claiming deletion succeeded.
+7. Expire affected backups/replicas according to the approved backup policy, and verify through restore testing that erased payload is not reintroduced.
+8. Keep legal holds, failed deletions, and partial completion visible as unresolved states; never silently bypass append-only triggers.
+
+### 13.3 Migration and testing requirements
+
+- Do not drop or disable the v1.0 append-only triggers in place. Introduce a new schema version with explicit migration and forward-recovery instructions.
+- Prefer a dedicated retention operation with narrow permissions over allowing application roles to issue arbitrary deletes.
+- Test legal-hold exclusion, dry-run determinism, idempotent retries, partial failure, transaction rollback, foreign-key cleanup, tombstone minimization, backup expiry, and restore behavior.
+- Test that ordinary ingestion and assessment code cannot invoke retention operations.
+- Keep the current API read-only and the SQLite adapter local-only until all policy and deployment gates are approved.
+
+### 13.4 Unresolved policy decisions
+
+The following are intentionally not guessed or implemented:
+
+- Retention periods by provider, evidence type, and data classification.
+- Applicable privacy/legal basis and erasure exceptions.
+- Whether any source metadata or derived hashes may be retained after payload erasure.
+- Who may authorize deletion and how that authority is authenticated.
+- Legal-hold scope and release procedure.
+- Backup/replica expiry limits and restore-time deletion replay.
+- Whether minimal tombstones are permitted or required for each source class.
+
+**Acceptance status:** design documented; implementation blocked pending these policy decisions. No trigger has been disabled, no record has been deleted, and no retention schedule or worker has been enabled.
