@@ -12,6 +12,7 @@ const text = (value, max = 160) => typeof value === "string" && value.trim() &&
   value.length <= max && !/[\u0000-\u001f\u007f]/.test(value);
 const iso = value => typeof value === "string" && !Number.isNaN(Date.parse(value)) &&
   /(?:Z|[+-]\d{2}:\d{2})$/.test(value);
+const utc = value => new Date(value).toISOString();
 const stable = value => {
   if (Array.isArray(value)) return "[" + value.map(stable).join(",") + "]";
   if (value && typeof value === "object")
