@@ -1,0 +1,105 @@
+"""Guard the public evidence API's read-only persistence boundary."""
+import ast
+from pathlib import Path
+import unittest
+from unittest.mock import patch
+
+from fastapi import HTTPException
+
+import cin_evidence_ingestion_api as api
+
+
+ROOT = Path(__file__).resolve().parents[1]
+API_SOURCE = ROOT / "cin_evidence_ingestion_api.py"
+
+
+class TestEvidenceIngestionAPIStorageBoundary(unittest.TestCase):
+    def test_api_module_does_not_import_or_initialize_a_storage_backend(self):
+        tree = ast.parse(API_SOURCE.read_text(encoding="utf-8"))
+        imported_modules = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imported_modules.update(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imported_modules.add(node.module)
+
+        self.assertFalse(any("sqlite" in name.lower() for name in imported_modules))
+        self.assertNotIn("cin_evidence_store", imported_modules)
+        self.assertNotIn("cin_local_sqlite_evidence_repository", imported_modules)
+
+    def test_successful_provider_response_is_returned_without_persistence_claim(self):
+        provider_payload = {
+            "symbol": "ETH",
+            "repository": "ethereum/go-ethereum",
+            "retrieval_status": "success",
+            "claim_verification_status": "unverified",
+            "independently_verified": False,
+        }
+        request = api.PublicEvidenceRequest(
+            symbol="ETH", repository="ethereum/go-ethereum"
+        )
+        with patch.object(api, "fetch_github_repository_evidence", return_value=provider_payload) as fetch:
+            result = api.public_evidence_ingestion(request)
+
+        self.assertEqual(result, provider_payload)
+        fetch.assert_called_once_with("ethereum/go-ethereum")
+        self.assertFalse(result["independently_verified"])
+        self.assertEqual(result["claim_verification_status"], "unverified")
+
+    def test_provider_error_is_returned_as_controlled_502(self):
+        request = api.PublicEvidenceRequest(
+            symbol="ETH", repository="ethereum/go-ethereum"
+        )
+        with patch.object(
+            api, "fetch_github_repository_evidence",
+            side_effect=api.EvidenceSourceError("upstream unavailable"),
+        ):
+            with self.assertRaises(HTTPException) as raised:
+                api.public_evidence_ingestion(request)
+
+        self.assertEqual(raised.exception.status_code, 502)
+        self.assertEqual(raised.exception.detail, "upstream unavailable")
+
+    def test_unexpected_provider_error_does_not_leak_internal_details(self):
+        request = api.PublicEvidenceRequest(
+            symbol="ETH", repository="ethereum/go-ethereum"
+        )
+        with patch.object(
+            api, "fetch_github_repository_evidence",
+            side_effect=RuntimeError("sensitive internal detail"),
+        ):
+            with self.assertRaises(HTTPException) as raised:
+                api.public_evidence_ingestion(request)
+
+        self.assertEqual(raised.exception.status_code, 502)
+        self.assertEqual(
+            raised.exception.detail,
+            "Public evidence provider returned an unexpected response",
+        )
+        self.assertNotIn("sensitive internal detail", raised.exception.detail)
+
+    def test_non_eth_symbol_is_rejected_before_provider_call(self):
+        request = api.PublicEvidenceRequest(
+            symbol="BTC", repository="ethereum/go-ethereum"
+        )
+        with patch.object(api, "fetch_github_repository_evidence") as fetch:
+            with self.assertRaises(HTTPException) as raised:
+                api.public_evidence_ingestion(request)
+
+        self.assertEqual(raised.exception.status_code, 400)
+        fetch.assert_not_called()
+
+    def test_repository_outside_allowlist_is_rejected_before_provider_call(self):
+        request = api.PublicEvidenceRequest(
+            symbol="ETH", repository="attacker/unknown-repository"
+        )
+        with patch.object(api, "fetch_github_repository_evidence") as fetch:
+            with self.assertRaises(HTTPException) as raised:
+                api.public_evidence_ingestion(request)
+
+        self.assertEqual(raised.exception.status_code, 400)
+        fetch.assert_not_called()
+
+
+if __name__ == "__main__":
+    unittest.main()
