@@ -11,6 +11,23 @@ from typing import Any
 from cin_evidence_store import EvidenceStore
 
 
+def _is_provider_identity_unique_conflict(exc: sqlite3.IntegrityError) -> bool:
+    """Recognize only the named provider-identity index violation.
+
+    SQLite exposes a generic UNIQUE error code for every unique constraint.
+    Checking the constrained columns prevents an unrelated claim, relationship,
+    or primary-key collision from being mistaken for an ingestion race.
+    """
+    if getattr(exc, "sqlite_errorcode", None) != sqlite3.SQLITE_CONSTRAINT_UNIQUE:
+        return False
+    message = str(exc)
+    return (
+        "UNIQUE constraint failed: "
+        "cin_evidence_records.source_namespace, "
+        "cin_evidence_records.external_evidence_id"
+    ) in message
+
+
 def persist_evidence_snapshot(
     store: EvidenceStore,
     *,
@@ -28,10 +45,9 @@ def persist_evidence_snapshot(
 ) -> dict[str, str]:
     """Create the first bundle or append an observation to its existing record.
 
-    A concurrent first-ingestion uniqueness conflict is resolved by looking up
-    the winning record and appending this retrieval as a new observation.
-    Non-integrity failures propagate; they are never reported as persistence
-    success.
+    A concurrent first-ingestion provider-identity uniqueness conflict is
+    resolved by looking up the winning record and appending this retrieval.
+    Unrelated integrity failures and all other failures propagate.
     """
     identity = {
         "source_namespace": source_namespace,
@@ -70,10 +86,7 @@ def persist_evidence_snapshot(
         )
         return {**result, "operation": "bundle_created"}
     except sqlite3.IntegrityError as exc:
-        # Recover only the provider-identity UNIQUE violation. Other integrity
-        # failures (FK, CHECK, NOT NULL, PK, etc.) must remain visible even if
-        # a matching provider identity happens to exist.
-        if getattr(exc, "sqlite_errorcode", None) != sqlite3.SQLITE_CONSTRAINT_UNIQUE:
+        if not _is_provider_identity_unique_conflict(exc):
             raise
         winning_id = store.find_evidence_id(**identity)
         if winning_id is None:
