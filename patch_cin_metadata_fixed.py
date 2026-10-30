@@ -26,6 +26,7 @@ MODULES = (
     "cin_public_news_sentiment_api.py",
     "cross_source_evidence.py",
     "cross_source_evidence_api.py",
+    "cin_verifiable_evidence.py",
 )
 main_path = APP_DIR / "main.py"
 if not main_path.is_file():
