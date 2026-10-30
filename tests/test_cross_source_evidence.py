@@ -115,6 +115,23 @@ def test_latest_observation_per_source_is_used_for_comparison():
     assert item["status"] == "agreement_observed"
     assert item["comparable_source_count"] == 2
     assert item["duplicate_source_observation_count"] == 1
-    alpha = next(row for row in item["source_observations"] if row["source_url"] == "https://alpha.example/market")
+    alpha = next(row for row in item["source_observations"] if row["source_url"] == "https://alpha.example")
     assert alpha["value"] == 104.0
     assert alpha["observed_at"] == "2026-10-30T10:04:00+00:00"
+
+
+def test_different_paths_on_same_origin_do_not_count_as_separate_sources():
+    result = compare_metric_observations([
+        observation("Alpha market page", 100.0, source_url="https://alpha.example/markets/btc"),
+        observation("Alpha API endpoint", 100.1, source_url="https://alpha.example/api/v1/btc"),
+        observation("Beta", 100.0),
+    ])
+
+    item = result["results"][0]
+    assert item["status"] == "agreement_observed"
+    assert item["comparable_source_count"] == 2
+    assert item["duplicate_source_observation_count"] == 1
+    assert {row["source_url"] for row in item["source_observations"]} == {
+        "https://alpha.example",
+        "https://beta.example",
+    }
