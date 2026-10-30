@@ -39,6 +39,18 @@ def _finite_number(value: Any, *, minimum: float | None = None) -> bool:
     return minimum is None or numeric_value >= minimum
 
 
+
+def _provider_number(value: Any, *, minimum: float | None = None) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        return None
+    try:
+        number = float(value)
+    except (OverflowError, TypeError, ValueError):
+        return None
+    if not math.isfinite(number) or (minimum is not None and number < minimum):
+        return None
+    return number
+
 def _timestamp_status(value: Any) -> tuple[str, int | None, str | None]:
     if not isinstance(value, str) or not value.strip():
         return "unknown", None, "missing_or_invalid_last_updated"
@@ -107,15 +119,17 @@ def _fetch_market_data(ids: list[str], vs_currency: str) -> list[dict[str, Any]]
         price = stats.get("last")
         volume = stats.get("volume")
         open_price = stats.get("open")
-        if not _finite_number(price, minimum=0):
+        price_value = _provider_number(price, minimum=0)
+        if price_value is None:
             continue
         warnings = []
-        volume_value = float(volume) if _finite_number(volume, minimum=0) else None
+        volume_value = _provider_number(volume, minimum=0)
         if volume_value is None:
             warnings.append("invalid_total_volume_omitted")
         change = None
-        if _finite_number(open_price, minimum=0) and float(open_price) > 0:
-            change = (float(price) / float(open_price) - 1.0) * 100.0
+        open_value = _provider_number(open_price, minimum=0)
+        if open_value is not None and open_value > 0:
+            change = (price_value / open_value - 1.0) * 100.0
         else:
             warnings.append("price_change_unavailable")
         last_updated = ticker.get("time")
@@ -124,7 +138,6 @@ def _fetch_market_data(ids: list[str], vs_currency: str) -> list[dict[str, Any]]
             warnings.append(timestamp_warning)
         if freshness_status == "stale":
             warnings.append("market_data_older_than_15_minutes")
-        price_value = float(price)
         if price_value == 0:
             warnings.append("zero_price_not_suitable_for_analysis")
         if volume_value is None:
