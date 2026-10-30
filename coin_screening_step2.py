@@ -277,7 +277,10 @@ def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict
     req = urllib.request.Request(url, headers={"accept": "application/json", "user-agent": "CIN-Research-API/0.4.0"}, method="GET")
     try:
         with urllib.request.urlopen(req, timeout=20) as response:
-            payload = json.loads(response.read().decode("utf-8"))
+            raw = response.read(_MAX_MARKET_PROVIDER_RESPONSE_BYTES + 1)
+        if len(raw) > _MAX_MARKET_PROVIDER_RESPONSE_BYTES:
+            raise ValueError("CoinPaprika response exceeded the configured size limit")
+        payload = json.loads(raw.decode("utf-8"))
         if not isinstance(payload, list):
             raise ValueError("Unexpected CoinPaprika ticker response")
         mapped: list[dict[str, Any]] = []
