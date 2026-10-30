@@ -44,6 +44,7 @@ function makeD1({ failBatchAt = -1 } = {}) {
       }
     },
     setBatchFailureIndex(index) { batchFailureIndex = index; },
+    countRows(table) {\n      if (![\"cin_forecasts\", \"cin_forecast_observations\", \"cin_forecast_evaluations\"].includes(table)) throw new Error(\"invalid test table\");\n      return Number(db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get().count);\n    },
     close() { db.close(); },
   };
 }
@@ -391,6 +392,22 @@ test("does not leave a partial evaluation when the evaluation batch fails", asyn
   });
   assert.equal(stored.status, 200);
   assert.equal(stored.body.result, null);
+  db.close();
+});
+
+test("rolls back an observation insert when its transactional readback fails", async () => {
+  const db = makeD1({ failBatchAt: 1 });
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const response = await call(env, "insert_observation", {
+    observation: {
+      observation_id: "obs-batch-rollback", asset_id: "BTC-USD",
+      metric: "price", value: 70000, unit: "USD", source_id: "test",
+      observed_at: "2026-10-30T11:00:00Z",
+      retrieved_at: "2026-10-30T11:00:05Z",
+    },
+  });
+  assert.equal(response.status, 503);
+  assert.equal(db.countRows("cin_forecast_observations"), 0);
   db.close();
 });
 
