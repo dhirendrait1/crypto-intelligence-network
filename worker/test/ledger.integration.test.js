@@ -20,7 +20,7 @@ function makeD1({ failBatchAt = -1 } = {}) {
           return { success: true, meta: { changes: Number(result.changes) } };
         },
         batchResult() {
-          if (/^\\s*SELECT/i.test(sql))
+          if (/^\s*SELECT/i.test(sql))
             return { success: true, results: db.prepare(sql).all(...values) };
           const result = db.prepare(sql).run(...values);
           return { success: true, meta: { changes: Number(result.changes) }, results: [] };
