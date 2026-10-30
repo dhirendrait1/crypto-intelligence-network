@@ -1006,3 +1006,15 @@ This checkpoint validates configured offline automation only. It does not establ
 - [ ] Run and verify all four GitHub Actions workflows on the latest branch head.
 - [ ] Select and implement a durable production database only after deployment topology, cost, backup/restore, retention, deletion, and authorization requirements are approved.
 - **Boundary:** SQLite DDL/tests do not constitute durable persistence. No records are stored by CIN through this change, and no Render changes were made.
+
+
+## Local claim/evidence repository adapter increment (2026-10-30)
+
+- [x] Add explicit-connection SQLite adapter for local development/tests; no implicit DB creation or migration execution.
+- [x] Persist evidence record, immutable observation, claim, initial assessment event, and relationship atomically in one transaction.
+- [x] Keep caller external evidence IDs namespaced and separate from CIN-owned evidence IDs.
+- [x] Preserve caller-supplied provenance (retrieved_at remains null; source_status remains caller_supplied).
+- [x] Add offline tests for successful bundle persistence, duplicate-identity rollback, timezone validation, and non-finite JSON rejection.
+- [ ] Run all four GitHub Actions workflows on the latest branch head.
+- [ ] Implement durable production storage only after the hosting, cost, backup/restore, retention, deletion, and authorization gates are approved.
+- **Boundary:** adapter is not wired to API/application startup and is not production durability. No Render changes.
