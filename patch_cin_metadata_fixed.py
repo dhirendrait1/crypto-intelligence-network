@@ -24,6 +24,8 @@ MODULES = (
     "cin_public_market_candles_api.py",
     "cin_derivatives_market_data_api.py",
     "cin_public_news_sentiment_api.py",
+    "cin_forecast_outcomes.py",
+    "cin_forecast_ledger.py",
     "cin_forecast_ledger_api.py",
 )
 main_path = APP_DIR / "main.py"
