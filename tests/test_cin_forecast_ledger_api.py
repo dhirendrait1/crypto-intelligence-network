@@ -126,3 +126,27 @@ def test_extra_fields_are_rejected(tmp_path, monkeypatch):
     c = client(tmp_path, monkeypatch)
     invalid = {**FORECAST, "wallet_private_key": "must-never-be-accepted"}
     assert c.post("/forecasts", json=invalid, headers=auth()).status_code == 422
+
+
+def test_api_normalizes_offset_timestamps_to_utc(tmp_path, monkeypatch):
+    c = client(tmp_path, monkeypatch)
+    offset_forecast = {
+        **FORECAST,
+        "created_at": "2026-10-30T13:00:00+03:00",
+        "target_at": "2026-10-30T14:00:00+03:00",
+    }
+    response = c.post("/forecasts", json=offset_forecast, headers=auth())
+    assert response.status_code == 201
+    assert response.json()["created_at"] == "2026-10-30T10:00:00Z"
+    assert response.json()["target_at"] == "2026-10-30T11:00:00Z"
+
+
+def test_api_rejects_naive_timestamps(tmp_path, monkeypatch):
+    c = client(tmp_path, monkeypatch)
+    naive_forecast = {
+        **FORECAST,
+        "created_at": "2026-10-30T10:00:00",
+    }
+    response = c.post("/forecasts", json=naive_forecast, headers=auth())
+    assert response.status_code == 422
+    assert "timezone" in response.json()["detail"]
