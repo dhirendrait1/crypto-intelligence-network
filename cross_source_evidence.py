@@ -35,10 +35,12 @@ def _source_identity(value: Any) -> str | None:
         port = parsed.port
         scheme = parsed.scheme.lower()
         host = parsed.hostname.lower()
+        # HTTP and HTTPS variants of one hostname are still one publisher.
+        # Preserve only an explicitly non-default port in the identity.
         if port is not None and not ((scheme == "https" and port == 443) or (scheme == "http" and port == 80)):
             host = f"{host}:{port}"
-        # Treat paths and query variants on the same origin as one source endpoint.
-        return f"{scheme}://{host}"
+        # Paths, query strings, and scheme variants must not inflate source count.
+        return host
     except ValueError:
         return None
 
