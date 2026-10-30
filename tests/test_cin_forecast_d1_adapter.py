@@ -63,7 +63,8 @@ def test_api_dispatches_to_d1_adapter_when_configured(monkeypatch):
     monkeypatch.setenv("CIN_FORECAST_D1_WORKER_URL", "https://cin-ledger.example.workers.dev")
     monkeypatch.setenv("CIN_FORECAST_D1_WORKER_TOKEN", "service-secret")
     monkeypatch.delenv("CIN_FORECAST_DB_PATH", raising=False)
-    monkeypatch.setattr(adapter, "get_forecast", lambda _path, forecast_id: {"forecast_id": forecast_id})
+    from app import cin_forecast_d1_adapter as app_adapter
+    monkeypatch.setattr(app_adapter, "get_forecast", lambda _path, forecast_id: {"forecast_id": forecast_id})
     assert api._ledger_call(api.get_forecast, api._database_path(), "fc-remote") == {
         "forecast_id": "fc-remote"
     }
