@@ -299,3 +299,10 @@ When continuing work, choose the earliest unfinished step that can be completed 
 
 - Added docs/CIN_STEP23_DISASTER_RECOVERY_AND_SERVICE_CONTINUITY_READINESS_V1.md covering current Render manifest evidence, service tiers, RTO/RPO decision requirements, failure-mode/safe-degradation matrix, recovery sequence, and continuity acceptance tests.
 - This review is separate from backup/export/replica/restore design. No numeric recovery objectives, standby, failover, monitoring, release gate, retry loop, hosting setting, or deployment was implemented. F-12 remains Open; Step 23 remains Partial.
+
+
+### Step 23 F-13 provider governance and source-of-truth increment (2026-10-31)
+
+- Added docs/CIN_STEP23_PROVIDER_GOVERNANCE_AND_SOURCE_OF_TRUTH_READINESS_V1.md covering versioned provider registry requirements, metric-specific authority, fallback comparability, source provenance, disagreement handling, and acceptance tests.
+- The existing GitHub connector's allowlist, bounded retrieval, provenance, freshness, and unverified semantics were reviewed; these are source-specific controls, not a general source-of-truth framework.
+- No runtime registry, provider promotion, fallback, cache, retry, source priority, or live validation was implemented. F-13 remains Open; Step 23 remains Partial.
