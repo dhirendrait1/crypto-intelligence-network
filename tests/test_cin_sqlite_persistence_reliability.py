@@ -105,6 +105,23 @@ class TestSQLitePersistenceReliability(unittest.TestCase):
             },
         )
 
+        trigger_names = {
+            row[0]
+            for row in self.db.execute(
+                "SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'trg_cin_%'"
+            ).fetchall()
+        }
+        self.assertEqual(
+            trigger_names,
+            {
+                "trg_cin_evidence_observations_no_update",
+                "trg_cin_evidence_observations_no_delete",
+                "trg_cin_claim_assessment_events_no_update",
+                "trg_cin_claim_assessment_events_no_delete",
+            },
+            "reapplying the migration must preserve exactly one copy of each guard",
+        )
+
     def test_failed_bundle_does_not_reserve_external_evidence_identity(self):
         self.db.execute(
             """
