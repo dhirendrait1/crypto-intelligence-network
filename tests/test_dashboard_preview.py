@@ -1,0 +1,197 @@
+"""Static safety and responsive-contract checks for the CIN dashboard preview."""
+from pathlib import Path
+import unittest
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DASHBOARD = REPO_ROOT / "dashboard" / "index.html"
+
+
+class DashboardPreviewTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.html = DASHBOARD.read_text(encoding="utf-8")
+
+    def test_preview_is_explicitly_disconnected_and_does_not_claim_live_data(self):
+        self.assertIn("UI PREVIEW · API NOT CONNECTED", self.html)
+        self.assertIn("This preview does not fetch live data", self.html)
+        self.assertIn("No API request has been made.", self.html)
+
+    def test_mobile_viewport_and_narrow_layout_are_defined(self):
+        self.assertIn('<meta name="viewport" content="width=device-width, initial-scale=1">', self.html)
+        self.assertIn("@media(max-width:720px)", self.html)
+        self.assertIn(".card,.wide{grid-column:1/-1}", self.html)
+
+    def test_required_research_panels_are_present(self):
+        for panel in (
+            "Market data", "Technical analysis", "Coin screening",
+            "Evidence & provenance", "News & derivatives",
+            "Monitoring", "Data quality rules",
+        ):
+            with self.subTest(panel=panel):
+                self.assertIn(panel, self.html)
+
+    def test_read_only_boundary_is_visible(self):
+        self.assertIn("No trading or order execution", self.html)
+        self.assertIn("No wallet access", self.html)
+        self.assertNotIn("XMLHttpRequest", self.html)
+        self.assertNotIn("WebSocket(", self.html)
+        self.assertIn('id="connect-api"', self.html)
+        self.assertIn('method:"GET"', self.html)
+        self.assertIn('credentials:"omit"', self.html)
+        self.assertIn('redirect:"error"', self.html)
+        self.assertIn('id="disconnect-api"', self.html)
+        self.assertNotIn('method:"POST"', self.html)
+        self.assertNotIn("/orders", self.html)
+        self.assertNotIn("/wallet", self.html)
+
+    def test_preview_button_only_updates_local_status(self):
+        self.assertIn('document.getElementById("refresh-state").textContent=', self.html)
+        self.assertIn("No request was made by this button.", self.html)
+        self.assertIn('role="status"', self.html)
+        self.assertIn('aria-live="polite"', self.html)
+
+    def test_api_requests_require_explicit_user_action_and_safe_origin(self):
+        self.assertIn('connectButton.addEventListener("click"', self.html)
+        self.assertIn('disconnectButton.addEventListener("click"', self.html)
+        self.assertIn('function validOrigin(value)', self.html)
+        self.assertIn('url.protocol==="https:"||url.protocol==="http:"', self.html)
+        self.assertIn('activeController=new AbortController()', self.html)
+        self.assertIn('cache:"no-store"', self.html)
+        self.assertIn('results.replaceChildren()', self.html)
+        self.assertIn('Partial connection:', self.html)
+        self.assertIn('Request blocked or network/CORS error.', self.html)
+
+
+    def test_read_only_endpoints_and_response_schemas_are_explicit(self):
+        for endpoint in (
+            "/market-candles?symbol=BTCUSDT",
+            "/technical-analysis/market?symbol=BTCUSDT",
+            "/coin-screening?vs_currency=usd",
+            "/news-sentiment?query=cryptocurrency",
+            "/derivatives/market-snapshot?symbol=BTCUSDT",
+        ):
+            with self.subTest(endpoint=endpoint):
+                self.assertIn(endpoint, self.html)
+        self.assertIn("Invalid CIN response schema", self.html)
+        self.assertIn("Number.isInteger(data.count)&&Array.isArray(data.data)", self.html)
+        self.assertIn("!!data.sentiment_summary", self.html)
+        self.assertIn("!!data.data_quality", self.html)
+        self.assertIn("not data correctness, freshness, or source authenticity", self.html)
+
+
+    def test_verified_endpoint_states_update_visible_dashboard_panels(self):
+        for panel in ("market", "technical", "screening", "evidence", "news", "monitoring"):
+            self.assertIn('data-cin-panel="' + panel + '"', self.html)
+        self.assertIn("function updateDashboardPanel(name,state,detail,data,meta)", self.html)
+        self.assertIn("updateDashboardPanel(name,state,detail,data,meta);", self.html)
+        self.assertIn("function renderEndpointMetrics(name,data)", self.html)
+        self.assertIn("function metricLine(container,label,value)", self.html)
+        self.assertIn("Latest close", self.html)
+        self.assertIn("Funding (% / interval)", self.html)
+        self.assertIn("latest_closed_candle_age_seconds", self.html)
+        self.assertIn("stale_data_warning", self.html)
+        self.assertIn("provider_timestamp_quality_counts", self.html)
+        self.assertIn("analysis_candle_count", self.html)
+        self.assertIn("data.market_structure||data.summary||data.analysis||{}", self.html)
+        self.assertIn("summary.rsi_14??summary.rsi", self.html)
+        self.assertIn("summary.directional_bias||summary.trend||summary.bias||summary.direction", self.html)
+        self.assertIn("summary.structure_event||summary.market_structure||summary.structure", self.html)
+        self.assertIn("open_interest_contracts", self.html)
+        self.assertIn("spread_percent", self.html)
+        self.assertIn("article.provider_seen_at||article.published_at||\"time unknown\"", self.html)
+        self.assertIn("Sentiment method warning", self.html)
+        self.assertIn("Headline-only public news; no X, Reddit, or Telegram ingestion.", self.html)
+        self.assertIn("Bid/ask notional imbalance", self.html)
+        self.assertIn("Open-interest value change (4h %)", self.html)
+        self.assertIn("JSON.stringify(data.timestamp_quality||{})", self.html)
+        self.assertIn("Analysis eligibility", self.html)
+        for metric in (
+            "Directional bias", "Structure event", "RSI (14)", "MACD histogram",
+            "ATR (14)", "Buy-side swing reference", "Scenario targets status",
+            "Analysis limitations",
+        ):
+            with self.subTest(metric=metric):
+                self.assertIn(metric, self.html)
+        self.assertIn("data.market_structure||data.summary||data.analysis", self.html)
+        self.assertIn("data.indicators||{}", self.html)
+        self.assertIn("data.scenario_targets||{}", self.html)
+        self.assertIn("indicators.rsi_14??summary.rsi_14??summary.rsi", self.html)
+        self.assertIn('if(name==="Technical analysis"){', self.html)
+        self.assertIn('Waiting for verified API response; chart geometry remains illustrative.', self.html)
+        self.assertIn('analysisPanel.querySelectorAll(".ref-kpi strong").forEach(node=>node.textContent="unknown")', self.html)
+        self.assertIn('document.querySelectorAll(".asset-rail .asset-item").forEach((item)=>', self.html)
+        self.assertIn('value.textContent="unknown / not verified"', self.html)
+        self.assertIn('node.textContent.includes("BTC / USDT")', self.html)
+        self.assertIn('value.textContent=latest&&latest.close!=null?safeText(latest.close):"UNKNOWN"', self.html)
+        self.assertIn('if(value) value.textContent="UNKNOWN"', self.html)
+        self.assertIn("panel.setAttribute(\"data-api-state\",state)", self.html)
+        self.assertIn('panel.querySelector(\'[data-api-metrics="\'+name+\'"]\')', self.html)
+        self.assertIn('metrics.setAttribute("data-api-metrics",name)', self.html)
+        self.assertIn('const latencyMs=Date.now()-requestStarted', self.html)
+        self.assertIn('kpis[1].textContent=meta.latencyMs+" ms"', self.html)
+        self.assertIn('data.data.length+"/"+data.count+" candles"', self.html)
+        self.assertIn('data.latest_closed_candle_age_seconds', self.html)
+        self.assertIn('tag.textContent=state==="available"?"API-REPORTED / MEASURED":"UNVERIFIED"', self.html)
+        self.assertIn('tag.textContent="UNVERIFIED"', self.html)
+        self.assertIn('if(state!=="available")', self.html)
+        self.assertIn('if(name==="Market candles"||name==="Derivatives snapshot") kpis[0].textContent=freshness', self.html)
+        self.assertIn('if(kpis[2]) kpis[2].textContent="UNKNOWN"', self.html)
+        self.assertIn('tag.textContent=state==="available"?"API-REPORTED / MEASURED":"UNVERIFIED"', self.html)
+        self.assertIn('const metrics=panel.querySelector(\'[data-api-metrics="\'+name+\'"]\');if(metrics)metrics.replaceChildren();', self.html)
+        self.assertIn("if(state!==\"available\")", self.html)
+        self.assertIn('panel.setAttribute("data-api-state",state)', self.html)
+        self.assertIn('document.querySelectorAll("[data-cin-panel]")', self.html)
+        self.assertIn('for(const endpoint of endpoints) updateDashboardPanel(endpoint.name,"unavailable","Disconnected; reconnect to refresh this read-only endpoint.",null,null)', self.html)
+
+    def test_reference_matched_dense_intelligence_terminal_is_present(self):
+        for section in (
+            "Market status ribbon",
+            "BTC market structure",
+            "Feed latency & data quality",
+            "Neural shell / evidence relationship map",
+            "Watchlist / screening",
+            "Execution tape / event stream",
+            "Resolution funnel / analysis trace",
+            "READ ONLY",
+            "No wallet connected",
+        ):
+            with self.subTest(section=section):
+                self.assertIn(section, self.html)
+        self.assertIn('id="network-dots"', self.html)
+        self.assertIn("for(let i=0;i<560;i++)", self.html)
+        self.assertIn("not live measurements", self.html)
+        self.assertIn("Nodes are illustrative", self.html)
+        self.assertIn("@media(max-width:560px)", self.html)
+        self.assertIn("No live data", self.html)
+
+    def test_btc_ticker_quote_currency_matches_btcusdt_api_symbol(self):
+        ticker = next(
+            line for line in self.html.splitlines()
+            if 'class="ticker"' in line and "BTC / USDT" in line
+        )
+        self.assertIn("BTC / USDT", ticker)
+        self.assertNotIn("<span>BTC / USD <b>", ticker)
+        self.assertIn("/market-candles?symbol=BTCUSDT", self.html)
+
+    def test_documented_contract_matches_opt_in_read_only_preview(self):
+        contract = (REPO_ROOT / "docs" / "cin-mobile-dashboard-contract.md").read_text(encoding="utf-8")
+        self.assertIn("No API request is made until the user explicitly", contract)
+        self.assertIn("GET requests only", contract)
+        self.assertIn("omits credentials", contract)
+        self.assertIn("rejects redirects", contract)
+        self.assertIn("not a claim that every route is present in every deployed build", contract)
+        for path in (
+            "/market-candles?symbol=BTCUSDT",
+            "/technical-analysis/market?symbol=BTCUSDT",
+            "/coin-screening?vs_currency=usd",
+            "/news-sentiment?query=cryptocurrency",
+            "/derivatives/market-snapshot?symbol=BTCUSDT",
+        ):
+            with self.subTest(path=path):
+                self.assertIn(path, contract)
+        self.assertIn("data_quality.freshness_status", contract)
+        self.assertIn("timestamp_quality", contract)
+
+
+if __name__ == "__main__":
+    unittest.main()
