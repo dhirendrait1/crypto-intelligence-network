@@ -67,7 +67,7 @@ Cloudflare's current Workers product page advertises starting on the Free plan w
 - D1 `batch()` transaction semantics have not yet been implemented or verified for multi-statement ledger operations.
 - List endpoints enforce a maximum row limit but do not yet provide cursor pagination.
 - Worker-side tests cover authentication, path/method restrictions, operation allowlisting, payload size, malformed payload/limit rejection, and a Node SQLite compatibility harness for forecast/observation CRUD, idempotency, nearest-observation evaluation, and readback. This is a local SQL compatibility test, not a real Cloudflare D1 integration test.
-- Error mapping, quota exhaustion, export/restore, and persistence across Worker/Render restarts remain unverified.
+- Error mapping now has sanitized 503 handling and offline simulated quota/unavailable-binding tests; real D1 quota behaviour remains unverified.\n- An independent staging backup/restore drill is documented in `worker/README.md`, but no export, restore, checksum comparison, or live persistence test has been run.
 
 ## Explicit non-actions
 
