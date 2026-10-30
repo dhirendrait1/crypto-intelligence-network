@@ -141,6 +141,25 @@ class TestEvidenceStoreContract(unittest.TestCase):
         finally:
             connection.close()
 
+    def test_identity_lookup_enforces_documented_component_length_bounds(self):
+        connection = sqlite3.connect(":memory:")
+        try:
+            connection.executescript(SCHEMA.read_text(encoding="utf-8"))
+            repository = LocalSQLiteEvidenceRepository(connection)
+            invalid_cases = [
+                ("x" * 129, "valid-id"),
+                ("valid-provider", "x" * 257),
+            ]
+            for namespace, external_id in invalid_cases:
+                with self.subTest(namespace_length=len(namespace), external_id_length=len(external_id)):
+                    with self.assertRaises(ValueError):
+                        repository.find_evidence_id(
+                            source_namespace=namespace,
+                            external_evidence_id=external_id,
+                        )
+        finally:
+            connection.close()
+
     def test_identity_lookup_returns_none_for_missing_provider_identity(self):
         connection = sqlite3.connect(":memory:")
         try:
