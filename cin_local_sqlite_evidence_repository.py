@@ -43,10 +43,18 @@ class LocalSQLiteEvidenceRepository:
         external_evidence_id: str,
     ) -> str | None:
         """Read an existing evidence ID by its unique provider identity."""
-        if not isinstance(source_namespace, str) or not source_namespace.strip():
-            raise ValueError("source_namespace must be non-empty")
-        if not isinstance(external_evidence_id, str) or not external_evidence_id.strip():
-            raise ValueError("external_evidence_id must be non-empty")
+        if (
+            not isinstance(source_namespace, str)
+            or not source_namespace.strip()
+            or len(source_namespace.strip()) > 128
+        ):
+            raise ValueError("source_namespace must contain 1..128 characters")
+        if (
+            not isinstance(external_evidence_id, str)
+            or not external_evidence_id.strip()
+            or len(external_evidence_id.strip()) > 256
+        ):
+            raise ValueError("external_evidence_id must contain 1..256 characters")
         row = self.connection.execute(
             """SELECT cin_evidence_id
                FROM cin_evidence_records
