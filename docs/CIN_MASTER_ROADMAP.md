@@ -368,3 +368,11 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - Added a standalone React 18 + TypeScript + Vite app shell under `frontend/`, responsive dark-first styling, explicit demo-only/no-live-data disclosure, read-only scope, and navigation that labels unimplemented modules.
 - Added Vitest/Testing Library checks and `.github/workflows/cin-frontend-ci.yml` for Node 22 typecheck, tests and production build. Workflow result remains pending until Actions completes.
 - Added implementation record at `docs/CIN_F22_FRONTEND_FOUNDATION_IMPLEMENTATION_RECORD.md`. A committed npm lockfile is still missing, so transitive dependency reproducibility is an open acceptance gap. API integration, real dashboard panels, accessibility/browser tests and deployment remain pending. No backend/API, CORS, persistence, Render, Cloudflare, DNS or production deployment changed.
+
+
+### F-23 — API client and shared data-state layer (2026-10-31)
+
+- Added a centralized typed fetch boundary with an environment-configured API origin, timeout and normalized errors; connected health/readiness checks only when configured.
+- Added reusable fresh/stale/partial/conflicting/unavailable/unknown/error state presentation and source/retrieval metadata slots.
+- Deliberately did not wire market-data/screening endpoints because their checked-in provider behavior is CoinGecko/CoinPaprika and conflicts with the saved Coinbase-first / exclude-CoinGecko preference. No live market values or provider assumptions were introduced. See `docs/CIN_F23_API_CLIENT_AND_DATA_STATE_IMPLEMENTATION.md`.
+- CI verification, committed npm lockfile, deployed health/readiness payload validation and Coinbase-aligned market contracts remain outstanding. No backend/CORS/provider/deployment changes. F-23 remains Partial.
