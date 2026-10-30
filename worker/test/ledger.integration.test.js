@@ -50,13 +50,13 @@ test("persists immutable forecasts and observations and evaluates the nearest ho
     forecast, recorded_at: "2026-10-30T10:00:05+00:00",
   });
   assert.equal(created.status, 200);
-  assert.equal(created.body.result.forecast_id, forecast.forecast_id);
+  assert.equal(created.body.result.forecast_id, forecast.forecast_id);\n  assert.equal(created.body.result.created_at, "2026-10-30T10:00:00.000Z");\n  assert.equal(created.body.result.target_at, "2026-10-30T11:00:00.000Z");
 
   const replay = await call(env, "create_forecast", {
     forecast, recorded_at: "2026-10-30T10:05:00+00:00",
   });
   assert.equal(replay.status, 200);
-  assert.equal(replay.body.result.recorded_at, "2026-10-30T10:00:05+00:00");
+  assert.equal(replay.body.result.recorded_at, "2026-10-30T10:00:05.000Z");
 
   const conflict = await call(env, "create_forecast", {
     forecast: { ...forecast, value: 71000 },
@@ -230,3 +230,34 @@ test("concurrent observation retries are idempotent and conflicting IDs fail clo
   db.close();
 });
 
+test("canonicalizes offset timestamps before storing and comparing ledger rows", async () => {
+  const db = makeD1();
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const created = await call(env, "create_forecast", {
+    forecast: {
+      forecast_id: "fc-offset-1", asset_id: "BTC-USD", metric: "price",
+      value: 70000, unit: "USD", source_id: "cin-model-v1",
+      created_at: "2026-10-30T12:00:00+02:00",
+      target_at: "2026-10-30T13:00:00+02:00",
+    },
+    recorded_at: "2026-10-30T12:00:05+02:00",
+  });
+  assert.equal(created.status, 200);
+  assert.equal(created.body.result.created_at, "2026-10-30T10:00:00.000Z");
+  assert.equal(created.body.result.target_at, "2026-10-30T11:00:00.000Z");
+  assert.equal(created.body.result.recorded_at, "2026-10-30T10:00:05.000Z");
+
+  const inserted = await call(env, "insert_observation", {
+    observation: {
+      observation_id: "obs-offset-1", asset_id: "BTC-USD", metric: "price",
+      value: 69900, unit: "USD", source_id: "coinbase-public",
+      observed_at: "2026-10-30T13:02:00+02:00",
+      retrieved_at: "2026-10-30T13:03:00+02:00",
+    },
+  });
+  assert.equal(inserted.status, 200);
+  assert.equal(inserted.body.result.observed_at, "2026-10-30T11:02:00.000Z");
+  assert.equal(inserted.body.result.retrieved_at, "2026-10-30T11:03:00.000Z");
+  db.close();
+});
+\n
