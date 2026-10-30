@@ -14,6 +14,7 @@ class GrowthFundamentalsValidationTests(unittest.TestCase):
             "source_name": "Example source",
             "source_url": "https://example.com/report",
             "published_at": "2026-10-01T00:00:00Z",
+            "checked_at": "2026-10-20T00:00:00Z",
             "status": "verified",
         }
         item.update(overrides)
