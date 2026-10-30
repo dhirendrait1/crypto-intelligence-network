@@ -18,8 +18,25 @@ function makeD1() {
           const result = db.prepare(sql).run(...values);
           return { success: true, meta: { changes: Number(result.changes) } };
         },
+        batchResult() {
+          if (/^\\s*SELECT/i.test(sql))
+            return { success: true, results: db.prepare(sql).all(...values) };
+          const result = db.prepare(sql).run(...values);
+          return { success: true, meta: { changes: Number(result.changes) }, results: [] };
+        },
       };
       return statement;
+    },
+    batch(statements) {
+      db.exec("BEGIN");
+      try {
+        const results = statements.map(statement => statement.batchResult());
+        db.exec("COMMIT");
+        return results;
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
     },
     close() { db.close(); },
   };
