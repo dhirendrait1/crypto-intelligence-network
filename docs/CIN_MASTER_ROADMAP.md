@@ -197,3 +197,8 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - Added `docs/CIN_VERIFIABLE_EVIDENCE_MODEL.md` defining claim, evidence record, and claim-evidence relationship objects; distinct published/observed/provider-seen/retrieved/checked/valid times; source provenance and independence; descriptive confidence states; conflict handling; freshness/completeness; and audit/versioning requirements.
 - The specification explicitly distinguishes source assertions from CIN verification, prohibits treating missing evidence as zero, and disallows numeric confidence probabilities without calibration evidence.
 - Step 23 remains Partial: this is a design specification. Persistent evidence storage, versioned claim APIs, and migration of existing modules are not implemented.
+
+### Step 23 status reconciliation (2026-10-30)
+
+- Reconciled the roadmap with the existing common evidence-model specification and implementation tracker: Step 23 is Partial, not Pending.
+- The specification is documentation only. It does not imply a persistent evidence store, a versioned claim API, or migration of existing assessment APIs.
