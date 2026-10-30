@@ -149,6 +149,8 @@ def normalize_evidence(item: Any, *, now: datetime | None = None,
     record["source_role"] = normalized_source_role
     record["source_role_is_self_reported"] = raw_source_role is not None
     record["source_role_authenticated"] = False
+    record["claim_text"] = str(item.get("claim_text", "")).strip() or None
+    record["claim_text_is_caller_supplied"] = record["claim_text"] is not None
     record["notes"] = str(item.get("notes", "")).strip() or None
     record["invalid_record"] = False
     status = str(record.get("status") or "unverified").lower()
@@ -209,7 +211,7 @@ def normalize_evidence(item: Any, *, now: datetime | None = None,
     record["assessment_clock_valid"] = assessment_clock_valid
     fingerprint_fields = {
         field: record.get(field)
-        for field in (*REQUIRED_EVIDENCE_FIELDS, "evidence_id", "source_role", "notes")
+        for field in (*REQUIRED_EVIDENCE_FIELDS, "evidence_id", "source_role", "claim_text", "notes")
     }
     canonical_payload = json.dumps(
         fingerprint_fields, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str
