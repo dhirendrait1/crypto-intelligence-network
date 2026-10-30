@@ -48,42 +48,33 @@ function validateObservation(o) {
   return { ...o, observed_at: utc(o.observed_at), retrieved_at: utc(o.retrieved_at) };
 }
 async function insertImmutable(env, table, idColumn, id, item) {
+  // D1 batch executes the insert and readback in one transaction. The table
+  // and identifier names are selected only by the fixed internal callers.
+  const db = env.CIN_FORECAST_DB;
   const payload = JSON.stringify(item);
-  const existing = await env.CIN_FORECAST_DB.prepare(
-    `SELECT payload_json FROM ${table} WHERE ${idColumn} = ?`
-  ).bind(id).first();
-  if (existing) {
-    const old = JSON.parse(existing.payload_json);
-    if (table === "cin_forecasts") {
-      const originalRecordedAt = old.recorded_at;
-      delete old.recorded_at;
-      const copy = { ...item };
-      delete copy.recorded_at;
-      if (stable(old) !== stable(copy)) throw new Error("ID already exists with different content");
-      return { ...old, recorded_at: originalRecordedAt };
-    }
-    if (stable(old) !== stable(item)) throw new Error("ID already exists with different content");
-    return old;
-  }
-  if (table === "cin_forecasts") {
-    await env.CIN_FORECAST_DB.prepare(
+  const insert = table === "cin_forecasts"
+    ? db.prepare(
       "INSERT OR IGNORE INTO cin_forecasts (forecast_id, asset_id, metric, unit, created_at, payload_json) VALUES (?, ?, ?, ?, ?, ?)"
-    ).bind(id, item.asset_id, item.metric, item.unit, item.created_at, payload).run();
-  } else {
-    await env.CIN_FORECAST_DB.prepare(
+    ).bind(id, item.asset_id, item.metric, item.unit, item.created_at, payload)
+    : db.prepare(
       "INSERT OR IGNORE INTO cin_forecast_observations (observation_id, asset_id, metric, unit, observed_at, payload_json) VALUES (?, ?, ?, ?, ?, ?)"
-    ).bind(id, item.asset_id, item.metric, item.unit, item.observed_at, payload).run();
-  }
-  const saved = await env.CIN_FORECAST_DB.prepare(
+    ).bind(id, item.asset_id, item.metric, item.unit, item.observed_at, payload);
+  const readback = db.prepare(
     `SELECT payload_json FROM ${table} WHERE ${idColumn} = ?`
-  ).bind(id).first();
+  ).bind(id);
+  const results = await db.batch([insert, readback]);
+  const saved = results?.[1]?.results?.[0] ?? null;
   const value = saved && JSON.parse(saved.payload_json);
-  if (!value || (table !== "cin_forecasts" && stable(value) !== stable(item)))
-    throw new Error("ID already exists with different content");
+  if (!value) throw new Error("ledger insert was not confirmed");
   if (table === "cin_forecasts") {
-    const a = { ...value }, b = { ...item }; delete a.recorded_at; delete b.recorded_at;
+    const a = { ...value }, b = { ...item };
+    delete a.recorded_at;
+    delete b.recorded_at;
     if (stable(a) !== stable(b)) throw new Error("ID already exists with different content");
+    return value;
   }
+  if (stable(value) !== stable(item))
+    throw new Error("ID already exists with different content");
   return value;
 }
 async function handle(env, op, p) {
@@ -158,11 +149,15 @@ async function handle(env, op, p) {
         observation_id:o.observation_id, source_id:o.source_id, observed_at:o.observed_at,
         evaluated_at:p.evaluated_at, asset_id:f.asset_id,
         observation_retrieved_at:o.retrieved_at, max_observation_lag_seconds:lag };
-      await db.prepare("INSERT OR IGNORE INTO cin_forecast_evaluations (forecast_id, observation_id, evaluated_at, result_json) VALUES (?, ?, ?, ?)")
-        .bind(f.forecast_id, o.observation_id, p.evaluated_at, JSON.stringify(result)).run();
-      const saved = await db.prepare("SELECT result_json FROM cin_forecast_evaluations WHERE forecast_id=?")
-        .bind(f.forecast_id).first();
-      return saved ? JSON.parse(saved.result_json) : result;
+      const persisted = await db.batch([
+        db.prepare("INSERT OR IGNORE INTO cin_forecast_evaluations (forecast_id, observation_id, evaluated_at, result_json) VALUES (?, ?, ?, ?)")
+          .bind(f.forecast_id, o.observation_id, p.evaluated_at, JSON.stringify(result)),
+        db.prepare("SELECT result_json FROM cin_forecast_evaluations WHERE forecast_id=?")
+          .bind(f.forecast_id),
+      ]);
+      const saved = persisted?.[1]?.results?.[0] ?? null;
+      if (!saved) throw new Error("evaluation persistence was not confirmed");
+      return JSON.parse(saved.result_json);
     }
     default: throw new Error("unsupported ledger operation");
   }
