@@ -12,7 +12,12 @@ const text = (value, max = 160) => typeof value === "string" && value.trim() &&
   value.length <= max && !/[\u0000-\u001f\u007f]/.test(value);
 const iso = value => typeof value === "string" && !Number.isNaN(Date.parse(value)) &&
   /(?:Z|[+-]\d{2}:\d{2})$/.test(value);
-const stable = value => JSON.stringify(value, Object.keys(value || {}).sort());
+const stable = value => {
+  if (Array.isArray(value)) return "[" + value.map(stable).join(",") + "]";
+  if (value && typeof value === "object")
+    return "{" + Object.keys(value).sort().map(key => JSON.stringify(key) + ":" + stable(value[key])).join(",") + "}";
+  return JSON.stringify(value);
+};
 
 async function forecast(env, id) {
   const row = await env.CIN_FORECAST_DB.prepare(
@@ -54,10 +59,10 @@ async function insertImmutable(env, table, idColumn, id, item) {
       delete old.recorded_at;
       const copy = { ...item };
       delete copy.recorded_at;
-      if (JSON.stringify(old) !== JSON.stringify(copy)) throw new Error("ID already exists with different content");
+      if (stable(old) !== stable(copy)) throw new Error("ID already exists with different content");
       return { ...old, recorded_at: originalRecordedAt };
     }
-    if (JSON.stringify(old) !== payload) throw new Error("ID already exists with different content");
+    if (stable(old) !== stable(item)) throw new Error("ID already exists with different content");
     return old;
   }
   if (table === "cin_forecasts") {
@@ -73,11 +78,11 @@ async function insertImmutable(env, table, idColumn, id, item) {
     `SELECT payload_json FROM ${table} WHERE ${idColumn} = ?`
   ).bind(id).first();
   const value = saved && JSON.parse(saved.payload_json);
-  if (!value || (table !== "cin_forecasts" && JSON.stringify(value) !== payload))
+  if (!value || (table !== "cin_forecasts" && stable(value) !== stable(item)))
     throw new Error("ID already exists with different content");
   if (table === "cin_forecasts") {
     const a = { ...value }, b = { ...item }; delete a.recorded_at; delete b.recorded_at;
-    if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error("ID already exists with different content");
+    if (stable(a) !== stable(b)) throw new Error("ID already exists with different content");
   }
   return value;
 }
