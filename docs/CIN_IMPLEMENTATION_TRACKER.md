@@ -972,3 +972,12 @@ This checkpoint validates configured offline automation only. It does not establ
 - Mapped existing evidence IDs, module-specific evidence types/categories, source metadata, publication/check times, caller-supplied claim text, metadata fingerprints, and freshness fields to the common evidence model.
 - Identified the principal schema gap: neither module yet emits a first-class stable CIN `claim_id` or explicit claim-evidence relationship object with relationship type, rationale, and review status.
 - Defined additive compatibility rules and acceptance gates for the next code increment. This documentation change does not alter API/runtime behavior and does not imply persistence, source retrieval, authentication, or independent verification. Step 23 remains Partial.
+
+
+### Step 23 shared claim/evidence primitives (2026-10-30)
+
+- Added `cin_verifiable_evidence.py` with deterministic content-derived claim IDs, typed claim values/units, valid-time bounds, timezone-aware creation time, explicit claim status, and schema version.
+- Added validated claim-evidence relationship objects with the four documented relationship types and three review states. Creation time is excluded from claim identity; identity fields are canonicalized and hashed. IDs/fingerprints are not truth or authenticity proofs.
+- Added offline tests covering stable identity, identity changes, valid-time ordering, timezone awareness, finite JSON-compatible values, allowed status vocabularies, malformed inputs, relationship types, and review states.
+- Added the module to `patch_cin_metadata_fixed.py` and its deployment-scaffold regression fixture so the scaffold copies it into `cin/app`. No router or public endpoint was added.
+- This is an in-memory construction layer only; no persistence, source fetching/authentication, relationship API, or migration of existing assessment response payloads. Step 23 remains Partial.
