@@ -275,3 +275,9 @@ When continuing work, choose the earliest unfinished step that can be completed 
 
 - Added `docs/CIN_STEP23_BACKUP_EXPORT_REPLICA_RESTORE_READINESS_V1.md` and recorded F-08 in the privacy/data-minimization audit. The design specifies copy lineage manifests, export restrictions, restore quarantine, erasure replay, residual scans, and acceptance gates.
 - Operational backup, replica, export, cache, and restore controls are not evidenced in the reviewed repository; hosting-provider-managed copies remain unverified. No operational configuration or data was changed. F-08 remains Open; Step 23 remains Partial.
+
+
+### Step 23 F-09 access-control readiness increment (2026-10-31)
+
+- Added `docs/CIN_STEP23_ACCESS_CONTROL_AND_AUTHORIZATION_READINESS_V1.md` and recorded F-09 in the privacy audit and persistence lifecycle. It distinguishes input validation/dependency injection from identity and authorization, defines proposed least-privilege controls, and records implementation acceptance gates.
+- Authentication, role matrix, privileged-action approval, audit storage, and deployment identity remain unresolved. No schema/runtime/deployment change was made. F-09 remains Open; Step 23 remains Partial.
