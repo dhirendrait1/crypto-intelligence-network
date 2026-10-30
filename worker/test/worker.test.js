@@ -78,3 +78,41 @@ test("rejects invalid list limits instead of passing unsafe values to D1", async
   assert.equal(response.status, 422);
   assert.match((await response.json()).error, /invalid list limit/);
 });
+
+test("returns a sanitized retryable response when the D1 binding is missing", async () => {
+  const response = await worker.fetch(request(" /v1/ledger".trim(), {
+    operation: "get_forecast",
+    payload: { forecast_id: "fc-missing-db" },
+  }), { CIN_FORECAST_WORKER_TOKEN: "worker-test-secret" });
+  assert.equal(response.status, 503);
+  const body = await response.json();
+  assert.match(body.error, /temporarily unavailable/);
+});
+
+test("does not expose database or quota internals when storage rejects a write", async () => {
+  const brokenDb = {
+    prepare() {
+      return {
+        bind() { return this; },
+        first() { throw new Error("D1_ERROR: daily write quota exceeded; internal detail"); },
+      };
+    },
+  };
+  const response = await worker.fetch(request("/v1/ledger", {
+    operation: "create_forecast",
+    payload: {
+      forecast: {
+        forecast_id: "fc-quota", asset_id: "BTC-USD", metric: "price",
+        value: 70000, unit: "USD", source_id: "test",
+        created_at: "2026-10-30T10:00:00Z",
+        target_at: "2026-10-30T11:00:00Z",
+      },
+      recorded_at: "2026-10-30T10:00:01Z",
+    },
+  }), { CIN_FORECAST_WORKER_TOKEN: "worker-test-secret", CIN_FORECAST_DB: brokenDb });
+  assert.equal(response.status, 503);
+  const body = await response.json();
+  assert.match(body.error, /temporarily unavailable/);
+  assert.doesNotMatch(body.error, /quota|D1_ERROR|internal detail/);
+});
+
