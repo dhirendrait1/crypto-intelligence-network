@@ -301,5 +301,21 @@ class TestSQLitePersistenceReliability(unittest.TestCase):
             ["initial-unassessed-v1", "reliability-test-v1", "reliability-test-v2"],
         )
 
+    def test_assessment_event_rejects_unknown_claim_without_creating_history(self):
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.repo.append_assessment_event(
+                claim_id="cin-claim-does-not-exist",
+                claim_status="supported",
+                assessed_at="2026-10-30T12:03:00Z",
+                methodology_version="reliability-test-v1",
+                assessor_type="automated_rule",
+                rationale="Foreign-key guard regression test.",
+            )
+
+        self.assertEqual(
+            self.db.execute("SELECT COUNT(*) FROM cin_claim_assessment_events").fetchone()[0],
+            0,
+        )
+
 if __name__ == "__main__":
     unittest.main()
