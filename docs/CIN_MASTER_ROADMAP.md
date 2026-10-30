@@ -54,7 +54,7 @@
 20. **[Partial]** Design authorized social-source ingestion for X, Reddit, and Telegram, respecting platform access limits. Provider authorization, access-tier, privacy, retention, provenance, and release-gate requirements are documented; actual connectors remain unimplemented.
 21. **[Partial]** Define evidence-backed exchange-flow and whale-attribution methodology with clear identity uncertainty. Read-only transfer taxonomy, exchange-label evidence tiers, flow definitions, uncertainty rules, quality controls, and provider acceptance gates are documented; chain-data implementation and live validation remain outstanding.
 22. **[Partial]** Build source ingestion for commodity backing and growth fundamentals; distinguish claims from independently verified evidence. Commodity and growth evidence APIs now accept caller-supplied evidence IDs, source roles, and explicit claim text separate from source references; growth evidence also validates check-time chronology and fingerprints normalized metadata. Source retrieval and independent verification remain outstanding.
-23. **[Partial]** Define a verifiable evidence model for claims, citations, observation time, retrieval time, conflicts, and confidence. A common claim/evidence/relationship schema, time semantics, provenance, descriptive confidence states, conflict handling, freshness, and migration gates are documented; persistent implementation and module migration remain outstanding.
+23. **[Partial]** Define and incrementally implement a verifiable evidence model for claims, citations, observation time, retrieval time, conflicts, and confidence. The common schema and migration contract are documented; a shared deterministic claim builder and validated claim-evidence relationship builder now exist with offline tests and scaffold copying. Persistent storage, API integration, migration of assessment responses, and source authentication remain outstanding.
 
 **Exit gate:** CIN does not claim social sentiment, whale attribution, backing, or fundamentals are verified until sources and methods substantiate those claims.
 
@@ -212,3 +212,12 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - Defined additive migration rules: preserve legacy API fields, keep claim identity separate from evidence identity, do not infer relationships from source URLs, preserve timestamp semantics, and keep metadata fingerprints distinct from content hashes/authenticity proof.
 - Specified deterministic acceptance gates for relationship types/review states, duplicate IDs, missing claims, timestamp/freshness/conflict cases, scaffold registration, and offline CI.
 - Documentation-only increment; no API or runtime behavior changed. Step 23 remains Partial.
+
+
+### Step 23 shared claim/evidence primitives (2026-10-30)
+
+- Added `cin_verifiable_evidence.py` with a deterministic SHA-256-derived CIN claim ID based on canonical claim identity (subject, predicate, statement, typed value/unit, and valid-time bounds); creation time is intentionally excluded from identity.
+- Added validated claim-evidence relationship construction for `supports`, `contradicts`, `qualifies`, and `context_only`, with explicit `automated_candidate`, `human_reviewed`, and `rejected` review states.
+- Added offline tests for deterministic identity, identity changes, typed values, timezone-aware and ordered valid times, allowed statuses, malformed values, relationship types, and review states.
+- Added the shared module to the Render scaffold copy list and scaffold regression fixture. No Render deployment was performed.
+- These are in-memory construction/validation primitives only: no persistence, source retrieval/authentication, relationship API, or automatic claim inference. Step 23 remains Partial.
