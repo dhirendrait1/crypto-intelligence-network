@@ -1,0 +1,8 @@
+name = "cin-forecast-ledger"
+main = "src/index.js"
+compatibility_date = "2026-10-30"
+
+[[d1_databases]]
+binding = "CIN_FORECAST_DB"
+database_name = "cin-forecast-ledger"
+database_id = "REPLACE_WITH_NON_PRODUCTION_D1_DATABASE_ID"
