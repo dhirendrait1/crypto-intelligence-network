@@ -40,10 +40,30 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r cin/requirements.txt pytest httpx
 
+      - name: Set up Node.js for Worker compatibility tests
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+
+      - name: Validate D1 Worker JavaScript and SQL schema
+        run: |
+          node --check --input-type=module < worker/src/index.js
+          node --test worker/test/*.test.js
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          db = sqlite3.connect(":memory:")
+          db.executescript(Path("worker/migrations/0001_forecast_ledger.sql").read_text())
+          tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+          required = {"cin_forecasts", "cin_forecast_observations", "cin_forecast_evaluations"}
+          assert required <= tables, required - tables
+          PY
+
       - name: Compile CIN modules and tests
         run: |
           python -m compileall -q cin
           python -m compileall -q tests
+          python -m py_compile cin_forecast_d1_adapter.py cin_forecast_ledger_api.py
 
       - name: Run offline test suite
         run: python -m pytest -q tests
@@ -69,6 +89,9 @@ jobs:
               "/growth-fundamentals-assessment",
               "/derivatives/market-snapshot",
               "/news-sentiment",
+              "/forecasts",
+              "/forecasts/observations",
+              "/forecasts/scorecards/summary",
           }
           missing = sorted(required - paths)
           print("Registered CIN routes:")
