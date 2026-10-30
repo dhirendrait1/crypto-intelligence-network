@@ -105,3 +105,73 @@ test("persists immutable forecasts and observations and evaluates the nearest ho
   assert.equal(evaluations.body.result.length, 1);
   db.close();
 });
+
+
+test("canonical payload comparison accepts reordered nested JSON keys", async () => {
+  const db = makeD1();
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const base = {
+    forecast_id: "fc-canonical", asset_id: "ETH-USD", metric: "price",
+    value: 3000, unit: "USD", source_id: "test",
+    created_at: "2026-10-30T10:00:00Z", target_at: "2026-10-30T11:00:00Z",
+    metadata: { model: "v1", inputs: { volatility: 0.2, horizon: "1h" } },
+  };
+  const first = await call(env, "create_forecast", {
+    forecast: base, recorded_at: "2026-10-30T10:00:01Z",
+  });
+  const replay = await call(env, "create_forecast", {
+    forecast: {
+      ...base,
+      metadata: { inputs: { horizon: "1h", volatility: 0.2 }, model: "v1" },
+    },
+    recorded_at: "2026-10-30T10:01:00Z",
+  });
+  assert.equal(first.status, 200);
+  assert.equal(replay.status, 200);
+  assert.equal(replay.body.result.recorded_at, "2026-10-30T10:00:01Z");
+  db.close();
+});
+
+test("concurrent duplicate forecast inserts preserve one immutable record", async () => {
+  const db = makeD1();
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const forecast = {
+    forecast_id: "fc-race", asset_id: "BTC-USD", metric: "price",
+    value: 70000, unit: "USD", source_id: "test",
+    created_at: "2026-10-30T10:00:00Z", target_at: "2026-10-30T11:00:00Z",
+  };
+  const [one, two] = await Promise.all([
+    call(env, "create_forecast", { forecast, recorded_at: "2026-10-30T10:00:01Z" }),
+    call(env, "create_forecast", { forecast, recorded_at: "2026-10-30T10:00:02Z" }),
+  ]);
+  assert.equal(one.status, 200);
+  assert.equal(two.status, 200);
+  assert.equal(one.body.result.recorded_at, two.body.result.recorded_at);
+  const saved = await call(env, "get_forecast", { forecast_id: "fc-race" });
+  assert.equal(saved.body.result.forecast_id, "fc-race");
+  db.close();
+});
+
+test("concurrent evaluations return the single persisted first result", async () => {
+  const db = makeD1();
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const forecast = {
+    forecast_id: "fc-eval-race", asset_id: "BTC-USD", metric: "price",
+    value: 70000, unit: "USD", source_id: "test",
+    created_at: "2026-10-30T10:00:00Z", target_at: "2026-10-30T11:00:00Z",
+  };
+  await call(env, "create_forecast", { forecast, recorded_at: "2026-10-30T10:00:01Z" });
+  await call(env, "insert_observation", { observation: {
+    observation_id: "obs-eval-race", asset_id: "BTC-USD", metric: "price",
+    value: 69900, unit: "USD", source_id: "test",
+    observed_at: "2026-10-30T11:01:00Z", retrieved_at: "2026-10-30T11:02:00Z",
+  } });
+  const [one, two] = await Promise.all([
+    call(env, "evaluate_forecast", { forecast_id: "fc-eval-race", evaluated_at: "2026-10-30T11:03:00Z" }),
+    call(env, "evaluate_forecast", { forecast_id: "fc-eval-race", evaluated_at: "2026-10-30T11:04:00Z" }),
+  ]);
+  assert.equal(one.status, 200);
+  assert.equal(two.status, 200);
+  assert.deepEqual(one.body.result, two.body.result);
+  db.close();
+});
