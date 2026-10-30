@@ -27,8 +27,8 @@ class FakeResponse:
 class MarketDataStep1ValidationTests(unittest.TestCase):
     def _responses(self, mocked, stats=None, ticker=None):
         mocked.side_effect = [
-            FakeResponse(stats or {"last": "100", "open": "90", "volume": "12"}),
-            FakeResponse(ticker or {"time": datetime.now(timezone.utc).isoformat()}),
+            FakeResponse(stats if stats is not None else {"last": "100", "open": "90", "volume": "12"}),
+            FakeResponse(ticker if ticker is not None else {"time": datetime.now(timezone.utc).isoformat()}),
         ]
 
     @patch("market_data_step1.urllib.request.urlopen")
