@@ -102,3 +102,17 @@ def test_request_rejects_unsupported_evidence_status():
             symbol="ETH",
             evidence=[{"category": "usage_and_adoption", "status": "confirmed"}],
         )
+
+
+
+def test_request_accepts_claim_text_and_rejects_oversized_claim_text():
+    request = GrowthFundamentalsRequest(
+        symbol="ETH",
+        evidence=[{"category": "fees_and_revenue", "claim_text": "Issuer-reported revenue"}],
+    )
+    assert request.evidence[0].claim_text == "Issuer-reported revenue"
+    with pytest.raises(ValidationError):
+        GrowthFundamentalsRequest(
+            symbol="ETH",
+            evidence=[{"category": "fees_and_revenue", "claim_text": "x" * 4001}],
+        )
