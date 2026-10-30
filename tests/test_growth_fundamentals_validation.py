@@ -38,7 +38,7 @@ class GrowthFundamentalsValidationTests(unittest.TestCase):
         self.assertIsNone(result["evidence"][0]["publication_age_days"])
         self.assertEqual(
             result["evidence"][0]["timestamp_validation_errors"],
-            ["published_at_is_in_the_future"],
+            ["published_at_is_in_the_future", "checked_at_precedes_published_at"],
         )
         self.assertFalse(result["cin_independently_verified_claims"])
 
