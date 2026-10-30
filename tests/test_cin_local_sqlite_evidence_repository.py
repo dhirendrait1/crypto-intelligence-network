@@ -112,6 +112,46 @@ class TestLocalSQLiteEvidenceRepository(unittest.TestCase):
                 rationale="Invalid vocabulary.",
             )
 
+    def test_append_observation_preserves_history_and_original_observation(self):
+        first = self._store()
+        second_id = self.repo.append_observation(
+            cin_evidence_id=first["cin_evidence_id"],
+            metadata={"metric": "commits", "count": 15},
+            observed_at="2026-10-30T13:00:00+01:00",
+            source_status="cin_observed",
+        )
+        rows = self.db.execute(
+            """SELECT observation_id, observed_at, retrieved_at, metadata_json, source_status
+               FROM cin_evidence_observations WHERE cin_evidence_id=?
+               ORDER BY observed_at""",
+            (first["cin_evidence_id"],),
+        ).fetchall()
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]["observation_id"], first["observation_id"])
+        self.assertEqual(rows[0]["source_status"], "caller_supplied")
+        self.assertIsNone(rows[0]["retrieved_at"])
+        self.assertEqual(rows[1]["observation_id"], second_id)
+        self.assertEqual(rows[1]["observed_at"], "2026-10-30T12:00:00Z")
+        self.assertEqual(rows[1]["source_status"], "cin_observed")
+        self.assertIn('"count":15', rows[1]["metadata_json"])
+
+    def test_append_observation_rejects_unknown_record_and_nonfinite_json(self):
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.repo.append_observation(
+                cin_evidence_id="missing", metadata={}, observed_at="2026-10-30T12:00:00Z",
+                source_status="caller_supplied",
+            )
+        first = self._store()
+        with self.assertRaises(ValueError):
+            self.repo.append_observation(
+                cin_evidence_id=first["cin_evidence_id"], metadata={"n": float("inf")},
+                observed_at="2026-10-30T12:00:00Z", source_status="cin_observed",
+            )
+        self.assertEqual(
+            self.db.execute("SELECT COUNT(*) FROM cin_evidence_observations").fetchone()[0],
+            1,
+        )
+
     def test_invalid_naive_timestamp_is_rejected_before_write(self):
         with self.assertRaises(ValueError):
             self.repo.store_bundle(
