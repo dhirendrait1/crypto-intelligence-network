@@ -75,3 +75,19 @@ The adapter:
 - The existing storage-boundary regression tests also passed in the same workflow.
 
 **Gate A: implemented and CI-verified. Gate B: initial offline adapter contract suite implemented and CI-verified.** This is not a live provider smoke test and does not yet register or expose the adapter through the production API.
+
+
+### Gate C — isolated read-only API contract (2026-10-31)
+
+Added:
+- `cin_coinbase_market_data_api.py` — FastAPI router exposing `GET /coinbase/market-candles`.
+- `tests/test_cin_coinbase_market_data_api.py` — API contract tests.
+- CI now compiles the API module and runs both adapter and API test suites.
+
+The route requires explicit Unix-second `start` and `end` bounds, an explicit Coinbase product ID, and a supported granularity. Its response carries provider identity, USD quote identity, retrieval time, candle timestamps, closed/forming state, freshness metadata, and limitations. Provider exceptions are not exposed to clients.
+
+GitHub Actions [run #41146284133](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/41146284133) passed. The Coinbase adapter tests and API contract tests passed, together with the existing storage-boundary regression suite.
+
+**Gate C status: isolated router and contract tests implemented and CI-verified; production application registration remains blocked.** The audited feature branch does not contain an independently maintained FastAPI application entrypoint/router registry (the Render deployment app is packaged separately in the scaffold archive). This route has therefore not been mounted into the running service or exposed publicly. No archive, Render service, or deployment was changed.
+
+F-24 remains Partial. Remaining work includes safe integration into the actual deployment application source, API-level live read-only smoke validation, and dashboard wiring only after the deployed contract is verified.
