@@ -263,3 +263,8 @@ See docs/CIN_FRONTEND_IMPLEMENTATION_READINESS_AND_TECHNOLOGY_DECISION_V1.md. Se
 ## 30. Frontend foundation delivery boundary (F-22, 2026-10-31)
 
 The first React/TypeScript/Vite app shell is documented in docs/CIN_F22_FRONTEND_FOUNDATION_IMPLEMENTATION_RECORD.md. It is a separate frontend preview with demo-data disclosure, read-only boundary, responsive navigation and a CI workflow for typecheck, tests and build. This is outside the SQLite persistence runtime and does not wire persistence to a browser. No API, CORS, storage, provider or deployment change was made. GitHub Actions results and a committed npm lockfile remain outstanding; the frontend is not production-ready.
+
+
+## 31. Browser API boundary and data-state presentation (F-23, 2026-10-31)
+
+A centralized frontend fetch boundary now supports explicitly configured service health/readiness checks with timeout and normalized failure states. Shared UI state indicators cover freshness, partial results, conflicts, unknowns, unavailability and errors. This browser layer does not invoke the SQLite evidence store and does not enable persistence. Market/screening endpoints remain disconnected until provider semantics align with CIN's Coinbase-first preference. See docs/CIN_F23_API_CLIENT_AND_DATA_STATE_IMPLEMENTATION.md.
