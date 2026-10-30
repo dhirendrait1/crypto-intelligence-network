@@ -24,6 +24,7 @@ MODULES = (
     "cin_public_market_candles_api.py",
     "cin_derivatives_market_data_api.py",
     "cin_public_news_sentiment_api.py",
+    "cin_forecast_ledger_api.py",
 )
 main_path = APP_DIR / "main.py"
 if not main_path.is_file():
@@ -88,6 +89,12 @@ registrations = [
         "app.include_router(cin_derivatives_market_data_router)\n",
     ),
     (
+        "cin_forecast_ledger_router",
+        "\n# CIN: authenticated forecast ledger API; read-only research, no trading\n"
+        "from app.cin_forecast_ledger_api import router as cin_forecast_ledger_router\n"
+        "app.include_router(cin_forecast_ledger_router)\n",
+    ),
+    (
         "cin_public_news_sentiment_router",
         "\n# CIN: read-only public news and heuristic headline sentiment\n"
         "from app.cin_public_news_sentiment_api import router as cin_public_news_sentiment_router\n"
@@ -149,4 +156,4 @@ for module_name in MODULES:
     shutil.copyfile(ROOT / module_name, APP_DIR / module_name)
 
 
-print(f"CIN metadata verified; read-only market data, screening, assessment, evidence, and technical-analysis and public market-candle routers installed; files updated: {changed}")
+print(f"CIN metadata verified; read-only market data, screening, assessment, evidence, technical-analysis, public market-candle, and authenticated forecast-ledger routers installed; files updated: {changed}")
