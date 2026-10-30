@@ -388,3 +388,6 @@ When continuing work, choose the earliest unfinished step that can be completed 
 
 
 - **F-24 follow-through:** Coinbase public candle adapter and nine dedicated offline contract tests are now implemented and passed GitHub Actions run [#41146066687](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/41146066687). The adapter is isolated, fixed-host, USD-product explicit, 300-candle bounded, and not yet exposed as a registered API route. F-24 remains Partial; API route integration, provider policy for fallback pairs, frontend integration, and live read-only validation remain.
+
+
+- **F-24 Gate C increment:** Added the isolated `GET /coinbase/market-candles` FastAPI router and offline API contract tests. CI run [#41146284133](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/41146284133) passed. The audited branch lacks the deployment application's source entrypoint/router registry, so the route is not mounted in the Render service. Gate C is Partial (router contract implemented; deployment-app registration and live smoke test remain); no deployment or service configuration was changed.
