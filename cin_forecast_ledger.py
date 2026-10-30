@@ -13,7 +13,12 @@ from contextlib import closing
 from pathlib import Path
 from typing import Any, Mapping
 
-from cin_forecast_outcomes import evaluate_forecast_outcome
+try:
+    from app.cin_forecast_outcomes import evaluate_forecast_outcome
+except ModuleNotFoundError as exc:
+    if exc.name not in {"app", "app.cin_forecast_outcomes"}:
+        raise
+    from cin_forecast_outcomes import evaluate_forecast_outcome
 
 _SCHEMA = """
 PRAGMA foreign_keys=ON;
