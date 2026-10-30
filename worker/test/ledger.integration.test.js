@@ -261,3 +261,54 @@ test("canonicalizes offset timestamps before storing and comparing ledger rows",
   db.close();
 });
 \n
+
+test("concurrent evaluations persist one immutable result and return the winning row", async () => {
+  const db = makeD1();
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const forecast = {
+    forecast_id: "fc-eval-race-1", asset_id: "SOL-USD", metric: "price",
+    value: 150, unit: "USD", source_id: "cin-model-v1",
+    created_at: "2026-10-30T10:00:00Z",
+    target_at: "2026-10-30T11:00:00Z",
+  };
+  await call(env, "create_forecast", {
+    forecast, recorded_at: "2026-10-30T10:00:01Z",
+  });
+  await call(env, "insert_observation", {
+    observation: {
+      observation_id: "obs-eval-race-1", asset_id: "SOL-USD",
+      metric: "price", value: 155, unit: "USD", source_id: "coinbase-public",
+      observed_at: "2026-10-30T11:01:00Z",
+      retrieved_at: "2026-10-30T11:01:05Z",
+    },
+  });
+  const [a, b] = await Promise.all([
+    call(env, "evaluate_forecast", {
+      forecast_id: forecast.forecast_id,
+      evaluated_at: "2026-10-30T11:02:00+02:00",
+      max_observation_lag_seconds: 600,
+    }),
+    call(env, "evaluate_forecast", {
+      forecast_id: forecast.forecast_id,
+      evaluated_at: "2026-10-30T11:03:00Z",
+      max_observation_lag_seconds: 600,
+    }),
+  ]);
+  assert.equal(a.status, 200);
+  assert.equal(b.status, 200);
+  assert.deepEqual(a.body.result, b.body.result);
+  assert.equal(a.body.result.evaluated_at, "2026-10-30T09:02:00.000Z");
+
+  const stored = await call(env, "get_evaluation", {
+    forecast_id: forecast.forecast_id,
+  });
+  assert.deepEqual(stored.body.result, a.body.result);
+  const replay = await call(env, "evaluate_forecast", {
+    forecast_id: forecast.forecast_id,
+    evaluated_at: "2026-10-30T13:00:00Z",
+    max_observation_lag_seconds: 3600,
+  });
+  assert.deepEqual(replay.body.result, stored.body.result);
+  db.close();
+});
+
