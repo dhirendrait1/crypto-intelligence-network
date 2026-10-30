@@ -198,3 +198,8 @@ See `docs/CIN_STEP23_BACKUP_EXPORT_REPLICA_RESTORE_READINESS_V1.md` for the asse
 ## 17. Access-control and authorization readiness gate (2026-10-31)
 
 See `docs/CIN_STEP23_ACCESS_CONTROL_AND_AUTHORIZATION_READINESS_V1.md` for the current trust-boundary inventory, proposed principal/permission model, fail-closed requirements, privileged-operation controls, acceptance tests, and unresolved decisions. Reviewed API validation and dependency injection are not authentication or authorization; the SQLite adapter has no role enforcement and connection possession is not production identity. No authentication, permissions, schema, secrets, API write path, or deployment configuration was changed. Privileged operations remain unauthorized.
+
+
+## 18. Public endpoint abuse and rate-limit readiness gate (2026-10-31)
+
+See `docs/CIN_STEP23_PUBLIC_ENDPOINT_ABUSE_AND_RATE_LIMIT_READINESS_V1.md` for the public evidence-ingestion request/provider resource review, threat scenarios, caller/global quotas, concurrency/backpressure, provider-429 handling, telemetry, acceptance tests, and unresolved deployment evidence. The connector already has a fixed provider destination, bounded timeout, and 1,000,000-byte response limit; per-caller/global throttling and concurrency controls were not evidenced in the reviewed route/connector. No middleware, edge rule, runtime code, provider quota, or deployment setting was changed. Abuse-control readiness remains open.
