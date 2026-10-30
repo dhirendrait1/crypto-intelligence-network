@@ -112,7 +112,7 @@ Before any production persistence is proposed, require:
 | F-04 Missing repository payload byte ceiling | Open — implement and test before persistence expansion |
 | F-05 Retention semantics | Clock/expiry design documented in `CIN_STEP23_RETENTION_CLOCKS_AND_EXPIRY_RULES_V1.md`; provider-specific terms, durations, approval and implementation remain open |
 | F-06 Error disclosure regression protection | Partially mitigated; add regression tests before API expansion |
-| F-07 Hash lifecycle | Open — include in retention and erasure policy |
+| F-07 Hash lifecycle | Derived-data lifecycle documented in `CIN_STEP23_DERIVED_DATA_HASH_AND_FINGERPRINT_LIFECYCLE_V1.md`; lineage, policy approval and implementation remain open |
 
 **Overall:** source review completed; privacy/data-minimization readiness is not yet established. These findings do not authorize production storage. The API remains read-only, SQLite remains a local reference implementation, and no deployment or paid service change is included.
 
@@ -123,3 +123,7 @@ Added `docs/CIN_STEP23_DATA_CLASSIFICATION_AND_RETENTION_CLASSES_V1.md`. It defi
 ### F-05 design increment — retention clocks and expiry rules (2026-10-31)
 
 Added `docs/CIN_STEP23_RETENTION_CLOCKS_AND_EXPIRY_RULES_V1.md`. It defines distinct start events for provider snapshots, source versions, evidence identities, observations, claims, relationships, assessment/conflict events, derived fingerprints/hashes, diagnostics, exports, caches, backups, and tombstones. It specifies fail-closed handling for missing/invalid clocks, prohibits silent timestamp substitution and clock resets on re-ingestion/reassessment, and makes expiry eligibility distinct from deletion authorization. No durations, provider terms, legal basis, or hold authority were invented. No schema, records, scheduler, worker, or production persistence changed. F-05 is design-documented but remains open pending provider-specific approval.
+
+### F-07 design increment — derived hash and fingerprint lifecycle (2026-10-31)
+
+Added `docs/CIN_STEP23_DERIVED_DATA_HASH_AND_FINGERPRINT_LIFECYCLE_V1.md`. It records the current adapter behavior accurately (SHA-256 over canonical metadata; optional content-hash column currently written as NULL), explains linkability and known-content confirmation risks, requires exact source lineage and algorithm versioning, defaults derived expiry to source expiry, and defines a narrow independently approved retention exception. No current hash was changed/deleted; no content hashing, lineage schema, API, worker, or production persistence was added. F-07 is design-documented only and remains open pending approval and implementation.
