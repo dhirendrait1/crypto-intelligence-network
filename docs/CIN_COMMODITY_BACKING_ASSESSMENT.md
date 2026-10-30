@@ -10,7 +10,7 @@ The `commodity_backing_assessment.py` module provides a read-only evidence regis
 - `redemption_terms`: eligibility, minimum redemption size, fees, jurisdiction limits, and process.
 - `custody_or_issuer_disclosure`: issuer, custodian, legal structure, and relevant disclosures.
 
-Each record stores evidence type, source name and URL, publication timestamp, checked timestamp, status, and notes. Accepted status values are `verified`, `unverified`, `stale`, and `unavailable`.
+Each record stores evidence type, optional caller-supplied evidence ID and source role, source name and URL, publication timestamp, checked timestamp, status, and notes. Source roles are unauthenticated caller metadata. The API accepts these optional fields and preserves them for assessment and audit. Accepted status values are `verified`, `unverified`, `stale`, and `unavailable`.
 
 ## Safety and interpretation
 
