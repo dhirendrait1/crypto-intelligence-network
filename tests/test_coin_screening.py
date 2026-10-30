@@ -266,7 +266,7 @@ class ProviderFallbackNumericQualityTests(unittest.TestCase):
         primary_error = MODULE.urllib.error.HTTPError(
             "https://api.coinpaprika.com/v1/tickers", 503, "unavailable", {}, None
         )
-        with patch.object(MODULE.urllib.request, "urlopen", side_effect=[primary_error, response]):
+        with patch.object(MODULE.urllib.request, "urlopen", return_value=response):
             rows = MODULE._request_markets("usd", 10)
         self.assertEqual([row["id"] for row in rows], ["good-quotes"])
 
@@ -291,7 +291,7 @@ class ProviderFallbackMappingTests(unittest.TestCase):
         primary_error = MODULE.urllib.error.HTTPError(
             "https://api.coinpaprika.com/v1/tickers", 503, "unavailable", {}, None
         )
-        with patch.object(MODULE.urllib.request, "urlopen", side_effect=[primary_error, response]):
+        with patch.object(MODULE.urllib.request, "urlopen", return_value=response):
             rows = MODULE._request_markets("usd", 2)
 
         self.assertEqual([row["_cin_provider"] for row in rows], ["CoinPaprika", "CoinPaprika"])
@@ -380,9 +380,9 @@ class ProviderFailureClassificationTests(unittest.TestCase):
         self.assertEqual(MODULE._failure_kind(ValueError("invalid")), ("invalid_response", None))
 
 
-    def test_primary_and_fallback_http_failures_preserve_both_statuses(self):
-        primary = MODULE.urllib.error.HTTPError("coingecko", 429, "limited", {}, None)
-        fallback = MODULE.urllib.error.HTTPError("coinpaprika", 503, "unavailable", {}, None)
+    def test_coinpaprika_http_failure_preserves_status_without_fallback(self):
+        primary = MODULE.urllib.error.HTTPError("coinpaprika", 429, "limited", {}, None)
+        fallback = MODULE.urllib.error.HTTPError("unused-fallback", 503, "unavailable", {}, None)
         with patch.object(MODULE.urllib.request, "urlopen", side_effect=[primary]):
             with self.assertRaises(MODULE.MarketDataProviderFailure) as caught:
                 MODULE._request_markets("usd", 5)
@@ -393,7 +393,7 @@ class ProviderFailureClassificationTests(unittest.TestCase):
         self.assertIsNone(failure.fallback_status)
 
 
-    def test_invalid_primary_payload_and_fallback_network_failure_are_distinct(self):
+    def test_invalid_coinpaprika_payload_is_reported_without_fallback(self):
         import io
         primary_response = type(
             "Response", (), {
@@ -413,7 +413,7 @@ class ProviderFailureClassificationTests(unittest.TestCase):
         self.assertIsNone(failure.fallback_status)
 
 
-    def test_stale_cache_is_used_after_both_providers_fail_and_timestamp_survives(self):
+    def test_stale_cache_is_used_after_coinpaprika_failure_and_timestamp_survives(self):
         MODULE._CACHE.clear()
         now = 1_800_000_000.0
         cached_rows = [{
