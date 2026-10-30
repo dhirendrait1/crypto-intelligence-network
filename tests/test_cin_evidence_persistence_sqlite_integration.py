@@ -120,6 +120,66 @@ class TestEvidencePersistenceSQLiteIntegration(unittest.TestCase):
             )
             reopened_connection.close()
 
+    def test_stale_parallel_lookup_recovers_from_real_sqlite_identity_conflict(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "cin-race.sqlite3"
+            first_connection = sqlite3.connect(database_path)
+            first_connection.executescript(SCHEMA.read_text(encoding="utf-8"))
+            second_connection = sqlite3.connect(database_path)
+            first_repository = LocalSQLiteEvidenceRepository(first_connection)
+            second_repository = LocalSQLiteEvidenceRepository(second_connection)
+
+            first = persist_evidence_snapshot(first_repository, **self.arguments)
+
+            class StaleLookupRepository:
+                def __init__(self, delegate):
+                    self.delegate = delegate
+                    self.first_lookup = True
+
+                def find_evidence_id(self, **kwargs):
+                    if self.first_lookup:
+                        self.first_lookup = False
+                        # Model a second worker whose identity read happened
+                        # just before the first worker committed its bundle.
+                        return None
+                    return self.delegate.find_evidence_id(**kwargs)
+
+                def store_bundle(self, **kwargs):
+                    return self.delegate.store_bundle(**kwargs)
+
+                def append_observation(self, **kwargs):
+                    return self.delegate.append_observation(**kwargs)
+
+                def append_assessment_event(self, **kwargs):
+                    return self.delegate.append_assessment_event(**kwargs)
+
+            second_arguments = dict(self.arguments)
+            second_arguments["metadata"] = {"stars": 120, "forks": 25}
+            second_arguments["observed_at"] = "2026-10-30T12:20:00Z"
+            second_arguments["retrieved_at"] = "2026-10-30T12:20:00Z"
+            second = persist_evidence_snapshot(
+                StaleLookupRepository(second_repository), **second_arguments
+            )
+
+            self.assertEqual(
+                second["operation"], "observation_appended_after_identity_race"
+            )
+            self.assertEqual(first["cin_evidence_id"], second["cin_evidence_id"])
+            self.assertEqual(
+                second_connection.execute(
+                    "SELECT COUNT(*) FROM cin_evidence_records"
+                ).fetchone()[0],
+                1,
+            )
+            self.assertEqual(
+                second_connection.execute(
+                    "SELECT COUNT(*) FROM cin_evidence_observations"
+                ).fetchone()[0],
+                2,
+            )
+            first_connection.close()
+            second_connection.close()
+
     def test_existing_identity_is_not_mutated_when_observation_append_fails(self):
         first = persist_evidence_snapshot(self.repository, **self.arguments)
         self.connection.execute(
