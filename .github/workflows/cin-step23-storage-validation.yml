@@ -33,10 +33,13 @@ jobs:
       - name: Compile CIN modules and tests
         run: |
           python -m compileall -q tests
-          python -m py_compile cin_evidence_store.py cin_local_sqlite_evidence_repository.py cin_evidence_ingestion_api.py cin_coinbase_public_market_data.py
+          python -m py_compile cin_evidence_store.py cin_local_sqlite_evidence_repository.py cin_evidence_ingestion_api.py cin_coinbase_public_market_data.py cin_coinbase_market_data_api.py
 
-      - name: Run Coinbase public candle contract tests
+      - name: Run Coinbase public candle adapter tests
         run: python -m unittest discover -s tests -p "test_cin_coinbase_public_market_data.py" -v
+
+      - name: Run Coinbase public candles API tests
+        run: python -m unittest discover -s tests -p "test_cin_coinbase_market_data_api.py" -v
 
       - name: Run SQLite persistence reliability tests
         run: python -m unittest discover -s tests -p "test_cin_sqlite_persistence_reliability.py" -v
