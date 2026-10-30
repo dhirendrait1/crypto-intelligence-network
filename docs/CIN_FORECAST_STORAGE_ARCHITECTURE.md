@@ -63,11 +63,12 @@ Cloudflare's current Workers product page advertises starting on the Free plan w
 
 ## Current implementation gaps (must close before staging)
 
-- The current Worker is an initial development adapter. It has an operation allowlist and prepared statements, but its read-then-write paths are not yet covered by real D1 concurrency tests.
-- D1 `batch()` transaction semantics have not yet been implemented or verified for multi-statement ledger operations.
+- The Worker is a development-stage adapter with a fixed operation allowlist, bearer authentication, request bounds, and prepared statements.
+- Forecast, observation, and evaluation writes now use D1 `batch()` for insert-plus-readback atomicity. The Node SQLite harness models rollback behaviour, but actual Cloudflare D1 transaction/concurrency semantics have not been verified against a live D1 database.
 - List endpoints enforce a maximum row limit but do not yet provide cursor pagination.
-- Worker-side tests cover authentication, path/method restrictions, operation allowlisting, payload size, malformed payload/limit rejection, and a Node SQLite compatibility harness for forecast/observation CRUD, idempotency, nearest-observation evaluation, and readback. This is a local SQL compatibility test, not a real Cloudflare D1 integration test.
-- Error mapping now has sanitized 503 handling and offline simulated quota/unavailable-binding tests; real D1 quota behaviour remains unverified.\n- An independent staging backup/restore drill is documented in `worker/README.md`, but no export, restore, checksum comparison, or live persistence test has been run.
+- Worker tests cover authentication, path/method restrictions, operation allowlisting, payload size, malformed payload/limit rejection, immutable replay/conflict handling, concurrency scenarios, rollback, transient failure recovery, and sanitized storage failures. These are offline compatibility tests, not a real Cloudflare D1 integration test.
+- Error mapping has sanitized 503 handling and offline simulated quota/unavailable-binding tests; real D1 quota behaviour remains unverified.
+- An independent staging backup/restore drill is documented in `worker/README.md`, but no export, restore, checksum comparison, or live persistence test has been run.
 
 ## Explicit non-actions
 
