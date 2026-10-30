@@ -193,3 +193,8 @@ See `docs/CIN_STEP23_F03_CLASSIFICATION_IMPLEMENTATION_READINESS_V1.md` for the 
 ## 16. Backup, export, replica, and restore readiness gate (2026-10-31)
 
 See `docs/CIN_STEP23_BACKUP_EXPORT_REPLICA_RESTORE_READINESS_V1.md` for the asset/control matrix, copy-manifest contract, restore quarantine and erasure-replay sequence, export/support-bundle boundaries, acceptance tests, and evidence gaps. This review found no repository evidence of an operational CIN backup job, replica inventory, governed export workflow, or restore-time erasure replay. Provider-managed copies were not independently verified; this is an evidence gap, not a claim that hosting providers keep no backups. No copy, export, backup, restore, data, or deployment was changed. Operational lifecycle remains unverified and production persistence remains unauthorized.
+
+
+## 17. Access-control and authorization readiness gate (2026-10-31)
+
+See `docs/CIN_STEP23_ACCESS_CONTROL_AND_AUTHORIZATION_READINESS_V1.md` for the current trust-boundary inventory, proposed principal/permission model, fail-closed requirements, privileged-operation controls, acceptance tests, and unresolved decisions. Reviewed API validation and dependency injection are not authentication or authorization; the SQLite adapter has no role enforcement and connection possession is not production identity. No authentication, permissions, schema, secrets, API write path, or deployment configuration was changed. Privileged operations remain unauthorized.
