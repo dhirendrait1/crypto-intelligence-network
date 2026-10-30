@@ -556,7 +556,7 @@ async def coin_screening(
             "primary_provider": "CoinPaprika",
             "primary_error": exc.primary_kind,
             "primary_http_status": exc.primary_status,
-            "fallback_provider": "CoinPaprika",
+            "fallback_provider": None,
             "fallback_error": exc.fallback_kind,
             "fallback_http_status": exc.fallback_status,
         }) from exc
@@ -584,8 +584,8 @@ async def coin_screening(
             "primary_provider": "CoinPaprika",
             "primary_error": "http_error",
             "primary_http_status": exc.code,
-            "fallback_provider": "CoinPaprika",
-            "fallback_error": "not_usable",
+            "fallback_provider": None,
+            "fallback_error": "not_attempted",
         }) from exc
     except (urllib.error.URLError, TimeoutError) as exc:
         provider = "CoinPaprika"
