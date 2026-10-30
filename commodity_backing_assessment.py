@@ -12,6 +12,8 @@ import json
 from typing import Any
 from urllib.parse import urlsplit
 
+from cin_verifiable_evidence import create_claim, create_claim_evidence_relationship
+
 VALID_STATUSES = {"verified", "unverified", "stale", "unavailable"}
 VALID_SOURCE_ROLES = {"issuer", "custodian", "auditor", "regulator", "exchange", "independent_research", "other"}
 REQUIRED_EVIDENCE_FIELDS = (
@@ -303,6 +305,32 @@ def assess_commodity_asset(symbol: str, evidence: list[dict[str, Any]], *,
     ]
     for row in normalized:
         row["assessment_clock_valid"] = assessment_clock_valid
+        claim_text = row.get("claim_text")
+        claim = None
+        relationship = None
+        if isinstance(claim_text, str) and claim_text.strip():
+            claim = create_claim(
+                subject=str(symbol or "").strip().upper(),
+                predicate=str(row.get("evidence_type") or "unspecified_evidence"),
+                statement=claim_text,
+                created_at=current,
+                claim_status="not_assessed",
+            )
+            evidence_id = row.get("evidence_id")
+            if evidence_id:
+                relationship = create_claim_evidence_relationship(
+                    claim_id=claim["claim_id"],
+                    evidence_id=evidence_id,
+                    relationship="context_only",
+                    rationale=(
+                        "Caller-supplied claim text is linked for traceability only; "
+                        "CIN has not independently verified the claim or source."
+                    ),
+                    review_status="automated_candidate",
+                    created_at=current,
+                )
+        row["claim"] = claim
+        row["claim_evidence_relationship"] = relationship
     by_type: dict[str, list[dict[str, Any]]] = {kind: [] for kind in required_types}
     for item in normalized:
         kind = item.get("evidence_type")
