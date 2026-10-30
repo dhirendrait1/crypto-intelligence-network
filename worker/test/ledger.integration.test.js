@@ -1,0 +1,107 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { DatabaseSync } from "node:sqlite";
+import worker from "../src/index.js";
+
+function makeD1() {
+  const db = new DatabaseSync(":memory:");
+  db.exec(readFileSync("worker/migrations/0001_forecast_ledger.sql", "utf8"));
+  return {
+    prepare(sql) {
+      let values = [];
+      const statement = {
+        bind(...args) { values = args; return statement; },
+        first() { return db.prepare(sql).get(...values) ?? null; },
+        all() { return { results: db.prepare(sql).all(...values) }; },
+        run() {
+          const result = db.prepare(sql).run(...values);
+          return { success: true, meta: { changes: Number(result.changes) } };
+        },
+      };
+      return statement;
+    },
+    close() { db.close(); },
+  };
+}
+
+const token = "worker-test-secret";
+async function call(env, operation, payload) {
+  const response = await worker.fetch(new Request("https://worker.example/v1/ledger", {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ operation, payload }),
+  }), env);
+  return { status: response.status, body: await response.json() };
+}
+
+test("persists immutable forecasts and observations and evaluates the nearest horizon observation once", async () => {
+  const db = makeD1();
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const forecast = {
+    forecast_id: "fc-btc-1", asset_id: "BTC-USD", metric: "price",
+    value: 70000, unit: "USD", source_id: "cin-model-v1",
+    created_at: "2026-10-30T10:00:00+00:00",
+    target_at: "2026-10-30T11:00:00+00:00",
+    invalidation_conditions: { below: 68000 },
+  };
+
+  const created = await call(env, "create_forecast", {
+    forecast, recorded_at: "2026-10-30T10:00:05+00:00",
+  });
+  assert.equal(created.status, 200);
+  assert.equal(created.body.result.forecast_id, forecast.forecast_id);
+
+  const replay = await call(env, "create_forecast", {
+    forecast, recorded_at: "2026-10-30T10:05:00+00:00",
+  });
+  assert.equal(replay.status, 200);
+  assert.equal(replay.body.result.recorded_at, "2026-10-30T10:00:05+00:00");
+
+  const conflict = await call(env, "create_forecast", {
+    forecast: { ...forecast, value: 71000 },
+    recorded_at: "2026-10-30T10:05:00+00:00",
+  });
+  assert.equal(conflict.status, 422);
+
+  const observation = (id, observedAt, value) => ({
+    observation_id: id, asset_id: "BTC-USD", metric: "price", value,
+    unit: "USD", source_id: "coinbase-public", observed_at: observedAt,
+    retrieved_at: "2026-10-30T11:05:00+00:00",
+  });
+  const first = await call(env, "insert_observation", {
+    observation: observation("obs-near", "2026-10-30T11:02:00+00:00", 69500),
+  });
+  const second = await call(env, "insert_observation", {
+    observation: observation("obs-far", "2026-10-30T11:04:00+00:00", 69000),
+  });
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
+
+  const evaluated = await call(env, "evaluate_forecast", {
+    forecast_id: forecast.forecast_id,
+    evaluated_at: "2026-10-30T11:06:00+00:00",
+    max_observation_lag_seconds: 600,
+  });
+  assert.equal(evaluated.status, 200);
+  assert.equal(evaluated.body.result.status, "evaluated");
+  assert.equal(evaluated.body.result.observation_id, "obs-near");
+  assert.equal(evaluated.body.result.error, -500);
+
+  const repeated = await call(env, "evaluate_forecast", {
+    forecast_id: forecast.forecast_id,
+    evaluated_at: "2026-10-30T12:00:00+00:00",
+    max_observation_lag_seconds: 600,
+  });
+  assert.equal(repeated.body.result.evaluated_at, "2026-10-30T11:06:00+00:00");
+
+  const detail = await call(env, "get_forecast", { forecast_id: forecast.forecast_id });
+  const evaluation = await call(env, "get_evaluation", { forecast_id: forecast.forecast_id });
+  const forecasts = await call(env, "list_forecasts", { asset_id: "BTC-USD", limit: 10 });
+  const evaluations = await call(env, "list_evaluations", { asset_id: "BTC-USD", limit: 10 });
+  assert.equal(detail.body.result.forecast_id, forecast.forecast_id);
+  assert.equal(evaluation.body.result.observation_id, "obs-near");
+  assert.equal(forecasts.body.result.length, 1);
+  assert.equal(evaluations.body.result.length, 1);
+  db.close();
+});
