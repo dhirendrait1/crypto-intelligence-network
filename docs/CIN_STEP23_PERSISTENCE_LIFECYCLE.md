@@ -1,6 +1,6 @@
 # CIN Step 23 — Persistence and Evidence Lifecycle Design
 
-**Status:** Design only; no database, migration, repository, retention job, or public endpoint is implemented by this document.  
+**Status:** Design plus partial local SQLite reference implementation. This document itself is not an implementation; the migration and adapter are local-only, are not wired to the public API, and are not production persistence. No retention job or public persistence endpoint is implemented.  
 **Schema baseline:** shared claim/evidence schema v1.0 (cin_verifiable_evidence.py).  
 **Safety boundary:** read-only intelligence. This design does not authorize source crawling, account access, trading, wallet access, or fund movement.
 
@@ -112,3 +112,17 @@ This remains local development/test functionality. It is not connected to a user
 ## 11. Append-only lifecycle operations (2026-10-30)
 
 The local-only adapter now supports appending a new observation to an existing CIN evidence record and appending claim assessment events without updating prior rows. New observation writes validate timezone-aware timestamps, JSON-serialize finite metadata, compute a normalized metadata fingerprint, and rely on the database foreign key to reject unknown evidence IDs. Regression tests verify historical observations remain unchanged, UTC normalization is applied, and invalid writes do not add rows. These operations remain local SQLite development/test functionality only; there is no API wiring, retention worker, or production durability.
+
+
+## 12. Database-enforced append-only history and current limitations (2026-10-30)
+
+The local SQLite reference migration now installs four database triggers:
+
+- `trg_cin_evidence_observations_no_update` and `trg_cin_evidence_observations_no_delete`
+- `trg_cin_claim_assessment_events_no_update` and `trg_cin_claim_assessment_events_no_delete`
+
+These guards apply even when SQL is issued outside the repository adapter. Regression tests attempt direct SQL updates and deletes and verify that SQLite rejects the mutations without changing the stored history. Migration tests also reapply schema v1.0 and assert that exactly one instance of each guard remains.
+
+**Important retention/deletion interaction:** the v1.0 reference triggers intentionally block deletion of observations and assessment events. This is an integrity safeguard for local tests, not an approved permanent-retention policy. It currently means a retention or erasure workflow cannot delete those rows through this schema. Before any real persistence is enabled, CIN must define the applicable retention, privacy, legal-erasure, backup-expiry, and audit requirements, then design and test an explicitly versioned retention mechanism. Do not silently disable these triggers or treat append-only storage as overriding a valid deletion obligation.
+
+**Current implementation boundary:** the triggers and tests apply only to the local SQLite reference migration. They do not establish production durability, authenticated reviewer identity, source authenticity, API write authorization, or a production retention policy. The API remains read-only and persistence remains opt-in/local-only.
