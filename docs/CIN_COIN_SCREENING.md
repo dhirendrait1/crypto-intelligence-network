@@ -25,7 +25,7 @@ The `commodity_backed` filter uses the public CoinPaprika ticker endpoint and cl
 - `returned_count`: matching rows returned after `per_page`.
 - `status`: `matches_found` or `no_matches_in_scanned_universe`.
 
-This is still only the provider's returned ticker universe, not every token in existence. Classification is heuristic and can miss assets. A zero-match response means no matches were identified in the scanned provider response; it does not prove no commodity-backed tokens exist. This category-specific path uses CoinPaprika data and has a 20-second provider timeout.
+This is still only the provider's returned ticker universe, not every token in existence. Classification is heuristic and can miss assets. A zero-match response means no matches were identified in the scanned provider response; it does not prove no commodity-backed tokens exist. This category-specific path uses CoinPaprika data and has a 20-second provider timeout. The response body is read with the same 5 MB maximum as the standard screening request; oversized payloads are rejected before JSON parsing.
 
 ## Score and interpretation
 
