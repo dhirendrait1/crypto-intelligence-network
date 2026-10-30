@@ -996,3 +996,13 @@ This checkpoint validates configured offline automation only. It does not establ
 - [ ] Implement durable persistence, migrations, transactional writes, deletion/retention jobs, and API authorization.
 - [ ] Validate provider licensing/authorization and any source-fetch SSRF protections before retrieval.
 - **Boundary:** this is architecture documentation only. No database, migration, source collector, persistence API, or Render change was created. Step 23 remains Partial.
+
+
+## Claim/evidence reference schema increment (2026-10-30)
+
+- [x] Add SQLite reference DDL at database/migrations/0001_claim_evidence_schema_v1.sql for local development/test schema review.
+- [x] Add in-memory SQLite tests for schema objects/indexes, namespaced external-ID uniqueness, foreign keys, claim status constraints, and JSON validity.
+- [x] Keep the reference DDL out of application startup and API execution; no migration runner or persistence adapter is introduced.
+- [ ] Run and verify all four GitHub Actions workflows on the latest branch head.
+- [ ] Select and implement a durable production database only after deployment topology, cost, backup/restore, retention, deletion, and authorization requirements are approved.
+- **Boundary:** SQLite DDL/tests do not constitute durable persistence. No records are stored by CIN through this change, and no Render changes were made.
