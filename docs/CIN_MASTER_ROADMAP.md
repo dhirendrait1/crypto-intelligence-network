@@ -257,3 +257,9 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - Reconciled F-01 and F-04 dispositions against the existing local SQLite adapter and regression tests. F-01 is partially mitigated for the GitHub namespace and structurally bounded for other namespaces; universal source-specific allowlists and production enforcement remain open. F-04's 64 KiB canonical metadata ceiling is implemented and tested for bundle and appended-observation writes in the local adapter only.
 - F-06 validation is confirmed successful on PR #70 head `da1fa72b904d9364a280fe0f43a67f848697589b` (GitHub Actions runs 41140427820 and 41140425052).
 - F-03, F-05, and F-07 remain design-documented, with policy approval and separately reviewed implementation outstanding. Step 23 remains Partial; no production persistence or deployment is authorized by these changes.
+
+
+### Step 23 F-03 implementation-readiness increment (2026-10-31)
+
+- Added `docs/CIN_STEP23_F03_CLASSIFICATION_IMPLEMENTATION_READINESS_V1.md` converting the classification/retention proposal into a field-level assignment matrix, candidate schema-v2 contract, fail-closed semantics, safe migration sequence, acceptance tests, and explicit approval register.
+- This is planning only. No schema-v2 migration, classification backfill, retention duration, legal basis, provider permission, legal-hold authority, erasure process, scheduler, or production persistence was introduced. All policy approvals remain explicitly unresolved; Step 23 remains Partial.
