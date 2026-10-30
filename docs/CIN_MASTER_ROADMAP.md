@@ -293,3 +293,9 @@ When continuing work, choose the earliest unfinished step that can be completed 
 
 - Added docs/CIN_STEP23_OPERATIONAL_LOGGING_MONITORING_INCIDENT_RESPONSE_READINESS_V1.md documenting existing sanitized provider-error responses and offline CI evidence, alongside gaps in structured operational events, correlation IDs, metrics/SLOs, alert routing, incident runbooks, ownership, and log retention.
 - The bundled application entry point was not independently inspected; runtime middleware/logging behavior remains not assessed. No runtime telemetry, dashboard, alert, incident automation, retention policy, or deployment change was made. F-11 remains Open; Step 23 remains Partial.
+
+
+### Step 23 F-12 disaster recovery and service continuity readiness increment (2026-10-31)
+
+- Added docs/CIN_STEP23_DISASTER_RECOVERY_AND_SERVICE_CONTINUITY_READINESS_V1.md covering current Render manifest evidence, service tiers, RTO/RPO decision requirements, failure-mode/safe-degradation matrix, recovery sequence, and continuity acceptance tests.
+- This review is separate from backup/export/replica/restore design. No numeric recovery objectives, standby, failover, monitoring, release gate, retry loop, hosting setting, or deployment was implemented. F-12 remains Open; Step 23 remains Partial.
