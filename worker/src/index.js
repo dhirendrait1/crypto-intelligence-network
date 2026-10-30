@@ -37,7 +37,7 @@ function validateForecast(f, recordedAt) {
       !iso(f.created_at) || !iso(f.target_at) || !iso(recordedAt) ||
       Date.parse(f.target_at) <= Date.parse(f.created_at))
     throw new Error("invalid forecast payload");
-  return { ...f, recorded_at: recordedAt };
+  return { ...f, created_at: utc(f.created_at), target_at: utc(f.target_at), recorded_at: utc(recordedAt) };
 }
 function validateObservation(o) {
   if (!o || !text(o.observation_id) || !text(o.asset_id) || !text(o.metric) ||
@@ -45,7 +45,7 @@ function validateObservation(o) {
       !iso(o.observed_at) || !iso(o.retrieved_at) ||
       Date.parse(o.retrieved_at) < Date.parse(o.observed_at))
     throw new Error("invalid observation payload");
-  return o;
+  return { ...o, observed_at: utc(o.observed_at), retrieved_at: utc(o.retrieved_at) };
 }
 async function insertImmutable(env, table, idColumn, id, item) {
   const payload = JSON.stringify(item);
