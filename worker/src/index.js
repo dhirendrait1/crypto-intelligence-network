@@ -48,9 +48,13 @@ async function insertImmutable(env, table, idColumn, id, item) {
   ).bind(id).first();
   if (existing) {
     const old = JSON.parse(existing.payload_json);
-    if (table === "cin_forecasts") { delete old.recorded_at; const copy = { ...item }; delete copy.recorded_at;
+    if (table === "cin_forecasts") {
+      const originalRecordedAt = old.recorded_at;
+      delete old.recorded_at;
+      const copy = { ...item };
+      delete copy.recorded_at;
       if (JSON.stringify(old) !== JSON.stringify(copy)) throw new Error("ID already exists with different content");
-      return old.recorded_at ? { ...old, recorded_at: old.recorded_at } : item;
+      return { ...old, recorded_at: originalRecordedAt };
     }
     if (JSON.stringify(old) !== payload) throw new Error("ID already exists with different content");
     return old;
