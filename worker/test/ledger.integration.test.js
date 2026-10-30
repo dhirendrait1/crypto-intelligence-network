@@ -44,7 +44,10 @@ function makeD1({ failBatchAt = -1 } = {}) {
       }
     },
     setBatchFailureIndex(index) { batchFailureIndex = index; },
-    countRows(table) {\n      if (![\"cin_forecasts\", \"cin_forecast_observations\", \"cin_forecast_evaluations\"].includes(table)) throw new Error(\"invalid test table\");\n      return Number(db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get().count);\n    },
+    countRows(table) {
+      if (!["cin_forecasts", "cin_forecast_observations", "cin_forecast_evaluations"].includes(table)) throw new Error("invalid test table");
+      return Number(db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get().count);
+    },
     close() { db.close(); },
   };
 }
@@ -74,7 +77,9 @@ test("persists immutable forecasts and observations and evaluates the nearest ho
     forecast, recorded_at: "2026-10-30T10:00:05+00:00",
   });
   assert.equal(created.status, 200);
-  assert.equal(created.body.result.forecast_id, forecast.forecast_id);\n  assert.equal(created.body.result.created_at, "2026-10-30T10:00:00.000Z");\n  assert.equal(created.body.result.target_at, "2026-10-30T11:00:00.000Z");
+  assert.equal(created.body.result.forecast_id, forecast.forecast_id);
+  assert.equal(created.body.result.created_at, "2026-10-30T10:00:00.000Z");
+  assert.equal(created.body.result.target_at, "2026-10-30T11:00:00.000Z");
 
   const replay = await call(env, "create_forecast", {
     forecast, recorded_at: "2026-10-30T10:05:00+00:00",
@@ -284,7 +289,8 @@ test("canonicalizes offset timestamps before storing and comparing ledger rows",
   assert.equal(inserted.body.result.retrieved_at, "2026-10-30T11:03:00.000Z");
   db.close();
 });
-\n
+
+
 
 test("concurrent evaluations persist one immutable result and return the winning row", async () => {
   const db = makeD1();
@@ -408,6 +414,31 @@ test("rolls back an observation insert when its transactional readback fails", a
   });
   assert.equal(response.status, 503);
   assert.equal(db.countRows("cin_forecast_observations"), 0);
+  db.close();
+});
+
+test("recovers cleanly after a transient D1 batch failure", async () => {
+  const db = makeD1({ failBatchAt: 1 });
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const forecast = {
+    forecast_id: "fc-batch-recovery", asset_id: "BTC-USD", metric: "price",
+    value: 71000, unit: "USD", source_id: "test",
+    created_at: "2026-10-30T10:00:00Z",
+    target_at: "2026-10-30T11:00:00Z",
+  };
+  const failed = await call(env, "create_forecast", {
+    forecast, recorded_at: "2026-10-30T10:00:01Z",
+  });
+  assert.equal(failed.status, 503);
+  assert.equal(db.countRows("cin_forecasts"), 0);
+
+  db.setBatchFailureIndex(-1);
+  const recovered = await call(env, "create_forecast", {
+    forecast, recorded_at: "2026-10-30T10:00:02Z",
+  });
+  assert.equal(recovered.status, 200);
+  assert.equal(recovered.body.result.forecast_id, forecast.forecast_id);
+  assert.equal(db.countRows("cin_forecasts"), 1);
   db.close();
 });
 
