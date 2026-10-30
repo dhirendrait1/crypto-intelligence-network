@@ -228,3 +228,11 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - Added `docs/CIN_STEP23_DATA_CLASSIFICATION_AND_RETENTION_CLASSES_V1.md` with distinct sensitivity classifications and retention-class selectors, field/entity mapping for evidence, claims, rationales, fingerprints, logs, exports, backups and replicas, plus a future policy-version contract and acceptance gates.
 - The design intentionally defines no retention durations, legal basis, source authorization, or hold authority without review. Schema v1.0 remains unchanged; no data was backfilled, erased, or rewritten, and no retention worker or production persistence was enabled.
 - F-03 is design-documented but remains open pending policy approval and separately reviewed schema implementation. F-05 retention start/expiry semantics and F-07 derived-hash lifecycle remain open. Step 23 remains Partial.
+
+
+### Step 23 retention-clock design increment (2026-10-31)
+
+- Added `docs/CIN_STEP23_RETENTION_CLOCKS_AND_EXPIRY_RULES_V1.md` defining event-specific candidate clocks for provider snapshots/versions, evidence identities, observations, claims, relationships, assessment/conflict events, fingerprints/hashes, logs, exports, caches, backups and tombstones.
+- Defined fail-closed behavior for missing/invalid clocks, no silent timestamp substitution, no clock reset on re-ingestion or reassessment, provider-specific policy records, and expiry eligibility distinct from deletion authorization.
+- No retention periods, legal basis, provider terms, or hold authority were invented. No schema migration, record change/deletion, expiry scheduler, worker, or production persistence was enabled.
+- F-05 is design-documented only; provider-specific policy approval and implementation remain open. Step 23 remains Partial.
