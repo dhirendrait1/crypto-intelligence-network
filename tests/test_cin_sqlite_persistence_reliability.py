@@ -264,6 +264,43 @@ class TestSQLitePersistenceReliability(unittest.TestCase):
             finally:
                 verification.close()
 
+    def test_database_rejects_update_and_delete_of_append_only_history(self):
+        stored = self._store()
+        observation_id = stored["observation_id"]
+        assessment_event_id = self.db.execute(
+            "SELECT assessment_event_id FROM cin_claim_assessment_events WHERE claim_id=?",
+            (stored["claim_id"],),
+        ).fetchone()["assessment_event_id"]
+
+        statements = (
+            ("UPDATE cin_evidence_observations SET source_status='invalid' WHERE observation_id=?",
+             observation_id),
+            ("DELETE FROM cin_evidence_observations WHERE observation_id=?",
+             observation_id),
+            ("UPDATE cin_claim_assessment_events SET claim_status='supported' WHERE assessment_event_id=?",
+             assessment_event_id),
+            ("DELETE FROM cin_claim_assessment_events WHERE assessment_event_id=?",
+             assessment_event_id),
+        )
+        for statement, identifier in statements:
+            with self.subTest(statement=statement), self.assertRaises(sqlite3.IntegrityError):
+                self.db.execute(statement, (identifier,))
+
+        self.assertEqual(
+            self.db.execute(
+                "SELECT source_status FROM cin_evidence_observations WHERE observation_id=?",
+                (observation_id,),
+            ).fetchone()["source_status"],
+            "caller_supplied",
+        )
+        self.assertEqual(
+            self.db.execute(
+                "SELECT claim_status FROM cin_claim_assessment_events WHERE assessment_event_id=?",
+                (assessment_event_id,),
+            ).fetchone()["claim_status"],
+            "not_assessed",
+        )
+
     def test_assessment_events_are_appended_without_overwriting_prior_history(self):
         stored = self._store()
         first_event_id = self.repo.append_assessment_event(
