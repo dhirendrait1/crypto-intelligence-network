@@ -236,3 +236,10 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - Defined fail-closed behavior for missing/invalid clocks, no silent timestamp substitution, no clock reset on re-ingestion or reassessment, provider-specific policy records, and expiry eligibility distinct from deletion authorization.
 - No retention periods, legal basis, provider terms, or hold authority were invented. No schema migration, record change/deletion, expiry scheduler, worker, or production persistence was enabled.
 - F-05 is design-documented only; provider-specific policy approval and implementation remain open. Step 23 remains Partial.
+
+
+### Step 23 derived-data lifecycle design increment (2026-10-31)
+
+- Added `docs/CIN_STEP23_DERIVED_DATA_HASH_AND_FINGERPRINT_LIFECYCLE_V1.md` defining default source-linked expiry for metadata fingerprints, content hashes, and future derived indicators; exact lineage/version requirements; linkability and known-content confirmation risks; and a narrow independent-retention exception requiring explicit policy approval.
+- Recorded current implementation accurately: local adapter stores SHA-256 fingerprints of canonical metadata; optional content-hash column is currently NULL. Hashes are not authenticity proof or automatically anonymous.
+- No current hash or record was changed/deleted. No content-hash computation, lineage schema, API exposure, worker, or production persistence was implemented. F-07 is design-documented only; Step 23 remains Partial.
