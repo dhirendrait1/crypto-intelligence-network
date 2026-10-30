@@ -58,3 +58,20 @@ def test_request_rejects_invalid_tolerance_ranges():
         CrossSourceComparisonRequest(observations=[payload("Alpha", 1.0)], relative_tolerance=1.1)
     with pytest.raises(ValidationError):
         CrossSourceComparisonRequest(observations=[payload("Alpha", 1.0)], absolute_tolerance=-1)
+
+
+
+@pytest.mark.parametrize("bad_value", [float("nan"), float("inf"), float("-inf")])
+def test_request_rejects_non_finite_observation_values(bad_value):
+    with pytest.raises(ValidationError):
+        CrossSourceComparisonRequest(observations=[payload("Alpha", bad_value)])
+
+
+@pytest.mark.parametrize("field", ["absolute_tolerance", "relative_tolerance"])
+@pytest.mark.parametrize("bad_value", [float("nan"), float("inf"), float("-inf")])
+def test_request_rejects_non_finite_tolerances(field, bad_value):
+    with pytest.raises(ValidationError):
+        CrossSourceComparisonRequest(
+            observations=[payload("Alpha", 1.0)],
+            **{field: bad_value},
+        )
