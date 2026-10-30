@@ -228,3 +228,8 @@ See docs/CIN_STEP23_CLAIM_CONFLICT_AND_REVIEW_STATE_READINESS_V1.md for the dist
 ## 23. Evidence completeness and coverage readiness (2026-10-31)
 
 See docs/CIN_STEP23_EVIDENCE_COMPLETENESS_AND_COVERAGE_READINESS_V1.md for the expected-source manifest, source/entity/metric/time/field/pagination/provenance coverage dimensions, scan-gap accounting, assessment status rules, and acceptance tests. The common evidence model specifies completeness fields, while the reviewed GitHub connector has only source-specific missing-field/freshness reporting and the cross-source comparator accepts caller-supplied observations without an expected coverage denominator. No general coverage evaluator, scheduler, pagination client, provider query, API, schema, or persistence activation was added. Runtime completeness enforcement remains open.
+
+
+## 24. Assessment methodology and reproducibility readiness (2026-10-31)
+
+See docs/CIN_STEP23_ASSESSMENT_METHODOLOGY_AND_REPRODUCIBILITY_READINESS_V1.md for the reproducibility envelope, methodology versioning, deterministic calculation requirements, module-specific risks, minimum persisted snapshot contract, and acceptance tests. Existing coin-screening weights are documented, and several functions accept explicit clocks/parameters, but no common methodology registry, immutable input snapshot, pinned execution fingerprint, component-level lineage, or end-to-end replay facility is evidenced. No formulas, defaults, source data, schema, runtime, or persistence activation changed. Exact historical reproducibility remains unimplemented.
