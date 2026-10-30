@@ -188,6 +188,19 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         self.assertIn("volume_24h_unavailable", result["data_quality_warnings"])
 
     @patch("market_data_step1.urllib.request.urlopen")
+    def test_overflowing_percentage_change_is_omitted(self, mocked):
+        self._responses(
+            mocked,
+            stats={"last": "1e308", "open": "1e-308", "volume": "12"},
+        )
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertIsNone(result["price_change_percentage_24h"])
+        self.assertIn(
+            "invalid_price_change_percentage_omitted",
+            result["data_quality_warnings"],
+        )
+
+    @patch("market_data_step1.urllib.request.urlopen")
     def test_invalid_open_price_does_not_create_percentage_change(self, mocked):
         self._responses(mocked, stats={"last": "100", "open": "0", "volume": "12"})
         result = _fetch_market_data(["bitcoin"], "usd")[0]
