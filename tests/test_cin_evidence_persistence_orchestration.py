@@ -24,9 +24,20 @@ class FakeStore:
             self.identity = (kwargs["source_namespace"], kwargs["external_evidence_id"])
             connection = sqlite3.connect(":memory:")
             try:
-                connection.execute("CREATE TABLE identity (value TEXT UNIQUE)")
-                connection.execute("INSERT INTO identity VALUES ('same')")
-                connection.execute("INSERT INTO identity VALUES ('same')")
+                connection.execute(
+                    "CREATE TABLE cin_evidence_records "
+                    "(source_namespace TEXT, external_evidence_id TEXT)"
+                )
+                connection.execute(
+                    "CREATE UNIQUE INDEX uq_cin_evidence_external_identity "
+                    "ON cin_evidence_records(source_namespace, external_evidence_id)"
+                )
+                connection.execute(
+                    "INSERT INTO cin_evidence_records VALUES ('github_public_repository_api', 'ethereum/go-ethereum')"
+                )
+                connection.execute(
+                    "INSERT INTO cin_evidence_records VALUES ('github_public_repository_api', 'ethereum/go-ethereum')"
+                )
             except sqlite3.IntegrityError as exc:
                 raise exc
             finally:
