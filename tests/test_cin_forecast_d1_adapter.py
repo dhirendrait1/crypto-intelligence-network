@@ -56,3 +56,14 @@ def test_adapter_rejects_invalid_worker_response(monkeypatch):
     monkeypatch.setattr(adapter, "urlopen", lambda *a, **k: FakeResponse(b'{"unexpected":true}'))
     with pytest.raises(adapter.ForecastD1Error, match="invalid response"):
         adapter.get_forecast(None, "fc-1")
+
+
+def test_api_dispatches_to_d1_adapter_when_configured(monkeypatch):
+    import cin_forecast_ledger_api as api
+    monkeypatch.setenv("CIN_FORECAST_D1_WORKER_URL", "https://cin-ledger.example.workers.dev")
+    monkeypatch.setenv("CIN_FORECAST_D1_WORKER_TOKEN", "service-secret")
+    monkeypatch.delenv("CIN_FORECAST_DB_PATH", raising=False)
+    monkeypatch.setattr(adapter, "get_forecast", lambda _path, forecast_id: {"forecast_id": forecast_id})
+    assert api._ledger_call(api.get_forecast, api._database_path(), "fc-remote") == {
+        "forecast_id": "fc-remote"
+    }
