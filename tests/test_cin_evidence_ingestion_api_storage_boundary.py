@@ -2,7 +2,7 @@
 import ast
 from pathlib import Path
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from fastapi import HTTPException
 
@@ -24,7 +24,7 @@ class TestEvidenceIngestionAPIStorageBoundary(unittest.TestCase):
                 imported_modules.add(node.module)
 
         self.assertFalse(any("sqlite" in name.lower() for name in imported_modules))
-        self.assertNotIn("cin_evidence_store", imported_modules)
+        self.assertIn("cin_evidence_store", imported_modules)
         self.assertNotIn("cin_local_sqlite_evidence_repository", imported_modules)
 
     def test_successful_provider_response_is_returned_without_persistence_claim(self):
@@ -39,7 +39,7 @@ class TestEvidenceIngestionAPIStorageBoundary(unittest.TestCase):
             symbol="ETH", repository="ethereum/go-ethereum"
         )
         with patch.object(api, "fetch_github_repository_evidence", return_value=provider_payload) as fetch:
-            result = api.public_evidence_ingestion(request)
+            result = api.public_evidence_ingestion(request, store=None)
 
         self.assertEqual(result, provider_payload)
         fetch.assert_called_once_with("ethereum/go-ethereum")
@@ -100,6 +100,30 @@ class TestEvidenceIngestionAPIStorageBoundary(unittest.TestCase):
         self.assertEqual(raised.exception.status_code, 400)
         fetch.assert_not_called()
 
+
+    def test_dependency_returns_none_when_application_has_no_store(self):
+        from types import SimpleNamespace
+
+        request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace()))
+        self.assertIsNone(api.get_evidence_store(request))
+
+    def test_dependency_returns_only_explicitly_configured_store(self):
+        from types import SimpleNamespace
+
+        sentinel_store = object()
+        request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(cin_evidence_store=sentinel_store)))
+        self.assertIs(api.get_evidence_store(request), sentinel_store)
+
+    def test_injected_store_is_not_written_by_read_only_endpoint(self):
+        store = Mock()
+        request = api.PublicEvidenceRequest(symbol="ETH", repository="ethereum/go-ethereum")
+        payload = {"symbol": "ETH", "claim_verification_status": "unverified"}
+        with patch.object(api, "fetch_github_repository_evidence", return_value=payload):
+            result = api.public_evidence_ingestion(request, store=store)
+        self.assertEqual(result, payload)
+        store.store_bundle.assert_not_called()
+        store.append_observation.assert_not_called()
+        store.append_assessment_event.assert_not_called()
 
 if __name__ == "__main__":
     unittest.main()
