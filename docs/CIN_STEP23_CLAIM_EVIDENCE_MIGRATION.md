@@ -16,24 +16,25 @@ This is the first migration contract for the existing commodity-backing and grow
 | Claim statement | `claim_text` | Optional caller-supplied text; not independently validated |
 | Change detection | `record_fingerprint_sha256` | Hashes normalized supplied metadata only, not source content or authenticity |
 | Freshness | Existing assessment status and age fields | Module-specific thresholds and semantics remain in place |
-| Relationship to a claim | Not yet represented as a first-class object | No stable CIN `claim_id`, relationship type, rationale, or review status exists |
+| Claim identity | Additive `claim` object with deterministic `claim_id` | Created only from caller-supplied non-empty `claim_text`; status remains `not_assessed` |
+| Relationship to a claim | Additive `claim_evidence_relationship` object | Created only when a caller-supplied `evidence_id` exists; always `context_only` and `automated_candidate` in this migration |
 
 ## Migration rules
 
 1. Preserve all existing fields and endpoint behavior until a separately reviewed, versioned API change is approved.
 2. Never treat caller-supplied `evidence_id`, `claim_text`, `source_role`, or `verified` status as CIN-authenticated facts.
-3. Do not synthesize a claim-evidence relationship merely because a record contains a source URL. A relationship needs an explicit claim identity, relationship type, rationale, and review state.
+3. Do not synthesize a claim-evidence relationship merely because a record contains a source URL. The current additive integration requires caller-supplied claim text and a stable evidence ID; it links them as `context_only` only and does not assert support.
 4. Keep evidence identity separate from claim identity. One claim may have multiple evidence records; one evidence record may relate to multiple claims.
 5. Keep published, observed, retrieved, and checked timestamps semantically distinct. Existing commodity/growth inputs do not yet provide a CIN retrieval timestamp.
 6. Keep metadata fingerprints explicitly labeled as metadata-only; never expose them as content hashes, signatures, or authenticity proofs.
 7. Preserve conflicts and missing evidence. Do not select a preferred source based only on recency, hostname, source-role label, or a caller-supplied status.
 8. Do not add persistence or background collection until retention, deletion, licensing, privacy, and provider authorization requirements have been reviewed.
 
-## Acceptance gates for the next implementation increment
+## Acceptance gates for subsequent increments
 
-- Introduce a shared, versioned claim/evidence/relationship representation without changing legacy response fields.
-- Generate stable CIN claim identifiers with documented identity semantics; avoid conflating claim edits with evidence-record identity.
-- Emit explicit relationship types (`supports`, `contradicts`, `qualifies`, `context_only`) and conservative review status (`automated_candidate`, `human_reviewed`, `rejected`).
+- Preserve the additive shared, versioned claim/evidence/relationship representation without changing legacy response fields.
+- Keep stable CIN claim identifiers separate from evidence-record identity.
+- Expand relationship types/review states only through separately reviewed evidence rules; current assessment integration must remain `context_only` / `automated_candidate` until source verification and human review exist.
 - Validate duplicate IDs, missing claim text, malformed timestamps, stale records, and contradictory evidence with deterministic tests.
 - Include schema/methodology version and timezone-aware CIN creation/retrieval timestamps only when those events actually occur.
 - Add the shared module to the deployment scaffold and verify router/module registration in offline CI.
@@ -41,4 +42,4 @@ This is the first migration contract for the existing commodity-backing and grow
 
 ## Current status
 
-This increment documents the concrete field mapping and migration constraints. It does not implement first-class claim IDs or relationship objects, migrate API payloads, persist evidence, fetch source documents, or independently verify claims. Step 23 remains Partial.
+The assessment modules now expose additive first-class claim and relationship objects while preserving legacy fields. Claims remain `not_assessed`; relationships remain context-only traceability links. The increment does not persist evidence, fetch/authenticate source documents, or independently verify claims. Step 23 remains Partial.
