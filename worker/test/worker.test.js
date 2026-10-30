@@ -42,3 +42,39 @@ test("enforces request body size before JSON parsing", async () => {
   }), env);
   assert.equal(response.status, 413);
 });
+
+
+test("rejects malformed forecast, observation, and evaluation payloads before database access", async () => {
+  const invalidForecast = await worker.fetch(request("/v1/ledger", {
+    operation: "create_forecast",
+    payload: { forecast: {
+      forecast_id: "fc-1", asset_id: "BTC-USD", metric: "price", value: 100,
+      unit: "USD", source_id: "test", created_at: "2026-10-30T10:00:00Z",
+      target_at: "2026-10-30T11:00:00Z",
+    } },
+  }), env);
+  const invalidObservation = await worker.fetch(request("/v1/ledger", {
+    operation: "insert_observation",
+    payload: { observation: {
+      observation_id: "obs-1", asset_id: "BTC-USD", metric: "price", value: 100,
+      unit: "USD", source_id: "test", observed_at: "2026-10-30T11:00:00Z",
+      retrieved_at: "2026-10-30T10:59:00Z",
+    } },
+  }), env);
+  const invalidEvaluation = await worker.fetch(request("/v1/ledger", {
+    operation: "evaluate_forecast",
+    payload: { forecast_id: "fc-1", evaluated_at: "not-a-time" },
+  }), env);
+  assert.equal(invalidForecast.status, 422);
+  assert.equal(invalidObservation.status, 422);
+  assert.equal(invalidEvaluation.status, 422);
+});
+
+test("rejects invalid list limits instead of passing unsafe values to D1", async () => {
+  const response = await worker.fetch(request("/v1/ledger", {
+    operation: "list_forecasts",
+    payload: { limit: 501 },
+  }), env);
+  assert.equal(response.status, 422);
+  assert.match((await response.json()).error, /invalid list limit/);
+});
