@@ -91,3 +91,12 @@ This design does not authenticate issuers, auditors, custodians, reserve reports
 A SQLite DDL reference migration is now present at database/migrations/0001_claim_evidence_schema_v1.sql, with in-memory schema tests in tests/test_cin_evidence_schema_v1.py. The tests exercise entity/index creation, namespaced external-ID uniqueness, foreign-key enforcement, constrained assessment vocabulary, and JSON validation.
 
 This file is a **reference schema for local development/tests only**. It is not applied by application startup, is not connected to an API or repository adapter, and is not a production persistence implementation. The SQL uses SQLite JSON functions and must not be assumed portable to another database engine. Before adoption, validate timestamp normalization, migration runner behavior, transactional semantics, backup/restore, retention/deletion, and the selected durable production database.
+
+
+## 10. Local repository adapter increment (2026-10-30)
+
+Added cin_local_sqlite_evidence_repository.py as an explicit-connection, local-development-only adapter. It does not initialize a database, run migrations, attach to the API, fetch URLs, or configure production storage. The caller must explicitly create a connection and apply the reference schema.
+
+The adapter writes one evidence record, immutable observation, claim, initial assessment event, and claim/evidence relationship inside one SQLite transaction. It assigns a CIN-owned evidence ID and stores the caller's external ID separately. Caller-submitted metadata retains source_status=caller_supplied and retrieved_at=NULL. The adapter does not infer claim truth or promote relationship review state.
+
+Offline tests cover successful atomic writes, duplicate external identity rollback, timezone-aware timestamp validation, and rejection of non-finite metadata. This is not durable production persistence and does not change assessment API behavior or Render deployment.
