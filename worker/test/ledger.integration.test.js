@@ -5,6 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import worker from "../src/index.js";
 
 function makeD1({ failBatchAt = -1 } = {}) {
+  let batchFailureIndex = failBatchAt;
   const db = new DatabaseSync(":memory:");
   db.exec(readFileSync("worker/migrations/0001_forecast_ledger.sql", "utf8"));
   return {
@@ -32,7 +33,7 @@ function makeD1({ failBatchAt = -1 } = {}) {
       try {
         const results = [];
         for (let i = 0; i < statements.length; i++) {
-          if (i === failBatchAt) throw new Error("simulated D1 batch statement failure");
+          if (i === batchFailureIndex) throw new Error("simulated D1 batch statement failure");
           results.push(statements[i].batchResult());
         }
         db.exec("COMMIT");
@@ -42,6 +43,7 @@ function makeD1({ failBatchAt = -1 } = {}) {
         throw error;
       }
     },
+    setBatchFailureIndex(index) { batchFailureIndex = index; },
     close() { db.close(); },
   };
 }
@@ -355,6 +357,40 @@ test("rolls back an insert when a later statement in the D1 batch fails", async 
   });
   assert.equal(remaining.status, 200);
   assert.equal(remaining.body.result, null);
+  db.close();
+});
+
+test("does not leave a partial evaluation when the evaluation batch fails", async () => {
+  const db = makeD1();
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const forecast = {
+    forecast_id: "fc-eval-rollback", asset_id: "BTC-USD", metric: "price",
+    value: 70000, unit: "USD", source_id: "test",
+    created_at: "2026-10-30T10:00:00Z",
+    target_at: "2026-10-30T11:00:00Z",
+  };
+  await call(env, "create_forecast", {
+    forecast, recorded_at: "2026-10-30T10:00:01Z",
+  });
+  await call(env, "insert_observation", { observation: {
+    observation_id: "obs-eval-rollback", asset_id: "BTC-USD",
+    metric: "price", value: 69900, unit: "USD", source_id: "test",
+    observed_at: "2026-10-30T11:01:00Z",
+    retrieved_at: "2026-10-30T11:02:00Z",
+  } });
+  db.setBatchFailureIndex(1);
+  const failed = await call(env, "evaluate_forecast", {
+    forecast_id: forecast.forecast_id,
+    evaluated_at: "2026-10-30T11:03:00Z",
+    max_observation_lag_seconds: 600,
+  });
+  assert.equal(failed.status, 503);
+  db.setBatchFailureIndex(-1);
+  const stored = await call(env, "get_evaluation", {
+    forecast_id: forecast.forecast_id,
+  });
+  assert.equal(stored.status, 200);
+  assert.equal(stored.body.result, null);
   db.close();
 });
 
