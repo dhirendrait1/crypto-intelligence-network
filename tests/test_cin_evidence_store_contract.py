@@ -46,6 +46,89 @@ class TestEvidenceStoreContract(unittest.TestCase):
         finally:
             connection.close()
 
+    def test_identity_lookup_trims_outer_whitespace_consistently(self):
+        from datetime import datetime, timezone
+        from cin_verifiable_evidence import create_claim, create_claim_evidence_relationship
+
+        connection = sqlite3.connect(":memory:")
+        try:
+            connection.executescript(SCHEMA.read_text(encoding="utf-8"))
+            repository = LocalSQLiteEvidenceRepository(connection)
+            now = datetime(2026, 10, 30, 12, 0, tzinfo=timezone.utc)
+            claim = create_claim(
+                subject="ETH", predicate="identity_test",
+                statement="Provider identity normalization test.", created_at=now,
+            )
+            relationship = create_claim_evidence_relationship(
+                claim_id=claim["claim_id"], evidence_id="identity-test",
+                relationship="context_only", rationale="Traceability only.",
+                created_at=now,
+            )
+            bundle = repository.store_bundle(
+                source_namespace=" github_public_repository_api ",
+                external_evidence_id=" ethereum/go-ethereum ",
+                evidence_type="repository_metadata", metadata={"stars": 1},
+                observed_at="2026-10-30T12:00:00Z", claim=claim,
+                relationship=relationship,
+            )
+            self.assertEqual(
+                repository.find_evidence_id(
+                    source_namespace="github_public_repository_api",
+                    external_evidence_id="ethereum/go-ethereum",
+                ),
+                bundle["cin_evidence_id"],
+            )
+            with self.assertRaises(sqlite3.IntegrityError):
+                repository.store_bundle(
+                    source_namespace="github_public_repository_api",
+                    external_evidence_id="ethereum/go-ethereum",
+                    evidence_type="repository_metadata", metadata={"stars": 2},
+                    observed_at="2026-10-30T12:01:00Z", claim=claim,
+                    relationship=relationship,
+                )
+        finally:
+            connection.close()
+
+    def test_provider_external_id_case_is_preserved_not_folded(self):
+        from datetime import datetime, timezone
+        from cin_verifiable_evidence import create_claim, create_claim_evidence_relationship
+
+        connection = sqlite3.connect(":memory:")
+        try:
+            connection.executescript(SCHEMA.read_text(encoding="utf-8"))
+            repository = LocalSQLiteEvidenceRepository(connection)
+            now = datetime(2026, 10, 30, 12, 0, tzinfo=timezone.utc)
+            claim = create_claim(
+                subject="ETH", predicate="identity_case_test",
+                statement="Case sensitivity must remain provider-defined.", created_at=now,
+            )
+            relationship = create_claim_evidence_relationship(
+                claim_id=claim["claim_id"], evidence_id="identity-case-test",
+                relationship="context_only", rationale="Traceability only.",
+                created_at=now,
+            )
+            lower = repository.store_bundle(
+                source_namespace="provider", external_evidence_id="Asset-A",
+                evidence_type="provider_record", metadata={"v": 1},
+                observed_at="2026-10-30T12:00:00Z", claim=claim,
+                relationship=relationship,
+            )
+            upper = repository.store_bundle(
+                source_namespace="provider", external_evidence_id="asset-a",
+                evidence_type="provider_record", metadata={"v": 2},
+                observed_at="2026-10-30T12:01:00Z", claim=claim,
+                relationship=relationship,
+            )
+            self.assertNotEqual(lower["cin_evidence_id"], upper["cin_evidence_id"])
+            self.assertEqual(
+                connection.execute(
+                    "SELECT COUNT(*) FROM cin_evidence_records WHERE source_namespace='provider'"
+                ).fetchone()[0],
+                2,
+            )
+        finally:
+            connection.close()
+
     def test_identity_lookup_returns_existing_id_without_mutating_records(self):
         from datetime import datetime, timezone
         from cin_verifiable_evidence import create_claim, create_claim_evidence_relationship
