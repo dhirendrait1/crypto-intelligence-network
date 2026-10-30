@@ -185,8 +185,6 @@ export default {
       return bad("invalid request");
     try { return json({ result: await handle(env, body.operation, body.payload) }); }
     catch (error) {
-      if (env.CIN_TEST_DIAGNOSTICS === true)
-        console.error("CIN ledger test diagnostic:", error?.stack || error);
       const message = String(error?.message || "ledger operation failed");
       if (/not found/.test(message)) return bad(message, 404);
       if (/already exists|invalid|horizon|unsupported/.test(message)) return bad(message, 422);
