@@ -178,3 +178,8 @@ The following are intentionally not guessed or implemented:
 - Whether minimal tombstones are permitted or required for each source class.
 
 **Acceptance status:** design documented; implementation blocked pending these policy decisions. No trigger has been disabled, no record has been deleted, and no retention schedule or worker has been enabled.
+
+
+## 14. Derived hash and fingerprint lifecycle design gate (2026-10-31)
+
+See `docs/CIN_STEP23_DERIVED_DATA_HASH_AND_FINGERPRINT_LIFECYCLE_V1.md` for the detailed F-07 proposal. Current behavior is limited: the local adapter stores SHA-256 fingerprints of canonicalized allowlisted metadata; the optional content-hash column is currently populated with NULL. Neither is proof of authenticity or anonymity. Default future treatment is to inherit source classification, policy version, lineage, and expiry; source erasure triggers a dependency review and removal of derived descendants unless a narrow, independently approved retention exception is fully justified. Missing lineage fails closed. No current hash is changed or deleted; no new hash computation, lineage schema, retention worker, or production persistence is enabled. This is a design gate only.
