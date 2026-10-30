@@ -55,9 +55,15 @@ async function insertImmutable(env, table, idColumn, id, item) {
     if (JSON.stringify(old) !== payload) throw new Error("ID already exists with different content");
     return old;
   }
-  await env.CIN_FORECAST_DB.prepare(
-    `INSERT OR IGNORE INTO ${table} (${idColumn}, payload_json) VALUES (?, ?)`
-  ).bind(id, payload).run();
+  if (table === "cin_forecasts") {
+    await env.CIN_FORECAST_DB.prepare(
+      "INSERT OR IGNORE INTO cin_forecasts (forecast_id, asset_id, metric, unit, created_at, payload_json) VALUES (?, ?, ?, ?, ?, ?)"
+    ).bind(id, item.asset_id, item.metric, item.unit, item.created_at, payload).run();
+  } else {
+    await env.CIN_FORECAST_DB.prepare(
+      "INSERT OR IGNORE INTO cin_forecast_observations (observation_id, payload_json) VALUES (?, ?)"
+    ).bind(id, payload).run();
+  }
   const saved = await env.CIN_FORECAST_DB.prepare(
     `SELECT payload_json FROM ${table} WHERE ${idColumn} = ?`
   ).bind(id).first();
@@ -144,14 +150,13 @@ export default {
       return bad("not found", 404);
     const expected = env.CIN_FORECAST_WORKER_TOKEN;
     const auth = request.headers.get("authorization") || "";
-    if (!expected || !auth.startsWith("Bearer ") ||
-        auth.slice(7).length !== expected.length ||
-        !crypto.subtle.timingSafeEqual) return bad("unauthorized", 401);
+    if (!expected || !auth.startsWith("Bearer ")) return bad("unauthorized", 401);
     const supplied = new TextEncoder().encode(auth.slice(7));
     const wanted = new TextEncoder().encode(expected);
-    if (supplied.length !== wanted.length ||
-        !(await crypto.subtle.digest("SHA-256", supplied)).every((v, i) => v ===
-          (await crypto.subtle.digest("SHA-256", wanted))[i])) return bad("unauthorized", 401);
+    if (supplied.length !== wanted.length) return bad("unauthorized", 401);
+    let mismatch = 0;
+    for (let i = 0; i < supplied.length; i++) mismatch |= supplied[i] ^ wanted[i];
+    if (mismatch !== 0) return bad("unauthorized", 401);
     let body;
     try { body = await request.json(); } catch { return bad("invalid JSON"); }
     if (!body || !text(body.operation, 60) || !body.payload || typeof body.payload !== "object")
