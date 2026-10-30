@@ -163,3 +163,11 @@ Added `docs/CIN_STEP23_DERIVED_DATA_HASH_AND_FINGERPRINT_LIFECYCLE_V1.md`. It re
 - Reviewed `cin_evidence_ingestion_api.py`, `cin_evidence_store.py`, `cin_local_sqlite_evidence_repository.py`, and schema v1.0. API request validation and dependency injection do not authenticate or authorize callers. The local adapter trusts its caller-supplied SQLite connection; schema v1.0 contains no principal/role/permission model. Export, retention, and restore privileged operations are not implemented.
 - Added `docs/CIN_STEP23_ACCESS_CONTROL_AND_AUTHORIZATION_READINESS_V1.md` with current trust boundaries, proposed least-privilege permission vocabulary, separation-of-duties controls, fail-closed behavior, acceptance tests, and unresolved approvals.
 - No authentication provider, role, permission, token, secret, schema, API write path, or deployment configuration was created or changed. F-09 remains Open; privileged operations remain unauthorized.
+
+
+### F-10 public endpoint abuse and rate-limit readiness finding (2026-10-31)
+
+- Reviewed the public evidence-ingestion route, its GitHub connector, HTTP tests, and Render manifest. Request shape and exact source allowlisting are enforced; the connector uses a fixed GitHub API root, bounded timeout, and a 1,000,000-byte response limit.
+- No per-caller quota, global request budget, concurrency ceiling, cooldown, explicit provider-429 retry policy, or rate-limit telemetry was evidenced in the reviewed route/connector. The Render manifest does not document an edge rate-limit policy; this does not prove the hosting platform has no external controls.
+- Added `docs/CIN_STEP23_PUBLIC_ENDPOINT_ABUSE_AND_RATE_LIMIT_READINESS_V1.md` with threat scenarios, minimum control contract, safe implementation sequence, acceptance gates, and explicit non-actions.
+- No runtime code, middleware, package, edge rule, Render/Cloudflare setting, provider quota, or deployment was changed. F-10 remains Open; the route remains read-only and Step 23 remains Partial.
