@@ -11,6 +11,8 @@ import json
 from typing import Any
 from urllib.parse import urlsplit
 
+from cin_verifiable_evidence import create_claim, create_claim_evidence_relationship
+
 CATEGORIES = {
     "usage_and_adoption": "On-chain users, transactions, retention, or adoption",
     "fees_and_revenue": "Protocol fees, revenue, or sustainable economic activity",
@@ -196,6 +198,30 @@ def assess_growth_fundamentals(
             "cin_independently_verified": False,
             "invalid_record": False,
         }
+        claim = None
+        relationship = None
+        if record["claim_text"]:
+            claim = create_claim(
+                subject=str(symbol or "").strip().upper(),
+                predicate=kind or "unspecified_category",
+                statement=record["claim_text"],
+                created_at=current,
+                claim_status="not_assessed",
+            )
+            if evidence_id:
+                relationship = create_claim_evidence_relationship(
+                    claim_id=claim["claim_id"],
+                    evidence_id=evidence_id,
+                    relationship="context_only",
+                    rationale=(
+                        "Caller-supplied claim text is linked for traceability only; "
+                        "CIN has not independently verified the claim or source."
+                    ),
+                    review_status="automated_candidate",
+                    created_at=current,
+                )
+        record["claim"] = claim
+        record["claim_evidence_relationship"] = relationship
         fingerprint_fields = {key: record.get(key) for key in (
             "category", "evidence_id", "source_role", "source_name", "source_url",
             "published_at", "checked_at", "status", "claim_text", "notes"
