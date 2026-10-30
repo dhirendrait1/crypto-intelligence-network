@@ -25,7 +25,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<ApiResult<T
     const body = payload as Record<string, unknown>;
     const retrievedAt = typeof body.retrieved_at === "string" ? body.retrieved_at : null;
     const source = typeof body.source === "string" ? body.source : null;
-    if (path === "/health" || path === "/ready") {\n      const healthy = body.status === "ok" || body.status === "ready";\n      return { state: healthy ? "fresh" : "unavailable", data: payload as T, retrievedAt, source, message: healthy ? "CIN service endpoint responded successfully." : "CIN service did not report a healthy state." };\n    }\n    if (!Array.isArray(body.data)) return { state: "unknown", data: payload as T, retrievedAt, source, message: "Response received, but its data collection is missing or has an unsupported shape." };
+    if (path === "/health" || path === "/ready") {
+      const healthy = body.status === "ok" || body.status === "ready";
+      return { state: healthy ? "fresh" : "unavailable", data: payload as T, retrievedAt, source, message: healthy ? "CIN service endpoint responded successfully." : "CIN service did not report a healthy state." };
+    }
+    if (!Array.isArray(body.data)) return { state: "unknown", data: payload as T, retrievedAt, source, message: "Response received, but its data collection is missing or has an unsupported shape." };
     const rows = body.data as unknown[];
     const rowStates = rows.map((row) => row && typeof row === "object" ? (row as Record<string, unknown>).freshness_status : undefined);
     const hasStale = rowStates.includes("stale") || body.data_mode === "stale_cache";
