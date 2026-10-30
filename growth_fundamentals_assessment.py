@@ -127,6 +127,8 @@ def assess_growth_fundamentals(
                 "missing_fields": ["record_object", "recognized_category", "source_name", "source_url", "published_at"],
                 "notes": None,
                 "cin_independently_verified": False,
+                "claim": None,
+                "claim_evidence_relationship": None,
                 "assessment_clock_valid": assessment_clock_valid,
                 "invalid_record": True,
             })
