@@ -950,3 +950,10 @@ This checkpoint validates configured offline automation only. It does not establ
 - Added four growth-assessment regression tests covering missing check time, future/impossible chronology, role/fingerprint disclosure, and metadata fingerprint change detection.
 - Fingerprints are not document hashes, signatures, trusted timestamps, or authenticity proof. Source roles remain caller supplied and unauthenticated.
 - Step 22 remains Partial: source documents are not fetched and issuer/reserve/custody/audit/fundamental claims are not independently verified. Live source validation is outstanding.
+
+
+## Step 23 — common verifiable evidence model specification (2026-10-30)
+
+- Added `docs/CIN_VERIFIABLE_EVIDENCE_MODEL.md` defining claim, evidence-record, and claim-evidence relationship fields; source provenance; distinct publication/observation/provider-seen/retrieval/check/valid times; descriptive confidence states; conflict handling; freshness/completeness; and audit/versioning requirements.
+- Explicitly distinguishes source assertions from CIN verification, prohibits treating missing evidence as zero, and rejects numeric confidence probabilities without a calibrated model and validation data.
+- Step 23 remains Partial. No persistent evidence store, versioned claim API, or cross-module migration was implemented by this specification.
