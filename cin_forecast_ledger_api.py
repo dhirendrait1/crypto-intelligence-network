@@ -7,6 +7,7 @@ wallet operations, or fund movement are implemented here.
 from __future__ import annotations
 
 import hmac
+from contextlib import asynccontextmanager
 import os
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -42,19 +43,20 @@ except ModuleNotFoundError as exc:
         record_forecast_observation,
     )
 
-router = APIRouter(prefix="/forecasts", tags=["forecast ledger"])
-_bearer = HTTPBearer(auto_error=False)
-
-
-@router.on_event("startup")
-def initialize_configured_forecast_storage() -> None:
-    """Initialize schema only when an explicit absolute DB path is configured."""
+@asynccontextmanager
+async def _forecast_lifespan(app):
+    """Initialize configured SQLite schema before serving forecast requests."""
     raw = os.getenv("CIN_FORECAST_DB_PATH", "").strip()
     if raw:
         path = Path(raw)
         if not path.is_absolute():
             raise RuntimeError("CIN_FORECAST_DB_PATH must be an absolute path")
         initialize_forecast_ledger(path)
+    yield
+
+
+router = APIRouter(prefix="/forecasts", tags=["forecast ledger"], lifespan=_forecast_lifespan)
+_bearer = HTTPBearer(auto_error=False)
 
 
 def _database_path() -> Path:
