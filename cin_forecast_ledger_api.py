@@ -46,8 +46,13 @@ except ModuleNotFoundError as exc:
 @asynccontextmanager
 async def _forecast_lifespan(app):
     """Initialize configured SQLite schema before serving forecast requests."""
+    d1_url = os.getenv("CIN_FORECAST_D1_WORKER_URL", "").strip()
+    d1_token = os.getenv("CIN_FORECAST_D1_WORKER_TOKEN", "")
     raw = os.getenv("CIN_FORECAST_DB_PATH", "").strip()
-    if raw:
+    if d1_url or d1_token:
+        if not d1_url.startswith("https://") or not d1_token:
+            raise RuntimeError("Both HTTPS D1 Worker URL and D1 Worker token must be configured")
+    elif raw:
         path = Path(raw)
         if not path.is_absolute():
             raise RuntimeError("CIN_FORECAST_DB_PATH must be an absolute path")
@@ -60,6 +65,12 @@ _bearer = HTTPBearer(auto_error=False)
 
 
 def _database_path() -> Path:
+    d1_url = os.getenv("CIN_FORECAST_D1_WORKER_URL", "").strip()
+    d1_token = os.getenv("CIN_FORECAST_D1_WORKER_TOKEN", "")
+    if d1_url or d1_token:
+        if not d1_url.startswith("https://") or not d1_token:
+            raise HTTPException(status_code=503, detail="D1 Worker URL and token must both be configured")
+        return Path("/__cin_d1_remote__")
     raw = os.getenv("CIN_FORECAST_DB_PATH", "").strip()
     if not raw:
         raise HTTPException(
@@ -129,9 +140,29 @@ def _translate_value_error(fn, *args, **kwargs):
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
+def _ledger_call(fn, *args, **kwargs):
+    """Select remote D1 adapter only when its complete HTTPS configuration exists."""
+    d1_url = os.getenv("CIN_FORECAST_D1_WORKER_URL", "").strip()
+    d1_token = os.getenv("CIN_FORECAST_D1_WORKER_TOKEN", "")
+    try:
+        if d1_url or d1_token:
+            if not d1_url.startswith("https://") or not d1_token:
+                raise HTTPException(status_code=503, detail="D1 Worker URL and token must both be configured")
+            try:
+                from app import cin_forecast_d1_adapter as adapter
+            except ModuleNotFoundError:
+                import cin_forecast_d1_adapter as adapter
+            return getattr(adapter, fn.__name__)(None, *args[1:], **kwargs)
+        return fn(*args, **kwargs)
+    except adapter.ForecastD1Error as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @router.post("", status_code=201, dependencies=[Depends(_require_write_token)])
 def create_forecast(request: ForecastInput) -> dict[str, Any]:
-    return _translate_value_error(
+    return _ledger_call(
         record_forecast,
         _database_path(),
         _payload(request),
@@ -144,29 +175,29 @@ def forecast_history(
     asset_id: str | None = None,
     limit: int = Query(default=100, ge=1, le=500),
 ) -> dict[str, Any]:
-    rows = _translate_value_error(list_forecasts, _database_path(), asset_id=asset_id, limit=limit)
+    rows = _ledger_call(list_forecasts, _database_path(), asset_id=asset_id, limit=limit)
     return {"count": len(rows), "items": rows, "read_only": True}
 
 
 @router.get("/{forecast_id}")
 def forecast_detail(forecast_id: str) -> dict[str, Any]:
-    item = _translate_value_error(get_forecast, _database_path(), forecast_id)
+    item = _ledger_call(get_forecast, _database_path(), forecast_id)
     if item is None:
         raise HTTPException(status_code=404, detail="Forecast not found")
-    return {"forecast": item, "evaluation": get_forecast_evaluation(_database_path(), forecast_id),
+    return {"forecast": item, "evaluation": _ledger_call(get_forecast_evaluation, _database_path(), forecast_id),
             "read_only": True}
 
 
 @router.post("/observations", status_code=201, dependencies=[Depends(_require_write_token)])
 def ingest_observation(request: ObservationInput) -> dict[str, Any]:
-    item = _translate_value_error(record_forecast_observation, _database_path(), _payload(request))
+    item = _ledger_call(record_forecast_observation, _database_path(), _payload(request))
     return {"observation": item, "read_only": True}
 
 
 @router.post("/{forecast_id}/evaluate", dependencies=[Depends(_require_write_token)])
 def evaluate_forecast(forecast_id: str, request: EvaluationInput) -> dict[str, Any]:
     evaluated_at = request.evaluated_at or datetime.now(timezone.utc)
-    result = _translate_value_error(
+    result = _ledger_call(
         evaluate_and_record_forecast,
         _database_path(),
         forecast_id,
@@ -182,7 +213,7 @@ def forecast_scorecards(
     limit: int = Query(default=500, ge=1, le=500),
 ) -> dict[str, Any]:
     """Compute independent descriptive scorecards per asset, metric and unit."""
-    rows = _translate_value_error(
+    rows = _ledger_call(
         list_forecast_evaluations, _database_path(), asset_id=asset_id, limit=limit
     )
     groups: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
