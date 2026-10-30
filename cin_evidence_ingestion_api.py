@@ -63,7 +63,14 @@ def public_evidence_ingestion(
     try:
         return fetch_github_repository_evidence(request.repository)
     except EvidenceSourceError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        # Provider exception text is diagnostic input, not a client-safe message.
+        raise HTTPException(
+            status_code=502,
+            detail="Public evidence provider is temporarily unavailable",
+        ) from exc
     except Exception as exc:
-        # Keep unexpected provider failures from leaking internals to API clients.
-        raise HTTPException(status_code=502, detail="Public evidence provider returned an unexpected response") from exc
+        # Never expose provider URLs, response fragments, credentials, or exception text.
+        raise HTTPException(
+            status_code=502,
+            detail="Public evidence provider is temporarily unavailable",
+        ) from exc
