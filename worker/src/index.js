@@ -161,11 +161,13 @@ export default {
     let mismatch = 0;
     for (let i = 0; i < supplied.length; i++) mismatch |= supplied[i] ^ wanted[i];
     if (mismatch !== 0) return bad("unauthorized", 401);
+    let raw;
+    try { raw = await request.text(); } catch { return bad("invalid request"); }
+    if (new TextEncoder().encode(raw).length > 65536) return bad("request too large", 413);
     let body;
-    try { body = await request.json(); } catch { return bad("invalid JSON"); }
+    try { body = JSON.parse(raw); } catch { return bad("invalid JSON"); }
     if (!body || !text(body.operation, 60) || !body.payload || typeof body.payload !== "object")
       return bad("invalid request");
-    if (Number(request.headers.get("content-length") || 0) > 65536) return bad("request too large", 413);
     try { return json({ result: await handle(env, body.operation, body.payload) }); }
     catch (error) {
       const message = String(error?.message || "ledger operation failed");
