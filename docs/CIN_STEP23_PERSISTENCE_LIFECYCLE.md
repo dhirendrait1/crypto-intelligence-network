@@ -208,3 +208,8 @@ See `docs/CIN_STEP23_PUBLIC_ENDPOINT_ABUSE_AND_RATE_LIMIT_READINESS_V1.md` for t
 ## 19. Operational logging, monitoring, and incident-response readiness gate (2026-10-31)
 
 See docs/CIN_STEP23_OPERATIONAL_LOGGING_MONITORING_INCIDENT_RESPONSE_READINESS_V1.md for the reviewed sanitized API error behavior, offline CI evidence, candidate minimized event schema, monitoring indicators, incident runbook requirements, acceptance gates, and unresolved operational ownership/retention questions. The bundled application entry point and hosting-level logging behavior were not independently inspected in this pass and remain not assessed. No runtime telemetry, alert, incident automation, log retention policy, or deployment setting was changed. Operational readiness remains open.
+
+
+## 20. Disaster recovery and service continuity readiness gate (2026-10-31)
+
+See docs/CIN_STEP23_DISASTER_RECOVERY_AND_SERVICE_CONTINUITY_READINESS_V1.md for service-tier RTO/RPO decision requirements, provider/platform/release/overload failure scenarios, safe degradation, staged recovery sequence, and continuity test gates. This is distinct from the backup/export/replica/restore lifecycle: it addresses service availability and controlled restoration of service. No RTO/RPO targets, standby, failover, monitor, release gate, retry loop, hosting configuration, or deployment was changed. Operational recovery remains unimplemented and unverified.
