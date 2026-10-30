@@ -175,3 +175,58 @@ test("concurrent evaluations return the single persisted first result", async ()
   assert.deepEqual(one.body.result, two.body.result);
   db.close();
 });
+
+test("concurrent forecast retries preserve the first write and reject conflicting content", async () => {
+  const db = makeD1();
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const forecast = {
+    forecast_id: "fc-race-1", asset_id: "ETH-USD", metric: "price",
+    value: 2500, unit: "USD", source_id: "cin-model-v1",
+    created_at: "2026-10-30T10:00:00Z",
+    target_at: "2026-10-30T12:00:00Z",
+  };
+  const [a, b] = await Promise.all([
+    call(env, "create_forecast", { forecast, recorded_at: "2026-10-30T10:00:01Z" }),
+    call(env, "create_forecast", { forecast, recorded_at: "2026-10-30T10:00:02Z" }),
+  ]);
+  assert.equal(a.status, 200);
+  assert.equal(b.status, 200);
+  assert.equal(a.body.result.recorded_at, b.body.result.recorded_at);
+  assert.equal(a.body.result.recorded_at, "2026-10-30T10:00:01Z");
+
+  const [same, conflict] = await Promise.all([
+    call(env, "create_forecast", { forecast, recorded_at: "2026-10-30T10:01:00Z" }),
+    call(env, "create_forecast", {
+      forecast: { ...forecast, value: 2600 },
+      recorded_at: "2026-10-30T10:01:00Z",
+    }),
+  ]);
+  assert.equal(same.status, 200);
+  assert.equal(conflict.status, 422);
+  db.close();
+});
+
+test("concurrent observation retries are idempotent and conflicting IDs fail closed", async () => {
+  const db = makeD1();
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const observation = {
+    observation_id: "obs-race-1", asset_id: "ETH-USD", metric: "price",
+    value: 2501, unit: "USD", source_id: "coinbase-public",
+    observed_at: "2026-10-30T12:00:01Z",
+    retrieved_at: "2026-10-30T12:00:02Z",
+  };
+  const [a, b] = await Promise.all([
+    call(env, "insert_observation", { observation }),
+    call(env, "insert_observation", { observation }),
+  ]);
+  assert.equal(a.status, 200);
+  assert.equal(b.status, 200);
+  assert.deepEqual(a.body.result, b.body.result);
+
+  const conflict = await call(env, "insert_observation", {
+    observation: { ...observation, value: 2499 },
+  });
+  assert.equal(conflict.status, 422);
+  db.close();
+});
+
