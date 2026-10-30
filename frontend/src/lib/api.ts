@@ -1,9 +1,5 @@
 export type DataState = "fresh" | "stale" | "partial" | "conflicting" | "unavailable" | "unknown" | "error";
 export interface ApiResult<T> { state: DataState; data: T | null; retrievedAt: string | null; source: string | null; message: string; }
-export interface MarketDataRow { id: string; symbol: string | null; name: string | null; currency: string; provider: string; price: number; last_updated: string | null; freshness_status: "fresh" | "stale" | "unknown"; freshness_age_seconds: number | null; analysis_eligible: boolean; data_quality_warnings: string[]; }
-export interface MarketDataResponse { service: string; source: string; mode: "read_only"; retrieved_at: string; partial_result: boolean; missing_coins: string[]; data: MarketDataRow[]; }
-export interface ScreeningResponse { service: string; endpoint: string; source: string; mode: "read_only"; data_mode: string; stale_data_warning: string | null; retrieved_at: string; count: number; data: unknown[]; limitations: string[]; }
-
 const API_BASE = (import.meta.env.VITE_CIN_API_BASE_URL ?? "").trim().replace(/\/$/, "");
 const REQUEST_TIMEOUT_MS = 12_000;
 
@@ -47,17 +43,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<ApiResult<T
 
 export const cinApi = {
   configured: Boolean(API_BASE),
-  getMarketData(coins = ["bitcoin", "ethereum"], currency = "usd") {
-    const query = new URLSearchParams({ coins: coins.join(","), vs_currency: currency });
-    return request<MarketDataResponse>(`/market-data?${query.toString()}`);
-  },
-  getCoinScreening(params: { currency?: string; perPage?: number; minScore?: number; assetType?: string } = {}) {
-    const query = new URLSearchParams({
-      vs_currency: params.currency ?? "usd",
-      per_page: String(params.perPage ?? 50),
-      min_score: String(params.minScore ?? 0),
-      asset_type: params.assetType ?? "all",
-    });
-    return request<ScreeningResponse>(`/coin-screening?${query.toString()}`);
-  },
+  getHealth() { return request<Record<string, unknown>>("/health"); },
+  getReadiness() { return request<Record<string, unknown>>("/ready"); },
 };
