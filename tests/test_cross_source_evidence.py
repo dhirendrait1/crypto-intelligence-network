@@ -135,3 +135,20 @@ def test_different_paths_on_same_origin_do_not_count_as_separate_sources():
         "https://alpha.example",
         "https://beta.example",
     }
+
+
+
+def test_http_and_https_variants_of_same_host_are_one_source():
+    result = compare_metric_observations([
+        observation("Alpha secure", 100.0, source_url="https://alpha.example/price"),
+        observation("Alpha legacy", 100.0, source_url="http://alpha.example/quote"),
+        observation("Beta", 100.0),
+    ])
+
+    item = result["results"][0]
+    assert item["comparable_source_count"] == 2
+    assert item["duplicate_source_observation_count"] == 1
+    assert {row["source_url"] for row in item["source_observations"]} == {
+        "alpha.example",
+        "beta.example",
+    }
