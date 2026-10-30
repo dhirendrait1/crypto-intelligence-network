@@ -221,3 +221,10 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - Added offline tests for deterministic identity, identity changes, typed values, timezone-aware and ordered valid times, allowed statuses, malformed values, relationship types, and review states.
 - Added the shared module to the Render scaffold copy list and scaffold regression fixture. No Render deployment was performed.
 - These are in-memory construction/validation primitives only: no persistence, source retrieval/authentication, relationship API, or automatic claim inference. Step 23 remains Partial.
+
+
+### Step 23 data-classification design increment (2026-10-31)
+
+- Added `docs/CIN_STEP23_DATA_CLASSIFICATION_AND_RETENTION_CLASSES_V1.md` with distinct sensitivity classifications and retention-class selectors, field/entity mapping for evidence, claims, rationales, fingerprints, logs, exports, backups and replicas, plus a future policy-version contract and acceptance gates.
+- The design intentionally defines no retention durations, legal basis, source authorization, or hold authority without review. Schema v1.0 remains unchanged; no data was backfilled, erased, or rewritten, and no retention worker or production persistence was enabled.
+- F-03 is design-documented but remains open pending policy approval and separately reviewed schema implementation. F-05 retention start/expiry semantics and F-07 derived-hash lifecycle remain open. Step 23 remains Partial.
