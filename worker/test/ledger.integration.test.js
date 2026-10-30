@@ -126,7 +126,7 @@ test("persists immutable forecasts and observations and evaluates the nearest ho
     evaluated_at: "2026-10-30T12:00:00+00:00",
     max_observation_lag_seconds: 600,
   });
-  assert.equal(repeated.body.result.evaluated_at, "2026-10-30T11:06:00+00:00");
+  assert.equal(repeated.body.result.evaluated_at, "2026-10-30T11:06:00.000Z");
 
   const detail = await call(env, "get_forecast", { forecast_id: forecast.forecast_id });
   const evaluation = await call(env, "get_evaluation", { forecast_id: forecast.forecast_id });
@@ -161,7 +161,7 @@ test("canonical payload comparison accepts reordered nested JSON keys", async ()
   });
   assert.equal(first.status, 200);
   assert.equal(replay.status, 200);
-  assert.equal(replay.body.result.recorded_at, "2026-10-30T10:00:01Z");
+  assert.equal(replay.body.result.recorded_at, "2026-10-30T10:00:01.000Z");
   db.close();
 });
 
@@ -225,7 +225,7 @@ test("concurrent forecast retries preserve the first write and reject conflictin
   assert.equal(a.status, 200);
   assert.equal(b.status, 200);
   assert.equal(a.body.result.recorded_at, b.body.result.recorded_at);
-  assert.equal(a.body.result.recorded_at, "2026-10-30T10:00:01Z");
+  assert.equal(a.body.result.recorded_at, "2026-10-30T10:00:01.000Z");
 
   const [same, conflict] = await Promise.all([
     call(env, "create_forecast", { forecast, recorded_at: "2026-10-30T10:01:00Z" }),
@@ -319,7 +319,7 @@ test("concurrent evaluations persist one immutable result and return the winning
   const [a, b] = await Promise.all([
     call(env, "evaluate_forecast", {
       forecast_id: forecast.forecast_id,
-      evaluated_at: "2026-10-30T11:02:00+02:00",
+      evaluated_at: "2026-10-30T13:02:00+02:00",
       max_observation_lag_seconds: 600,
     }),
     call(env, "evaluate_forecast", {
@@ -331,7 +331,7 @@ test("concurrent evaluations persist one immutable result and return the winning
   assert.equal(a.status, 200);
   assert.equal(b.status, 200);
   assert.deepEqual(a.body.result, b.body.result);
-  assert.equal(a.body.result.evaluated_at, "2026-10-30T09:02:00.000Z");
+  assert.equal(a.body.result.evaluated_at, "2026-10-30T11:02:00.000Z");
 
   const stored = await call(env, "get_evaluation", {
     forecast_id: forecast.forecast_id,
