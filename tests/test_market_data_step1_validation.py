@@ -54,6 +54,14 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         self.assertEqual(rows[0]["product_id"], "ETH-USD")
 
     @patch("market_data_step1.urllib.request.urlopen")
+    def test_coinbase_numeric_strings_are_parsed(self, mocked):
+        self._responses(mocked, stats={"last": "123.45", "open": "100", "volume": "50.25"})
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertEqual(result["price"], 123.45)
+        self.assertEqual(result["total_volume_24h"], 50.25)
+        self.assertAlmostEqual(result["price_change_percentage_24h"], 23.45)
+
+    @patch("market_data_step1.urllib.request.urlopen")
     def test_unsupported_asset_is_not_substituted(self, mocked):
         self.assertEqual(_fetch_market_data(["unknown-token"], "usd"), [])
         mocked.assert_not_called()
