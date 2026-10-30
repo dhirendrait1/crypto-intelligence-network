@@ -258,3 +258,8 @@ See docs/CIN_DASHBOARD_DATA_INTEGRATION_AND_ASSESSMENT_PRESENTATION_ARCHITECTURE
 ## 29. Dashboard frontend technology readiness (F-21, 2026-10-31)
 
 See docs/CIN_FRONTEND_IMPLEMENTATION_READINESS_AND_TECHNOLOGY_DECISION_V1.md. Selected a separate React + TypeScript + Vite static frontend, with Cloudflare Pages Free as a proposed hosting target and the existing FastAPI API retained as a separate origin. Defined dependency, API client, public configuration, CORS, security, responsive/accessibility, build/test and release gates. Repository deployment evidence shows the current Render manifest starts the FastAPI scaffold; this review found no independently maintained frontend. No frontend code, dependency, CORS, Cloudflare project, DNS, Render setting or deployment was changed. F-21 is design only; actual scaffold implementation remains open.
+
+
+## 30. Frontend foundation delivery boundary (F-22, 2026-10-31)
+
+The first React/TypeScript/Vite app shell is documented in docs/CIN_F22_FRONTEND_FOUNDATION_IMPLEMENTATION_RECORD.md. It is a separate frontend preview with demo-data disclosure, read-only boundary, responsive navigation and a CI workflow for typecheck, tests and build. This is outside the SQLite persistence runtime and does not wire persistence to a browser. No API, CORS, storage, provider or deployment change was made. GitHub Actions results and a committed npm lockfile remain outstanding; the frontend is not production-ready.
