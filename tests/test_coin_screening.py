@@ -725,7 +725,7 @@ class MarketCacheProvenanceTests(unittest.TestCase):
 
 
 class MarketProviderResponseSizeTests(unittest.TestCase):
-    def test_primary_and_fallback_provider_bodies_are_bounded(self):
+    def test_coinpaprika_provider_body_is_bounded(self):
         class OversizedResponse:
             def __enter__(self):
                 return self
@@ -745,4 +745,4 @@ class MarketProviderResponseSizeTests(unittest.TestCase):
 
         self.assertEqual(primary.requested_size, MODULE._MAX_MARKET_PROVIDER_RESPONSE_BYTES + 1)
         self.assertEqual(caught.exception.primary_kind, "invalid_response")
-        self.assertEqual(caught.exception.fallback_kind, "invalid_response")
+        self.assertEqual(caught.exception.fallback_kind, "not_attempted")
