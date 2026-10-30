@@ -168,5 +168,56 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         self.assertIn("provider returned HTTP 400", raised.exception.detail)
 
 
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_negative_price_is_excluded(self, mocked):
+        self._responses(mocked, stats={"last": "-1", "open": "90", "volume": "12"})
+        self.assertEqual(_fetch_market_data(["bitcoin"], "usd"), [])
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_non_finite_price_is_excluded(self, mocked):
+        self._responses(mocked, stats={"last": "Infinity", "open": "90", "volume": "12"})
+        self.assertEqual(_fetch_market_data(["bitcoin"], "usd"), [])
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_invalid_optional_volume_is_null_and_warned(self, mocked):
+        self._responses(mocked, stats={"last": "100", "open": "90", "volume": "-2"})
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertIsNone(result["total_volume_24h"])
+        self.assertEqual(result["volume_24h_status"], "missing")
+        self.assertIn("invalid_total_volume_omitted", result["data_quality_warnings"])
+        self.assertIn("volume_24h_unavailable", result["data_quality_warnings"])
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_invalid_open_price_does_not_create_percentage_change(self, mocked):
+        self._responses(mocked, stats={"last": "100", "open": "0", "volume": "12"})
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertIsNone(result["price_change_percentage_24h"])
+        self.assertIn("price_change_unavailable", result["data_quality_warnings"])
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_missing_timestamp_is_unknown_and_not_analysis_eligible(self, mocked):
+        self._responses(mocked, ticker={})
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertEqual(result["freshness_status"], "unknown")
+        self.assertIsNone(result["freshness_age_seconds"])
+        self.assertFalse(result["analysis_eligible"])
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_malformed_provider_object_is_rejected(self, mocked):
+        mocked.side_effect = [FakeResponse([])]
+        with self.assertRaisesRegex(ValueError, "response was not an object"):
+            _fetch_market_data(["bitcoin"], "usd")
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_non_json_provider_response_is_rejected(self, mocked):
+        class InvalidJsonResponse(FakeResponse):
+            def read(self, size=-1):
+                return b"{not-json"
+        mocked.return_value = InvalidJsonResponse({})
+        with self.assertRaises(json.JSONDecodeError):
+            _fetch_market_data(["bitcoin"], "usd")
+
+
+
 if __name__ == "__main__":
     unittest.main()
