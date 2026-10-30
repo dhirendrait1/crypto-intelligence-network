@@ -113,11 +113,20 @@ class TestEvidenceStoreContract(unittest.TestCase):
                 observed_at="2026-10-30T12:00:00Z", claim=claim,
                 relationship=relationship,
             )
+            second_claim = create_claim(
+                subject="ETH", predicate="identity_case_test_second",
+                statement="Second provider identity test record.", created_at=now,
+            )
+            second_relationship = create_claim_evidence_relationship(
+                claim_id=second_claim["claim_id"], evidence_id="identity-case-test-second",
+                relationship="context_only", rationale="Traceability only.",
+                created_at=now,
+            )
             upper = repository.store_bundle(
                 source_namespace="provider", external_evidence_id="asset-a",
                 evidence_type="provider_record", metadata={"v": 2},
-                observed_at="2026-10-30T12:01:00Z", claim=claim,
-                relationship=relationship,
+                observed_at="2026-10-30T12:01:00Z", claim=second_claim,
+                relationship=second_relationship,
             )
             self.assertNotEqual(lower["cin_evidence_id"], upper["cin_evidence_id"])
             self.assertEqual(
