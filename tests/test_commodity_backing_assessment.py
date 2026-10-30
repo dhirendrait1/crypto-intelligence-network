@@ -477,3 +477,13 @@ def test_commodity_record_without_claim_text_has_no_claim_objects():
     row = assess_commodity_asset("PAXG", [valid_item()], now=NOW)["evidence"][0]
     assert row["claim"] is None
     assert row["claim_evidence_relationship"] is None
+
+
+def test_non_string_claim_text_is_not_coerced_into_a_claim():
+    for supplied in (None, 7, {"statement": "not a string"}, ["not", "a", "string"]):
+        row = assess_commodity_asset(
+            "PAXG", [valid_item(evidence_id="e-1", claim_text=supplied)], now=NOW
+        )["evidence"][0]
+        assert row["claim_text"] is None
+        assert row["claim"] is None
+        assert row["claim_evidence_relationship"] is None
