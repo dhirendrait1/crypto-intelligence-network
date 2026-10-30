@@ -2,6 +2,7 @@
 from datetime import datetime, timezone
 from pathlib import Path
 import sqlite3
+import tempfile
 import unittest
 
 from cin_evidence_persistence import persist_evidence_snapshot
@@ -85,6 +86,39 @@ class TestEvidencePersistenceSQLiteIntegration(unittest.TestCase):
             [row[0] for row in observations],
             ['{"forks":20,"stars":100}', '{"forks":21,"stars":105}'],
         )
+
+    def test_repeat_ingestion_survives_reopening_database_connection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "cin-evidence.sqlite3"
+            first_connection = sqlite3.connect(database_path)
+            first_connection.executescript(SCHEMA.read_text(encoding="utf-8"))
+            first_repository = LocalSQLiteEvidenceRepository(first_connection)
+            first = persist_evidence_snapshot(first_repository, **self.arguments)
+            first_connection.close()
+
+            reopened_connection = sqlite3.connect(database_path)
+            reopened_repository = LocalSQLiteEvidenceRepository(reopened_connection)
+            repeated = dict(self.arguments)
+            repeated["metadata"] = {"stars": 111, "forks": 22}
+            repeated["observed_at"] = "2026-10-30T12:15:00Z"
+            repeated["retrieved_at"] = "2026-10-30T12:15:00Z"
+            second = persist_evidence_snapshot(reopened_repository, **repeated)
+
+            self.assertEqual(second["operation"], "observation_appended")
+            self.assertEqual(first["cin_evidence_id"], second["cin_evidence_id"])
+            self.assertEqual(
+                reopened_connection.execute(
+                    "SELECT COUNT(*) FROM cin_evidence_records"
+                ).fetchone()[0],
+                1,
+            )
+            self.assertEqual(
+                reopened_connection.execute(
+                    "SELECT COUNT(*) FROM cin_evidence_observations"
+                ).fetchone()[0],
+                2,
+            )
+            reopened_connection.close()
 
     def test_existing_identity_is_not_mutated_when_observation_append_fails(self):
         first = persist_evidence_snapshot(self.repository, **self.arguments)
