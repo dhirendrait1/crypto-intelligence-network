@@ -58,7 +58,42 @@ class TestEvidenceIngestionAPIStorageBoundary(unittest.TestCase):
                 api.public_evidence_ingestion(request)
 
         self.assertEqual(raised.exception.status_code, 502)
-        self.assertEqual(raised.exception.detail, "upstream unavailable")
+        self.assertEqual(
+            raised.exception.detail,
+            "Public evidence provider is temporarily unavailable",
+        )
+
+    def test_provider_error_never_exposes_injected_sensitive_details(self):
+        request = api.PublicEvidenceRequest(
+            symbol="ETH", repository="ethereum/go-ethereum"
+        )
+        secret_markers = (
+            "RAW_PROVIDER_BODY_SECRET",
+            "ghp_SUPER_SECRET_TOKEN",
+            "Bearer top-secret-credential",
+            "access_token=private-query-secret",
+            "https://api.github.com/private?token=url-secret",
+        )
+        for marker in secret_markers:
+            with self.subTest(marker=marker):
+                with patch.object(
+                    api,
+                    "fetch_github_repository_evidence",
+                    side_effect=api.EvidenceSourceError(
+                        f"provider failed: {marker}; body=RAW_PROVIDER_BODY_SECRET"
+                    ),
+                ):
+                    with self.assertRaises(HTTPException) as raised:
+                        api.public_evidence_ingestion(request)
+
+                self.assertEqual(raised.exception.status_code, 502)
+                response_text = str(raised.exception.detail)
+                self.assertEqual(
+                    response_text,
+                    "Public evidence provider is temporarily unavailable",
+                )
+                for sensitive in secret_markers:
+                    self.assertNotIn(sensitive, response_text)
 
     def test_unexpected_provider_error_does_not_leak_internal_details(self):
         request = api.PublicEvidenceRequest(
