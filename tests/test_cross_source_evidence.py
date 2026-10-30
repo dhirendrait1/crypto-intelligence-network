@@ -138,7 +138,7 @@ def test_different_paths_on_same_origin_do_not_count_as_separate_sources():
 
 
 
-def test_http_and_https_variants_of_same_host_are_one_source():
+def test_http_and_https_origins_remain_distinct_source_identities():
     result = compare_metric_observations([
         observation("Alpha secure", 100.0, source_url="https://alpha.example/price"),
         observation("Alpha legacy", 100.0, source_url="http://alpha.example/quote"),
@@ -146,9 +146,10 @@ def test_http_and_https_variants_of_same_host_are_one_source():
     ])
 
     item = result["results"][0]
-    assert item["comparable_source_count"] == 2
-    assert item["duplicate_source_observation_count"] == 1
+    assert item["comparable_source_count"] == 3
+    assert item["duplicate_source_observation_count"] == 0
     assert {row["source_url"] for row in item["source_observations"]} == {
-        "alpha.example",
-        "beta.example",
+        "https://alpha.example",
+        "http://alpha.example",
+        "https://beta.example",
     }
