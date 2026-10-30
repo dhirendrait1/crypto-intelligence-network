@@ -74,3 +74,8 @@ Coinbase remains the preferred public source for exact USD-quoted exchange candl
 ## Manual live-provider smoke check
 
 Run `python scripts/cin_coinpaprika_smoke.py` from the repository root when outbound network access is available. The script makes one unauthenticated GET request to `/v1/tickers?quotes=USD`, enforces a 12-second timeout and 5 MB response cap, and validates the returned ticker-list shape plus Bitcoin USD price, market cap, 24-hour volume, and timezone-aware source timestamp. It prints a compact JSON report and exits nonzero on failure. It does not require an API key, make paid calls, or perform any trading or wallet operation. A successful run validates only the provider response at that time; it does not validate complete asset coverage or independently verify market data.
+
+
+## Free-tier quota and usage-rights boundary
+
+CoinPaprika's published API documentation currently describes keyless access as 20,000 calls per month per IP address, with a rate limit of 10 requests per second. The public API is described as free for personal use; the provider's published FAQ says commercial use starts on a paid plan. CIN must therefore treat the keyless endpoint as a personal/research-only dependency unless the provider confirms in writing that the intended CIN deployment and audience are permitted under the free tier. Do not add a paid key, upgrade, or incur charges as part of this project. Monitor request volume and avoid unnecessary polling; each HTTP request counts as one call.
