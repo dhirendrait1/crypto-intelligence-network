@@ -313,3 +313,10 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - Added docs/CIN_STEP23_CLAIM_CONFLICT_AND_REVIEW_STATE_READINESS_V1.md assessing the common evidence specification against shared claim/relationship construction primitives.
 - Deterministic claim identity and relationship/review-status vocabulary validation exist, but no conflict detector, comparability engine, authenticated reviewer workflow, adjudication state machine, or persisted review-event history is implemented.
 - Documented non-destructive conflict lifecycle, comparability gates, resolution safeguards, and acceptance tests. No claim was adjudicated or status promoted. F-14 remains Open; Step 23 remains Partial.
+
+
+### Step 23 F-15 evidence completeness and coverage readiness increment (2026-10-31)
+
+- Added docs/CIN_STEP23_EVIDENCE_COMPLETENESS_AND_COVERAGE_READINESS_V1.md defining expected-source manifests, coverage dimensions, scan/pagination/time-gap accounting, complete/partial/stale/unavailable/unknown semantics, UI/API requirements, and deterministic acceptance tests.
+- Reviewed common evidence model completeness requirements, GitHub connector missing-field/freshness reporting, and caller-supplied cross-source comparison. These do not constitute a general expected-coverage evaluator.
+- No provider query, coverage engine, scheduler, pagination client, percentage/confidence score, API, schema, or persistence activation was implemented. F-15 remains Open; Step 23 remains Partial.
