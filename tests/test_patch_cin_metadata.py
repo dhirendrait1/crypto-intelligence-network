@@ -24,6 +24,7 @@ MODULES = (
     "cin_forecast_outcomes.py",
     "cin_forecast_ledger.py",
     "cin_forecast_ledger_api.py",
+    "cin_forecast_d1_adapter.py",
 )
 
 
