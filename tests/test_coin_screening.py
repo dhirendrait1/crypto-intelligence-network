@@ -746,3 +746,33 @@ class MarketProviderResponseSizeTests(unittest.TestCase):
         self.assertEqual(primary.requested_size, MODULE._MAX_MARKET_PROVIDER_RESPONSE_BYTES + 1)
         self.assertEqual(caught.exception.primary_kind, "invalid_response")
         self.assertEqual(caught.exception.fallback_kind, "not_attempted")
+
+
+class CoinPaprikaRequestContractTests(unittest.TestCase):
+    def test_request_uses_requested_quote_currency_and_bounded_timeout(self):
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = json.dumps([{
+            "id": "bitcoin", "symbol": "BTC", "name": "Bitcoin",
+            "quotes": {"EUR": {"price": 90, "market_cap": 900, "volume_24h": 9}},
+        }]).encode("utf-8")
+        with patch.object(MODULE.urllib.request, "urlopen", return_value=response) as request:
+            rows = MODULE._request_markets("eur", 1)
+
+        sent_request = request.call_args.args[0]
+        self.assertEqual(sent_request.full_url, "https://api.coinpaprika.com/v1/tickers?quotes=EUR")
+        self.assertEqual(request.call_args.kwargs["timeout"], 12)
+        self.assertEqual(rows[0]["_cin_quote_currency"], "EUR")
+        self.assertEqual(rows[0]["current_price"], 90.0)
+
+    def test_provider_result_is_sorted_by_market_cap_then_bounded_to_requested_count(self):
+        payload = [
+            {"id": "low", "symbol": "LOW", "name": "Low", "quotes": {"USD": {"price": 1, "market_cap": 10}}},
+            {"id": "high", "symbol": "HIGH", "name": "High", "quotes": {"USD": {"price": 2, "market_cap": 100}}},
+            {"id": "mid", "symbol": "MID", "name": "Mid", "quotes": {"USD": {"price": 3, "market_cap": 50}}},
+        ]
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = json.dumps(payload).encode("utf-8")
+        with patch.object(MODULE.urllib.request, "urlopen", return_value=response):
+            rows = MODULE._request_markets("usd", 2)
+        self.assertEqual([row["id"] for row in rows], ["high", "mid"])
+        self.assertEqual(len(rows), 2)
