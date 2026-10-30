@@ -190,8 +190,10 @@ export default {
     try { return json({ result: await handle(env, body.operation, body.payload) }); }
     catch (error) {
       const message = String(error?.message || "ledger operation failed");
-      const status = /not found/.test(message) ? 404 : /already exists|invalid|horizon|unsupported/.test(message) ? 422 : 500;
-      return bad(message, status);
+      if (/not found/.test(message)) return bad(message, 404);
+      if (/already exists|invalid|horizon|unsupported/.test(message)) return bad(message, 422);
+      // Do not disclose SQL, quota, binding, or provider internals to callers.
+      return bad("ledger storage temporarily unavailable; no success is confirmed", 503);
     }
   }
 };
