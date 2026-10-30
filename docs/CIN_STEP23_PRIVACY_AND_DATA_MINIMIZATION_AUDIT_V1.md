@@ -180,3 +180,14 @@ Added `docs/CIN_STEP23_DERIVED_DATA_HASH_AND_FINGERPRINT_LIFECYCLE_V1.md`. It re
 - No application-level structured operational event contract, correlation-ID contract, service metrics/SLO thresholds, alert routing, incident runbook, accountable on-call ownership, or log access/retention policy was evidenced in the reviewed paths. The bundled application entry point was not independently inspected in this pass; its middleware/logging behavior remains not assessed.
 - Added docs/CIN_STEP23_OPERATIONAL_LOGGING_MONITORING_INCIDENT_RESPONSE_READINESS_V1.md with a minimized telemetry contract, monitoring requirements, incident runbook requirements, acceptance gates, and explicit evidence limitations.
 - No runtime logging, middleware, dashboard, alert, incident automation, log shipper, retention policy, or deployment setting was changed. F-11 remains Open; Step 23 remains Partial.
+
+
+### F-13 — Provider governance and source-of-truth integrity are not established
+
+**Evidence:** The reviewed public evidence connector has a fixed GitHub source allowlist, fixed API root, bounded request/response, selected-field validation, explicit freshness metadata, and unverified claim semantics. The mapper is pure and produces context-only relationships. No versioned provider registry, metric-specific authority/precedence matrix, source terms and retention review register, fallback eligibility matrix, or provider independence/conflict policy was evidenced in the reviewed path.
+
+**Risk:** Future connectors or fallback behavior could silently substitute incomparable data, overstate provider authority, misread repeated upstream copies as corroboration, or retain/use public data outside source terms.
+
+**Recommendation:** Require a reviewed, versioned provider registry and metric-specific source-of-truth contract before adding or promoting sources. Fallback must preserve source identity and failure status, validate comparability, and expose stale/unavailable states. Preserve conflicting observations; never average or select a winner without a documented metric-specific method. Public availability is not a blanket retention or redistribution license.
+
+**Disposition:** Readiness requirements documented in docs/CIN_STEP23_PROVIDER_GOVERNANCE_AND_SOURCE_OF_TRUTH_READINESS_V1.md. No runtime provider registry, source promotion, fallback, or live validation was implemented. F-13 remains open.
