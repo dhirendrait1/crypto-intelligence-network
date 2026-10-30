@@ -109,7 +109,7 @@ class TestEvidenceIngestionAPIStorageBoundary(unittest.TestCase):
         self.assertEqual(raised.exception.status_code, 502)
         self.assertEqual(
             raised.exception.detail,
-            "Public evidence provider returned an unexpected response",
+            "Public evidence provider is temporarily unavailable",
         )
         self.assertNotIn("sensitive internal detail", raised.exception.detail)
 
