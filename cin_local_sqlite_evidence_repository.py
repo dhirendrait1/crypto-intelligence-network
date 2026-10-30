@@ -35,6 +35,45 @@ class LocalSQLiteEvidenceRepository:
         self.connection.row_factory = sqlite3.Row
         self.connection.execute("PRAGMA foreign_keys = ON")
 
+
+    def append_assessment_event(
+        self,
+        *,
+        claim_id: str,
+        claim_status: str,
+        assessed_at: str,
+        methodology_version: str,
+        assessor_type: str,
+        rationale: str,
+    ) -> str:
+        """Append a new assessment; never overwrite an earlier assessment."""
+        allowed_statuses = {
+            "supported", "contradicted", "mixed",
+            "insufficient_evidence", "not_assessed",
+        }
+        if claim_status not in allowed_statuses:
+            raise ValueError("unsupported claim_status")
+        if assessor_type not in {"automated_rule", "human_reviewer"}:
+            raise ValueError("unsupported assessor_type")
+        if not isinstance(claim_id, str) or not claim_id.strip():
+            raise ValueError("claim_id must be non-empty")
+        if not isinstance(methodology_version, str) or not methodology_version.strip():
+            raise ValueError("methodology_version must be non-empty")
+        if not isinstance(rationale, str) or not rationale.strip() or len(rationale.strip()) > 4000:
+            raise ValueError("rationale must contain 1..4000 characters")
+        timestamp = _utc_timestamp(assessed_at, "assessed_at")
+        event_id = "cin-assessment-" + uuid4().hex
+        with self.connection:
+            self.connection.execute(
+                """INSERT INTO cin_claim_assessment_events
+                   (assessment_event_id, claim_id, claim_status, assessed_at,
+                    methodology_version, assessor_type, rationale)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (event_id, claim_id, claim_status, timestamp,
+                 methodology_version.strip(), assessor_type, rationale.strip()),
+            )
+        return event_id
+
     def store_bundle(
         self,
         *,
