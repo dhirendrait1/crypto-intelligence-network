@@ -171,5 +171,80 @@ class TestLocalSQLiteEvidenceRepository(unittest.TestCase):
         self.assertEqual(self.db.execute("SELECT COUNT(*) FROM cin_evidence_records").fetchone()[0], 0)
 
 
+    def test_repository_rejects_metadata_over_64_kib_before_write(self):
+        oversized = {"payload": "x" * (64 * 1024)}
+        with self.assertRaisesRegex(ValueError, "65536-byte"):
+            self.repo.store_bundle(
+                source_namespace="test-provider", evidence_type="caller_metadata",
+                metadata=oversized, observed_at="2026-10-30T12:00:00Z",
+                claim=self.claim, relationship=self.relationship,
+            )
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM cin_evidence_records").fetchone()[0], 0)
+
+    def test_repository_rejects_excessive_depth_and_collection_size(self):
+        deeply_nested = {}
+        cursor = deeply_nested
+        for _ in range(10):
+            cursor["child"] = {}
+            cursor = cursor["child"]
+        for metadata in (deeply_nested, {"items": list(range(257))}):
+            with self.subTest(metadata_shape="deep" if metadata is deeply_nested else "wide"):
+                with self.assertRaises(ValueError):
+                    self.repo.store_bundle(
+                        source_namespace="test-provider", evidence_type="caller_metadata",
+                        metadata=metadata, observed_at="2026-10-30T12:00:00Z",
+                        claim=self.claim, relationship=self.relationship,
+                    )
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM cin_evidence_records").fetchone()[0], 0)
+
+    def test_github_source_metadata_rejects_unknown_top_level_and_nested_fields(self):
+        base = {
+            "symbol": "ETH", "category": "developer_activity",
+            "metric": "public_repository_activity_metadata",
+            "source_name": "GitHub public repository API",
+            "source_url": "https://api.github.com/repos/ethereum/go-ethereum",
+            "repository": "ethereum/go-ethereum", "published_at": None,
+            "retrieved_at": "2026-10-30T12:00:00Z",
+            "measurement_period": "repository metadata snapshot",
+            "value": {"default_branch": "main"},
+            "unit": "repository metadata fields", "retrieval_status": "success",
+            "validation_status": "metadata_shape_validated", "missing_fields": [],
+            "freshness_status": "fresh", "freshness_age_seconds": 0,
+            "freshness_policy": "seven day freshness window",
+            "claim_verification_status": "unverified",
+            "independently_verified": False, "provenance": "public GitHub REST API",
+            "limitations": ["metadata only"],
+        }
+        for mutate in (
+            lambda item: item.update({"unexpected_secret": "not-allowed"}),
+            lambda item: item["value"].update({"unexpected_field": "not-allowed"}),
+        ):
+            candidate = {**base, "value": dict(base["value"])}
+            mutate(candidate)
+            with self.subTest(candidate=candidate):
+                with self.assertRaisesRegex(ValueError, "allowlist"):
+                    self.repo.store_bundle(
+                        source_namespace="github_public_repository_api",
+                        evidence_type="public_repository_metadata_snapshot",
+                        metadata=candidate, observed_at="2026-10-30T12:00:00Z",
+                        claim=self.claim, relationship=self.relationship,
+                    )
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM cin_evidence_records").fetchone()[0], 0)
+
+    def test_append_observation_applies_repository_byte_limit(self):
+        first = self._store()
+        with self.assertRaisesRegex(ValueError, "65536-byte"):
+            self.repo.append_observation(
+                cin_evidence_id=first["cin_evidence_id"],
+                metadata={"payload": "x" * (64 * 1024)},
+                observed_at="2026-10-30T13:00:00Z",
+                source_status="cin_observed",
+            )
+        self.assertEqual(
+            self.db.execute("SELECT COUNT(*) FROM cin_evidence_observations").fetchone()[0],
+            1,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
