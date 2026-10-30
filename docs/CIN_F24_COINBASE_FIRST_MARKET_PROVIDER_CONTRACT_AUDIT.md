@@ -1,0 +1,52 @@
+# F-24 — Coinbase-First Market Provider Contract Audit
+
+**Status: Partial — provider mismatch identified; live market panel intentionally blocked**  
+**Branch:** `test/cin-step23-sqlite-persistence-reliability`  
+**Scope:** Read-only public market data only. No account access, credentials, order placement, trading, wallet control, or fund movement.
+
+## 1. Audit outcome
+
+The current checked-in market-candle implementation is not Coinbase-first:
+
+- `cin_public_market_candles_api.py` declares Binance public klines as its primary provider and Kraken public OHLC as fallback.
+- `docs/CIN_PUBLIC_MARKET_CANDLES.md` describes the Binance/Kraken path.
+- `cin_derivatives_market_data_api.py` uses Binance USDⓈ-M public futures endpoints.
+- The repository tree contains no Coinbase-specific provider adapter or Coinbase market-data contract test suite.
+
+This conflicts with the project data preference: Coinbase public market data first and CoinGecko excluded unless the project owner explicitly changes that preference. The existing Binance/Kraken path is not silently re-labelled as Coinbase.
+
+## 2. Dashboard integration decision
+
+**Do not connect `/market-candles`, `/technical-analysis/market`, derivatives, screening, or any cached provider output to the dashboard as Coinbase data.** A provider-neutral UI is not sufficient when the actual source precedence and symbol/interval semantics are not verified.
+
+The current frontend therefore remains an explicit preview with no live prices. This is intentional data-integrity protection, not a missing UI placeholder to work around.
+
+## 3. Required Coinbase-first contract
+
+Before market panels can be enabled, a dedicated read-only adapter and tests must establish:
+
+1. Public, unauthenticated endpoint selection and documented request limits.
+2. Product-ID mapping and explicit rejection/normalization rules (for example, BTC-USD versus BTCUSDT); never assume quote currencies are interchangeable.
+3. Supported candle granularities, maximum row limits, pagination behavior, and UTC timestamp interpretation.
+4. OHLCV numeric validation, candle ordering, duplicate handling, missing intervals, and forming-versus-closed candle semantics.
+5. Provenance fields: provider name, endpoint family, product ID, granularity, retrieval timestamp, source candle timestamps, and fallback reason if any.
+6. Error taxonomy for timeout, rate limiting, unsupported product/granularity, malformed response, and provider outage.
+7. A deterministic provider-selection rule: Coinbase first; any secondary source requires an explicit documented fallback policy and must never be presented as Coinbase-origin data.
+8. Offline fixtures and tests for success, empty response, malformed rows, non-finite numbers, stale data, pagination, duplicate timestamps, and provider failure.
+9. Contract compatibility review before API route registration or frontend wiring.
+
+## 4. Acceptance gates
+
+- **Gate A — adapter:** Coinbase public candle adapter and typed normalized model implemented.
+- **Gate B — tests:** deterministic offline tests pass, including provenance and negative cases.
+- **Gate C — API:** read-only route exposes truthful provider and timestamp metadata; no credential or execution surface.
+- **Gate D — frontend:** market panel consumes only the verified response contract and visibly distinguishes fresh, stale, partial, conflicting, unavailable, and error states.
+- **Gate E — live smoke test:** limited read-only public request validates endpoint behavior; record date, product, granularity, returned source, and limitations. CI fixtures alone do not satisfy this gate.
+
+## 5. Explicit exclusions
+
+No exchange account authentication, private API keys, order endpoints, order execution, wallet access, trade routing, paid data services, or production deployment are part of F-24.
+
+## 6. Current disposition
+
+F-24 is **not complete**. The audit has established the provider mismatch and prevented unsafe dashboard wiring. The next implementation increment is Gate A: a Coinbase public-data adapter with fixture-driven tests, after confirming current Coinbase public API contract details. No existing Binance/Kraken route has been modified by this audit.
