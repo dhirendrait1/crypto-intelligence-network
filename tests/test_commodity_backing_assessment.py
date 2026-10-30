@@ -391,3 +391,19 @@ def test_snapshot_comparison_requires_two_lists():
     import pytest
     with pytest.raises(ValueError):
         compare_evidence_snapshots([], "not-a-list", now=NOW)
+
+
+
+def test_commodity_claim_text_is_caller_supplied_and_included_in_fingerprint():
+    original = normalize_evidence(
+        valid_item(claim_text="Issuer states each token is backed by one unit."),
+        now=NOW,
+    )
+    revised = normalize_evidence(
+        valid_item(claim_text="Issuer states each token is backed by two units."),
+        now=NOW,
+    )
+    assert original["claim_text_is_caller_supplied"] is True
+    assert original["claim_text"] == "Issuer states each token is backed by one unit."
+    assert original["fingerprint_is_authenticity_proof"] is False
+    assert original["record_fingerprint_sha256"] != revised["record_fingerprint_sha256"]
