@@ -156,3 +156,10 @@ Added `docs/CIN_STEP23_DERIVED_DATA_HASH_AND_FINGERPRINT_LIFECYCLE_V1.md`. It re
 - Added `docs/CIN_STEP23_BACKUP_EXPORT_REPLICA_RESTORE_READINESS_V1.md` defining the copy inventory, lineage manifest, export/support-bundle controls, restore quarantine and erasure replay, backup/replica expiry semantics, acceptance tests, and evidence gaps.
 - Repository review did not find evidence of an operational CIN backup job, replica inventory, governed export workflow, or restore replay implementation. Provider-managed copies were not independently verified; this is an evidence gap, not a claim that a provider has no backups.
 - No backup/export/replica/restore configuration or data was changed. F-08 remains Open pending inventory, provider review, policy approval, implementation and tests. Production persistence remains unauthorized.
+
+
+### F-09 access control and authorization readiness finding (2026-10-31)
+
+- Reviewed `cin_evidence_ingestion_api.py`, `cin_evidence_store.py`, `cin_local_sqlite_evidence_repository.py`, and schema v1.0. API request validation and dependency injection do not authenticate or authorize callers. The local adapter trusts its caller-supplied SQLite connection; schema v1.0 contains no principal/role/permission model. Export, retention, and restore privileged operations are not implemented.
+- Added `docs/CIN_STEP23_ACCESS_CONTROL_AND_AUTHORIZATION_READINESS_V1.md` with current trust boundaries, proposed least-privilege permission vocabulary, separation-of-duties controls, fail-closed behavior, acceptance tests, and unresolved approvals.
+- No authentication provider, role, permission, token, secret, schema, API write path, or deployment configuration was created or changed. F-09 remains Open; privileged operations remain unauthorized.
