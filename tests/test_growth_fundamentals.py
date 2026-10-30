@@ -120,3 +120,22 @@ def test_growth_evidence_fingerprint_changes_when_claim_metadata_changes():
     first = assess_growth_fundamentals("ABC", [base], now=now)["evidence"][0]
     second = assess_growth_fundamentals("ABC", [changed], now=now)["evidence"][0]
     assert first["record_fingerprint_sha256"] != second["record_fingerprint_sha256"]
+
+
+
+def test_growth_claim_text_is_separate_from_evidence_and_fingerprinted():
+    now = datetime(2026, 10, 24, tzinfo=timezone.utc)
+    record = {
+        "category": "fees_and_revenue", "evidence_id": "claim-7",
+        "source_role": "issuer", "claim_text": "Protocol revenue increased 20% quarter over quarter.",
+        "source_name": "Project issuer", "source_url": "https://example.com/report",
+        "published_at": "2026-10-01T00:00:00Z", "checked_at": "2026-10-20T00:00:00Z",
+        "status": "unverified",
+    }
+    row = assess_growth_fundamentals("ABC", [record], now=now)["evidence"][0]
+    assert row["claim_text"] == record["claim_text"]
+    assert row["claim_text_is_caller_supplied"] is True
+    assert row["cin_independently_verified"] is False
+    changed = {**record, "claim_text": "Protocol revenue increased 30% quarter over quarter."}
+    changed_row = assess_growth_fundamentals("ABC", [changed], now=now)["evidence"][0]
+    assert row["record_fingerprint_sha256"] != changed_row["record_fingerprint_sha256"]
