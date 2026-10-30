@@ -43,6 +43,7 @@ jobs:
       - name: Validate D1 Worker JavaScript and SQL schema
         run: |
           node --check --input-type=module < worker/src/index.js
+          node --test worker/test/*.test.js
           python - <<'PY'
           import sqlite3
           from pathlib import Path
