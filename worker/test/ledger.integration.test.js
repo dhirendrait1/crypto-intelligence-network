@@ -68,7 +68,7 @@ async function call(env, operation, payload) {
 
 test("persists immutable forecasts and observations and evaluates the nearest horizon observation once", async () => {
   const db = makeD1();
-  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db, CIN_TEST_DIAGNOSTICS: true };
   const forecast = {
     forecast_id: "fc-btc-1", asset_id: "BTC-USD", metric: "price",
     value: 70000, unit: "USD", source_id: "cin-model-v1",
@@ -142,7 +142,7 @@ test("persists immutable forecasts and observations and evaluates the nearest ho
 
 test("canonical payload comparison accepts reordered nested JSON keys", async () => {
   const db = makeD1();
-  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db, CIN_TEST_DIAGNOSTICS: true };
   const base = {
     forecast_id: "fc-canonical", asset_id: "ETH-USD", metric: "price",
     value: 3000, unit: "USD", source_id: "test",
@@ -167,7 +167,7 @@ test("canonical payload comparison accepts reordered nested JSON keys", async ()
 
 test("concurrent duplicate forecast inserts preserve one immutable record", async () => {
   const db = makeD1();
-  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db, CIN_TEST_DIAGNOSTICS: true };
   const forecast = {
     forecast_id: "fc-race", asset_id: "BTC-USD", metric: "price",
     value: 70000, unit: "USD", source_id: "test",
@@ -187,7 +187,7 @@ test("concurrent duplicate forecast inserts preserve one immutable record", asyn
 
 test("concurrent evaluations return the single persisted first result", async () => {
   const db = makeD1();
-  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db, CIN_TEST_DIAGNOSTICS: true };
   const forecast = {
     forecast_id: "fc-eval-race", asset_id: "BTC-USD", metric: "price",
     value: 70000, unit: "USD", source_id: "test",
@@ -211,7 +211,7 @@ test("concurrent evaluations return the single persisted first result", async ()
 
 test("concurrent forecast retries preserve the first write and reject conflicting content", async () => {
   const db = makeD1();
-  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db, CIN_TEST_DIAGNOSTICS: true };
   const forecast = {
     forecast_id: "fc-race-1", asset_id: "ETH-USD", metric: "price",
     value: 2500, unit: "USD", source_id: "cin-model-v1",
@@ -241,7 +241,7 @@ test("concurrent forecast retries preserve the first write and reject conflictin
 
 test("concurrent observation retries are idempotent and conflicting IDs fail closed", async () => {
   const db = makeD1();
-  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db, CIN_TEST_DIAGNOSTICS: true };
   const observation = {
     observation_id: "obs-race-1", asset_id: "ETH-USD", metric: "price",
     value: 2501, unit: "USD", source_id: "coinbase-public",
@@ -265,7 +265,7 @@ test("concurrent observation retries are idempotent and conflicting IDs fail clo
 
 test("canonicalizes offset timestamps before storing and comparing ledger rows", async () => {
   const db = makeD1();
-  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db, CIN_TEST_DIAGNOSTICS: true };
   const created = await call(env, "create_forecast", {
     forecast: {
       forecast_id: "fc-offset-1", asset_id: "BTC-USD", metric: "price",
@@ -298,7 +298,7 @@ test("canonicalizes offset timestamps before storing and comparing ledger rows",
 
 test("concurrent evaluations persist one immutable result and return the winning row", async () => {
   const db = makeD1();
-  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db, CIN_TEST_DIAGNOSTICS: true };
   const forecast = {
     forecast_id: "fc-eval-race-1", asset_id: "SOL-USD", metric: "price",
     value: 150, unit: "USD", source_id: "cin-model-v1",
@@ -348,7 +348,7 @@ test("concurrent evaluations persist one immutable result and return the winning
 
 test("rolls back an insert when a later statement in the D1 batch fails", async () => {
   const db = makeD1({ failBatchAt: 1 });
-  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db, CIN_TEST_DIAGNOSTICS: true };
   const forecast = {
     forecast_id: "fc-batch-rollback", asset_id: "BTC-USD", metric: "price",
     value: 70000, unit: "USD", source_id: "test",
@@ -373,7 +373,7 @@ test("rolls back an insert when a later statement in the D1 batch fails", async 
 
 test("does not leave a partial evaluation when the evaluation batch fails", async () => {
   const db = makeD1();
-  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db, CIN_TEST_DIAGNOSTICS: true };
   const forecast = {
     forecast_id: "fc-eval-rollback", asset_id: "BTC-USD", metric: "price",
     value: 70000, unit: "USD", source_id: "test",
@@ -407,7 +407,7 @@ test("does not leave a partial evaluation when the evaluation batch fails", asyn
 
 test("rolls back an observation insert when its transactional readback fails", async () => {
   const db = makeD1({ failBatchAt: 1 });
-  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db, CIN_TEST_DIAGNOSTICS: true };
   const response = await call(env, "insert_observation", {
     observation: {
       observation_id: "obs-batch-rollback", asset_id: "BTC-USD",
@@ -423,7 +423,7 @@ test("rolls back an observation insert when its transactional readback fails", a
 
 test("recovers cleanly after a transient D1 batch failure", async () => {
   const db = makeD1({ failBatchAt: 1 });
-  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db };
+  const env = { CIN_FORECAST_WORKER_TOKEN: token, CIN_FORECAST_DB: db, CIN_TEST_DIAGNOSTICS: true };
   const forecast = {
     forecast_id: "fc-batch-recovery", asset_id: "BTC-USD", metric: "price",
     value: 71000, unit: "USD", source_id: "test",
