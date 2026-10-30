@@ -38,7 +38,7 @@ class TestEvidencePersistenceSQLiteIntegration(unittest.TestCase):
             source_namespace="github_public_repository_api",
             external_evidence_id="ethereum/go-ethereum",
             evidence_type="public_repository_metadata_snapshot",
-            metadata={"stars": 100, "forks": 20},
+            metadata={"value": {"stargazers_count": 100, "forks_count": 20}},
             observed_at="2026-10-30T12:00:00Z",
             claim=self.claim,
             relationship=self.relationship,
@@ -52,7 +52,7 @@ class TestEvidencePersistenceSQLiteIntegration(unittest.TestCase):
     def test_first_and_repeat_ingestion_use_one_record_and_append_history(self):
         first = persist_evidence_snapshot(self.repository, **self.arguments)
         second_arguments = dict(self.arguments)
-        second_arguments["metadata"] = {"stars": 105, "forks": 21}
+        second_arguments["metadata"] = {"value": {"stargazers_count": 105, "forks_count": 21}}
         second_arguments["observed_at"] = "2026-10-30T12:05:00Z"
         second_arguments["retrieved_at"] = "2026-10-30T12:05:00Z"
 
@@ -85,13 +85,13 @@ class TestEvidencePersistenceSQLiteIntegration(unittest.TestCase):
         ).fetchall()
         self.assertEqual(
             [row[0] for row in observations],
-            ['{"forks":20,"stars":100}', '{"forks":21,"stars":105}'],
+            ['{"value":{"forks_count":20,"stargazers_count":100}}', '{"value":{"forks_count":21,"stargazers_count":105}}'],
         )
 
     def test_observation_fingerprints_and_provenance_timestamps_are_preserved(self):
         first = persist_evidence_snapshot(self.repository, **self.arguments)
         repeated = dict(self.arguments)
-        repeated["metadata"] = {"stars": 105, "forks": 21}
+        repeated["metadata"] = {"value": {"stargazers_count": 105, "forks_count": 21}}
         repeated["observed_at"] = "2026-10-30T12:05:00Z"
         repeated["retrieved_at"] = "2026-10-30T12:06:00Z"
         repeated["published_at"] = "2026-10-29T18:30:00+05:30"
