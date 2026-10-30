@@ -1018,3 +1018,12 @@ This checkpoint validates configured offline automation only. It does not establ
 - [ ] Run all four GitHub Actions workflows on the latest branch head.
 - [ ] Implement durable production storage only after the hosting, cost, backup/restore, retention, deletion, and authorization gates are approved.
 - **Boundary:** adapter is not wired to API/application startup and is not production durability. No Render changes.
+
+
+## Append-only assessment history increment (2026-10-30)
+
+- [x] Add append_assessment_event to the local-only repository adapter; preserve earlier assessment events.
+- [x] Validate claim status, assessor type, methodology version, rationale, and timezone-aware assessment timestamp.
+- [x] Add tests proving assessment history is append-only and invalid/unknown claim assessments are rejected.
+- [ ] Run all four GitHub Actions workflows on the latest branch head.
+- **Boundary:** no authenticated reviewer identity, production workflow, API integration, or durable production database is implemented.
