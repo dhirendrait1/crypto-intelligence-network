@@ -21,6 +21,7 @@ from cin_forecast_ledger import (
     evaluate_and_record_forecast,
     get_forecast,
     get_forecast_evaluation,
+    initialize_forecast_ledger,
     list_forecast_evaluations,
     list_forecasts,
     record_forecast,
@@ -29,6 +30,17 @@ from cin_forecast_ledger import (
 
 router = APIRouter(prefix="/forecasts", tags=["forecast ledger"])
 _bearer = HTTPBearer(auto_error=False)
+
+
+@router.on_event("startup")
+def initialize_configured_forecast_storage() -> None:
+    """Initialize schema only when an explicit absolute DB path is configured."""
+    raw = os.getenv("CIN_FORECAST_DB_PATH", "").strip()
+    if raw:
+        path = Path(raw)
+        if not path.is_absolute():
+            raise RuntimeError("CIN_FORECAST_DB_PATH must be an absolute path")
+        initialize_forecast_ledger(path)
 
 
 def _database_path() -> Path:
