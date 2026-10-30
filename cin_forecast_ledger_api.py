@@ -17,16 +17,30 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field
 
-from cin_forecast_ledger import (
-    evaluate_and_record_forecast,
-    get_forecast,
-    get_forecast_evaluation,
-    initialize_forecast_ledger,
-    list_forecast_evaluations,
-    list_forecasts,
-    record_forecast,
-    record_forecast_observation,
-)
+try:
+    from app.cin_forecast_ledger import (
+        evaluate_and_record_forecast,
+        get_forecast,
+        get_forecast_evaluation,
+        initialize_forecast_ledger,
+        list_forecast_evaluations,
+        list_forecasts,
+        record_forecast,
+        record_forecast_observation,
+    )
+except ModuleNotFoundError as exc:
+    if exc.name not in {"app", "app.cin_forecast_ledger"}:
+        raise
+    from cin_forecast_ledger import (
+        evaluate_and_record_forecast,
+        get_forecast,
+        get_forecast_evaluation,
+        initialize_forecast_ledger,
+        list_forecast_evaluations,
+        list_forecasts,
+        record_forecast,
+        record_forecast_observation,
+    )
 
 router = APIRouter(prefix="/forecasts", tags=["forecast ledger"])
 _bearer = HTTPBearer(auto_error=False)
