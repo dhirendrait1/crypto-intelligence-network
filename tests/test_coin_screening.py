@@ -236,9 +236,9 @@ class ProviderFallbackNumericQualityTests(unittest.TestCase):
         response = MagicMock()
         response.__enter__.return_value.read.return_value = json.dumps(payload).encode("utf-8")
         primary_error = MODULE.urllib.error.HTTPError(
-            "https://api.coingecko.com/api/v3/coins/markets", 503, "unavailable", {}, None
+            "https://api.coinpaprika.com/v1/tickers", 503, "unavailable", {}, None
         )
-        with patch.object(MODULE.urllib.request, "urlopen", side_effect=[primary_error, response]):
+        with patch.object(MODULE.urllib.request, "urlopen", return_value=response):
             rows = MODULE._request_markets("usd", 10)
         by_id = {row["id"]: row for row in rows}
         malformed = by_id["malformed-coin"]
@@ -264,7 +264,7 @@ class ProviderFallbackNumericQualityTests(unittest.TestCase):
         response = MagicMock()
         response.__enter__.return_value.read.return_value = json.dumps(payload).encode("utf-8")
         primary_error = MODULE.urllib.error.HTTPError(
-            "https://api.coingecko.com/api/v3/coins/markets", 503, "unavailable", {}, None
+            "https://api.coinpaprika.com/v1/tickers", 503, "unavailable", {}, None
         )
         with patch.object(MODULE.urllib.request, "urlopen", side_effect=[primary_error, response]):
             rows = MODULE._request_markets("usd", 10)
@@ -289,7 +289,7 @@ class ProviderFallbackMappingTests(unittest.TestCase):
         response = MagicMock()
         response.__enter__.return_value.read.return_value = json.dumps(payload).encode("utf-8")
         primary_error = MODULE.urllib.error.HTTPError(
-            "https://api.coingecko.com/api/v3/coins/markets", 503, "unavailable", {}, None
+            "https://api.coinpaprika.com/v1/tickers", 503, "unavailable", {}, None
         )
         with patch.object(MODULE.urllib.request, "urlopen", side_effect=[primary_error, response]):
             rows = MODULE._request_markets("usd", 2)
@@ -341,7 +341,7 @@ class ScreeningFreshnessTests(unittest.TestCase):
     def test_provider_retrieval_timestamp_is_preserved_and_cache_age_is_measurable(self):
         fixture = [{
             "id": "fresh-coin", "symbol": "FRSH", "name": "Fresh Coin",
-            "_cin_provider": "CoinGecko", "_cin_quote_currency": "USD",
+            "_cin_provider": "CoinPaprika", "_cin_quote_currency": "USD",
             "current_price": 2.0, "market_cap": 100.0, "total_volume": 10.0,
             "fully_diluted_valuation": 120.0, "circulating_supply": 40.0,
             "total_supply": 50.0, "price_change_percentage_24h": 1.0,
@@ -354,13 +354,13 @@ class ScreeningFreshnessTests(unittest.TestCase):
         self.assertIsInstance(rows[0].get("_cin_retrieved_at"), (int, float))
         output = MODULE._score(rows[0])
         self.assertIsNotNone(output["provider_retrieved_at"])
-        self.assertEqual(output["provider"], "CoinGecko")
+        self.assertEqual(output["provider"], "CoinPaprika")
         self.assertEqual(output["quote_currency"], "USD")
         rows_cached, cached_mode, cached_error, cached_details = MODULE._fetch_markets("usd", 1)
         self.assertEqual(cached_mode, "cache")
         self.assertEqual(cached_error, 0)
         self.assertEqual(rows_cached[0]["_cin_retrieved_at"], rows[0]["_cin_retrieved_at"])
-        self.assertEqual(rows_cached[0]["_cin_provider"], "CoinGecko")
+        self.assertEqual(rows_cached[0]["_cin_provider"], "CoinPaprika")
         self.assertEqual(rows_cached[0]["_cin_quote_currency"], "USD")
         self.assertIsNone(cached_details)
 
@@ -383,14 +383,14 @@ class ProviderFailureClassificationTests(unittest.TestCase):
     def test_primary_and_fallback_http_failures_preserve_both_statuses(self):
         primary = MODULE.urllib.error.HTTPError("coingecko", 429, "limited", {}, None)
         fallback = MODULE.urllib.error.HTTPError("coinpaprika", 503, "unavailable", {}, None)
-        with patch.object(MODULE.urllib.request, "urlopen", side_effect=[primary, fallback]):
+        with patch.object(MODULE.urllib.request, "urlopen", side_effect=[primary]):
             with self.assertRaises(MODULE.MarketDataProviderFailure) as caught:
                 MODULE._request_markets("usd", 5)
         failure = caught.exception
         self.assertEqual(failure.primary_kind, "http_error")
         self.assertEqual(failure.primary_status, 429)
-        self.assertEqual(failure.fallback_kind, "http_error")
-        self.assertEqual(failure.fallback_status, 503)
+        self.assertEqual(failure.fallback_kind, "not_attempted")
+        self.assertIsNone(failure.fallback_status)
 
 
     def test_invalid_primary_payload_and_fallback_network_failure_are_distinct(self):
@@ -403,13 +403,13 @@ class ProviderFailureClassificationTests(unittest.TestCase):
             }
         )()
         fallback = MODULE.urllib.error.URLError("offline")
-        with patch.object(MODULE.urllib.request, "urlopen", side_effect=[primary_response, fallback]):
+        with patch.object(MODULE.urllib.request, "urlopen", return_value=primary_response):
             with self.assertRaises(MODULE.MarketDataProviderFailure) as caught:
                 MODULE._request_markets("usd", 5)
         failure = caught.exception
         self.assertEqual(failure.primary_kind, "invalid_response")
         self.assertIsNone(failure.primary_status)
-        self.assertEqual(failure.fallback_kind, "network_error")
+        self.assertEqual(failure.fallback_kind, "not_attempted")
         self.assertIsNone(failure.fallback_status)
 
 
@@ -432,9 +432,9 @@ class ProviderFailureClassificationTests(unittest.TestCase):
         self.assertEqual(mode, "stale_cache")
         self.assertEqual(error_code, 503)
         self.assertEqual(error_details["primary_http_status"], 429)
-        self.assertEqual(error_details["fallback_http_status"], 503)
+        self.assertIsNone(error_details["fallback_http_status"])
         self.assertEqual(error_details["primary_error"], "http_error")
-        self.assertEqual(error_details["fallback_error"], "http_error")
+        self.assertEqual(error_details["fallback_error"], "not_attempted")
         self.assertEqual(rows[0]["_cin_retrieved_at"], now - 120)
         MODULE._CACHE.clear()
 
@@ -460,7 +460,7 @@ class ScreeningResponseMetadataTests(unittest.IsolatedAsyncioTestCase):
             "fully_diluted_valuation": 120.0, "circulating_supply": 40.0,
             "total_supply": 50.0, "price_change_percentage_24h": 1.0,
             "last_updated": "2026-10-24T00:00:00Z",
-            "_cin_provider": "CoinGecko", "_cin_retrieved_at": MODULE.time.time(),
+            "_cin_provider": "CoinPaprika", "_cin_retrieved_at": MODULE.time.time(),
         }
 
         async def fake_to_thread(func, *args, **kwargs):
@@ -486,7 +486,7 @@ class ScreeningResponseMetadataTests(unittest.IsolatedAsyncioTestCase):
             "fully_diluted_valuation": 120.0, "circulating_supply": 40.0,
             "total_supply": 50.0, "price_change_percentage_24h": 1.0,
             "last_updated": "2026-10-24T00:00:00Z",
-            "_cin_provider": "CoinGecko", "_cin_retrieved_at": retrieved_at,
+            "_cin_provider": "CoinPaprika", "_cin_retrieved_at": retrieved_at,
         }
 
         async def fake_to_thread(func, *args, **kwargs):
@@ -579,12 +579,12 @@ class ScreeningResponseMetadataTests(unittest.IsolatedAsyncioTestCase):
             "current_price": 2.0, "market_cap": 100.0, "total_volume": 10.0,
             "fully_diluted_valuation": None, "circulating_supply": 40.0,
             "total_supply": 50.0, "price_change_percentage_24h": 1.0,
-            "_cin_provider": "CoinGecko", "_cin_retrieved_at": 1_800_000_000.0,
+            "_cin_provider": "CoinPaprika", "_cin_retrieved_at": 1_800_000_000.0,
         }
         details = {
-            "primary_provider": "CoinGecko", "primary_error": "http_error",
-            "primary_http_status": 429, "fallback_provider": "CoinPaprika",
-            "fallback_error": "http_error", "fallback_http_status": 503,
+            "primary_provider": "CoinPaprika", "primary_error": "http_error",
+            "primary_http_status": 429, "fallback_provider": None,
+            "fallback_error": "not_attempted", "fallback_http_status": None,
         }
 
         async def fake_to_thread(func, *args, **kwargs):
@@ -622,13 +622,13 @@ class CacheFreshnessContractTests(unittest.TestCase):
             "total_volume": 20_000_000, "fully_diluted_valuation": 600_000_000,
             "circulating_supply": 80_000_000, "total_supply": 100_000_000,
             "price_change_percentage_24h": 2.0, "last_updated": provider_time,
-            "_cin_provider": "CoinGecko", "_cin_quote_currency": "USD",
+            "_cin_provider": "CoinPaprika", "_cin_quote_currency": "USD",
             "_cin_retrieved_at": retrieved_at,
         }
         with patch.object(MODULE, "_fetch_markets", return_value=([row], "stale_cache", 0, {
-            "primary_provider": "CoinGecko", "primary_error": "network_error",
-            "primary_http_status": None, "fallback_provider": "CoinPaprika",
-            "fallback_error": "network_error", "fallback_http_status": None,
+            "primary_provider": "CoinPaprika", "primary_error": "network_error",
+            "primary_http_status": None, "fallback_provider": None,
+            "fallback_error": "not_attempted", "fallback_http_status": None,
         })):
             response = asyncio.run(MODULE.coin_screening(vs_currency="usd", per_page=1, min_score=0, asset_type="all"))
 
@@ -706,8 +706,8 @@ class MarketCacheProvenanceTests(unittest.TestCase):
         MODULE._CACHE.clear()
 
     def test_cache_hit_preserves_original_retrieval_timestamp_and_currency_isolation(self):
-        usd_rows = [{"id": "bitcoin", "current_price": 100, "_cin_provider": "CoinGecko", "_cin_quote_currency": "USD"}]
-        eur_rows = [{"id": "bitcoin", "current_price": 90, "_cin_provider": "CoinGecko", "_cin_quote_currency": "EUR"}]
+        usd_rows = [{"id": "bitcoin", "current_price": 100, "_cin_provider": "CoinPaprika", "_cin_quote_currency": "USD"}]
+        eur_rows = [{"id": "bitcoin", "current_price": 90, "_cin_provider": "CoinPaprika", "_cin_quote_currency": "EUR"}]
         with patch.object(MODULE, "_request_markets", side_effect=[usd_rows, eur_rows]) as request:
             first, first_mode, _, _ = MODULE._fetch_markets("usd", 1)
             original_retrieved_at = first[0]["_cin_retrieved_at"]
@@ -739,11 +739,10 @@ class MarketProviderResponseSizeTests(unittest.TestCase):
 
         primary = OversizedResponse()
         fallback = OversizedResponse()
-        with patch.object(MODULE.urllib.request, "urlopen", side_effect=[primary, fallback]):
+        with patch.object(MODULE.urllib.request, "urlopen", side_effect=[primary]):
             with self.assertRaises(MODULE.MarketDataProviderFailure) as caught:
                 MODULE._request_markets("usd", 5)
 
         self.assertEqual(primary.requested_size, MODULE._MAX_MARKET_PROVIDER_RESPONSE_BYTES + 1)
-        self.assertEqual(fallback.requested_size, MODULE._MAX_MARKET_PROVIDER_RESPONSE_BYTES + 1)
         self.assertEqual(caught.exception.primary_kind, "invalid_response")
         self.assertEqual(caught.exception.fallback_kind, "invalid_response")
