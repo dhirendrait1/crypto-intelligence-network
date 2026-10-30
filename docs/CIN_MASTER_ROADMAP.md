@@ -204,3 +204,11 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - The specification is documentation only. It does not imply a persistent evidence store, a versioned claim API, or migration of existing assessment APIs.
 
 - Step 22 claim/evidence separation increment (2026-10-30): commodity-backed and growth-fundamentals records now preserve caller-submitted claim text separately from source name/URL and publication/check timestamps. Claim text is included in metadata fingerprints; API request schemas bound it to 4,000 characters. Offline tests cover claim preservation, fingerprint change detection, and API limits. This does not authenticate the claim or verify the linked source.
+
+
+### Step 23 claim/evidence migration contract (2026-10-30)
+
+- Added `docs/CIN_STEP23_CLAIM_EVIDENCE_MIGRATION.md` mapping the current commodity/growth evidence fields to the common model and identifying the missing first-class claim ID and claim-evidence relationship layer.
+- Defined additive migration rules: preserve legacy API fields, keep claim identity separate from evidence identity, do not infer relationships from source URLs, preserve timestamp semantics, and keep metadata fingerprints distinct from content hashes/authenticity proof.
+- Specified deterministic acceptance gates for relationship types/review states, duplicate IDs, missing claims, timestamp/freshness/conflict cases, scaffold registration, and offline CI.
+- Documentation-only increment; no API or runtime behavior changed. Step 23 remains Partial.
