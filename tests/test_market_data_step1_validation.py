@@ -107,5 +107,56 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
             _fetch_market_data(["bitcoin"], "usd")
 
 
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_coinbase_volume_is_explicitly_base_asset_denominated(self, mocked):
+        self._responses(mocked, stats={"last": "100", "open": "90", "volume": "12"})
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertEqual(result["total_volume_24h"], 12.0)
+        self.assertEqual(result["total_volume_24h_unit"], "BTC")
+        self.assertEqual(result["volume_24h_currency"], "BTC")
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_missing_timezone_timestamp_is_unknown(self, mocked):
+        self._responses(mocked, ticker={"time": "2026-10-24T00:00:00"})
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertEqual(result["freshness_status"], "unknown")
+        self.assertFalse(result["analysis_eligible"])
+        self.assertIn("timezone_missing_from_last_updated", result["data_quality_warnings"])
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_future_timestamp_is_unknown(self, mocked):
+        future = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+        self._responses(mocked, ticker={"time": future})
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertEqual(result["freshness_status"], "unknown")
+        self.assertFalse(result["analysis_eligible"])
+        self.assertIn("future_last_updated_timestamp", result["data_quality_warnings"])
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_oversized_provider_response_is_rejected(self, mocked):
+        class OversizedResponse(FakeResponse):
+            def read(self, size=-1):
+                return b"x" * (size if size > 0 else 2_000_001)
+        mocked.return_value = OversizedResponse({})
+        with self.assertRaisesRegex(ValueError, "exceeded the configured size limit"):
+            _fetch_market_data(["bitcoin"], "usd")
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_unexpected_provider_http_status_is_rejected(self, mocked):
+        class UnavailableResponse(FakeResponse):
+            status = 503
+        mocked.return_value = UnavailableResponse({})
+        with self.assertRaisesRegex(ValueError, "unexpected HTTP status 503"):
+            _fetch_market_data(["bitcoin"], "usd")
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_zero_base_asset_volume_is_not_liquidity_evidence(self, mocked):
+        self._responses(mocked, stats={"last": "100", "open": "90", "volume": "0"})
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertEqual(result["volume_24h_status"], "zero")
+        self.assertIn("zero_volume_not_liquidity_evidence", result["data_quality_warnings"])
+
+
+
 if __name__ == "__main__":
     unittest.main()
