@@ -320,3 +320,10 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - Added docs/CIN_STEP23_EVIDENCE_COMPLETENESS_AND_COVERAGE_READINESS_V1.md defining expected-source manifests, coverage dimensions, scan/pagination/time-gap accounting, complete/partial/stale/unavailable/unknown semantics, UI/API requirements, and deterministic acceptance tests.
 - Reviewed common evidence model completeness requirements, GitHub connector missing-field/freshness reporting, and caller-supplied cross-source comparison. These do not constitute a general expected-coverage evaluator.
 - No provider query, coverage engine, scheduler, pagination client, percentage/confidence score, API, schema, or persistence activation was implemented. F-15 remains Open; Step 23 remains Partial.
+
+
+### Step 23 F-16 assessment methodology and reproducibility readiness increment (2026-10-31)
+
+- Added docs/CIN_STEP23_ASSESSMENT_METHODOLOGY_AND_REPRODUCIBILITY_READINESS_V1.md defining a reproducibility envelope for exact inputs, source/cache/fallback provenance, methodology/configuration versions, code/runtime/schema versions, explicit clocks, calculation traces, output fingerprints, and lineage.
+- Reviewed coin screening, commodity backing, growth fundamentals, cross-source comparison, and shared claim construction. Existing formulas and deterministic primitives are partial controls; current-time freshness, live/cache/fallback inputs, and input ordering can affect repeated results.
+- No formulas, weights, thresholds, defaults, provider behavior, source data, schema, runtime, API, persistence, or deployment were changed. F-16 remains Open; Step 23 remains Partial.
