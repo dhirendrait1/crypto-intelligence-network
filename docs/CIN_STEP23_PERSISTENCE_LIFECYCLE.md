@@ -100,3 +100,10 @@ Added cin_local_sqlite_evidence_repository.py as an explicit-connection, local-d
 The adapter writes one evidence record, immutable observation, claim, initial assessment event, and claim/evidence relationship inside one SQLite transaction. It assigns a CIN-owned evidence ID and stores the caller's external ID separately. Caller-submitted metadata retains source_status=caller_supplied and retrieved_at=NULL. The adapter does not infer claim truth or promote relationship review state.
 
 Offline tests cover successful atomic writes, duplicate external identity rollback, timezone-aware timestamp validation, and rejection of non-finite metadata. This is not durable production persistence and does not change assessment API behavior or Render deployment.
+
+
+## 11. Append-only assessment history (2026-10-30)
+
+The local SQLite adapter now exposes append_assessment_event(...). It inserts a new claim assessment event with an explicit assessment timestamp, methodology version, assessor type, status, and rationale. It never updates or deletes an earlier event. The operation validates the status and assessor vocabularies, requires a timezone-aware timestamp and bounded rationale, and relies on the claim foreign key. Tests verify a second assessment leaves the initial event intact and rejects an unknown claim or unsupported status.
+
+This remains local development/test functionality. It is not connected to a user-facing assessment workflow, does not establish that a human reviewer identity is authenticated, and does not authorize status promotion without a governed review process.
