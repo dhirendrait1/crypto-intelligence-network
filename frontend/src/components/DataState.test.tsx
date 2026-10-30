@@ -10,7 +10,7 @@ describe("data-state presentation", () => {
   });
   it("shows provenance and retrieval time when supplied", () => {
     render(<DataStatePanel state="partial" message="Some records are missing." source="Provider X" retrievedAt="2026-10-31T00:00:00Z" />);
-    expect(screen.getByText("Provider X")).toBeTruthy();
-    expect(screen.getByText(/2026-10-31/)).toBeTruthy();
+    expect(screen.getByText("Source: Provider X")).toBeTruthy();
+    expect(screen.getByText("API retrieval time: 2026-10-31T00:00:00Z")).toBeTruthy();
   });
 });
