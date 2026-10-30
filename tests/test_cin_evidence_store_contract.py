@@ -191,7 +191,7 @@ class TestEvidenceStoreContract(unittest.TestCase):
                 created_at=now,
             )
             bundle = repository.store_bundle(
-                source_namespace=" github_public_repository_api ",
+                source_namespace=" identity_test_provider ",
                 external_evidence_id=" ethereum/go-ethereum ",
                 evidence_type="repository_metadata", metadata={"stars": 1},
                 observed_at="2026-10-30T12:00:00Z", claim=claim,
@@ -199,14 +199,14 @@ class TestEvidenceStoreContract(unittest.TestCase):
             )
             self.assertEqual(
                 repository.find_evidence_id(
-                    source_namespace="github_public_repository_api",
+                    source_namespace="identity_test_provider",
                     external_evidence_id="ethereum/go-ethereum",
                 ),
                 bundle["cin_evidence_id"],
             )
             with self.assertRaises(sqlite3.IntegrityError):
                 repository.store_bundle(
-                    source_namespace="github_public_repository_api",
+                    source_namespace="identity_test_provider",
                     external_evidence_id="ethereum/go-ethereum",
                     evidence_type="repository_metadata", metadata={"stars": 2},
                     observed_at="2026-10-30T12:01:00Z", claim=claim,
