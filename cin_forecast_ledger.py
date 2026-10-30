@@ -224,3 +224,11 @@ def list_forecast_evaluations(database_path: str | Path, *, asset_id: str | None
     sql+=" ORDER BY e.evaluated_at DESC,e.forecast_id LIMIT ?"; args+=(limit,)
     with closing(_connect(database_path)) as db: rows=db.execute(sql,args).fetchall()
     return [json.loads(r[0]) for r in rows]
+
+def initialize_forecast_ledger(database_path: str | Path) -> None:
+    """Create/validate the ledger schema during application startup."""
+    with closing(_connect(database_path)) as db:
+        result = db.execute("PRAGMA quick_check").fetchone()
+        if not result or result[0] != "ok":
+            raise RuntimeError("CIN forecast ledger SQLite integrity check failed")
+
