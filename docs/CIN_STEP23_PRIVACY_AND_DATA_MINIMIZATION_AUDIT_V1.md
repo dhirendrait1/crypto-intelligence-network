@@ -108,7 +108,7 @@ Before any production persistence is proposed, require:
 |---|---|
 | F-01 Arbitrary metadata shape | Partially mitigated in local SQLite adapter: GitHub namespace allowlists plus recursive JSON depth/node/string/collection bounds. Other namespaces have structural bounds but no source-specific semantic allowlist; production enforcement remains open. |
 | F-02 Free-text sensitivity | Partially mitigated in local SQLite adapter — conservative marker/length checks; full content classification and production controls remain open |
-| F-03 Missing classification/retention class | Design proposal documented in `CIN_STEP23_DATA_CLASSIFICATION_AND_RETENTION_CLASSES_V1.md`; policy approval and future schema implementation remain open |
+| F-03 Missing classification/retention class | Design proposal and implementation-readiness specification documented in `CIN_STEP23_DATA_CLASSIFICATION_AND_RETENTION_CLASSES_V1.md` and `CIN_STEP23_F03_CLASSIFICATION_IMPLEMENTATION_READINESS_V1.md`; field-level candidate assignments, schema-v2 contract, fail-closed semantics, migration sequence, tests, and unresolved approvals are explicit. No policy is approved and no schema/runtime enforcement exists |
 | F-04 Missing repository payload byte ceiling | Implemented and tested in local SQLite adapter: canonical metadata is capped at 64 KiB before writes, including appended observations. This is not a provider-ingestion response limit or production storage guarantee. |
 | F-05 Retention semantics | Clock/expiry design documented in `CIN_STEP23_RETENTION_CLOCKS_AND_EXPIRY_RULES_V1.md`; provider-specific terms, durations, approval and implementation remain open |
 | F-06 Error disclosure regression protection | API boundary now returns one stable generic 502 detail for both known and unexpected provider failures; regression tests inject raw body, credential, token, and sensitive URL markers and assert they are not exposed. No raw exception logging was added. |
@@ -142,3 +142,10 @@ Added `docs/CIN_STEP23_DERIVED_DATA_HASH_AND_FINGERPRINT_LIFECYCLE_V1.md`. It re
 - F-01: the local SQLite adapter has a GitHub-specific top-level and nested-value allowlist, plus recursive bounds for JSON depth, node count, string length, and collection size. This partially mitigates F-01 for the implemented GitHub namespace. It does not create allowlists for every possible source namespace and is not production enforcement.
 - F-04: the local SQLite adapter canonicalizes metadata and rejects payloads above 64 KiB before evidence-bundle or observation writes. Regression tests cover oversized initial metadata and oversized appended observations. This is a repository-level local adapter ceiling, not a provider HTTP response-byte ceiling or production guarantee.
 - The earlier disposition table incorrectly left both findings fully Open; it now reflects the implemented scope and remaining limitations. No runtime code or data was changed in this reconciliation.
+
+
+### F-03 implementation-readiness reconciliation (2026-10-31)
+
+- Added `docs/CIN_STEP23_F03_CLASSIFICATION_IMPLEMENTATION_READINESS_V1.md` with a field-level candidate assignment matrix, candidate schema-v2 policy registry contract, fail-closed runtime semantics, additive migration/backfill sequence, acceptance tests, and approval register.
+- This narrows the implementation plan but does not close F-03: classification vocabulary, source permissions, legal/privacy basis, durations/start events, hold authority, backfill rules, erasure/backup workflow, and production activation remain unapproved or unimplemented.
+- Schema v1.0, existing rows, API behavior, and persistence activation are unchanged. F-03 remains Open pending policy approval and separate implementation review.
