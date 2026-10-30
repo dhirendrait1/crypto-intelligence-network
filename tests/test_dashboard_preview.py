@@ -173,6 +173,25 @@ class DashboardPreviewTests(unittest.TestCase):
         self.assertNotIn("<span>BTC / USD <b>", ticker)
         self.assertIn("/market-candles?symbol=BTCUSDT", self.html)
 
+    def test_documented_contract_matches_opt_in_read_only_preview(self):
+        contract = (REPO_ROOT / "docs" / "cin-mobile-dashboard-contract.md").read_text(encoding="utf-8")
+        self.assertIn("No API request is made until the user explicitly", contract)
+        self.assertIn("GET requests only", contract)
+        self.assertIn("omits credentials", contract)
+        self.assertIn("rejects redirects", contract)
+        self.assertIn("not a claim that every route is present in every deployed build", contract)
+        for path in (
+            "/market-candles?symbol=BTCUSDT",
+            "/technical-analysis/market?symbol=BTCUSDT",
+            "/coin-screening?vs_currency=usd",
+            "/news-sentiment?query=cryptocurrency",
+            "/derivatives/market-snapshot?symbol=BTCUSDT",
+        ):
+            with self.subTest(path=path):
+                self.assertIn(path, contract)
+        self.assertIn("data_quality.freshness_status", contract)
+        self.assertIn("timestamp_quality", contract)
+
 
 if __name__ == "__main__":
     unittest.main()
