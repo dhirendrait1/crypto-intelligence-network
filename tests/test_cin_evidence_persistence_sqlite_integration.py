@@ -88,6 +88,44 @@ class TestEvidencePersistenceSQLiteIntegration(unittest.TestCase):
             ['{"forks":20,"stars":100}', '{"forks":21,"stars":105}'],
         )
 
+    def test_observation_fingerprints_and_provenance_timestamps_are_preserved(self):
+        first = persist_evidence_snapshot(self.repository, **self.arguments)
+        repeated = dict(self.arguments)
+        repeated["metadata"] = {"stars": 105, "forks": 21}
+        repeated["observed_at"] = "2026-10-30T12:05:00Z"
+        repeated["retrieved_at"] = "2026-10-30T12:06:00Z"
+        repeated["published_at"] = "2026-10-29T18:30:00+05:30"
+        repeated["checked_at"] = "2026-10-30T12:07:00Z"
+        second = persist_evidence_snapshot(self.repository, **repeated)
+
+        rows = self.connection.execute(
+            """
+            SELECT observed_at, retrieved_at, published_at, checked_at,
+                   metadata_json, metadata_fingerprint_sha256, source_status
+            FROM cin_evidence_observations
+            WHERE cin_evidence_id = ?
+            ORDER BY observed_at
+            """,
+            (first["cin_evidence_id"],),
+        ).fetchall()
+
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]["observed_at"], "2026-10-30T12:00:00Z")
+        self.assertEqual(rows[0]["retrieved_at"], "2026-10-30T12:00:00Z")
+        self.assertIsNone(rows[0]["published_at"])
+        self.assertIsNone(rows[0]["checked_at"])
+        self.assertEqual(rows[0]["source_status"], "cin_retrieved")
+        self.assertEqual(rows[1]["observed_at"], "2026-10-30T12:05:00Z")
+        self.assertEqual(rows[1]["retrieved_at"], "2026-10-30T12:06:00Z")
+        self.assertEqual(rows[1]["published_at"], "2026-10-29T13:00:00Z")
+        self.assertEqual(rows[1]["checked_at"], "2026-10-30T12:07:00Z")
+        self.assertEqual(rows[1]["source_status"], "cin_retrieved")
+        self.assertNotEqual(
+            rows[0]["metadata_fingerprint_sha256"],
+            rows[1]["metadata_fingerprint_sha256"],
+        )
+        self.assertEqual(second["operation"], "observation_appended")
+
     def test_repeat_ingestion_survives_reopening_database_connection(self):
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "cin-evidence.sqlite3"
