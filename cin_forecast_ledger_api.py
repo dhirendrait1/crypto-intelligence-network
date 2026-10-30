@@ -152,12 +152,14 @@ def _ledger_call(fn, *args, **kwargs):
                 from app import cin_forecast_d1_adapter as adapter
             except ModuleNotFoundError:
                 import cin_forecast_d1_adapter as adapter
-            return getattr(adapter, fn.__name__)(None, *args[1:], **kwargs)
+            return getattr(adapter, fn.__name__)(*args, **kwargs)
         return fn(*args, **kwargs)
-    except adapter.ForecastD1Error as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        if exc.__class__.__name__ == "ForecastD1Error":
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        if isinstance(exc, ValueError):
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise
 
 
 @router.post("", status_code=201, dependencies=[Depends(_require_write_token)])
