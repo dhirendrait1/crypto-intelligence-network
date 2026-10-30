@@ -69,3 +69,8 @@ Before scoring, CIN requires each market row to have a non-empty string provider
 The broad `/coin-screening` market universe uses the public CoinPaprika ticker endpoint as its sole market-universe provider. Provider failure returns a structured error or uses an eligible cached response under the existing cache policy; it does not silently switch to another source.
 
 Coinbase remains the preferred public source for exact USD-quoted exchange candles in the market-candles module. Coinbase Exchange product and candle data is not a complete global market-cap-ranked token universe, so it is not substituted for CoinPaprika in broad-universe screening. Provider identity and quote currency are retained on each screening row. CoinPaprika market data is not independently verified issuer or project evidence.
+
+
+## Manual live-provider smoke check
+
+Run `python scripts/cin_coinpaprika_smoke.py` from the repository root when outbound network access is available. The script makes one unauthenticated GET request to `/v1/tickers?quotes=USD`, enforces a 12-second timeout and 5 MB response cap, and validates the returned ticker-list shape plus Bitcoin USD price, market cap, 24-hour volume, and timezone-aware source timestamp. It prints a compact JSON report and exits nonzero on failure. It does not require an API key, make paid calls, or perform any trading or wallet operation. A successful run validates only the provider response at that time; it does not validate complete asset coverage or independently verify market data.
