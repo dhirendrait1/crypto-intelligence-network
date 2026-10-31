@@ -20,7 +20,7 @@ export function IntegrityDiagnostics({ result }: IntegrityDiagnosticsProps) {
   const chronological = candles.every((candle, index) =>
     Number.isFinite(candle.open_time) &&
     Number.isFinite(candle.close_time) &&
-    (index === 0 || candle.open_time >= candles[index - 1].open_time)
+    (index === 0 || candle.open_time > candles[index - 1].open_time)
   );
   const ohlcValid = candles.every((candle) =>
     [candle.open, candle.high, candle.low, candle.close, candle.volume].every(Number.isFinite) &&
@@ -71,7 +71,7 @@ export function IntegrityDiagnostics({ result }: IntegrityDiagnosticsProps) {
     { label: "Declared candle count", state: hasPayload ? countMatches ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasPayload ? `${candles.length} returned / ${payload.count} declared` : "Cannot compare counts without a payload." },
     { label: "Provider row accounting", state: !hasPayload || !providerAccountingAvailable ? "UNAVAILABLE" : !providerAccountingConsistent || payload.provider_rows_invalid! > 0 || payload.provider_rows_duplicate! > 0 ? "WARN" : "PASS", detail: !hasPayload || !providerAccountingAvailable ? "Provider row accounting metadata is not available." : `Received ${payload.provider_rows_received}; invalid ${payload.provider_rows_invalid}; duplicate ${payload.provider_rows_duplicate}; normalized ${payload.normalized_rows_count}.` },
     { label: "Requested-window coverage", state: "UNAVAILABLE", detail: "The provider response does not establish complete coverage of the requested time window." },
-    { label: "Chronological ordering", state: hasCandles ? chronological ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasCandles ? chronological ? "Open times are non-decreasing." : "One or more candles are out of chronological order." : "No candle rows are available to inspect." },
+    { label: "Chronological ordering", state: hasCandles ? chronological ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasCandles ? chronological ? "Open times are strictly increasing; duplicate timestamps are not accepted." : "One or more candle timestamps are duplicated or out of chronological order." : "No candle rows are available to inspect." },
     { label: "OHLC and volume bounds", state: hasCandles ? ohlcValid ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasCandles ? ohlcValid ? "OHLCV values are finite and price/volume bounds are consistent." : "One or more candles contain non-finite values or violate OHLC/volume bounds." : "No candle values are available to inspect." },
     { label: "Candle timestamps", state: hasCandles ? timestampsValid ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasCandles ? timestampsValid ? "Candle timestamps are parseable." : "One or more candle timestamps are invalid." : "No candle timestamps are available to inspect." },
     { label: "Observed interval continuity", state: !hasCandles ? "UNAVAILABLE" : interval === undefined ? "WARN" : missingIntervals > 0 ? "WARN" : "PASS", detail: !hasCandles ? "No candle rows are available to assess interval continuity." : interval === undefined ? "The interval is unsupported; continuity cannot be assessed." : missingIntervals > 0 ? `${missingIntervals} expected interval(s) missing across ${gapCount} gap(s) between returned candles. Edge coverage is not inferred.` : "No missing intervals detected between the first and last returned candles. Edge coverage is not inferred." },
