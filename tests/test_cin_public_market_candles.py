@@ -239,6 +239,24 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["candle_count_shortfall"], 0)
         self.assertIn("continuity_is_reported_separately", result["coverage_scope"])
 
+    async def test_kraken_market_candle_gaps_are_not_labelled_as_feed_loss(self):
+        first = dict(SAMPLE[0], _source="Kraken public OHLC API", _source_endpoint=api.KRAKEN_OHLC_URL, _provider="kraken")
+        later = dict(SAMPLE[2], _source="Kraken public OHLC API", _source_endpoint=api.KRAKEN_OHLC_URL, _provider="kraken")
+        with patch.object(api, "_load", new=AsyncMock(return_value=[first, later])):
+            result = await api.get_market_candles("BTCUSDT", "1h", 5)
+        integrity = result["timeline_integrity"]
+        self.assertTrue(integrity["has_gaps"])
+        self.assertEqual(integrity["provider"], "kraken")
+        self.assertEqual(integrity["gap_interpretation"], "missing_intervals_may_indicate_no_trades")
+        self.assertIn("not proof of feed loss", integrity["interpretation_note"])
+
+    async def test_unknown_provider_gap_cause_remains_unclassified(self):
+        first = dict(SAMPLE[0], _source="Unknown public source", _source_endpoint="https://example.invalid", _provider="unknown")
+        later = dict(SAMPLE[2], _source="Unknown public source", _source_endpoint="https://example.invalid", _provider="unknown")
+        with patch.object(api, "_load", new=AsyncMock(return_value=[first, later])):
+            result = await api.get_market_candles("BTCUSDT", "1h", 5)
+        self.assertEqual(result["timeline_integrity"]["gap_interpretation"], "cause_not_inferred_from_candle_rows")
+
     async def test_market_candles_reports_partial_provider_response_coverage(self):
         rows = [dict(row) for row in SAMPLE[:3]]
         with patch.object(api, "_load", return_value=rows):
