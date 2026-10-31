@@ -242,8 +242,11 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     result = payload.get("result")
     if not isinstance(result, dict):
         raise ValueError("Kraken response had no result")
-    pair_key = next((key for key in result if key != "last"), None)
-    rows = result.get(pair_key) if pair_key else None
+    pair_keys = [key for key in result if key != "last"]
+    if len(pair_keys) != 1:
+        raise ValueError("Kraken response did not identify exactly one requested market")
+    pair_key = pair_keys[0]
+    rows = result.get(pair_key)
     if not isinstance(rows, list):
         raise ValueError("Kraken returned no candle rows")
     candles = []
