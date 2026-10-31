@@ -84,3 +84,8 @@ A malformed successful Kraken response is a data-integrity failure, not provider
 ### Coinbase fallback response classification
 
 A successful Coinbase HTTP response with an invalid JSON/Unicode body, non-list payload, oversized page, conflicting duplicate boundary row, malformed candle row, or empty usable candle set is a provider data-integrity failure and returns sanitized HTTP 502. It is not reported as ordinary provider unavailability (HTTP 503). Transport failures and HTTP errors remain separately classified. Kraken AssetPairs responses that do not resolve exactly one requested market are likewise malformed successful responses and must not be hidden by Coinbase fallback.
+
+
+### Cross-provider comparability and overlap reporting
+
+The offline comparison does not label snapshots consistent when market identity has not been explicitly verified for every provider. Without a complete base-asset/quote-asset mapping, `consistency_status` is `market_identity_unverified`, even if candle values and timestamps happen to match. With verified identity, the comparison still requires exact candle-open timestamp overlap for every provider pair; it does not interpolate or shift provider-specific boundaries. Pairwise reports include the shared timestamp ratio (shared opens divided by the union of opens) and the exact shared UTC window, while provider summaries expose each snapshot's UTC start/end. Missing timestamps and coverage mismatches remain visible and prevent a clean consistency result. These diagnostics establish comparability conditions only; they do not identify a trusted provider or certify data correctness.
