@@ -41,6 +41,36 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rows[0]["close"], 101.0)
 
 
+    async def test_kraken_rejects_ohlc_payload_over_documented_720_row_cap(self):
+        asset_pairs = {"error": [], "result": {
+            "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "base": "XXBT", "quote": "USDT"}
+        }}
+        rows = [[1700000000 + i * 60, "100", "102", "99", "101", "100.5", "10", 4] for i in range(721)]
+        ohlc = {"error": [], "result": {"XBTUSDT": rows, "last": 1700043260}}
+        with patch.object(api, "_request_json", side_effect=[asset_pairs, ohlc]):
+            with self.assertRaisesRegex(ValueError, "documented 720-row cap"):
+                api._fetch_kraken("BTCUSDT", "1m", 500)
+
+    async def test_kraken_keeps_forming_tail_but_freshness_uses_last_closed_candle(self):
+        asset_pairs = {"error": [], "result": {
+            "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "base": "XXBT", "quote": "USDT"}
+        }}
+        current_open = 1700002800  # UTC hour boundary
+        rows = [
+            [current_open - 3600, "100", "102", "99", "101", "100.5", "10", 4],
+            [current_open, "101", "103", "100", "102", "101.5", "5", 2],
+        ]
+        ohlc = {"error": [], "result": {"XBTUSDT": rows, "last": current_open + 30}}
+        with patch.object(api, "_request_json", side_effect=[asset_pairs, ohlc]):
+            candles = api._fetch_kraken("BTCUSDT", "1h", 5)
+        self.assertEqual(len(candles), 2)
+        freshness = api._freshness_metadata(candles, "1h", (current_open + 30) * 1000)
+        self.assertEqual(freshness["freshness_status"], "fresh")
+        self.assertEqual(
+            freshness["latest_closed_candle_close_time_utc"],
+            datetime.fromtimestamp((current_open - 1) * 1000, timezone.utc).isoformat(),
+        )
+
     async def test_kraken_resolves_exact_asset_pair_and_verifies_ohlc_key(self):
         rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
         asset_pairs = {"error": [], "result": {
