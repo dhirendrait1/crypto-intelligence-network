@@ -24,6 +24,7 @@ except ModuleNotFoundError as exc:
 router = APIRouter(tags=["public-market-candles"])
 BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines"
 KRAKEN_OHLC_URL = "https://api.kraken.com/0/public/OHLC"
+KRAKEN_ASSET_PAIRS_URL = "https://api.kraken.com/0/public/AssetPairs"
 MAX_PROVIDER_RESPONSE_BYTES = 2 * 1024 * 1024
 # Largest millisecond Unix timestamp representable by Python datetime (year 9999).
 MAX_TIMESTAMP_MS = 253402300799999
@@ -230,9 +231,31 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
         raise ValueError(f"Kraken fallback cannot map symbol {symbol}")
     base, quote = pair.groups()
     base = KRAKEN_SYMBOLS.get(base, base)
-    # Kraken's public OHLC supports USD and USDT pairs; retain the requested quote.
-    kraken_pair = f"{base}{quote}"
-    query = urllib.parse.urlencode({"pair": kraken_pair, "interval": KRAKEN_INTERVALS[interval]})
+    # Resolve the requested base/quote against Kraken's public market catalogue.
+    # AssetPairs exposes the canonical result key, altname, and websocket name;
+    # use its exact altname for OHLC and verify the returned key against that record.
+    requested_pair = f"{base}{quote}"
+    pair_query = urllib.parse.urlencode({"pair": requested_pair})
+    pair_payload = _request_json(f"{KRAKEN_ASSET_PAIRS_URL}?{pair_query}")
+    if not isinstance(pair_payload, dict) or (pair_payload.get("error") or []):
+        raise ValueError("Kraken AssetPairs lookup failed")
+    pair_result = pair_payload.get("result")
+    if not isinstance(pair_result, dict) or len(pair_result) != 1:
+        raise ValueError("Kraken AssetPairs did not resolve exactly one requested market")
+    canonical_key, pair_info = next(iter(pair_result.items()))
+    if not isinstance(pair_info, dict):
+        raise ValueError("Kraken AssetPairs returned invalid market metadata")
+    altname = pair_info.get("altname")
+    wsname = pair_info.get("wsname")
+    expected_wsname = f"{base}/{quote}"
+    if (
+        not isinstance(altname, str)
+        or altname.upper() != requested_pair
+        or not isinstance(wsname, str)
+        or wsname.upper() != expected_wsname
+    ):
+        raise ValueError("Kraken AssetPairs base/quote identity did not match the requested market")
+    query = urllib.parse.urlencode({"pair": altname, "interval": KRAKEN_INTERVALS[interval]})
     payload = _request_json(f"{KRAKEN_OHLC_URL}?{query}")
     if not isinstance(payload, dict):
         raise ValueError("Kraken response was not an object")
@@ -243,8 +266,9 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     if not isinstance(result, dict):
         raise ValueError("Kraken response had no result")
     pair_keys = [key for key in result if key != "last"]
-    if len(pair_keys) != 1:
-        raise ValueError("Kraken response did not identify exactly one requested market")
+    accepted_keys = {canonical_key, altname, wsname.replace("/", "")}
+    if len(pair_keys) != 1 or pair_keys[0] not in accepted_keys:
+        raise ValueError("Kraken OHLC result key did not match the resolved requested market")
     pair_key = pair_keys[0]
     rows = result.get(pair_key)
     if not isinstance(rows, list):
