@@ -12,7 +12,7 @@ const validPayload = (data: ReturnType<typeof candle>[]) => ({
   service: "cin", mode: "read_only", source: "coinbase", source_endpoint: "/products/BTC-USD/candles",
   product_id: "BTC-USD", quote_currency: "USD", granularity: "1m",
   requested_start_utc: new Date(0).toISOString(), requested_end_utc: new Date(120000).toISOString(),
-  retrieved_at: new Date(180000).toISOString(), count: data.length,
+  retrieved_at: new Date(900000).toISOString(), count: data.length,
   latest_closed_candle_close_time_utc: null, latest_closed_candle_age_seconds: null,
   stale_threshold_seconds: 120, stale_data_warning: null, data, limitations: [],
 });
@@ -67,6 +67,20 @@ describe("Coinbase candle response contract", () => {
     const result = validateCoinbaseCandlesPayload(validPayload([mismatched]), "BTC-USD", "1m");
     expect(result.valid).toBe(false);
     expect(result.message).toContain("UTC timestamps do not match");
+  });
+
+  it("rejects a closed flag when the candle close time is after retrieval", () => {
+    const openCandle = { ...candle(60), close_time: 960, close_time_utc: new Date(960_000).toISOString(), is_closed: true };
+    const payload = { ...validPayload([openCandle]), retrieved_at: new Date(900_000).toISOString() };
+    const result = validateCoinbaseCandlesPayload(payload, "BTC-USD", "1m");
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain("close-state flag conflicts");
+  });
+
+  it("accepts an explicitly open candle whose close time is after retrieval", () => {
+    const openCandle = { ...candle(60), close_time: 960, close_time_utc: new Date(960_000).toISOString(), is_closed: false };
+    const payload = { ...validPayload([openCandle]), retrieved_at: new Date(900_000).toISOString() };
+    expect(validateCoinbaseCandlesPayload(payload, "BTC-USD", "1m").valid).toBe(true);
   });
 
   it("rejects candles outside the declared request window", () => {
