@@ -752,8 +752,15 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
                 raise
             except (TypeError, ValueError, OverflowError):
                 raise _MalformedProviderResponse("Coinbase returned a malformed candle row") from None
-            # Coinbase may include buckets preceding the declared start.
-            # Keep only opens inside CIN's requested UTC history window.
+            # Coinbase may include the single candle immediately preceding
+            # the page start. A response containing older rows or rows beyond
+            # this page's end is not trusted as belonging to the requested page.
+            page_floor = max(start - duration, cursor - duration)
+            if timestamp_seconds_int < page_floor or timestamp_seconds_int > chunk_end:
+                raise _MalformedProviderResponse(
+                    "Coinbase returned a candle outside the requested pagination page"
+                )
+            # Keep only opens inside CIN's overall requested UTC history window.
             if start <= timestamp_seconds_int <= latest_open:
                 previous_row = rows_by_time.get(timestamp_seconds_int)
                 if previous_row is not None and previous_row != row:
