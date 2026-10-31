@@ -572,7 +572,10 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
                 continue
         cursor = chunk_end
     candles = []
-    for row in sorted(rows_by_time.values(), key=lambda item: int(item[0]))[-limit:]:
+    # Validate every collected row before selecting the requested latest
+    # window. Otherwise an invalid newest row can consume one of the limit
+    # slots and unnecessarily discard an older valid candle.
+    for row in sorted(rows_by_time.values(), key=lambda item: int(item[0])):
         try:
             start_ms = int(row[0]) * 1000
             duration_ms = duration * 1000
@@ -588,7 +591,7 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
             continue
     if not candles:
         raise ValueError("Coinbase returned no valid candles")
-    return candles
+    return candles[-limit:]
 
 
 def _fetch_klines(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:

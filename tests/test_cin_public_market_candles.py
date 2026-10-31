@@ -426,6 +426,19 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["open_time"], 1700000000000)
 
+    def test_coinbase_filters_invalid_rows_before_applying_requested_limit(self):
+        payload = [
+            [1700000000 + i * 3600, "99", "103", "100", "102", "10"]
+            for i in range(6)
+        ]
+        # The newest candle has an impossible OHLC range. It must not consume
+        # one of the five requested slots while an older valid row is available.
+        payload[-1] = [1700018000, "99", "98", "100", "102", "10"]
+        with patch.object(api, "_request_json", return_value=payload):
+            rows = api._fetch_coinbase("BTCUSD", "1h", 5)
+        self.assertEqual(len(rows), 5)
+        self.assertEqual(rows[-1]["open_time"], 1700014400000)
+
     def test_coinbase_fails_when_all_provider_candles_are_invalid(self):
         payload = [[1700000000, "99", "98", "100", "102", "10"]]
         with patch.object(api, "_request_json", return_value=payload):
