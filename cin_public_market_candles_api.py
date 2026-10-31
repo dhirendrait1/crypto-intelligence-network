@@ -657,6 +657,7 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
     for row in rows:
         row["_source"] = source
         row["_source_endpoint"] = endpoint
+        row["_provider"] = provider
     return rows
 
 
@@ -691,6 +692,20 @@ async def get_market_candles(
         raise HTTPException(status_code=502, detail="Public market-data provider returned inconsistent candle timeline metadata.") from None
     source = rows[0].get("_source", "Binance public market-data API")
     endpoint = rows[0].get("_source_endpoint", BINANCE_KLINES_URL)
+    provider = rows[0].get("_provider", "unknown")
+    # Kraken documents that OHLC intervals without trades are omitted. Keep
+    # gaps visible, but avoid implying that every missing interval is data loss.
+    timeline_integrity["provider"] = provider
+    timeline_integrity["gap_interpretation"] = (
+        "missing_intervals_may_indicate_no_trades"
+        if provider == "kraken" and timeline_integrity["has_gaps"]
+        else "cause_not_inferred_from_candle_rows"
+    )
+    timeline_integrity["interpretation_note"] = (
+        "Kraken may omit intervals with no trades; a reported gap is not proof of feed loss."
+        if provider == "kraken" and timeline_integrity["has_gaps"]
+        else "A timestamp gap identifies an absent interval only; its cause is not established by this snapshot."
+    )
     return {
         "service": "cin", "mode": "read_only", "source": source, "source_endpoint": endpoint,
         "retrieved_at": datetime.now(timezone.utc).isoformat(), "symbol": normalized,
