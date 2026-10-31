@@ -51,6 +51,37 @@ def _interval_duration_ms(interval: str, open_time_ms: int | None = None) -> int
     return int(next_month.timestamp() * 1000) - open_time_ms
 
 
+def _timeline_integrity_metadata(rows: list[dict[str, Any]], interval: str) -> dict[str, Any]:
+    """Report missing expected opens between returned candles; never fill gaps."""
+    if interval not in TIMEFRAMES:
+        raise ValueError("Unsupported timeline interval")
+    ordered = sorted(rows, key=lambda row: row["open_time"])
+    gaps = []
+    missing_total = 0
+    for previous, current in zip(ordered, ordered[1:]):
+        expected = previous["open_time"] + _interval_duration_ms(interval, previous["open_time"])
+        if current["open_time"] <= expected:
+            continue
+        cursor, missing = expected, 0
+        while cursor < current["open_time"]:
+            missing += 1
+            cursor += _interval_duration_ms(interval, cursor)
+        if cursor != current["open_time"]:
+            raise ValueError("Candle timestamps do not align to the requested interval")
+        missing_total += missing
+        gaps.append({
+            "after_open_time": previous["open_time"],
+            "before_open_time": current["open_time"],
+            "expected_next_open_time": expected,
+            "missing_interval_count": missing,
+        })
+    return {
+        "interval": interval, "has_gaps": bool(gaps), "gap_count": len(gaps),
+        "missing_interval_count": missing_total, "gaps": gaps,
+        "scope": "between_returned_candles_only", "missing_candles_synthesized": False,
+    }
+
+
 def _freshness_metadata(rows: list[dict[str, Any]], interval: str, now_ms: int) -> dict[str, Any]:
     """Report completed-candle freshness without implying provider verification."""
     closed_rows = [row for row in rows if row["close_time"] < now_ms]
@@ -501,6 +532,7 @@ async def get_market_candles(
     rows = await _load(normalized, interval, limit)
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     freshness = _freshness_metadata(rows, interval, now_ms)
+    timeline_integrity = _timeline_integrity_metadata(rows, interval)
     source = rows[0].get("_source", "Binance public market-data API")
     endpoint = rows[0].get("_source_endpoint", BINANCE_KLINES_URL)
     return {
@@ -508,6 +540,7 @@ async def get_market_candles(
         "retrieved_at": datetime.now(timezone.utc).isoformat(), "symbol": normalized,
         "timeframe": interval, "count": len(rows),
         **freshness,
+        "timeline_integrity": timeline_integrity,
         "data": [
             {
                 **{key: value for key, value in row.items() if not key.startswith("_")},
@@ -557,6 +590,7 @@ async def analyze_public_market(
         "last_candle_close_time_utc": datetime.fromtimestamp(closed_rows[-1]["close_time"] / 1000, timezone.utc).isoformat(),
         "volume_included_in_source_but_not_used_in_indicators": True,
         **freshness,
+        "timeline_integrity": _timeline_integrity_metadata(rows, interval),
     })
     analysis["limitations"].extend([
         "Public exchange data is not independently audited by CIN.",

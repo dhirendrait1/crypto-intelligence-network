@@ -352,6 +352,28 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.exception.status_code, 503)
 
 
+    def test_timeline_integrity_reports_contiguous_candles(self):
+        report = api._timeline_integrity_metadata([dict(row) for row in SAMPLE[:5]], "1h")
+        self.assertFalse(report["has_gaps"])
+        self.assertEqual(report["missing_interval_count"], 0)
+        self.assertFalse(report["missing_candles_synthesized"])
+
+    def test_timeline_integrity_counts_multiple_missing_intervals(self):
+        report = api._timeline_integrity_metadata([dict(SAMPLE[0]), dict(SAMPLE[1]), dict(SAMPLE[4])], "1h")
+        self.assertTrue(report["has_gaps"])
+        self.assertEqual(report["gap_count"], 1)
+        self.assertEqual(report["missing_interval_count"], 2)
+        self.assertEqual(report["gaps"][0]["missing_interval_count"], 2)
+        self.assertEqual(report["scope"], "between_returned_candles_only")
+
+    def test_timeline_integrity_counts_calendar_month_gaps(self):
+        def month_open(year, month):
+            return int(api.datetime(year, month, 1, tzinfo=api.timezone.utc).timestamp() * 1000)
+        january, april = month_open(2025, 1), month_open(2025, 4)
+        report = api._timeline_integrity_metadata([{"open_time": january}, {"open_time": april}], "1M")
+        self.assertEqual(report["missing_interval_count"], 2)
+        self.assertEqual(report["gaps"][0]["expected_next_open_time"], month_open(2025, 2))
+
     def test_freshness_metadata_marks_recent_completed_candle_fresh(self):
         now_ms = 1_700_000_000_000
         rows = [dict(SAMPLE[0])]
