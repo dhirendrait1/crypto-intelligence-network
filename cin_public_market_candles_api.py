@@ -411,6 +411,44 @@ def _provider_data_quality_metadata(rows: list[dict[str, Any]], interval: str, n
     }
 
 
+def _historical_continuity_metadata(rows: list[dict[str, Any]], interval: str) -> dict[str, Any]:
+    """Report internal historical candle gaps without attempting backfill or repair."""
+    if interval not in TIMEFRAMES:
+        raise ValueError("Unsupported historical continuity interval")
+    if not isinstance(rows, list) or not rows:
+        raise ValueError("Historical continuity assessment requires non-empty candles")
+    ordered = _normalize_candle_sequence(rows, interval)
+    gaps = []
+    for previous, current in zip(ordered, ordered[1:]):
+        expected_next = previous["open_time"] + _interval_duration_ms(interval, previous["open_time"])
+        if current["open_time"] > expected_next:
+            cursor = expected_next
+            missing = 0
+            while cursor < current["open_time"]:
+                missing += 1
+                cursor += _interval_duration_ms(interval, cursor)
+            if cursor != current["open_time"]:
+                raise ValueError("Historical candles do not align to the requested interval")
+            gaps.append({
+                "after_open_time": previous["open_time"],
+                "before_open_time": current["open_time"],
+                "missing_intervals": missing,
+            })
+    missing_count = sum(item["missing_intervals"] for item in gaps)
+    return {
+        "interval": interval,
+        "observed_candle_count": len(ordered),
+        "first_open_time": ordered[0]["open_time"],
+        "last_open_time": ordered[-1]["open_time"],
+        "internal_gap_count": len(gaps),
+        "missing_interval_count": missing_count,
+        "internal_gaps": gaps,
+        "continuity_status": "continuous" if not gaps else "internal_gaps_detected",
+        "window_completeness": "unknown_without_requested_start_and_end",
+        "historical_data_repaired_or_backfilled": False,
+    }
+
+
 def _freshness_metadata(rows: list[dict[str, Any]], interval: str, now_ms: int) -> dict[str, Any]:
     """Report completed-candle freshness and reject candles opening in the future."""
     if any(row["open_time"] > now_ms for row in rows):
