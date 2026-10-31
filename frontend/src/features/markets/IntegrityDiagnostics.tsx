@@ -34,6 +34,17 @@ export function IntegrityDiagnostics({ result }: IntegrityDiagnosticsProps) {
     Number.isFinite(Date.parse(candle.open_time_utc)) &&
     Number.isFinite(Date.parse(candle.close_time_utc))
   );
+  const epochUtcConsistent = candles.every((candle) =>
+    Number.isFinite(Date.parse(candle.open_time_utc)) &&
+    Number.isFinite(Date.parse(candle.close_time_utc)) &&
+    Date.parse(candle.open_time_utc) / 1000 === candle.open_time &&
+    Date.parse(candle.close_time_utc) / 1000 === candle.close_time
+  );
+  const retrievedAtSeconds = payload ? Date.parse(payload.retrieved_at) / 1000 : Number.NaN;
+  const closeStateAvailable = Number.isFinite(retrievedAtSeconds);
+  const closeStateConsistent = closeStateAvailable && candles.every((candle) =>
+    candle.is_closed === (candle.close_time <= retrievedAtSeconds)
+  );
   const epochUtcConsistent = candles.every((candle) => {
     const openUtcMs = Date.parse(candle.open_time_utc);
     const closeUtcMs = Date.parse(candle.close_time_utc);
@@ -84,6 +95,8 @@ export function IntegrityDiagnostics({ result }: IntegrityDiagnosticsProps) {
     { label: "Chronological ordering", state: hasCandles ? chronological ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasCandles ? chronological ? "Open times are strictly increasing; duplicate timestamps are not accepted." : "One or more candle timestamps are duplicated or out of chronological order." : "No candle rows are available to inspect." },
     { label: "OHLC and volume bounds", state: hasCandles ? ohlcValid ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasCandles ? ohlcValid ? "OHLCV values are finite and price/volume bounds are consistent." : "One or more candles contain non-finite values or violate OHLC/volume bounds." : "No candle values are available to inspect." },
     { label: "Candle timestamps", state: hasCandles ? timestampsValid ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasCandles ? timestampsValid ? "Candle timestamps are parseable." : "One or more candle timestamps are invalid." : "No candle timestamps are available to inspect." },
+    { label: "Epoch/UTC timestamp consistency", state: !hasCandles ? "UNAVAILABLE" : epochUtcConsistent ? "PASS" : "WARN", detail: !hasCandles ? "No candle rows are available to compare numeric epochs with UTC strings." : epochUtcConsistent ? "Numeric open/close epochs match their UTC timestamp strings." : "One or more numeric candle epochs do not match their UTC timestamp strings." },
+    { label: "Candle close-state consistency", state: !hasCandles || !closeStateAvailable ? "UNAVAILABLE" : closeStateConsistent ? "PASS" : "WARN", detail: !hasCandles ? "No candle rows are available to assess close state." : !closeStateAvailable ? "A valid response retrieval timestamp is unavailable." : closeStateConsistent ? "Each is_closed flag agrees with close_time and response retrieval time." : "One or more is_closed flags conflict with close_time and response retrieval time." },
     { label: "Epoch / UTC consistency", state: hasCandles ? epochUtcConsistent ? "PASS" : "WARN" : "UNAVAILABLE", detail: !hasCandles ? "No candle rows are available to compare epoch and UTC timestamps." : epochUtcConsistent ? "Numeric epoch values match their UTC timestamp strings." : "One or more numeric epoch values do not match their UTC timestamp strings." },
     { label: "Closed-state metadata", state: !hasCandles ? "UNAVAILABLE" : !Number.isFinite(retrievalTimeMs) ? "WARN" : closedStateConsistent ? "PASS" : "WARN", detail: !hasCandles ? "No candle rows are available to assess closed-state metadata." : !Number.isFinite(retrievalTimeMs) ? "Retrieval timestamp is invalid; closed-state metadata cannot be checked." : closedStateConsistent ? "Each is_closed flag agrees with close time relative to retrieval time." : "One or more is_closed flags disagree with close time relative to retrieval time." },
     { label: "Interval boundary alignment", state: !hasCandles ? "UNAVAILABLE" : interval === undefined ? "WARN" : intervalAligned ? "PASS" : "WARN", detail: !hasCandles ? "No candle rows are available to assess interval alignment." : interval === undefined ? "The interval is unsupported; boundary alignment cannot be assessed." : intervalAligned ? "Every candle open timestamp aligns to its UTC interval boundary." : "One or more candle open timestamps are not aligned to the UTC interval boundary." },
