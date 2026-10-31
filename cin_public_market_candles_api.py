@@ -559,6 +559,7 @@ def compare_provider_candles(
     price_tolerance_bps: float = 50.0,
     volume_tolerance_bps: float = 500.0,
     market_identity_by_provider: dict[str, dict[str, str]] | None = None,
+    volume_unit_by_provider: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Compare same-market provider snapshots without fetching data or choosing a winner.
 
@@ -589,6 +590,17 @@ def compare_provider_candles(
             normalized_market_identities[provider_name] = (base_asset, quote_asset)
         if len(set(normalized_market_identities.values())) != 1:
             raise ValueError("Provider market identities do not match: base/quote assets differ")
+    normalized_volume_units = None
+    if volume_unit_by_provider is not None:
+        if not isinstance(volume_unit_by_provider, dict) or set(volume_unit_by_provider) != set(provider_candles):
+            raise ValueError("Volume units must be supplied for exactly the compared providers")
+        normalized_volume_units = {}
+        for provider_name, unit in volume_unit_by_provider.items():
+            if not isinstance(unit, str) or not re.fullmatch(r"[A-Za-z0-9_./-]{1,40}", unit.strip()):
+                raise ValueError("Each provider volume unit must be a non-empty explicit identifier")
+            normalized_volume_units[provider_name] = unit.strip().upper()
+    volume_units_comparable = normalized_volume_units is not None and len(set(normalized_volume_units.values())) == 1
+
     try:
         price_tolerance_bps = float(price_tolerance_bps)
         volume_tolerance_bps = float(volume_tolerance_bps)
@@ -686,13 +698,14 @@ def compare_provider_candles(
                     midpoint = (float(a[field]) + float(b[field])) / 2
                     delta = abs(float(a[field]) - float(b[field])) / midpoint * 10_000
                     price_deltas.append(delta)
-                volume_midpoint = (float(a["volume"]) + float(b["volume"])) / 2
-                if volume_midpoint > 0:
-                    volume_deltas.append(abs(float(a["volume"]) - float(b["volume"])) / volume_midpoint * 10_000)
-                elif float(a["volume"]) != float(b["volume"]):
-                    volume_deltas.append(float("inf"))
-                else:
-                    volume_deltas.append(0.0)
+                if volume_units_comparable:
+                    volume_midpoint = (float(a["volume"]) + float(b["volume"])) / 2
+                    if volume_midpoint > 0:
+                        volume_deltas.append(abs(float(a["volume"]) - float(b["volume"])) / volume_midpoint * 10_000)
+                    elif float(a["volume"]) != float(b["volume"]):
+                        volume_deltas.append(float("inf"))
+                    else:
+                        volume_deltas.append(0.0)
             max_price = max(price_deltas, default=None)
             max_volume = max(volume_deltas, default=None)
             left_only = sorted(set(left) - set(right))
@@ -720,7 +733,8 @@ def compare_provider_candles(
                 "price_discrepancy_bps_max": round(max_price, 4) if max_price is not None and math.isfinite(max_price) else max_price,
                 "volume_discrepancy_bps_max": round(max_volume, 4) if max_volume is not None and math.isfinite(max_volume) else max_volume,
                 "price_within_tolerance": max_price is not None and max_price <= price_tolerance_bps,
-                "volume_within_tolerance": max_volume is not None and max_volume <= volume_tolerance_bps,
+                "volume_within_tolerance": volume_units_comparable and max_volume is not None and max_volume <= volume_tolerance_bps,
+                "volume_comparability": "verified_common_unit" if volume_units_comparable else "unverified_or_incompatible_units",
             })
 
     has_alignment = all(item["shared_candle_count"] > 0 for item in pairwise)
@@ -745,8 +759,11 @@ def compare_provider_candles(
         "pairwise_comparisons": pairwise,
         "price_tolerance_bps": float(price_tolerance_bps),
         "volume_tolerance_bps": float(volume_tolerance_bps),
+        "volume_units_by_provider": normalized_volume_units,
+        "volume_units_comparable": volume_units_comparable,
         "consistency_status": (
             "market_identity_unverified" if normalized_market_identities is None else
+            "volume_units_unverified" if not volume_units_comparable and has_alignment and all(item["price_within_tolerance"] for item in pairwise) else
             "consistent_within_configured_tolerances"
             if within_tolerance and not timeline_gaps and provider_missing_interval_count == 0 else
             "insufficient_timestamp_overlap" if not has_alignment else
@@ -758,11 +775,14 @@ def compare_provider_candles(
             "all_provider_pairs_have_overlap": has_alignment,
             "coverage_must_be_reviewed": True,
             "price_and_volume_tolerances_are_diagnostic_only": True,
+            "volume_unit_identity_verified": volume_units_comparable,
         },
         "limitations": [
             "Market identity must be supplied explicitly to obtain a consistency result; absent identity is reported as unverified.",
             "Provider snapshots are compared at exact candle-open timestamps; differing candle boundaries are not interpolated.",
             "A tolerance result is a diagnostic, not proof that either provider is correct or independently audited.",
+            "Volume deltas are withheld unless every provider explicitly declares the same volume unit; exchange-specific units are not inferred.",
+            "Large price discrepancies are reported without applying an undocumented outlier threshold or choosing a trusted provider.",
             "Known provider names are checked against their supported candle boundaries; generic provider labels receive timeframe-duration validation without an assumed weekly anchor.",
         ],
     }
