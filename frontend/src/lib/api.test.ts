@@ -29,6 +29,25 @@ describe("Coinbase candle response contract", () => {
     expect(validateCoinbaseCandlesPayload(validPayload([candle(60), candle(120)]), "BTC-USD", "1m").valid).toBe(true);
   });
 
+  it("rejects a candle timestamp that is not aligned to its requested interval", () => {
+    const payload = { ...validPayload([candle(60)]), granularity: "5m" };
+    const result = validateCoinbaseCandlesPayload(payload, "BTC-USD", "5m");
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain("not aligned to the requested interval boundary");
+  });
+
+  it("accepts a candle timestamp aligned to a five-minute UTC boundary", () => {
+    const payload = { ...validPayload([candle(300)]), granularity: "5m" };
+    expect(validateCoinbaseCandlesPayload(payload, "BTC-USD", "5m").valid).toBe(true);
+  });
+
+  it("rejects unsupported candle intervals", () => {
+    const payload = { ...validPayload([candle(60)]), granularity: "2m" };
+    const result = validateCoinbaseCandlesPayload(payload, "BTC-USD", "2m");
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain("interval is not supported");
+  });
+
   it("rejects duplicate candle open timestamps instead of silently accepting ambiguous rows", () => {
     const result = validateCoinbaseCandlesPayload(validPayload([candle(60), candle(60)]), "BTC-USD", "1m");
     expect(result.valid).toBe(false);
