@@ -46,4 +46,30 @@ describe("Integrity diagnostics", () => {
     expect(screen.getByText("One or more candles contain non-finite values or violate OHLC/volume bounds.")).toBeTruthy();
     expect(screen.getByText("WARN")).toBeTruthy();
   });
+
+  it("detects count, ordering, bounds, and timestamp inconsistencies independently", () => {
+    const malformed = {
+      ...result,
+      data: {
+        ...result.data!,
+        count: 1,
+        data: [
+          candle,
+          {
+            ...candle,
+            open_time: 90,
+            close_time: 89,
+            volume: -1,
+            open_time_utc: "not-a-date",
+            close_time_utc: "also-not-a-date",
+          },
+        ],
+      },
+    };
+    render(<IntegrityDiagnostics result={malformed} />);
+    expect(screen.getByText("2 returned / 1 declared")).toBeTruthy();
+    expect(screen.getByText("One or more candles are out of chronological order.")).toBeTruthy();
+    expect(screen.getByText("One or more candles contain non-finite values or violate OHLC/volume bounds.")).toBeTruthy();
+    expect(screen.getByText("One or more candle timestamps are invalid.")).toBeTruthy();
+  });
 });
