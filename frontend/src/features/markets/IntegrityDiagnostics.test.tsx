@@ -46,6 +46,7 @@ describe("Integrity diagnostics", () => {
     render(<IntegrityDiagnostics result={{ ...result, data: null, state: "unknown" }} />);
     expect(screen.getByText("No validated candle payload is available.")).toBeTruthy();
     expect(screen.getAllByText("UNAVAILABLE").length).toBe(7);
+    expect(screen.queryByText("PASS")).toBeNull();
   });
 
   it("does not report candle-level checks as passed for an empty response", () => {
