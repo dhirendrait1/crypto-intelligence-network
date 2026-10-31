@@ -468,6 +468,10 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
             }
             if not _is_valid_candle(candle):
                 raise _MalformedProviderResponse("Kraken returned invalid OHLCV values")
+            if candles and start <= candles[-1]["open_time"]:
+                raise _MalformedProviderResponse(
+                    "Kraken returned duplicate or out-of-order candle timestamps"
+                )
             candles.append(candle)
         except _MalformedProviderResponse:
             raise
