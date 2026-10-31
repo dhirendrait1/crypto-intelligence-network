@@ -23,6 +23,7 @@ This fetches public candles and passes OHLC values into CIN's existing determini
 - The most recent candle may still be forming. Use timestamped snapshots and account for that when comparing signals.
 - Binance HTTP 451 may trigger Kraken and then Coinbase public-data fallback; provider rate limits and unavailable fallbacks return a retryable 503 rather than stale data.
 - Coinbase fallback is restricted to USD-quoted pairs (for example, `BTCUSD`). A USDT request is not substituted with a USD product; quote assets are not interchangeable.
+- Coinbase candle rows are screened for finite positive OHLC values, non-negative finite volume, valid OHLC ranges, and whole-second timestamps within the supported datetime range; invalid rows are excluded.
 - Unsupported symbols/intervals and invalid limits are rejected.
 - Volume is returned as provider context but is not yet used in indicator calculations.
 - No credentials, user accounts, order placement, or trade execution are involved.
