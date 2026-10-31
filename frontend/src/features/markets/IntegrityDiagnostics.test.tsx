@@ -47,6 +47,31 @@ describe("Integrity diagnostics", () => {
     expect(screen.getAllByText("UNAVAILABLE").length).toBe(3);
   });
 
+  it("warns about missing intervals between returned candles without rejecting the payload", () => {
+    const withGap = {
+      ...result,
+      data: { ...result.data!, data: [
+        { ...candle, open_time: 0, close_time: 59 },
+        { ...candle, open_time: 180, close_time: 239 },
+      ], count: 2 },
+    };
+    render(<IntegrityDiagnostics result={withGap} />);
+    expect(screen.getByText("2 expected interval(s) missing across 1 gap(s) between returned candles. Edge coverage is not inferred.")).toBeTruthy();
+    expect(screen.getByText("WARN")).toBeTruthy();
+  });
+
+  it("passes continuity when returned candles are consecutive", () => {
+    const consecutive = {
+      ...result,
+      data: { ...result.data!, data: [
+        { ...candle, open_time: 0, close_time: 59 },
+        { ...candle, open_time: 60, close_time: 119 },
+      ], count: 2 },
+    };
+    render(<IntegrityDiagnostics result={consecutive} />);
+    expect(screen.getByText("No missing intervals detected between the first and last returned candles. Edge coverage is not inferred.")).toBeTruthy();
+  });
+
   it("warns when candle OHLCV values are non-finite", () => {
     const malformed = {
       ...result,
