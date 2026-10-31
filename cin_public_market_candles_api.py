@@ -223,8 +223,9 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
     if not pair:
         raise ValueError(f"Coinbase fallback cannot map symbol {symbol}")
     base, quote = pair.groups()
-    # Coinbase Exchange spot products are quoted with a hyphen; USDT requests
-    # are mapped to the equivalent USD spot market, and the actual product is reported.
+    # Never substitute a USD market for a USDT request: quote assets are not interchangeable.
+    if quote != "USD":
+        raise ValueError("Coinbase fallback supports USD-quoted pairs only; USDT requests are not mapped to USD.")
     product_id = f"{base}-USD"
     duration = COINBASE_GRANULARITY[interval]
     now = int(datetime.now(timezone.utc).timestamp())

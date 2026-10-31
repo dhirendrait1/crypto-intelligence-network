@@ -1,6 +1,6 @@
 # CIN Public Market Candles and Market-Backed Technical Analysis
 
-These read-only endpoints use the Binance public market-data REST endpoint. They do not require API credentials and do not access accounts or place orders.
+These read-only endpoints use public exchange market-data endpoints. Provider selection may fall back from Binance to Kraken and then Coinbase for eligible pairs/timeframes. They do not require API credentials and do not access accounts or place orders.
 
 ## 1. Retrieve timestamped candles
 
@@ -21,7 +21,8 @@ This fetches public candles and passes OHLC values into CIN's existing determini
 
 - Data is from the public Binance market-data API and is not independently audited by CIN.
 - The most recent candle may still be forming. Use timestamped snapshots and account for that when comparing signals.
-- Provider rate limits return a retryable 503; provider failures do not silently fall back to stale data.
+- Binance HTTP 451 may trigger Kraken and then Coinbase public-data fallback; provider rate limits and unavailable fallbacks return a retryable 503 rather than stale data.
+- Coinbase fallback is restricted to USD-quoted pairs (for example, `BTCUSD`). A USDT request is not substituted with a USD product; quote assets are not interchangeable.
 - Unsupported symbols/intervals and invalid limits are rejected.
 - Volume is returned as provider context but is not yet used in indicator calculations.
 - No credentials, user accounts, order placement, or trade execution are involved.

@@ -200,9 +200,15 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         )), patch.object(api, "_fetch_kraken", side_effect=ValueError("pair unavailable")), patch.object(
             api, "_fetch_coinbase", return_value=[dict(SAMPLE[0])]
         ):
-            rows = await api._load("BTCUSDT", "1h", 5)
+            rows = await api._load("BTCUSD", "1h", 5)
         self.assertEqual(rows[0]["_source"], "Coinbase Exchange public candles API (fallback after Binance HTTP 451)")
         self.assertEqual(rows[0]["_source_endpoint"], api.COINBASE_CANDLES_URL)
+
+    def test_coinbase_rejects_usdt_without_substituting_usd(self):
+        with patch.object(api, "_request_json") as request_json:
+            with self.assertRaisesRegex(ValueError, "USDT requests are not mapped to USD"):
+                api._fetch_coinbase("BTCUSDT", "1h", 5)
+        request_json.assert_not_called()
 
     def test_coinbase_candle_rows_are_normalized_and_sorted(self):
         payload = [
@@ -210,7 +216,7 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             [1700000000, "98", "102", "100", "101", "10.5"],
         ]
         with patch.object(api, "_request_json", return_value=payload):
-            rows = api._fetch_coinbase("BTCUSDT", "1h", 5)
+            rows = api._fetch_coinbase("BTCUSD", "1h", 5)
         self.assertEqual(len(rows), 2)
         self.assertLess(rows[0]["open_time"], rows[1]["open_time"])
         self.assertEqual(rows[0]["open"], 100.0)
