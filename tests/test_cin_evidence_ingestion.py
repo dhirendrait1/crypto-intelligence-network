@@ -54,6 +54,72 @@ class EvidenceIngestionTests(unittest.TestCase):
 
 
     @patch("cin_evidence_ingestion.urlopen")
+    def test_provider_identity_case_is_canonicalized_to_allowlisted_repository(self, mocked):
+        mocked.return_value = FakeResponse({
+            "full_name": "Ethereum/Go-Ethereum",
+            "default_branch": "master",
+            "pushed_at": "2026-10-20T10:00:00Z",
+            "updated_at": "2026-10-21T10:00:00Z",
+            "stargazers_count": 50000,
+            "forks_count": 20000,
+            "open_issues_count": 1000,
+            "archived": False,
+        })
+
+        result = fetch_github_repository_evidence("ethereum/go-ethereum")
+
+        self.assertEqual(result["repository"], "ethereum/go-ethereum")
+        self.assertEqual(
+            result["source_url"],
+            "https://api.github.com/repos/ethereum/go-ethereum",
+        )
+        self.assertEqual(result["claim_verification_status"], "unverified")
+        self.assertFalse(result["independently_verified"])
+
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_provenance_timestamps_are_distinct_and_timezone_aware(self, mocked):
+        provider_timestamp = "2026-10-20T10:00:00Z"
+        mocked.return_value = FakeResponse({
+            "full_name": "ethereum/go-ethereum",
+            "default_branch": "master",
+            "pushed_at": provider_timestamp,
+            "updated_at": "2026-10-21T10:00:00Z",
+            "stargazers_count": 50000,
+            "forks_count": 20000,
+            "open_issues_count": 1000,
+            "archived": False,
+        })
+
+        result = fetch_github_repository_evidence()
+
+        self.assertEqual(result["published_at"], provider_timestamp)
+        self.assertNotEqual(result["retrieved_at"], provider_timestamp)
+        retrieved = datetime.fromisoformat(result["retrieved_at"].replace("Z", "+00:00"))
+        self.assertIsNotNone(retrieved.tzinfo)
+        self.assertEqual(result["provenance"], "public GitHub REST API; allowlisted repository")
+
+    @patch("cin_evidence_ingestion.urlopen")
+    def test_metadata_counts_are_not_promoted_to_verification_or_investment_claims(self, mocked):
+        mocked.return_value = FakeResponse({
+            "full_name": "ethereum/go-ethereum",
+            "default_branch": "master",
+            "pushed_at": "2026-10-20T10:00:00Z",
+            "updated_at": "2026-10-21T10:00:00Z",
+            "stargazers_count": 999999,
+            "forks_count": 999999,
+            "open_issues_count": 0,
+            "archived": False,
+        })
+
+        result = fetch_github_repository_evidence()
+
+        self.assertEqual(result["value"]["stargazers_count"], 999999)
+        self.assertEqual(result["value"]["forks_count"], 999999)
+        self.assertEqual(result["claim_verification_status"], "unverified")
+        self.assertFalse(result["independently_verified"])
+        self.assertTrue(result["limitations"])
+
+    @patch("cin_evidence_ingestion.urlopen")
     def test_invalid_utf8_response_is_controlled_source_error(self, mocked):
         mocked.return_value = InvalidUtf8Response({})
         with self.assertRaisesRegex(EvidenceSourceError, "UnicodeDecodeError"):

@@ -1,0 +1,144 @@
+name: CIN Step 23 Storage Boundary Validation
+
+on:
+  push:
+    branches:
+      - test/cin-step23-sqlite-persistence-reliability
+  pull_request:
+    branches:
+      - feat/cin-market-data-row-provenance
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  storage-boundary:
+    name: SQLite, store contract, and API boundary tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install API runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "fastapi>=0.115,<1" "pydantic>=2,<3"
+
+      - name: Inspect packaged Render application entrypoint (read-only)
+        run: |
+          python -m zipfile -e cin_step203_scaffold_fixed.zip /tmp/cin-deployment-audit
+          echo "Packaged application files:"
+          find /tmp/cin-deployment-audit/cin -maxdepth 3 -type f | sort
+          echo "Packaged app/main.py:"
+          sed -n '1,260p' /tmp/cin-deployment-audit/cin/app/main.py
+          python -m compileall -q /tmp/cin-deployment-audit/cin/app
+
+      - name: Verify Render patch installs Coinbase router
+        run: |
+          staging="$(mktemp -d)"
+          python -m zipfile -e cin_step203_scaffold_fixed.zip "$staging"
+          cp ./*.py "$staging/"
+          python -m pip install -r "$staging/cin/requirements.txt"
+          cp patch_cin_metadata_fixed.py "$staging/"
+          (cd "$staging" && python patch_cin_metadata_fixed.py)
+          PYTHONPATH="$staging/cin" python -c "from app.main import app; paths={route.path for route in app.routes}; assert '/coinbase/market-candles' in paths, paths; print('Coinbase route mounted in packaged Render app')"
+          PYTHONPATH="$staging/cin" python - <<'PY'
+          import asyncio
+          from unittest.mock import patch
+          from fastapi import HTTPException
+          from app.main import app
+          import app.cin_coinbase_market_data_api as api
+
+          paths = {route.path for route in app.routes}
+          assert "/coinbase/market-candles" in paths
+
+          fixture = [{
+              "open_time": 1700000000000,
+              "close_time": 1700003599999,
+              "open": 100.0, "high": 103.0, "low": 99.0,
+              "close": 102.0, "volume": 12.5,
+          }]
+          with patch.object(api, "fetch_candles", return_value=fixture) as fetch:
+              body = asyncio.run(api.get_coinbase_market_candles(
+                  product_id="BTC-USD", granularity="1h",
+                  start=1700000000, end=1700003600,
+              ))
+          assert body["source"] == "Coinbase Exchange public candles API"
+          assert body["product_id"] == "BTC-USD"
+          assert body["quote_currency"] == "USD"
+          assert body["mode"] == "read_only"
+          assert body["count"] == 1 and body["data"][0]["open"] == 100.0
+          assert body["data"][0]["open_time_utc"].endswith("+00:00")
+          fetch.assert_called_once()
+
+          with patch.object(api, "fetch_candles", side_effect=RuntimeError("private provider detail")):
+              try:
+                  asyncio.run(api.get_coinbase_market_candles(
+                      product_id="BTC-USD", granularity="1h",
+                      start=1700000000, end=1700003600,
+                  ))
+              except HTTPException as exc:
+                  assert exc.status_code == 503
+                  assert "private" not in exc.detail
+              else:
+                  raise AssertionError("provider failure did not return HTTP 503")
+          print("Packaged Coinbase endpoint response and provider-error contract verified with mocked provider; no external request made")
+          PY
+          python -m compileall -q "$staging/cin/app"
+
+      - name: Compile CIN modules and tests
+        run: |
+          python -m compileall -q tests
+          python -m py_compile cin_evidence_store.py cin_local_sqlite_evidence_repository.py cin_evidence_ingestion_api.py cin_coinbase_public_market_data.py cin_coinbase_market_data_api.py
+
+      - name: Run Coinbase public candle adapter tests
+        run: python -m unittest discover -s tests -p "test_cin_coinbase_public_market_data.py" -v
+
+      - name: Run Coinbase public candles API tests
+        run: python -m unittest discover -s tests -p "test_cin_coinbase_market_data_api.py" -v
+
+      - name: Live Coinbase public BTC-USD read-only smoke check
+        run: |
+          python - <<'PY'
+          import time
+          from datetime import datetime, timezone
+          from cin_coinbase_public_market_data import fetch_candles
+
+          # Request the most recently completed one-hour UTC interval.
+          end = (int(time.time()) // 3600) * 3600
+          start = end - 3600
+          rows = fetch_candles("BTC-USD", "1h", start, end)
+          assert rows, "Coinbase returned no candles for the last completed hour"
+          assert all(row["close"] > 0 and row["high"] >= row["low"] for row in rows)
+          print({
+              "provider": "Coinbase Exchange public API",
+              "product_id": "BTC-USD",
+              "granularity": "1h",
+              "requested_start_utc": datetime.fromtimestamp(start, timezone.utc).isoformat(),
+              "requested_end_utc": datetime.fromtimestamp(end, timezone.utc).isoformat(),
+              "returned_candles": len(rows),
+              "latest_close": rows[-1]["close"],
+              "mode": "read_only",
+          })
+          PY
+
+      - name: Run SQLite persistence reliability tests
+        run: python -m unittest discover -s tests -p "test_cin_sqlite_persistence_reliability.py" -v
+
+      - name: Run evidence store contract and identity lookup tests
+        run: python -m unittest discover -s tests -p "test_cin_evidence_store_contract.py" -v
+
+      - name: Run public evidence API storage boundary tests
+        run: python -m unittest discover -s tests -p "test_cin_evidence_ingestion_api_storage_boundary.py" -v
+
+      - name: Run evidence persistence orchestration tests
+        run: python -m unittest discover -s tests -p "test_cin_evidence_persistence_orchestration.py" -v
+
+      - name: Run real SQLite persistence integration tests
+        run: python -m unittest discover -s tests -p "test_cin_evidence_persistence_sqlite_integration.py" -v

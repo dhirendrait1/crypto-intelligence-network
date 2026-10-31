@@ -221,3 +221,179 @@ When continuing work, choose the earliest unfinished step that can be completed 
 - Added offline tests for deterministic identity, identity changes, typed values, timezone-aware and ordered valid times, allowed statuses, malformed values, relationship types, and review states.
 - Added the shared module to the Render scaffold copy list and scaffold regression fixture. No Render deployment was performed.
 - These are in-memory construction/validation primitives only: no persistence, source retrieval/authentication, relationship API, or automatic claim inference. Step 23 remains Partial.
+
+
+### Step 23 data-classification design increment (2026-10-31)
+
+- Added `docs/CIN_STEP23_DATA_CLASSIFICATION_AND_RETENTION_CLASSES_V1.md` with distinct sensitivity classifications and retention-class selectors, field/entity mapping for evidence, claims, rationales, fingerprints, logs, exports, backups and replicas, plus a future policy-version contract and acceptance gates.
+- The design intentionally defines no retention durations, legal basis, source authorization, or hold authority without review. Schema v1.0 remains unchanged; no data was backfilled, erased, or rewritten, and no retention worker or production persistence was enabled.
+- F-03 is design-documented but remains open pending policy approval and separately reviewed schema implementation. F-05 retention start/expiry semantics and F-07 derived-hash lifecycle remain open. Step 23 remains Partial.
+
+
+### Step 23 retention-clock design increment (2026-10-31)
+
+- Added `docs/CIN_STEP23_RETENTION_CLOCKS_AND_EXPIRY_RULES_V1.md` defining event-specific candidate clocks for provider snapshots/versions, evidence identities, observations, claims, relationships, assessment/conflict events, fingerprints/hashes, logs, exports, caches, backups and tombstones.
+- Defined fail-closed behavior for missing/invalid clocks, no silent timestamp substitution, no clock reset on re-ingestion or reassessment, provider-specific policy records, and expiry eligibility distinct from deletion authorization.
+- No retention periods, legal basis, provider terms, or hold authority were invented. No schema migration, record change/deletion, expiry scheduler, worker, or production persistence was enabled.
+- F-05 is design-documented only; provider-specific policy approval and implementation remain open. Step 23 remains Partial.
+
+
+### Step 23 derived-data lifecycle design increment (2026-10-31)
+
+- Added `docs/CIN_STEP23_DERIVED_DATA_HASH_AND_FINGERPRINT_LIFECYCLE_V1.md` defining default source-linked expiry for metadata fingerprints, content hashes, and future derived indicators; exact lineage/version requirements; linkability and known-content confirmation risks; and a narrow independent-retention exception requiring explicit policy approval.
+- Recorded current implementation accurately: local adapter stores SHA-256 fingerprints of canonical metadata; optional content-hash column is currently NULL. Hashes are not authenticity proof or automatically anonymous.
+- No current hash or record was changed/deleted. No content-hash computation, lineage schema, API exposure, worker, or production persistence was implemented. F-07 is design-documented only; Step 23 remains Partial.
+
+
+### Step 23 F-06 API error-disclosure regression increment (2026-10-31)
+
+- The public evidence ingestion API now maps both known provider errors and unexpected provider exceptions to one stable generic HTTP 502 response. Raw provider exception text is not returned to clients.
+- Added regression tests with injected raw response-body, token, Bearer credential, and sensitive URL/query markers; assertions verify none appear in the client-facing detail.
+- This is an API response-boundary control only. It does not prove comprehensive log redaction or production security, and the endpoint remains read-only with persistence unwired. Step 23 remains Partial.
+
+
+### Step 23 privacy-audit status reconciliation (2026-10-31)
+
+- Reconciled F-01 and F-04 dispositions against the existing local SQLite adapter and regression tests. F-01 is partially mitigated for the GitHub namespace and structurally bounded for other namespaces; universal source-specific allowlists and production enforcement remain open. F-04's 64 KiB canonical metadata ceiling is implemented and tested for bundle and appended-observation writes in the local adapter only.
+- F-06 validation is confirmed successful on PR #70 head `da1fa72b904d9364a280fe0f43a67f848697589b` (GitHub Actions runs 41140427820 and 41140425052).
+- F-03, F-05, and F-07 remain design-documented, with policy approval and separately reviewed implementation outstanding. Step 23 remains Partial; no production persistence or deployment is authorized by these changes.
+
+
+### Step 23 F-03 implementation-readiness increment (2026-10-31)
+
+- Added `docs/CIN_STEP23_F03_CLASSIFICATION_IMPLEMENTATION_READINESS_V1.md` converting the classification/retention proposal into a field-level assignment matrix, candidate schema-v2 contract, fail-closed semantics, safe migration sequence, acceptance tests, and explicit approval register.
+- This is planning only. No schema-v2 migration, classification backfill, retention duration, legal basis, provider permission, legal-hold authority, erasure process, scheduler, or production persistence was introduced. All policy approvals remain explicitly unresolved; Step 23 remains Partial.
+
+
+### Step 23 F-03 audit and lifecycle reconciliation (2026-10-31)
+
+- Linked the F-03 implementation-readiness specification from the privacy audit and persistence lifecycle document. The audit now accurately distinguishes documented planning from approved policy or runtime enforcement.
+- F-03 remains Open pending explicit classification/source-policy/legal/privacy/retention approvals and a separately reviewed schema-v2 migration. No schema-v1 changes, backfill, deletion, retention worker, or production activation occurred. Step 23 remains Partial.
+
+
+### Step 23 F-08 backup/export/replica/restore readiness increment (2026-10-31)
+
+- Added `docs/CIN_STEP23_BACKUP_EXPORT_REPLICA_RESTORE_READINESS_V1.md` and recorded F-08 in the privacy/data-minimization audit. The design specifies copy lineage manifests, export restrictions, restore quarantine, erasure replay, residual scans, and acceptance gates.
+- Operational backup, replica, export, cache, and restore controls are not evidenced in the reviewed repository; hosting-provider-managed copies remain unverified. No operational configuration or data was changed. F-08 remains Open; Step 23 remains Partial.
+
+
+### Step 23 F-09 access-control readiness increment (2026-10-31)
+
+- Added `docs/CIN_STEP23_ACCESS_CONTROL_AND_AUTHORIZATION_READINESS_V1.md` and recorded F-09 in the privacy audit and persistence lifecycle. It distinguishes input validation/dependency injection from identity and authorization, defines proposed least-privilege controls, and records implementation acceptance gates.
+- Authentication, role matrix, privileged-action approval, audit storage, and deployment identity remain unresolved. No schema/runtime/deployment change was made. F-09 remains Open; Step 23 remains Partial.
+
+
+### Step 23 F-10 public endpoint abuse and rate-limit readiness increment (2026-10-31)
+
+- Added `docs/CIN_STEP23_PUBLIC_ENDPOINT_ABUSE_AND_RATE_LIMIT_READINESS_V1.md` documenting existing request/source/timeout/response-size controls and the evidence gap for per-caller/global quotas, concurrency/backpressure, cooldowns, provider-429 handling, and abuse telemetry.
+- No runtime middleware, rate-limit package, edge rule, Render/Cloudflare configuration, provider quota, or deployment was changed. F-10 remains Open; Step 23 remains Partial.
+
+
+### Step 23 F-11 operational observability and incident-response readiness increment (2026-10-31)
+
+- Added docs/CIN_STEP23_OPERATIONAL_LOGGING_MONITORING_INCIDENT_RESPONSE_READINESS_V1.md documenting existing sanitized provider-error responses and offline CI evidence, alongside gaps in structured operational events, correlation IDs, metrics/SLOs, alert routing, incident runbooks, ownership, and log retention.
+- The bundled application entry point was not independently inspected; runtime middleware/logging behavior remains not assessed. No runtime telemetry, dashboard, alert, incident automation, retention policy, or deployment change was made. F-11 remains Open; Step 23 remains Partial.
+
+
+### Step 23 F-12 disaster recovery and service continuity readiness increment (2026-10-31)
+
+- Added docs/CIN_STEP23_DISASTER_RECOVERY_AND_SERVICE_CONTINUITY_READINESS_V1.md covering current Render manifest evidence, service tiers, RTO/RPO decision requirements, failure-mode/safe-degradation matrix, recovery sequence, and continuity acceptance tests.
+- This review is separate from backup/export/replica/restore design. No numeric recovery objectives, standby, failover, monitoring, release gate, retry loop, hosting setting, or deployment was implemented. F-12 remains Open; Step 23 remains Partial.
+
+
+### Step 23 F-13 provider governance and source-of-truth increment (2026-10-31)
+
+- Added docs/CIN_STEP23_PROVIDER_GOVERNANCE_AND_SOURCE_OF_TRUTH_READINESS_V1.md covering versioned provider registry requirements, metric-specific authority, fallback comparability, source provenance, disagreement handling, and acceptance tests.
+- The existing GitHub connector's allowlist, bounded retrieval, provenance, freshness, and unverified semantics were reviewed; these are source-specific controls, not a general source-of-truth framework.
+- No runtime registry, provider promotion, fallback, cache, retry, source priority, or live validation was implemented. F-13 remains Open; Step 23 remains Partial.
+
+
+### Step 23 F-14 claim conflict and review-state readiness increment (2026-10-31)
+
+- Added docs/CIN_STEP23_CLAIM_CONFLICT_AND_REVIEW_STATE_READINESS_V1.md assessing the common evidence specification against shared claim/relationship construction primitives.
+- Deterministic claim identity and relationship/review-status vocabulary validation exist, but no conflict detector, comparability engine, authenticated reviewer workflow, adjudication state machine, or persisted review-event history is implemented.
+- Documented non-destructive conflict lifecycle, comparability gates, resolution safeguards, and acceptance tests. No claim was adjudicated or status promoted. F-14 remains Open; Step 23 remains Partial.
+
+
+### Step 23 F-15 evidence completeness and coverage readiness increment (2026-10-31)
+
+- Added docs/CIN_STEP23_EVIDENCE_COMPLETENESS_AND_COVERAGE_READINESS_V1.md defining expected-source manifests, coverage dimensions, scan/pagination/time-gap accounting, complete/partial/stale/unavailable/unknown semantics, UI/API requirements, and deterministic acceptance tests.
+- Reviewed common evidence model completeness requirements, GitHub connector missing-field/freshness reporting, and caller-supplied cross-source comparison. These do not constitute a general expected-coverage evaluator.
+- No provider query, coverage engine, scheduler, pagination client, percentage/confidence score, API, schema, or persistence activation was implemented. F-15 remains Open; Step 23 remains Partial.
+
+
+### Step 23 F-16 assessment methodology and reproducibility readiness increment (2026-10-31)
+
+- Added docs/CIN_STEP23_ASSESSMENT_METHODOLOGY_AND_REPRODUCIBILITY_READINESS_V1.md defining a reproducibility envelope for exact inputs, source/cache/fallback provenance, methodology/configuration versions, code/runtime/schema versions, explicit clocks, calculation traces, output fingerprints, and lineage.
+- Reviewed coin screening, commodity backing, growth fundamentals, cross-source comparison, and shared claim construction. Existing formulas and deterministic primitives are partial controls; current-time freshness, live/cache/fallback inputs, and input ordering can affect repeated results.
+- No formulas, weights, thresholds, defaults, provider behavior, source data, schema, runtime, API, persistence, or deployment were changed. F-16 remains Open; Step 23 remains Partial.
+
+
+### Step 23 F-17 assessment quality assurance and validation readiness increment (2026-10-31)
+
+- Added docs/CIN_STEP23_ASSESSMENT_QUALITY_ASSURANCE_AND_VALIDATION_READINESS_V1.md defining unit/contract/integration/regression/property/differential/independent validation roles; requirement-to-test traceability; ground-truth and reviewer independence; FP/FN and abstention measurement; temporal leakage and survivorship controls; module-specific edge cases; reproducibility; and proposed release/rollback gates.
+- Reviewed the existing offline test suites for coin screening, commodity backing, growth fundamentals, and cross-source evidence. The repository has meaningful unit/regression/API coverage and configured CI, but no unified governed benchmark set, independent validation protocol, shared confusion-matrix reporting, calibration framework for probabilistic outputs, or production drift-monitoring system was evidenced.
+- No numeric pass threshold was invented. No runtime code, test suite, formula, score, threshold, provider, schema, API, persistence behavior, hosting configuration, or deployment was changed. F-17 readiness design is documented; implementation remains open. Step 23 remains Partial.
+
+
+### Step 23 F-18 assessment governance and controlled change readiness increment (2026-10-31)
+
+- Added docs/CIN_STEP23_ASSESSMENT_GOVERNANCE_AND_CONTROLLED_CHANGE_READINESS_V1.md defining internal methodology ownership, semantic versioning, change classes, separation of duties, approval workflow/evidence, exceptions, immutable historical results, suspension/rollback and staged implementation criteria.
+- Reviewed the current module weights/formulas, shared evidence/claim vocabularies and local-only append-assessment-event support. These do not establish a methodology registry, authenticated reviewer independence, approval/release authorization, or production historical governance enforcement.
+- This is internal technical governance, not government licensing, certification or approval. No runtime code, formula, score, threshold, provider, schema, API, persistence wiring, deployment, Render or Cloudflare setting was changed. F-18 readiness design is documented; implementation remains open. Step 23 remains Partial.
+
+
+### Step 23 F-19 assessment API contracts and consumer-safety readiness increment (2026-10-31)
+
+- Added docs/CIN_STEP23_ASSESSMENT_API_CONTRACTS_AND_CONSUMER_SAFETY_READINESS_V1.md defining a common response envelope, entity identity, distinct source/observation/retrieval/assessment clocks, provenance, coverage and uncertainty semantics, module-specific output requirements, API contract tests, dashboard safety and stable error handling.
+- Reviewed commodity-backing, growth-fundamentals and cross-source API models/tests plus coin-screening provider/fallback output. Existing strict request validation and module-specific safety caveats are meaningful; no shared versioned response envelope or cross-module conformance suite is evidenced. Caller-supplied `verified` status is not authenticated CIN verification.
+- No runtime response model, route, formula, provider, schema, persistence wiring, dashboard or deployment changed. F-19 readiness design is documented; shared contract implementation remains open. Step 23 remains Partial.
+
+
+### F-20 — Dashboard data integration and assessment presentation architecture (2026-10-31)
+
+- Added docs/CIN_DASHBOARD_DATA_INTEGRATION_AND_ASSESSMENT_PRESENTATION_ARCHITECTURE_V1.md defining mobile-first navigation, API-to-screen mapping, a semantics-preserving client data model, refresh/cache/low-bandwidth policy, loading/empty/not-assessed/partial/stale/conflicting/unavailable/error/unknown states, visualization rules, alert delivery-state presentation, security, accessibility and implementation acceptance sequence.
+- Repository tree review found no independently maintained dashboard/frontend/static/template source tree; current implementation tracker marks dashboard/mobile UX as not established. F-20 is architecture-only; Stage 6 Steps 30–33 remain pending. No frontend, API, provider, persistence, deployment or configuration changed. Numbered roadmap remains 7 stages / 35 steps.
+
+
+### F-21 — Frontend implementation readiness and technology decision (2026-10-31)
+
+- Selected React + TypeScript + Vite for a separate static frontend, with Cloudflare Pages Free as a proposed target subject to account/plan review and explicit deployment approval. Keep FastAPI as a separate API origin.
+- Defined proposed repository layout, dependency policy, public API base URL handling, CORS prerequisites, mobile visual/accessibility requirements, security constraints, initial vertical slice, and CI/release acceptance gates. Evaluated Next.js, Streamlit, backend templates and plain HTML/JS.
+- No frontend directory, package/dependency, API/CORS change, Cloudflare project, DNS, Render setting or deployment was changed. F-21 is a technology decision only. Next increment: F-22 minimal frontend scaffold and CI build/typecheck.
+
+
+### F-22 — Initial frontend foundation (2026-10-31)
+
+- Added a standalone React 18 + TypeScript + Vite app shell under `frontend/`, responsive dark-first styling, explicit demo-only/no-live-data disclosure, read-only scope, and navigation that labels unimplemented modules.
+- Added Vitest/Testing Library checks and `.github/workflows/cin-frontend-ci.yml` for Node 22 typecheck, tests and production build. Workflow result remains pending until Actions completes.
+- Added implementation record at `docs/CIN_F22_FRONTEND_FOUNDATION_IMPLEMENTATION_RECORD.md`. A committed npm lockfile is still missing, so transitive dependency reproducibility is an open acceptance gap. API integration, real dashboard panels, accessibility/browser tests and deployment remain pending. No backend/API, CORS, persistence, Render, Cloudflare, DNS or production deployment changed.
+
+
+### F-23 — API client and shared data-state layer (2026-10-31)
+
+- Added a centralized typed fetch boundary with an environment-configured API origin, timeout and normalized errors; connected health/readiness checks only when configured.
+- Added reusable fresh/stale/partial/conflicting/unavailable/unknown/error state presentation and source/retrieval metadata slots.
+- Deliberately did not wire market-data/screening endpoints because their checked-in provider behavior is CoinGecko/CoinPaprika and conflicts with the saved Coinbase-first / exclude-CoinGecko preference. No live market values or provider assumptions were introduced. See `docs/CIN_F23_API_CLIENT_AND_DATA_STATE_IMPLEMENTATION.md`.
+- CI verification, committed npm lockfile, deployed health/readiness payload validation and Coinbase-aligned market contracts remain outstanding. No backend/CORS/provider/deployment changes. F-23 remains Partial.
+
+
+### F-24 — Coinbase-first market provider contract audit (2026-10-31)
+
+- Audited the current market-data implementation and repository tree. The candle path is Binance-primary/Kraken-fallback, derivatives use Binance USDⓈ-M public endpoints, and no Coinbase-specific adapter or contract tests are present.
+- Recorded the provider mismatch and explicit dashboard integration block in `docs/CIN_F24_COINBASE_FIRST_MARKET_PROVIDER_CONTRACT_AUDIT.md`.
+- The frontend remains demo-only; no market, screening, derivatives, or cached provider values are presented as Coinbase data.
+- F-24 is Partial: provider mismatch audit is complete; Coinbase adapter, fixture tests, API contract, frontend integration, and limited live read-only validation remain.
+- No provider routes, CORS, Render, Cloudflare, DNS, persistence activation, or deployment were changed.
+
+
+- **F-24 follow-through:** Coinbase public candle adapter and nine dedicated offline contract tests are now implemented and passed GitHub Actions run [#41146066687](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/41146066687). The adapter is isolated, fixed-host, USD-product explicit, 300-candle bounded, and not yet exposed as a registered API route. F-24 remains Partial; API route integration, provider policy for fallback pairs, frontend integration, and live read-only validation remain.
+
+
+- **F-24 Gate C increment:** Added the isolated `GET /coinbase/market-candles` FastAPI router and offline API contract tests. CI run [#41146284133](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/41146284133) passed. The audited branch lacks the deployment application's source entrypoint/router registry, so the route is not mounted in the Render service. Gate C is Partial (router contract implemented; deployment-app registration and live smoke test remain); no deployment or service configuration was changed.
+
+
+- **F-24 Gate C update:** Coinbase read-only router is now copied into the Render scaffold app and registered by the build-time patch script. CI extracts the actual archive, installs its runtime requirements, applies the patch, imports the packaged FastAPI app, and asserts the route is mounted. Verified by storage runs [#41146868606](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/41146868606) and [#41146874005](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/41146874005), plus frontend CI [#41146873995](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/41146873995). This is build-time verification only; Render remains unchanged and live Coinbase validation is pending.
+
+
+- **F-24 Gate E update (2026-10-31):** Added a bounded, unauthenticated live Coinbase BTC-USD hourly candle smoke check to GitHub Actions. Storage validation [#41147602014](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/41147602014) passed and returned 2 normalized candles for the completed 2026-10-30 22:00–23:00 UTC interval; frontend CI [#41147602010](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/41147602010) also passed. This verifies the public provider from the CI runner only, not Render deployment or browser CORS. F-24 remains Partial: deployed API verification and safe dashboard integration remain pending. No deployment, merge, CORS change, or production activation.

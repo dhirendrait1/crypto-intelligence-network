@@ -11,6 +11,134 @@ import json
 import sqlite3
 from typing import Any
 from uuid import uuid4
+import re
+
+MAX_TEXT_LENGTHS = {
+    "subject": 512,
+    "predicate": 128,
+    "statement": 4000,
+    "unit": 64,
+    "identifier_method": 128,
+    "methodology_version": 128,
+    "relationship.rationale": 2000,
+    "assessment.rationale": 4000,
+}
+_SECRET_PATTERNS = (
+    re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----", re.IGNORECASE),
+    re.compile(r"\bBearer\s+[A-Za-z0-9._~+/=-]{12,}", re.IGNORECASE),
+    re.compile(r"\b(?:sk_live|sk_test|gh[pousr]_|github_pat_|xox[baprs]-)[A-Za-z0-9_-]{12,}", re.IGNORECASE),
+    re.compile(r"\b(?:api[_ -]?key|access[_ -]?token|secret[_ -]?key|private[_ -]?key|recovery[_ -]?phrase|seed[_ -]?phrase|mnemonic)\s*[:=]\s*\S+", re.IGNORECASE),
+)
+
+def _validate_text(value: Any, field: str, limit: int) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field} must be a non-empty string")
+    normalized = value.strip()
+    if len(normalized) > limit:
+        raise ValueError(f"{field} must be at most {limit} characters")
+    if any(pattern.search(normalized) for pattern in _SECRET_PATTERNS):
+        raise ValueError(f"{field} contains a prohibited credential or secret marker")
+    return normalized
+
+def _validate_claim_value(value: Any) -> None:
+    secret_keys = {"password", "passwd", "token", "access_token", "api_key",
+                   "secret", "secret_key", "private_key", "seed_phrase",
+                   "mnemonic", "authorization", "cookie"}
+    def walk(item: Any, depth: int = 0) -> None:
+        if depth > MAX_METADATA_DEPTH:
+            raise ValueError("claim value exceeds the maximum nesting depth")
+        if isinstance(item, dict):
+            for key, child in item.items():
+                if isinstance(key, str) and key.strip().lower() in secret_keys:
+                    raise ValueError("claim value contains a prohibited sensitive field")
+                walk(child, depth + 1)
+        elif isinstance(item, list):
+            for child in item:
+                walk(child, depth + 1)
+        elif isinstance(item, str):
+            if any(pattern.search(item) for pattern in _SECRET_PATTERNS):
+                raise ValueError("claim value contains a prohibited credential or secret marker")
+
+MAX_METADATA_BYTES = 64 * 1024
+MAX_METADATA_DEPTH = 8
+MAX_METADATA_NODES = 2048
+MAX_METADATA_STRING_CHARS = 8192
+MAX_METADATA_COLLECTION_ITEMS = 256
+
+# Exact source schema for the only connector currently approved for evidence
+# mapping. Other namespaces receive structural/size validation but no claim of
+# source authenticity or semantic approval.
+SOURCE_METADATA_ALLOWLISTS = {
+    "github_public_repository_api": {
+        "symbol", "category", "metric", "source_name", "source_url",
+        "repository", "published_at", "retrieved_at", "measurement_period",
+        "value", "unit", "retrieval_status", "validation_status",
+        "missing_fields", "freshness_status", "freshness_age_seconds",
+        "freshness_policy", "claim_verification_status",
+        "independently_verified", "provenance", "limitations",
+    }
+}
+GITHUB_VALUE_ALLOWLIST = {
+    "default_branch", "pushed_at", "updated_at", "stargazers_count",
+    "forks_count", "open_issues_count", "archived",
+}
+
+
+def _serialize_metadata(metadata: dict[str, Any], source_namespace: str) -> str:
+    """Validate source shape and resource bounds before canonical JSON encoding."""
+    if not isinstance(metadata, dict):
+        raise ValueError("metadata must be a JSON object")
+
+    allowed = SOURCE_METADATA_ALLOWLISTS.get(source_namespace)
+    if allowed is not None:
+        unknown = set(metadata) - allowed
+        if unknown:
+            raise ValueError("metadata contains fields outside the source allowlist")
+        nested_value = metadata.get("value")
+        if nested_value is not None:
+            if not isinstance(nested_value, dict) or set(nested_value) - GITHUB_VALUE_ALLOWLIST:
+                raise ValueError("metadata value contains fields outside the source allowlist")
+
+    nodes = 0
+
+    def inspect(value: Any, depth: int = 0) -> None:
+        nonlocal nodes
+        nodes += 1
+        if nodes > MAX_METADATA_NODES:
+            raise ValueError("metadata exceeds the maximum JSON node count")
+        if depth > MAX_METADATA_DEPTH:
+            raise ValueError("metadata exceeds the maximum JSON nesting depth")
+        if isinstance(value, str):
+            if len(value) > MAX_METADATA_STRING_CHARS:
+                raise ValueError("metadata string exceeds the maximum length")
+        elif isinstance(value, dict):
+            if len(value) > MAX_METADATA_COLLECTION_ITEMS:
+                raise ValueError("metadata object exceeds the maximum field count")
+            for key, child in value.items():
+                if not isinstance(key, str) or len(key) > 128:
+                    raise ValueError("metadata object keys must be strings of at most 128 characters")
+                inspect(child, depth + 1)
+        elif isinstance(value, list):
+            if len(value) > MAX_METADATA_COLLECTION_ITEMS:
+                raise ValueError("metadata array exceeds the maximum item count")
+            for child in value:
+                inspect(child, depth + 1)
+        elif value is None or isinstance(value, (bool, int, float)):
+            return
+        else:
+            raise ValueError("metadata contains an unsupported JSON value")
+
+    inspect(metadata)
+    try:
+        encoded = json.dumps(
+            metadata, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False,
+        )
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("metadata must contain finite JSON-compatible values") from exc
+    if len(encoded.encode("utf-8")) > MAX_METADATA_BYTES:
+        raise ValueError("metadata exceeds the 65536-byte storage limit")
+    return encoded
 
 
 def _utc_timestamp(value: str, field: str) -> str:
@@ -36,6 +164,33 @@ class LocalSQLiteEvidenceRepository:
         self.connection.execute("PRAGMA foreign_keys = ON")
 
 
+    def find_evidence_id(
+        self,
+        *,
+        source_namespace: str,
+        external_evidence_id: str,
+    ) -> str | None:
+        """Read an existing evidence ID by its unique provider identity."""
+        if (
+            not isinstance(source_namespace, str)
+            or not source_namespace.strip()
+            or len(source_namespace.strip()) > 128
+        ):
+            raise ValueError("source_namespace must contain 1..128 characters")
+        if (
+            not isinstance(external_evidence_id, str)
+            or not external_evidence_id.strip()
+            or len(external_evidence_id.strip()) > 256
+        ):
+            raise ValueError("external_evidence_id must contain 1..256 characters")
+        row = self.connection.execute(
+            """SELECT cin_evidence_id
+               FROM cin_evidence_records
+               WHERE source_namespace = ? AND external_evidence_id = ?""",
+            (source_namespace.strip(), external_evidence_id.strip()),
+        ).fetchone()
+        return row["cin_evidence_id"] if row is not None else None
+
     def append_assessment_event(
         self,
         *,
@@ -57,10 +212,8 @@ class LocalSQLiteEvidenceRepository:
             raise ValueError("unsupported assessor_type")
         if not isinstance(claim_id, str) or not claim_id.strip():
             raise ValueError("claim_id must be non-empty")
-        if not isinstance(methodology_version, str) or not methodology_version.strip():
-            raise ValueError("methodology_version must be non-empty")
-        if not isinstance(rationale, str) or not rationale.strip() or len(rationale.strip()) > 4000:
-            raise ValueError("rationale must contain 1..4000 characters")
+        methodology_version = _validate_text(methodology_version, "methodology_version", MAX_TEXT_LENGTHS["methodology_version"])
+        rationale = _validate_text(rationale, "assessment.rationale", MAX_TEXT_LENGTHS["assessment.rationale"])
         timestamp = _utc_timestamp(assessed_at, "assessed_at")
         event_id = "cin-assessment-" + uuid4().hex
         with self.connection:
@@ -96,10 +249,16 @@ class LocalSQLiteEvidenceRepository:
         retrieved = _utc_timestamp(retrieved_at, "retrieved_at") if retrieved_at is not None else None
         published = _utc_timestamp(published_at, "published_at") if published_at is not None else None
         checked = _utc_timestamp(checked_at, "checked_at") if checked_at is not None else None
-        metadata_json = json.dumps(
-            metadata, sort_keys=True, separators=(",", ":"),
-            ensure_ascii=False, allow_nan=False,
-        )
+        namespace_row = self.connection.execute(
+            "SELECT source_namespace FROM cin_evidence_records WHERE cin_evidence_id = ?",
+            (cin_evidence_id,),
+        ).fetchone()
+        if namespace_row is None:
+            # Preserve the database FK as the authoritative unknown-record error.
+            source_namespace = ""
+        else:
+            source_namespace = namespace_row["source_namespace"]
+        metadata_json = _serialize_metadata(metadata, source_namespace)
         fingerprint = sha256(metadata_json.encode("utf-8")).hexdigest()
         observation_id = "cin-observation-" + uuid4().hex
         with self.connection:
@@ -159,6 +318,12 @@ class LocalSQLiteEvidenceRepository:
         if claim.get("claim_status") not in {"supported", "contradicted", "mixed", "insufficient_evidence", "not_assessed"}:
             raise ValueError("claim has unsupported status")
         claim_created = _utc_timestamp(claim["created_at"], "claim.created_at")
+        for field in ("subject", "predicate", "statement", "identifier_method"):
+            claim[field] = _validate_text(claim[field], f"claim.{field}", MAX_TEXT_LENGTHS[field])
+        if claim.get("unit") is not None:
+            claim["unit"] = _validate_text(claim["unit"], "claim.unit", MAX_TEXT_LENGTHS["unit"])
+        if claim.get("value") is not None:
+            _validate_claim_value(claim["value"])
         value_json = json.dumps(claim.get("value"), sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False) if claim.get("value") is not None else None
 
         required_rel = ("claim_id", "relationship", "review_status", "rationale", "created_at", "schema_version")
@@ -171,8 +336,12 @@ class LocalSQLiteEvidenceRepository:
         if relationship.get("review_status") not in {"automated_candidate", "human_reviewed", "rejected"}:
             raise ValueError("unsupported relationship review status")
         relationship_created = _utc_timestamp(relationship["created_at"], "relationship.created_at")
+        relationship["rationale"] = _validate_text(
+            relationship["rationale"], "relationship.rationale",
+            MAX_TEXT_LENGTHS["relationship.rationale"],
+        )
 
-        metadata_json = json.dumps(metadata, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
+        metadata_json = _serialize_metadata(metadata, source_namespace.strip())
         fingerprint = sha256(metadata_json.encode("utf-8")).hexdigest()
         cin_evidence_id = "cin-evidence-" + uuid4().hex
         observation_id = "cin-observation-" + uuid4().hex

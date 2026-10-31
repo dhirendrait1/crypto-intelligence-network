@@ -27,6 +27,8 @@ MODULES = (
     "cross_source_evidence.py",
     "cross_source_evidence_api.py",
     "cin_verifiable_evidence.py",
+    "cin_coinbase_public_market_data.py",
+    "cin_coinbase_market_data_api.py",
 )
 main_path = APP_DIR / "main.py"
 if not main_path.is_file():
@@ -89,6 +91,12 @@ registrations = [
         "\n# CIN: read-only public derivatives snapshot; no trading operations\n"
         "from app.cin_derivatives_market_data_api import router as cin_derivatives_market_data_router\n"
         "app.include_router(cin_derivatives_market_data_router)\n",
+    ),
+    (
+        "cin_coinbase_market_data_router",
+        "\n# CIN F-24: explicit Coinbase USD public candles (read-only)\n"
+        "from app.cin_coinbase_market_data_api import router as cin_coinbase_market_data_router\n"
+        "app.include_router(cin_coinbase_market_data_router)\n",
     ),
     (
         "cin_public_news_sentiment_router",
@@ -158,4 +166,4 @@ for module_name in MODULES:
     shutil.copyfile(ROOT / module_name, APP_DIR / module_name)
 
 
-print(f"CIN metadata verified; read-only market data, screening, assessment, evidence, and technical-analysis public market-candle, and cross-source evidence routers installed; files updated: {changed}")
+print(f"CIN metadata verified; read-only market data, screening, assessment, evidence, and technical-analysis public market-candle, Coinbase public candles and cross-source evidence routers installed; files updated: {changed}")

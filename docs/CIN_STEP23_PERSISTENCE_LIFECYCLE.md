@@ -1,6 +1,6 @@
 # CIN Step 23 — Persistence and Evidence Lifecycle Design
 
-**Status:** Design only; no database, migration, repository, retention job, or public endpoint is implemented by this document.  
+**Status:** Design plus partial local SQLite reference implementation. This document itself is not an implementation; the migration and adapter are local-only, are not wired to the public API, and are not production persistence. No retention job or public persistence endpoint is implemented.  
 **Schema baseline:** shared claim/evidence schema v1.0 (cin_verifiable_evidence.py).  
 **Safety boundary:** read-only intelligence. This design does not authorize source crawling, account access, trading, wallet access, or fund movement.
 
@@ -112,3 +112,159 @@ This remains local development/test functionality. It is not connected to a user
 ## 11. Append-only lifecycle operations (2026-10-30)
 
 The local-only adapter now supports appending a new observation to an existing CIN evidence record and appending claim assessment events without updating prior rows. New observation writes validate timezone-aware timestamps, JSON-serialize finite metadata, compute a normalized metadata fingerprint, and rely on the database foreign key to reject unknown evidence IDs. Regression tests verify historical observations remain unchanged, UTC normalization is applied, and invalid writes do not add rows. These operations remain local SQLite development/test functionality only; there is no API wiring, retention worker, or production durability.
+
+
+## 12. Database-enforced append-only history and current limitations (2026-10-30)
+
+The local SQLite reference migration now installs four database triggers:
+
+- `trg_cin_evidence_observations_no_update` and `trg_cin_evidence_observations_no_delete`
+- `trg_cin_claim_assessment_events_no_update` and `trg_cin_claim_assessment_events_no_delete`
+
+These guards apply even when SQL is issued outside the repository adapter. Regression tests attempt direct SQL updates and deletes and verify that SQLite rejects the mutations without changing the stored history. Migration tests also reapply schema v1.0 and assert that exactly one instance of each guard remains.
+
+**Important retention/deletion interaction:** the v1.0 reference triggers intentionally block deletion of observations and assessment events. This is an integrity safeguard for local tests, not an approved permanent-retention policy. It currently means a retention or erasure workflow cannot delete those rows through this schema. Before any real persistence is enabled, CIN must define the applicable retention, privacy, legal-erasure, backup-expiry, and audit requirements, then design and test an explicitly versioned retention mechanism. Do not silently disable these triggers or treat append-only storage as overriding a valid deletion obligation.
+
+**Current implementation boundary:** the triggers and tests apply only to the local SQLite reference migration. They do not establish production durability, authenticated reviewer identity, source authenticity, API write authorization, or a production retention policy. The API remains read-only and persistence remains opt-in/local-only.
+
+
+## 13. Retention and erasure design gate (2026-10-30)
+
+**Decision: no deletion migration or retention worker is authorized by the current project requirements.** The v1.0 append-only triggers remain unchanged. A retention duration, legal basis, data classification, source licence, and backup-expiry requirement must be approved before implementation; inventing a universal retention period would create an unsupported compliance and data-loss policy.
+
+### 13.1 Separate the data lifecycle classes
+
+| Data class | Proposed treatment | Required decision before implementation |
+|---|---|---|
+| Raw/normalized provider metadata payload | Eligible for policy-driven purge or redaction | Provider terms, permitted retention, and maximum age |
+| Derived metadata fingerprint/content hash | Retain only if it cannot reasonably reconstruct or identify erased content and policy permits it | Privacy review and hash-retention rationale |
+| Evidence record identity and provenance pointer | Retain a minimal tombstone only where lawful and necessary | Audit purpose, legal basis, and minimum fields |
+| Observation history | Append-only during its approved retention window; expiry handled by a versioned controlled process | Per-source retention class and deletion scope |
+| Claim assessment events | Preserve decision history only as long as justified; erase or pseudonymize reviewer data when required | Reviewer privacy and audit requirements |
+| Claim/evidence relationships and conflicts | Remove or detach references when the underlying evidence is erased, without leaving misleading active relationships | Referential-integrity and conflict-history policy |
+| Backups and replicas | Expire erased data through documented backup rotation; disclose the maximum residual period | Backup schedule, restore procedure, and expiry SLA |
+
+### 13.2 Required deletion workflow
+
+A future retention implementation must be a separately versioned migration and controlled application operation, not a general-purpose DELETE method on the evidence repository.
+
+1. Identify records by approved retention class and policy version; support legal holds and explicit exemptions.
+2. Produce a dry-run manifest containing record IDs, data classes, age basis, and intended action. Do not include payload contents.
+3. Require an authorized operator or approved policy engine to approve the manifest; record the policy version and authorization context.
+4. In one database transaction, mark the record as pending erasure, remove or redact eligible payload fields, and deactivate dependent relationships/conflict references as specified by policy.
+5. Retain only the minimum permitted tombstone/deletion event: opaque record reference, policy version, completion timestamp, action category, and non-sensitive outcome. Never copy erased payload into the audit event.
+6. Verify postconditions by querying for residual payload and active references; report exceptions rather than claiming deletion succeeded.
+7. Expire affected backups/replicas according to the approved backup policy, and verify through restore testing that erased payload is not reintroduced.
+8. Keep legal holds, failed deletions, and partial completion visible as unresolved states; never silently bypass append-only triggers.
+
+### 13.3 Migration and testing requirements
+
+- Do not drop or disable the v1.0 append-only triggers in place. Introduce a new schema version with explicit migration and forward-recovery instructions.
+- Prefer a dedicated retention operation with narrow permissions over allowing application roles to issue arbitrary deletes.
+- Test legal-hold exclusion, dry-run determinism, idempotent retries, partial failure, transaction rollback, foreign-key cleanup, tombstone minimization, backup expiry, and restore behavior.
+- Test that ordinary ingestion and assessment code cannot invoke retention operations.
+- Keep the current API read-only and the SQLite adapter local-only until all policy and deployment gates are approved.
+
+### 13.4 Unresolved policy decisions
+
+The following are intentionally not guessed or implemented:
+
+- Retention periods by provider, evidence type, and data classification.
+- Applicable privacy/legal basis and erasure exceptions.
+- Whether any source metadata or derived hashes may be retained after payload erasure.
+- Who may authorize deletion and how that authority is authenticated.
+- Legal-hold scope and release procedure.
+- Backup/replica expiry limits and restore-time deletion replay.
+- Whether minimal tombstones are permitted or required for each source class.
+
+**Acceptance status:** design documented; implementation blocked pending these policy decisions. No trigger has been disabled, no record has been deleted, and no retention schedule or worker has been enabled.
+
+
+## 14. Derived hash and fingerprint lifecycle design gate (2026-10-31)
+
+See `docs/CIN_STEP23_DERIVED_DATA_HASH_AND_FINGERPRINT_LIFECYCLE_V1.md` for the detailed F-07 proposal. Current behavior is limited: the local adapter stores SHA-256 fingerprints of canonicalized allowlisted metadata; the optional content-hash column is currently populated with NULL. Neither is proof of authenticity or anonymity. Default future treatment is to inherit source classification, policy version, lineage, and expiry; source erasure triggers a dependency review and removal of derived descendants unless a narrow, independently approved retention exception is fully justified. Missing lineage fails closed. No current hash is changed or deleted; no new hash computation, lineage schema, retention worker, or production persistence is enabled. This is a design gate only.
+
+
+## 15. Classification implementation-readiness gate (2026-10-31)
+
+See `docs/CIN_STEP23_F03_CLASSIFICATION_IMPLEMENTATION_READINESS_V1.md` for the field-level candidate mapping, proposed schema-v2 policy registry contract, fail-closed semantics, migration/backfill sequence, acceptance tests, and unresolved approval register. This plan is non-executable design guidance: no classification or retention labels are present in schema v1.0, no rows are backfilled, and no policy duration, legal basis, source permission, or legal-hold authority is approved by this document. Schema-v2 implementation remains blocked until each required decision has explicit evidence and the migration receives separate review and project approval.
+
+
+## 16. Backup, export, replica, and restore readiness gate (2026-10-31)
+
+See `docs/CIN_STEP23_BACKUP_EXPORT_REPLICA_RESTORE_READINESS_V1.md` for the asset/control matrix, copy-manifest contract, restore quarantine and erasure-replay sequence, export/support-bundle boundaries, acceptance tests, and evidence gaps. This review found no repository evidence of an operational CIN backup job, replica inventory, governed export workflow, or restore-time erasure replay. Provider-managed copies were not independently verified; this is an evidence gap, not a claim that hosting providers keep no backups. No copy, export, backup, restore, data, or deployment was changed. Operational lifecycle remains unverified and production persistence remains unauthorized.
+
+
+## 17. Access-control and authorization readiness gate (2026-10-31)
+
+See `docs/CIN_STEP23_ACCESS_CONTROL_AND_AUTHORIZATION_READINESS_V1.md` for the current trust-boundary inventory, proposed principal/permission model, fail-closed requirements, privileged-operation controls, acceptance tests, and unresolved decisions. Reviewed API validation and dependency injection are not authentication or authorization; the SQLite adapter has no role enforcement and connection possession is not production identity. No authentication, permissions, schema, secrets, API write path, or deployment configuration was changed. Privileged operations remain unauthorized.
+
+
+## 18. Public endpoint abuse and rate-limit readiness gate (2026-10-31)
+
+See `docs/CIN_STEP23_PUBLIC_ENDPOINT_ABUSE_AND_RATE_LIMIT_READINESS_V1.md` for the public evidence-ingestion request/provider resource review, threat scenarios, caller/global quotas, concurrency/backpressure, provider-429 handling, telemetry, acceptance tests, and unresolved deployment evidence. The connector already has a fixed provider destination, bounded timeout, and 1,000,000-byte response limit; per-caller/global throttling and concurrency controls were not evidenced in the reviewed route/connector. No middleware, edge rule, runtime code, provider quota, or deployment setting was changed. Abuse-control readiness remains open.
+
+
+## 19. Operational logging, monitoring, and incident-response readiness gate (2026-10-31)
+
+See docs/CIN_STEP23_OPERATIONAL_LOGGING_MONITORING_INCIDENT_RESPONSE_READINESS_V1.md for the reviewed sanitized API error behavior, offline CI evidence, candidate minimized event schema, monitoring indicators, incident runbook requirements, acceptance gates, and unresolved operational ownership/retention questions. The bundled application entry point and hosting-level logging behavior were not independently inspected in this pass and remain not assessed. No runtime telemetry, alert, incident automation, log retention policy, or deployment setting was changed. Operational readiness remains open.
+
+
+## 20. Disaster recovery and service continuity readiness gate (2026-10-31)
+
+See docs/CIN_STEP23_DISASTER_RECOVERY_AND_SERVICE_CONTINUITY_READINESS_V1.md for service-tier RTO/RPO decision requirements, provider/platform/release/overload failure scenarios, safe degradation, staged recovery sequence, and continuity test gates. This is distinct from the backup/export/replica/restore lifecycle: it addresses service availability and controlled restoration of service. No RTO/RPO targets, standby, failover, monitor, release gate, retry loop, hosting configuration, or deployment was changed. Operational recovery remains unimplemented and unverified.
+
+
+## 21. Provider governance and source-of-truth integrity readiness (2026-10-31)
+
+See docs/CIN_STEP23_PROVIDER_GOVERNANCE_AND_SOURCE_OF_TRUTH_READINESS_V1.md for the provider registry contract, metric-specific source precedence, fallback eligibility, provenance preservation, conflict handling, and acceptance tests. This is a governance/readiness design, not a runtime registry or provider certification. The current GitHub evidence connector remains narrowly allowlisted, bounded, and explicitly unverified; its 7-day activity freshness threshold is not a universal metric freshness policy. No provider, fallback, cache, retry, source priority, or live retrieval was changed. Cross-provider governance remains open.
+
+
+## 22. Claim conflict and review-state readiness (2026-10-31)
+
+See docs/CIN_STEP23_CLAIM_CONFLICT_AND_REVIEW_STATE_READINESS_V1.md for the distinction between relationship vocabulary validation and actual conflict detection/adjudication. The shared primitives validate relationship/review-status values but do not authenticate reviewers, compare evidence, execute state transitions, or persist review events. No claim was adjudicated or status promoted. Conflict detection, authenticated review, and durable resolution history remain unimplemented.
+
+
+## 23. Evidence completeness and coverage readiness (2026-10-31)
+
+See docs/CIN_STEP23_EVIDENCE_COMPLETENESS_AND_COVERAGE_READINESS_V1.md for the expected-source manifest, source/entity/metric/time/field/pagination/provenance coverage dimensions, scan-gap accounting, assessment status rules, and acceptance tests. The common evidence model specifies completeness fields, while the reviewed GitHub connector has only source-specific missing-field/freshness reporting and the cross-source comparator accepts caller-supplied observations without an expected coverage denominator. No general coverage evaluator, scheduler, pagination client, provider query, API, schema, or persistence activation was added. Runtime completeness enforcement remains open.
+
+
+## 24. Assessment methodology and reproducibility readiness (2026-10-31)
+
+See docs/CIN_STEP23_ASSESSMENT_METHODOLOGY_AND_REPRODUCIBILITY_READINESS_V1.md for the reproducibility envelope, methodology versioning, deterministic calculation requirements, module-specific risks, minimum persisted snapshot contract, and acceptance tests. Existing coin-screening weights are documented, and several functions accept explicit clocks/parameters, but no common methodology registry, immutable input snapshot, pinned execution fingerprint, component-level lineage, or end-to-end replay facility is evidenced. No formulas, defaults, source data, schema, runtime, or persistence activation changed. Exact historical reproducibility remains unimplemented.
+
+
+## 25. Assessment quality assurance and validation readiness (2026-10-31)
+
+See docs/CIN_STEP23_ASSESSMENT_QUALITY_ASSURANCE_AND_VALIDATION_READINESS_V1.md for the test taxonomy, requirement-to-evidence traceability, ground-truth governance, independent review, false-positive/false-negative measurement, temporal/universe controls, module-specific edge cases, reproducibility requirements, and proposed release/rollback gates. Existing offline unit and regression tests cover meaningful input validation and module behavior across coin screening, commodity backing, growth fundamentals, and cross-source comparison. They do not establish a unified benchmark/ground-truth registry, independent validation protocol, shared error-rate reporting, calibrated probabilistic output, or production drift monitoring. No numeric performance thresholds were invented. No runtime code, test suite, scoring formula, provider, schema, API, persistence behavior, or deployment was changed. F-17 readiness design is documented; unified QA and independent validation remain unimplemented. Step 23 remains Partial.
+
+
+## 26. Assessment governance and controlled change readiness (2026-10-31)
+
+See docs/CIN_STEP23_ASSESSMENT_GOVERNANCE_AND_CONTROLLED_CHANGE_READINESS_V1.md for internal methodology ownership, semantic versioning, change classification, independent review, approval evidence, exception handling, historical assessment immutability, suspension/rollback, and implementation acceptance criteria. Existing module formulas/weights, shared evidence vocabularies, and local append-only assessment-event support are partial building blocks only; no shared immutable methodology registry, authenticated reviewer separation, approval workflow, release authorization, or production historical governance is evidenced. No runtime, formula, provider, schema, API, persistence wiring, or deployment changed. F-18 readiness design is documented; enforcement remains unimplemented. Step 23 remains Partial.
+
+
+## 27. Assessment API contracts and consumer-safety readiness (2026-10-31)
+
+See docs/CIN_STEP23_ASSESSMENT_API_CONTRACTS_AND_CONSUMER_SAFETY_READINESS_V1.md for the proposed common response envelope, entity/time/provenance semantics, uncertainty and coverage vocabulary, module-specific requirements, contract tests, dashboard safety and error handling. Existing module APIs have meaningful request validation and read-only/caller-supplied caveats, but output shapes and terminology remain module-specific; a shared versioned response envelope and cross-module conformance suite were not evidenced. Caller-supplied `verified` values are not CIN verification. No response model, route, formula, provider, schema, persistence wiring, dashboard, or deployment was changed. F-19 readiness design is documented; shared contract implementation remains open. Step 23 remains Partial.
+
+
+## 28. Dashboard data integration and assessment presentation architecture (F-20, 2026-10-31)
+
+See docs/CIN_DASHBOARD_DATA_INTEGRATION_AND_ASSESSMENT_PRESENTATION_ARCHITECTURE_V1.md. Repository inventory review found no independently maintained dashboard/frontend/static/template source tree; the implementation tracker also records mobile dashboard UX as not established. F-20 defines mobile-first navigation, API-to-screen mapping, provenance/status semantics, refresh/cache policy, independent panel failure handling, visualization caveats, alert-state presentation, accessibility and acceptance sequence. This is architecture only: no frontend, API integration, route, schema, chart, alert engine, provider, persistence or deployment was changed. Stage 6 Steps 30–33 remain pending until implementation and tests exist.
+
+
+## 29. Dashboard frontend technology readiness (F-21, 2026-10-31)
+
+See docs/CIN_FRONTEND_IMPLEMENTATION_READINESS_AND_TECHNOLOGY_DECISION_V1.md. Selected a separate React + TypeScript + Vite static frontend, with Cloudflare Pages Free as a proposed hosting target and the existing FastAPI API retained as a separate origin. Defined dependency, API client, public configuration, CORS, security, responsive/accessibility, build/test and release gates. Repository deployment evidence shows the current Render manifest starts the FastAPI scaffold; this review found no independently maintained frontend. No frontend code, dependency, CORS, Cloudflare project, DNS, Render setting or deployment was changed. F-21 is design only; actual scaffold implementation remains open.
+
+
+## 30. Frontend foundation delivery boundary (F-22, 2026-10-31)
+
+The first React/TypeScript/Vite app shell is documented in docs/CIN_F22_FRONTEND_FOUNDATION_IMPLEMENTATION_RECORD.md. It is a separate frontend preview with demo-data disclosure, read-only boundary, responsive navigation and a CI workflow for typecheck, tests and build. This is outside the SQLite persistence runtime and does not wire persistence to a browser. No API, CORS, storage, provider or deployment change was made. GitHub Actions results and a committed npm lockfile remain outstanding; the frontend is not production-ready.
+
+
+## 31. Browser API boundary and data-state presentation (F-23, 2026-10-31)
+
+A centralized frontend fetch boundary now supports explicitly configured service health/readiness checks with timeout and normalized failure states. Shared UI state indicators cover freshness, partial results, conflicts, unknowns, unavailability and errors. This browser layer does not invoke the SQLite evidence store and does not enable persistence. Market/screening endpoints remain disconnected until provider semantics align with CIN's Coinbase-first preference. See docs/CIN_F23_API_CLIENT_AND_DATA_STATE_IMPLEMENTATION.md.
