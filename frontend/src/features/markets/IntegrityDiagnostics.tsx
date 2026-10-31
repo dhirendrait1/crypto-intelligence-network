@@ -45,17 +45,6 @@ export function IntegrityDiagnostics({ result }: IntegrityDiagnosticsProps) {
   const closeStateConsistent = closeStateAvailable && candles.every((candle) =>
     candle.is_closed === (candle.close_time <= retrievedAtSeconds)
   );
-  const epochUtcConsistent = candles.every((candle) => {
-    const openUtcMs = Date.parse(candle.open_time_utc);
-    const closeUtcMs = Date.parse(candle.close_time_utc);
-    return Number.isFinite(openUtcMs) && Number.isFinite(closeUtcMs) &&
-      openUtcMs === candle.open_time * 1000 &&
-      closeUtcMs === candle.close_time * 1000;
-  });
-  const retrievalTimeMs = payload ? Date.parse(payload.retrieved_at) : Number.NaN;
-  const closedStateConsistent = Number.isFinite(retrievalTimeMs) && candles.every((candle) =>
-    candle.is_closed === (candle.close_time * 1000 < retrievalTimeMs)
-  );
   const countMatches = payload !== null && payload.count === candles.length;
   const providerAccountingAvailable = payload !== null &&
     Number.isInteger(payload.provider_rows_received) &&
@@ -97,8 +86,6 @@ export function IntegrityDiagnostics({ result }: IntegrityDiagnosticsProps) {
     { label: "Candle timestamps", state: hasCandles ? timestampsValid ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasCandles ? timestampsValid ? "Candle timestamps are parseable." : "One or more candle timestamps are invalid." : "No candle timestamps are available to inspect." },
     { label: "Epoch/UTC timestamp consistency", state: !hasCandles ? "UNAVAILABLE" : epochUtcConsistent ? "PASS" : "WARN", detail: !hasCandles ? "No candle rows are available to compare numeric epochs with UTC strings." : epochUtcConsistent ? "Numeric open/close epochs match their UTC timestamp strings." : "One or more numeric candle epochs do not match their UTC timestamp strings." },
     { label: "Candle close-state consistency", state: !hasCandles || !closeStateAvailable ? "UNAVAILABLE" : closeStateConsistent ? "PASS" : "WARN", detail: !hasCandles ? "No candle rows are available to assess close state." : !closeStateAvailable ? "A valid response retrieval timestamp is unavailable." : closeStateConsistent ? "Each is_closed flag agrees with close_time and response retrieval time." : "One or more is_closed flags conflict with close_time and response retrieval time." },
-    { label: "Epoch / UTC consistency", state: hasCandles ? epochUtcConsistent ? "PASS" : "WARN" : "UNAVAILABLE", detail: !hasCandles ? "No candle rows are available to compare epoch and UTC timestamps." : epochUtcConsistent ? "Numeric epoch values match their UTC timestamp strings." : "One or more numeric epoch values do not match their UTC timestamp strings." },
-    { label: "Closed-state metadata", state: !hasCandles ? "UNAVAILABLE" : !Number.isFinite(retrievalTimeMs) ? "WARN" : closedStateConsistent ? "PASS" : "WARN", detail: !hasCandles ? "No candle rows are available to assess closed-state metadata." : !Number.isFinite(retrievalTimeMs) ? "Retrieval timestamp is invalid; closed-state metadata cannot be checked." : closedStateConsistent ? "Each is_closed flag agrees with close time relative to retrieval time." : "One or more is_closed flags disagree with close time relative to retrieval time." },
     { label: "Interval boundary alignment", state: !hasCandles ? "UNAVAILABLE" : interval === undefined ? "WARN" : intervalAligned ? "PASS" : "WARN", detail: !hasCandles ? "No candle rows are available to assess interval alignment." : interval === undefined ? "The interval is unsupported; boundary alignment cannot be assessed." : intervalAligned ? "Every candle open timestamp aligns to its UTC interval boundary." : "One or more candle open timestamps are not aligned to the UTC interval boundary." },
     { label: "Observed interval continuity", state: !hasCandles ? "UNAVAILABLE" : interval === undefined ? "WARN" : misalignedTransitions > 0 || missingIntervals > 0 ? "WARN" : "PASS", detail: !hasCandles ? "No candle rows are available to assess interval continuity." : interval === undefined ? "The interval is unsupported; continuity cannot be assessed." : misalignedTransitions > 0 ? `${misalignedTransitions} transition(s) do not follow an exact interval multiple; missing-slot count is not inferred for those transitions.` : missingIntervals > 0 ? `${missingIntervals} expected interval(s) missing across ${gapCount} gap(s) between returned candles. Edge coverage is not inferred.` : "No missing intervals detected between the first and last returned candles. Edge coverage is not inferred." },
   ];
