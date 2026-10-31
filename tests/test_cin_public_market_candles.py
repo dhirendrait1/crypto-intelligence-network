@@ -792,7 +792,7 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(pair["largest_price_discrepancies"]), 5)
         self.assertEqual(pair["largest_price_discrepancies"][0]["field"], "open")
         self.assertGreater(pair["price_discrepancy_bps_max"], 10000)
-        self.assertEqual(report["consistency_status"], "volume_units_unverified")
+        self.assertEqual(report["consistency_status"], "discrepancies_or_gaps_detected")
 
     def test_cross_provider_comparison_withholds_volume_delta_without_verified_units(self):
         rows_a = [dict(row) for row in SAMPLE[:3]]
