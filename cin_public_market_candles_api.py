@@ -271,6 +271,8 @@ def compare_provider_candles(
             "last_open_time": max(rows),
         }
 
+    provider_missing_interval_count = sum(item["missing_timestamp_count"] for item in providers.values())
+
     pairwise = []
     names = sorted(normalized)
     for index, left_name in enumerate(names):
@@ -314,6 +316,7 @@ def compare_provider_candles(
         "providers": providers,
         "timeline_gaps": timeline_gaps,
         "timeline_gap_count": len(timeline_gaps),
+        "provider_missing_interval_count": provider_missing_interval_count,
         "pairwise_comparisons": pairwise,
         "price_tolerance_bps": float(price_tolerance_bps),
         "volume_tolerance_bps": float(volume_tolerance_bps),
