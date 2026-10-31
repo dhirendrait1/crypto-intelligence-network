@@ -7,13 +7,19 @@ describe("CIN dashboard shell", () => {
     render(<App />);
     expect(screen.getByText(/Preview interface — demo mode/i)).toBeTruthy();
     expect(screen.getByText("READ ONLY")).toBeTruthy();
-    expect(screen.getByText(/layout fixtures, not live market data/i)).toBeTruthy();
+    expect(screen.getByText(/overview cards are layout fixtures/i)).toBeTruthy();
+  });
+
+  it("keeps Markets out of navigation while its feature gate is disabled", () => {
+    render(<App />);
+    expect(screen.queryByRole("button", { name: /^Markets$/i })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Overview" })).toBeTruthy();
   });
 
   it("navigates to a clearly unimplemented module without fabricating data", () => {
     render(<App />);
-    fireEvent.click(screen.getAllByRole("button", { name: /^Markets$/i })[0]);
-    expect(screen.getByRole("heading", { name: "Markets" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /^Screening$/i }));
+    expect(screen.getByRole("heading", { name: "Screening" })).toBeTruthy();
     expect(screen.getByText(/integration pending/i)).toBeTruthy();
     expect(screen.getByText("NOT IMPLEMENTED")).toBeTruthy();
   });

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { cinApi, type ApiResult } from "../lib/api";
+import { marketsFeatureEnabled } from "../lib/featureFlags";
+import { MarketsScreen } from "../features/markets/MarketsScreen";
 import { DataStatePanel } from "../components/DataState";
 
 const sections = ["Overview", "Markets", "Screening", "Analysis", "Research", "News", "Alerts", "System Health"] as const;
@@ -19,13 +21,15 @@ function App() {
     return () => { mounted = false; };
   }, []);
 
+  const visibleSections = sections.filter((section) => section !== "Markets" || marketsFeatureEnabled);
+
   return (
     <div className="app-shell">
       <aside className="sidebar" aria-label="Primary navigation">
         <div className="brand"><span className="brand-mark">C</span><span><strong>CIN</strong><small>CRYPTO INTELLIGENCE NETWORK</small></span></div>
         <div className="nav-label">WORKSPACE</div>
         <nav>
-          {sections.map((section) => (
+          {visibleSections.map((section) => (
             <button key={section} className={active === section ? "nav-item active" : "nav-item"} onClick={() => setActive(section)} aria-current={active === section ? "page" : undefined}>
               <span className="nav-dot" aria-hidden="true" />{section}
               {["Alerts", "Research", "News"].includes(section) && <span className="planned">PLANNED</span>}
@@ -41,14 +45,13 @@ function App() {
           <div className="topbar-right"><span className="read-only">READ ONLY</span><span className="avatar">C</span></div>
         </header>
 
-        <section className="notice" role="status">
-          <span className="notice-icon">i</span>
-          <div><strong>Preview interface — demo mode</strong><p>These are layout fixtures, not live market data. API integration has not been enabled.</p></div>
-          <span className="demo-tag">DEMO DATA</span>
-        </section>
-
-        {active === "Overview" ? (
+        {active === "Markets" && marketsFeatureEnabled ? <MarketsScreen /> : active === "Overview" ? (
           <>
+            <section className="notice" role="status">
+              <span className="notice-icon">i</span>
+              <div><strong>Preview interface — demo mode</strong><p>These overview cards are layout fixtures, not live market data. Markets requests are separately gated and user-initiated.</p></div>
+              <span className="demo-tag">DEMO DATA</span>
+            </section>
             <div className="section-heading"><div><span className="eyebrow">MARKET SNAPSHOT</span><h2>Market intelligence overview</h2></div><span className="timestamp">Fixture snapshot · no live feed</span></div>
             <div className="metric-grid">
               <article className="metric-card"><span>BTC / USD</span><strong>—</strong><small>Live feed not connected</small></article>
