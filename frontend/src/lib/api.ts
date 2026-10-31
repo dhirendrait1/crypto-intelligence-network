@@ -62,6 +62,7 @@ export function validateCoinbaseCandlesPayload(
   if (!isIsoTimestamp(body.requested_start_utc) || !isIsoTimestamp(body.requested_end_utc)) return { valid: false, message: "Requested candle window must contain valid UTC timestamps." };
   const requestedStart = Date.parse(body.requested_start_utc as string) / 1000;
   const requestedEnd = Date.parse(body.requested_end_utc as string) / 1000;
+  const retrievedAtSeconds = Date.parse(body.retrieved_at as string) / 1000;
   const intervalSeconds: Record<string, number> = { "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "6h": 21600, "1d": 86400 };
   const expectedIntervalSeconds = intervalSeconds[expectedGranularity];
   if (expectedIntervalSeconds === undefined) return { valid: false, message: "Requested candle interval is not supported by the frontend contract." };
@@ -87,6 +88,9 @@ export function validateCoinbaseCandlesPayload(
     }
     if (Date.parse(candle.open_time_utc as string) / 1000 !== openTime || Date.parse(candle.close_time_utc as string) / 1000 !== closeTime) {
       return { valid: false, message: `Candle ${index + 1} UTC timestamps do not match their numeric epoch fields.` };
+    }
+    if (candle.is_closed !== (closeTime <= retrievedAtSeconds)) {
+      return { valid: false, message: `Candle ${index + 1} close-state flag conflicts with its close timestamp and response retrieval time.` };
     }
     previousOpenTime = openTime;
   }
