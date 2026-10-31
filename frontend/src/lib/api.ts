@@ -57,6 +57,10 @@ export function validateCoinbaseCandlesPayload(
   if (typeof body.source !== "string" || !body.source.trim() || !isIsoTimestamp(body.retrieved_at)) return { valid: false, message: "Source provenance or retrieval timestamp is missing." };
   if (!Array.isArray(body.data) || !Number.isInteger(body.count) || body.count !== body.data.length) return { valid: false, message: "Candle count does not match the returned data collection." };
   if (typeof body.stale_data_warning !== "string" && body.stale_data_warning !== null) return { valid: false, message: "Staleness metadata has an unsupported shape." };
+  if (!isIsoTimestamp(body.requested_start_utc) || !isIsoTimestamp(body.requested_end_utc)) return { valid: false, message: "Requested candle window must contain valid UTC timestamps." };
+  const requestedStart = Date.parse(body.requested_start_utc as string) / 1000;
+  const requestedEnd = Date.parse(body.requested_end_utc as string) / 1000;
+  if (requestedStart > requestedEnd) return { valid: false, message: "Requested candle window starts after it ends." };
   let previousOpenTime = -Infinity;
   for (const [index, item] of body.data.entries()) {
     if (!item || typeof item !== "object" || Array.isArray(item)) return { valid: false, message: `Candle ${index + 1} is not an object.` };
@@ -64,6 +68,7 @@ export function validateCoinbaseCandlesPayload(
     const numeric = ["open_time", "close_time", "open", "high", "low", "close", "volume"] as const;
     if (numeric.some((key) => typeof candle[key] !== "number" || !Number.isFinite(candle[key]))) return { valid: false, message: `Candle ${index + 1} contains a non-finite numeric field.` };
     const openTime = candle.open_time as number, closeTime = candle.close_time as number;
+    if (openTime < requestedStart || openTime > requestedEnd) return { valid: false, message: `Candle ${index + 1} open timestamp falls outside the requested UTC window.` };
     const open = candle.open as number, high = candle.high as number, low = candle.low as number, close = candle.close as number, volume = candle.volume as number;
     if (closeTime < openTime || openTime <= previousOpenTime || volume < 0 || low > high || low > open || open > high || low > close || close > high) {
       return { valid: false, message: `Candle ${index + 1} failed OHLC, volume, or chronological validation. Candle open timestamps must be strictly increasing with no duplicates.` };

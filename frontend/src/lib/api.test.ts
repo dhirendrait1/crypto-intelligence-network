@@ -49,4 +49,17 @@ describe("Coinbase candle response contract", () => {
     expect(result.valid).toBe(false);
     expect(result.message).toContain("UTC timestamps do not match");
   });
+
+  it("rejects candles outside the declared request window", () => {
+    const result = validateCoinbaseCandlesPayload(validPayload([candle(180)]), "BTC-USD", "1m");
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain("outside the requested UTC window");
+  });
+
+  it("rejects an inverted requested UTC window", () => {
+    const payload = { ...validPayload([candle(60)]), requested_start_utc: new Date(120_000).toISOString(), requested_end_utc: new Date(0).toISOString() };
+    const result = validateCoinbaseCandlesPayload(payload, "BTC-USD", "1m");
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain("starts after it ends");
+  });
 });
