@@ -10,12 +10,12 @@ from fastapi import APIRouter, HTTPException, Query
 try:
     from cin_coinbase_public_market_data import (
         GRANULARITIES,
-        fetch_candles,
+        fetch_candles_with_diagnostics,
     )
 except ModuleNotFoundError as exc:
     if exc.name != "cin_coinbase_public_market_data":
         raise
-    from app.cin_coinbase_public_market_data import GRANULARITIES, fetch_candles
+    from app.cin_coinbase_public_market_data import GRANULARITIES, fetch_candles_with_diagnostics
 
 router = APIRouter(tags=["coinbase-public-market-data"])
 
@@ -35,7 +35,7 @@ async def get_coinbase_market_candles(
     if granularity not in GRANULARITIES:
         raise HTTPException(status_code=400, detail="Unsupported Coinbase candle granularity.")
     try:
-        rows = await asyncio.to_thread(fetch_candles, product_id, granularity, start, end)
+        rows, provider_diagnostics = await asyncio.to_thread(fetch_candles_with_diagnostics, product_id, granularity, start, end)
     except ValueError as exc:
         # Validation messages are controlled by the local adapter, not provider payloads.
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -62,6 +62,8 @@ async def get_coinbase_market_candles(
         "requested_end_utc": _utc(end),
         "retrieved_at": retrieved_at.isoformat(),
         "count": len(rows),
+        **provider_diagnostics,
+        "provider_window_coverage": "not_established",
         "latest_closed_candle_close_time_utc": (
             datetime.fromtimestamp(latest_closed["close_time"] / 1000, timezone.utc).isoformat()
             if latest_closed else None
@@ -85,6 +87,7 @@ async def get_coinbase_market_candles(
             "Public exchange-provided data; not independently audited by CIN.",
             "Only explicitly USD-quoted Coinbase products are accepted; quote currencies are not converted.",
             "The latest candle may still be forming.",
+            "Provider row accounting describes the returned payload only; requested-window coverage is not established by this endpoint.",
             "No account endpoints, credentials, orders, wallets, or trade execution are used.",
         ],
     }

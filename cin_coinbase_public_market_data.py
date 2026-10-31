@@ -67,22 +67,28 @@ def _finite_positive(value: Any) -> float | None:
     return number if math.isfinite(number) and number > 0 else None
 
 
-def _normalize_rows(payload: Any, granularity: str) -> list[dict[str, Any]]:
+def _normalize_rows_with_diagnostics(payload: Any, granularity: str) -> tuple[list[dict[str, Any]], dict[str, int]]:
     if not isinstance(payload, list):
         raise ValueError("Coinbase candles response was not a list.")
     if len(payload) > MAX_CANDLES_PER_REQUEST:
         raise ValueError("Coinbase returned more than 300 candles.")
     duration_ms = GRANULARITIES[granularity] * 1000
     by_timestamp: dict[int, dict[str, Any]] = {}
+    invalid_rows = 0
+    duplicate_rows = 0
+    valid_rows = 0
     for row in payload:
         if not isinstance(row, list) or len(row) != 6:
+            invalid_rows += 1
             continue
         timestamp = row[0]
         if isinstance(timestamp, bool):
+            invalid_rows += 1
             continue
         try:
             timestamp_float = float(timestamp)
             if not math.isfinite(timestamp_float) or not timestamp_float.is_integer():
+                invalid_rows += 1
                 continue
             timestamp_seconds = int(timestamp_float)
             # Coinbase row order is [time, low, high, open, close, volume].
@@ -92,17 +98,20 @@ def _normalize_rows(payload: Any, granularity: str) -> list[dict[str, Any]]:
             close = _finite_positive(row[4])
             volume = float(row[5]) if not isinstance(row[5], bool) else math.nan
         except (TypeError, ValueError, OverflowError):
+            invalid_rows += 1
             continue
         if (
-            min(timestamp_seconds, 0) < 0
+            timestamp_seconds < 0
             or any(value is None for value in (low, high, open_price, close))
             or not math.isfinite(volume) or volume < 0
             or high < max(open_price, close, low)
             or low > min(open_price, close)
         ):
+            invalid_rows += 1
             continue
+        valid_rows += 1
         open_ms = timestamp_seconds * 1000
-        by_timestamp[timestamp_seconds] = {
+        normalized_row = {
             "open_time": open_ms,
             "close_time": open_ms + duration_ms - 1,
             "open": open_price,
@@ -111,18 +120,33 @@ def _normalize_rows(payload: Any, granularity: str) -> list[dict[str, Any]]:
             "close": close,
             "volume": volume,
         }
+        if timestamp_seconds in by_timestamp:
+            duplicate_rows += 1
+            if by_timestamp[timestamp_seconds] != normalized_row:
+                raise ValueError(
+                    "Coinbase returned conflicting candle rows for the same timestamp."
+                )
+            continue
+        by_timestamp[timestamp_seconds] = normalized_row
     rows = [by_timestamp[key] for key in sorted(by_timestamp)]
     if not rows:
         raise ValueError("Coinbase returned no valid candles.")
+    diagnostics = {
+        "provider_rows_received": len(payload),
+        "provider_rows_invalid": invalid_rows,
+        "provider_rows_duplicate": duplicate_rows,
+        "provider_rows_valid_before_deduplication": valid_rows,
+        "normalized_rows_count": len(rows),
+    }
+    return rows, diagnostics
+
+
+def _normalize_rows(payload: Any, granularity: str) -> list[dict[str, Any]]:
+    rows, _ = _normalize_rows_with_diagnostics(payload, granularity)
     return rows
 
 
-def fetch_candles(product_id: str, granularity: str, start: int, end: int) -> list[dict[str, Any]]:
-    """Fetch one bounded UTC candle window from Coinbase Exchange public API.
-
-    Product IDs are passed as explicit USD-quoted identifiers. Quote currencies
-    are never silently converted (for example, BTC-USDT is not BTC-USD).
-    """
+def fetch_candles_with_diagnostics(product_id: str, granularity: str, start: int, end: int) -> tuple[list[dict[str, Any]], dict[str, int]]:
     _validate_request(product_id, granularity, start, end)
     query = urllib.parse.urlencode({
         "granularity": GRANULARITIES[granularity],
@@ -131,4 +155,14 @@ def fetch_candles(product_id: str, granularity: str, start: int, end: int) -> li
     })
     encoded_product = urllib.parse.quote(product_id, safe="")
     url = f"{BASE_URL}{CANDLES_PATH.format(product_id=encoded_product)}?{query}"
-    return _normalize_rows(_request_json(url), granularity)
+    return _normalize_rows_with_diagnostics(_request_json(url), granularity)
+
+
+def fetch_candles(product_id: str, granularity: str, start: int, end: int) -> list[dict[str, Any]]:
+    """Fetch one bounded UTC candle window from Coinbase Exchange public API.
+
+    Product IDs are passed as explicit USD-quoted identifiers. Quote currencies
+    are never silently converted (for example, BTC-USDT is not BTC-USD).
+    """
+    rows, _ = fetch_candles_with_diagnostics(product_id, granularity, start, end)
+    return rows

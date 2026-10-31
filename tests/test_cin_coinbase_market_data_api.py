@@ -8,14 +8,14 @@ import cin_coinbase_market_data_api as api
 
 
 class CoinbaseMarketDataApiTests(unittest.IsolatedAsyncioTestCase):
-    @patch.object(api, "fetch_candles")
+    @patch.object(api, "fetch_candles_with_diagnostics")
     async def test_returns_explicit_source_product_and_timestamp_provenance(self, fetch):
-        fetch.return_value = [{
+        fetch.return_value = ([{
             "open_time": 1700000000000,
             "close_time": 1700003599999,
             "open": 100.0, "high": 103.0, "low": 99.0,
             "close": 102.0, "volume": 12.5,
-        }]
+        }], {"provider_rows_received": 1, "provider_rows_invalid": 0, "provider_rows_duplicate": 0, "provider_rows_valid_before_deduplication": 1, "normalized_rows_count": 1})
         body = await api.get_coinbase_market_candles(
             product_id="BTC-USD", granularity="1h",
             start=1700000000, end=1700003600,
@@ -25,6 +25,9 @@ class CoinbaseMarketDataApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(body["product_id"], "BTC-USD")
         self.assertEqual(body["quote_currency"], "USD")
         self.assertEqual(body["count"], 1)
+        self.assertEqual(body["provider_rows_received"], 1)
+        self.assertEqual(body["provider_rows_invalid"], 0)
+        self.assertEqual(body["provider_window_coverage"], "not_established")
         self.assertIn("retrieved_at", body)
         self.assertIn("open_time_utc", body["data"][0])
         self.assertIn("close_time_utc", body["data"][0])
@@ -39,7 +42,7 @@ class CoinbaseMarketDataApiTests(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(caught.exception.status_code, 400)
 
-    @patch.object(api, "fetch_candles", side_effect=ValueError("Coinbase product must be USD quoted"))
+    @patch.object(api, "fetch_candles_with_diagnostics", side_effect=ValueError("Coinbase product must be USD quoted"))
     async def test_returns_controlled_validation_error(self, fetch):
         with self.assertRaises(HTTPException) as caught:
             await api.get_coinbase_market_candles(
@@ -49,7 +52,7 @@ class CoinbaseMarketDataApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(caught.exception.status_code, 400)
         self.assertIn("USD quoted", caught.exception.detail)
 
-    @patch.object(api, "fetch_candles", side_effect=RuntimeError("sensitive provider response detail"))
+    @patch.object(api, "fetch_candles_with_diagnostics", side_effect=RuntimeError("sensitive provider response detail"))
     async def test_provider_failure_does_not_leak_provider_exception(self, fetch):
         with self.assertRaises(HTTPException) as caught:
             await api.get_coinbase_market_candles(
