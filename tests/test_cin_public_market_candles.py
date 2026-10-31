@@ -1056,6 +1056,38 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(report["market_identity"]["verified_across_inputs"])
         self.assertEqual(report["market_identity"]["quote_asset"], "USD")
 
+    def test_cross_provider_market_identity_normalizes_case_and_surrounding_whitespace(self):
+        report = api.compare_provider_candles(
+            {"Binance": [dict(SAMPLE[0])], "Kraken": [dict(SAMPLE[0])]}, "1h",
+            market_identity_by_provider={
+                "Binance": {"base_asset": " btc ", "quote_asset": "usd"},
+                "Kraken": {"base_asset": "BTC", "quote_asset": " USD "},
+            },
+        )
+        self.assertTrue(report["market_identity"]["verified_across_inputs"])
+        self.assertEqual(report["market_identity"]["base_asset"], "BTC")
+        self.assertEqual(report["market_identity"]["quote_asset"], "USD")
+
+    def test_cross_provider_market_identity_does_not_infer_exchange_alias_equivalence(self):
+        with self.assertRaisesRegex(ValueError, "base/quote assets differ"):
+            api.compare_provider_candles(
+                {"Binance": [dict(SAMPLE[0])], "Kraken": [dict(SAMPLE[0])]}, "1h",
+                market_identity_by_provider={
+                    "Binance": {"base_asset": "BTC", "quote_asset": "USD"},
+                    "Kraken": {"base_asset": "XBT", "quote_asset": "USD"},
+                },
+            )
+
+    def test_cross_provider_market_identity_rejects_empty_tokens_after_normalization(self):
+        with self.assertRaisesRegex(ValueError, "valid base_asset and quote_asset"):
+            api.compare_provider_candles(
+                {"Binance": [dict(SAMPLE[0])], "Kraken": [dict(SAMPLE[0])]}, "1h",
+                market_identity_by_provider={
+                    "Binance": {"base_asset": "   ", "quote_asset": "USD"},
+                    "Kraken": {"base_asset": "BTC", "quote_asset": "USD"},
+                },
+            )
+
     def test_cross_provider_comparison_requires_identity_for_each_provider(self):
         with self.assertRaisesRegex(ValueError, "match the compared provider names"):
             api.compare_provider_candles(
