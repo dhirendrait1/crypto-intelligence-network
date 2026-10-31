@@ -305,6 +305,35 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(report["provider_missing_interval_count"], 1)
         self.assertEqual(report["consistency_status"], "discrepancies_or_gaps_detected")
 
+
+    def test_cross_provider_comparison_counts_calendar_month_gaps_exactly(self):
+        def month_open(year, month):
+            return int(api.datetime(year, month, 1, tzinfo=api.timezone.utc).timestamp() * 1000)
+        def candle(year, month):
+            start = month_open(year, month)
+            end = start + api._interval_duration_ms("1M", start) - 1
+            return {"open_time": start, "close_time": end, "open": 100.0,
+                    "high": 102.0, "low": 99.0, "close": 101.0, "volume": 10.0}
+        rows = [candle(2025, 1), candle(2025, 4), candle(2025, 10)]
+        report = api.compare_provider_candles({"Binance": rows, "Kraken": [dict(row) for row in rows]}, "1M")
+        self.assertEqual(report["timeline_gap_count"], 2)
+        self.assertEqual([gap["missing_intervals"] for gap in report["timeline_gaps"]], [2, 5])
+
+    def test_cross_provider_comparison_rejects_off_grid_month_boundary(self):
+        def month_open(year, month):
+            return int(api.datetime(year, month, 1, tzinfo=api.timezone.utc).timestamp() * 1000)
+        january = month_open(2025, 1)
+        off_grid = january + 45 * 86_400_000
+        def candle(start):
+            end = start + api._interval_duration_ms("1M", start) - 1
+            return {"open_time": start, "close_time": end, "open": 100.0,
+                    "high": 102.0, "low": 99.0, "close": 101.0, "volume": 10.0}
+        with self.assertRaisesRegex(ValueError, "do not align"):
+            api.compare_provider_candles(
+                {"Binance": [candle(january), candle(off_grid)],
+                 "Kraken": [candle(january), candle(off_grid)]}, "1M"
+            )
+
     def test_cross_provider_comparison_rejects_duplicate_or_invalid_rows(self):
         duplicate = [dict(SAMPLE[0]), dict(SAMPLE[0])]
         with self.assertRaisesRegex(ValueError, "duplicate candle timestamps"):

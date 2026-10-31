@@ -338,15 +338,20 @@ def compare_provider_candles(
         normalized[provider] = by_time
 
     all_times = sorted({stamp for rows in normalized.values() for stamp in rows})
-    expected_ms = _INTERVAL_MS[interval]
     timeline_gaps = []
     for previous, current in zip(all_times, all_times[1:]):
         expected_next = previous + _interval_duration_ms(interval, previous)
         if current > expected_next:
+            cursor, missing = expected_next, 0
+            while cursor < current:
+                missing += 1
+                cursor += _interval_duration_ms(interval, cursor)
+            if cursor != current:
+                raise ValueError("Provider comparison timestamps do not align to the requested interval")
             timeline_gaps.append({
                 "after_open_time": previous,
                 "before_open_time": current,
-                "missing_intervals": max(1, round((current - expected_next) / expected_ms)),
+                "missing_intervals": missing,
             })
 
     providers = {}
