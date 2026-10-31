@@ -268,6 +268,60 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(ValueError, "Coinbase returned no valid candles"):
                 api._fetch_coinbase("BTCUSD", "1h", 5)
 
+    def test_cross_provider_comparison_reports_consistent_aligned_candles(self):
+        left = [dict(row) for row in SAMPLE[:5]]
+        right = [dict(row) for row in SAMPLE[:5]]
+        report = api.compare_provider_candles({"Binance": left, "Kraken": right}, "1h")
+        self.assertEqual(report["consistency_status"], "consistent_within_configured_tolerances")
+        self.assertEqual(report["pairwise_comparisons"][0]["shared_candle_count"], 5)
+        self.assertEqual(report["timeline_gap_count"], 0)
+
+    def test_cross_provider_comparison_flags_price_and_volume_discrepancies(self):
+        left = [dict(row) for row in SAMPLE[:5]]
+        right = [dict(row) for row in SAMPLE[:5]]
+        right[2]["close"] *= 1.10
+        right[2]["high"] *= 1.10
+        right[2]["volume"] *= 3
+        report = api.compare_provider_candles(
+            {"Binance": left, "Kraken": right}, "1h",
+            price_tolerance_bps=25, volume_tolerance_bps=100,
+        )
+        comparison = report["pairwise_comparisons"][0]
+        self.assertFalse(comparison["price_within_tolerance"])
+        self.assertFalse(comparison["volume_within_tolerance"])
+        self.assertEqual(report["consistency_status"], "discrepancies_or_gaps_detected")
+
+    def test_cross_provider_comparison_reports_missing_timestamps_and_gaps(self):
+        left = [dict(row) for row in SAMPLE[:5]]
+        right = [dict(row) for row in SAMPLE[:5] if row["open_time"] != SAMPLE[2]["open_time"]]
+        right.append({
+            "open_time": SAMPLE[5]["open_time"], "open": 105.0, "high": 107.0,
+            "low": 104.0, "close": 106.0, "volume": 10.0,
+            "close_time": SAMPLE[5]["close_time"],
+        })
+        report = api.compare_provider_candles({"Binance": left, "Kraken": right}, "1h")
+        self.assertEqual(report["providers"]["Kraken"]["missing_timestamp_count"], 1)
+        self.assertEqual(report["timeline_gap_count"], 0)
+        self.assertEqual(report["provider_missing_interval_count"], 1)
+        self.assertEqual(report["consistency_status"], "discrepancies_or_gaps_detected")
+
+    def test_cross_provider_comparison_rejects_duplicate_or_invalid_rows(self):
+        duplicate = [dict(SAMPLE[0]), dict(SAMPLE[0])]
+        with self.assertRaisesRegex(ValueError, "duplicate candle timestamps"):
+            api.compare_provider_candles({"A": duplicate, "B": [dict(SAMPLE[0])]}, "1h")
+        invalid = [dict(SAMPLE[0])]
+        invalid[0]["high"] = 1
+        with self.assertRaisesRegex(ValueError, "invalid candle"):
+            api.compare_provider_candles({"A": invalid, "B": [dict(SAMPLE[0])]}, "1h")
+
+    def test_cross_provider_comparison_requires_two_providers_and_valid_tolerances(self):
+        with self.assertRaisesRegex(ValueError, "At least two"):
+            api.compare_provider_candles({"A": [dict(SAMPLE[0])]}, "1h")
+        with self.assertRaisesRegex(ValueError, "Price tolerance"):
+            api.compare_provider_candles(
+                {"A": [dict(SAMPLE[0])], "B": [dict(SAMPLE[0])]}, "1h", price_tolerance_bps=float("nan")
+            )
+
     async def test_451_and_fallback_failure_returns_clear_503(self):
         with patch.object(api, "_fetch_binance", side_effect=urllib.error.HTTPError(
             api.BINANCE_KLINES_URL, 451, "unavailable for legal reasons", {}, None

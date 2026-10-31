@@ -210,6 +210,133 @@ def _normalize_candle_sequence(rows: list[dict[str, Any]]) -> list[dict[str, Any
     return ordered
 
 
+def compare_provider_candles(
+    provider_candles: dict[str, list[dict[str, Any]]],
+    interval: str,
+    price_tolerance_bps: float = 50.0,
+    volume_tolerance_bps: float = 500.0,
+) -> dict[str, Any]:
+    """Compare same-market provider snapshots without fetching data or choosing a winner.
+
+    Inputs must already represent the same symbol and quote asset. The report
+    uses exact candle-open timestamp alignment and symmetric basis-point deltas.
+    """
+    if interval not in TIMEFRAMES:
+        raise ValueError("Unsupported comparison interval")
+    if not isinstance(provider_candles, dict) or len(provider_candles) < 2:
+        raise ValueError("At least two named providers are required")
+    try:
+        price_tolerance_bps = float(price_tolerance_bps)
+        volume_tolerance_bps = float(volume_tolerance_bps)
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError("Tolerances must be finite non-negative numbers") from None
+    if not math.isfinite(price_tolerance_bps) or price_tolerance_bps < 0:
+        raise ValueError("Price tolerance must be a finite non-negative number")
+    if not math.isfinite(volume_tolerance_bps) or volume_tolerance_bps < 0:
+        raise ValueError("Volume tolerance must be a finite non-negative number")
+
+    normalized: dict[str, dict[int, dict[str, Any]]] = {}
+    for provider, rows in provider_candles.items():
+        if not isinstance(provider, str) or not provider.strip():
+            raise ValueError("Provider names must be non-empty strings")
+        if not isinstance(rows, list) or not rows:
+            raise ValueError(f"{provider} must supply a non-empty candle list")
+        by_time: dict[int, dict[str, Any]] = {}
+        for row in rows:
+            if not isinstance(row, dict) or not _is_valid_candle(row):
+                raise ValueError(f"{provider} supplied an invalid candle")
+            timestamp = row["open_time"]
+            if isinstance(timestamp, bool) or not isinstance(timestamp, int):
+                raise ValueError(f"{provider} supplied a non-integer candle timestamp")
+            if timestamp in by_time:
+                raise ValueError(f"{provider} supplied duplicate candle timestamps")
+            by_time[timestamp] = row
+        normalized[provider] = by_time
+
+    all_times = sorted({stamp for rows in normalized.values() for stamp in rows})
+    expected_ms = _INTERVAL_MS[interval]
+    timeline_gaps = []
+    for previous, current in zip(all_times, all_times[1:]):
+        expected_next = previous + _interval_duration_ms(interval, previous)
+        if current > expected_next:
+            timeline_gaps.append({
+                "after_open_time": previous,
+                "before_open_time": current,
+                "missing_intervals": max(1, round((current - expected_next) / expected_ms)),
+            })
+
+    providers = {}
+    for name, rows in normalized.items():
+        missing = [stamp for stamp in all_times if stamp not in rows]
+        providers[name] = {
+            "candle_count": len(rows),
+            "missing_timestamps": missing,
+            "missing_timestamp_count": len(missing),
+            "first_open_time": min(rows),
+            "last_open_time": max(rows),
+        }
+
+    provider_missing_interval_count = sum(item["missing_timestamp_count"] for item in providers.values())
+
+    pairwise = []
+    names = sorted(normalized)
+    for index, left_name in enumerate(names):
+        for right_name in names[index + 1:]:
+            left, right = normalized[left_name], normalized[right_name]
+            shared = sorted(set(left) & set(right))
+            price_deltas = []
+            volume_deltas = []
+            for stamp in shared:
+                a, b = left[stamp], right[stamp]
+                for field in ("open", "high", "low", "close"):
+                    midpoint = (float(a[field]) + float(b[field])) / 2
+                    delta = abs(float(a[field]) - float(b[field])) / midpoint * 10_000
+                    price_deltas.append(delta)
+                volume_midpoint = (float(a["volume"]) + float(b["volume"])) / 2
+                if volume_midpoint > 0:
+                    volume_deltas.append(abs(float(a["volume"]) - float(b["volume"])) / volume_midpoint * 10_000)
+                elif float(a["volume"]) != float(b["volume"]):
+                    volume_deltas.append(float("inf"))
+                else:
+                    volume_deltas.append(0.0)
+            max_price = max(price_deltas, default=None)
+            max_volume = max(volume_deltas, default=None)
+            pairwise.append({
+                "providers": [left_name, right_name],
+                "shared_candle_count": len(shared),
+                "price_discrepancy_bps_max": round(max_price, 4) if max_price is not None and math.isfinite(max_price) else max_price,
+                "volume_discrepancy_bps_max": round(max_volume, 4) if max_volume is not None and math.isfinite(max_volume) else max_volume,
+                "price_within_tolerance": max_price is not None and max_price <= price_tolerance_bps,
+                "volume_within_tolerance": max_volume is not None and max_volume <= volume_tolerance_bps,
+            })
+
+    has_alignment = all(item["shared_candle_count"] > 0 for item in pairwise)
+    within_tolerance = has_alignment and all(
+        item["price_within_tolerance"] and item["volume_within_tolerance"] for item in pairwise
+    )
+    return {
+        "mode": "read_only",
+        "interval": interval,
+        "provider_count": len(normalized),
+        "providers": providers,
+        "timeline_gaps": timeline_gaps,
+        "timeline_gap_count": len(timeline_gaps),
+        "provider_missing_interval_count": provider_missing_interval_count,
+        "pairwise_comparisons": pairwise,
+        "price_tolerance_bps": float(price_tolerance_bps),
+        "volume_tolerance_bps": float(volume_tolerance_bps),
+        "consistency_status": "consistent_within_configured_tolerances" if within_tolerance and not timeline_gaps and provider_missing_interval_count == 0 else (
+            "insufficient_timestamp_overlap" if not has_alignment else "discrepancies_or_gaps_detected"
+        ),
+        "limitations": [
+            "Inputs must represent the same symbol and quote asset; this helper does not verify market identity.",
+            "Provider snapshots are compared at exact candle-open timestamps; differing candle boundaries are not interpolated.",
+            "A tolerance result is a diagnostic, not proof that either provider is correct or independently audited.",
+            "Monthly interval gap estimation uses a fixed-duration approximation for the missing-interval count.",
+        ],
+    }
+
+
 
 COINBASE_CANDLES_URL = "https://api.exchange.coinbase.com/products/{product_id}/candles"
 COINBASE_GRANULARITY = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "6h": 21600, "1d": 86400}
