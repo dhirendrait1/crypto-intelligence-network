@@ -93,6 +93,29 @@ def _timeline_integrity_metadata(rows: list[dict[str, Any]], interval: str) -> d
     }
 
 
+def _coverage_metadata(rows: list[dict[str, Any]], requested_limit: int) -> dict[str, Any]:
+    """Report returned row count against the requested limit, not continuity."""
+    returned_count = len(rows)
+    first_open = rows[0]["open_time"] if rows else None
+    last_open = rows[-1]["open_time"] if rows else None
+    shortfall = max(0, requested_limit - returned_count)
+    return {
+        "requested_candle_limit": requested_limit,
+        "returned_candle_count": returned_count,
+        "candle_count_shortfall": shortfall,
+        "coverage_status": "complete" if shortfall == 0 else "partial",
+        "first_returned_candle_open_time_utc": (
+            datetime.fromtimestamp(first_open / 1000, timezone.utc).isoformat()
+            if first_open is not None else None
+        ),
+        "last_returned_candle_open_time_utc": (
+            datetime.fromtimestamp(last_open / 1000, timezone.utc).isoformat()
+            if last_open is not None else None
+        ),
+        "coverage_scope": "returned_row_count_against_requested_limit; continuity_is_reported_separately",
+    }
+
+
 def _freshness_metadata(rows: list[dict[str, Any]], interval: str, now_ms: int) -> dict[str, Any]:
     """Report completed-candle freshness and reject candles opening in the future."""
     if any(row["open_time"] > now_ms for row in rows):
@@ -622,6 +645,7 @@ async def get_market_candles(
         "service": "cin", "mode": "read_only", "source": source, "source_endpoint": endpoint,
         "retrieved_at": datetime.now(timezone.utc).isoformat(), "symbol": normalized,
         "timeframe": interval, "count": len(rows),
+        "coverage": _coverage_metadata(rows, limit),
         **freshness,
         "timeline_integrity": timeline_integrity,
         "data": [
@@ -669,7 +693,10 @@ async def analyze_public_market(
     analysis["input"].update({
         "symbol": normalized, "timeframe": interval, "source": source, "source_endpoint": endpoint,
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
-        "requested_candle_count": len(rows),
+        "requested_candle_count": limit,
+        "returned_candle_count": len(rows),
+        "candle_count_shortfall": max(0, limit - len(rows)),
+        "coverage_status": "complete" if len(rows) >= limit else "partial",
         "analysis_candle_count": len(closed_rows),
         "forming_candle_excluded_count": len(rows) - len(closed_rows),
         "candle_closure_policy": "technical analysis uses only candles whose close_time is earlier than retrieval time",

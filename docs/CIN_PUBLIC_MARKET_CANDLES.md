@@ -10,6 +10,7 @@ These read-only endpoints use public exchange market-data endpoints. Provider se
 - `interval`: supported Binance kline interval (for example `15m`, `1h`, `4h`, `1d`)
 - `limit`: 5–500 candles
 - Response includes OHLCV, open/close timestamps in milliseconds and UTC ISO format, source, retrieval time, and limitations.
+- `coverage` compares the number of returned rows with the requested limit and reports `complete` or `partial`, the shortfall, and first/last returned candle opens. `complete` means the requested row count was met; it does not mean the timeline has no gaps. Check `timeline_integrity` separately. Providers may return fewer rows because of listing history, provider retention, or invalid source rows; CIN reports the shortfall rather than padding or synthesizing candles.
 
 ## 2. Run technical analysis from public candles
 

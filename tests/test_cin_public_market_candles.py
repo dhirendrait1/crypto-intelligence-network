@@ -124,6 +124,35 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("close_time_utc", result["data"][0])
         self.assertIn("retrieved_at", result)
 
+
+    def test_coverage_metadata_reports_partial_returned_row_count(self):
+        rows = [dict(row) for row in SAMPLE[:3]]
+        result = api._coverage_metadata(rows, 5)
+        self.assertEqual(result["requested_candle_limit"], 5)
+        self.assertEqual(result["returned_candle_count"], 3)
+        self.assertEqual(result["candle_count_shortfall"], 2)
+        self.assertEqual(result["coverage_status"], "partial")
+        self.assertEqual(
+            result["coverage_scope"],
+            "returned_row_count_against_requested_limit; continuity_is_reported_separately"
+        )
+
+    def test_coverage_metadata_reports_complete_count_without_claiming_continuity(self):
+        rows = [dict(row) for row in SAMPLE[:5]]
+        result = api._coverage_metadata(rows, 5)
+        self.assertEqual(result["coverage_status"], "complete")
+        self.assertEqual(result["candle_count_shortfall"], 0)
+        self.assertIn("continuity_is_reported_separately", result["coverage_scope"])
+
+    async def test_market_candles_reports_partial_provider_response_coverage(self):
+        rows = [dict(row) for row in SAMPLE[:3]]
+        with patch.object(api, "_load", return_value=rows):
+            result = await api.get_market_candles("BTCUSDT", "1h", 5)
+        self.assertEqual(result["coverage"]["requested_candle_limit"], 5)
+        self.assertEqual(result["coverage"]["returned_candle_count"], 3)
+        self.assertEqual(result["coverage"]["candle_count_shortfall"], 2)
+        self.assertEqual(result["coverage"]["coverage_status"], "partial")
+
     async def test_market_analysis_uses_source_candles_and_labels_limitations(self):
         with patch.object(api, "_load", return_value=SAMPLE):
             result = await api.analyze_public_market("BTCUSDT", "1h", 50)
