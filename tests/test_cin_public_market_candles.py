@@ -772,6 +772,28 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(comparison["volume_within_tolerance"])
         self.assertEqual(report["consistency_status"], "discrepancies_or_gaps_detected")
 
+    def test_cross_provider_comparison_reports_price_scale_ratio_and_largest_outliers(self):
+        left = [dict(row) for row in SAMPLE[:3]]
+        right = [dict(row) for row in SAMPLE[:3]]
+        for row in right:
+            for field in ("open", "high", "low", "close"):
+                row[field] *= 10
+        report = api.compare_provider_candles(
+            {"Binance": left, "Kraken": right}, "1h",
+            market_identity_by_provider={
+                "Binance": {"base_asset": "BTC", "quote_asset": "USD"},
+                "Kraken": {"base_asset": "BTC", "quote_asset": "USD"},
+            },
+        )
+        pair = report["pairwise_comparisons"][0]
+        self.assertAlmostEqual(pair["price_ratio_summary"]["left_to_right_median"], 0.1)
+        self.assertAlmostEqual(pair["price_ratio_summary"]["left_to_right_min"], 0.1)
+        self.assertAlmostEqual(pair["price_ratio_summary"]["left_to_right_max"], 0.1)
+        self.assertEqual(len(pair["largest_price_discrepancies"]), 5)
+        self.assertEqual(pair["largest_price_discrepancies"][0]["field"], "open")
+        self.assertGreater(pair["price_discrepancy_bps_max"], 10000)
+        self.assertEqual(report["consistency_status"], "discrepancies_or_gaps_detected")
+
     def test_cross_provider_comparison_withholds_volume_delta_without_verified_units(self):
         rows_a = [dict(row) for row in SAMPLE[:3]]
         rows_b = [dict(row) for row in SAMPLE[:3]]
