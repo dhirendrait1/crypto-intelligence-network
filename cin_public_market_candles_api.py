@@ -558,6 +558,8 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     wsname = pair_info.get("wsname")
     raw_base = pair_info.get("base")
     raw_quote = pair_info.get("quote")
+    asset_class_base = pair_info.get("aclass_base")
+    asset_class_quote = pair_info.get("aclass_quote")
     expected_wsname = f"{base}/{quote}"
     if (
         not isinstance(altname, str)
@@ -568,8 +570,10 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
         or not raw_base
         or not isinstance(raw_quote, str)
         or not raw_quote
+        or asset_class_base != "currency"
+        or asset_class_quote != "currency"
     ):
-        raise _MalformedProviderResponse("Kraken AssetPairs base/quote identity did not match the requested market")
+        raise _MalformedProviderResponse("Kraken AssetPairs base/quote identity or spot asset class did not match the requested market")
     # AssetPairs uses internal IDs such as XXBT and ZUSD. Translate only the
     # explicitly reviewed aliases above, then independently verify the pair key.
     canonical_base = KRAKEN_ASSET_CODE_ALIASES.get(raw_base, raw_base)
