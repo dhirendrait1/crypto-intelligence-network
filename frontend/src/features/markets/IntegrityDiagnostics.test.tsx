@@ -96,6 +96,18 @@ describe("Integrity diagnostics", () => {
     expect(screen.getAllByText("WARN").length).toBeGreaterThan(0);
   });
 
+  it("warns when returned candles repeat an open timestamp", () => {
+    const duplicated = {
+      ...result,
+      data: { ...result.data!, data: [
+        { ...candle, open_time: 0, close_time: 59 },
+        { ...candle, open_time: 0, close_time: 59 },
+      ], count: 2 },
+    };
+    render(<IntegrityDiagnostics result={duplicated} />);
+    expect(screen.getByText("One or more candle timestamps are duplicated or out of chronological order.")).toBeTruthy();
+  });
+
   it("passes continuity when returned candles are consecutive", () => {
     const consecutive = {
       ...result,
