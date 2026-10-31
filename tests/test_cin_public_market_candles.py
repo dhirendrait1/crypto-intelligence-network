@@ -251,6 +251,21 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
                 api._fetch_coinbase("BTCUSDT", "1h", 5)
         request_json.assert_not_called()
 
+
+    def test_coinbase_rejects_response_over_provider_page_limit(self):
+        payload = [[1700000000 + index * 3600, "99", "103", "100", "102", "10"] for index in range(301)]
+        with patch.object(api, "_request_json", return_value=payload):
+            with self.assertRaisesRegex(ValueError, "exceeded the 300-candle per-request limit"):
+                api._fetch_coinbase("BTCUSD", "1h", 5)
+
+    def test_coinbase_paginates_requested_history_in_bounded_chunks(self):
+        payload = [[1700000000, "99", "103", "100", "102", "10"]]
+        with patch.object(api, "_request_json", return_value=payload) as request:
+            rows = api._fetch_coinbase("BTCUSD", "1m", 500)
+        self.assertEqual(request.call_count, 2)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["open_time"], 1700000000000)
+
     def test_coinbase_candle_rows_are_normalized_and_sorted(self):
         payload = [
             [1700003600, "99", "103", "101", "102", "12.5"],
