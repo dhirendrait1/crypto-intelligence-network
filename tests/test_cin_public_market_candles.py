@@ -614,6 +614,22 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(report["provider_count"], 2)
 
+    def test_cross_provider_comparison_rejects_mismatched_provider_provenance(self):
+        binance_row = dict(SAMPLE[0], _provider="kraken")
+        kraken_row = dict(SAMPLE[0], _provider="kraken")
+        with self.assertRaisesRegex(ValueError, "mismatched provider provenance"):
+            api.compare_provider_candles(
+                {"Binance": [binance_row], "Kraken": [kraken_row]}, "1h"
+            )
+
+    def test_cross_provider_comparison_accepts_matching_provider_provenance(self):
+        binance_row = dict(SAMPLE[0], _provider="binance")
+        kraken_row = dict(SAMPLE[0], _provider="kraken")
+        report = api.compare_provider_candles(
+            {"Binance": [binance_row], "Kraken": [kraken_row]}, "1h"
+        )
+        self.assertEqual(report["consistency_status"], "consistent_within_configured_tolerances")
+
     def test_cross_provider_comparison_rejects_duplicate_or_invalid_rows(self):
         duplicate = [dict(SAMPLE[0]), dict(SAMPLE[0])]
         with self.assertRaisesRegex(ValueError, "duplicate candle timestamps"):
