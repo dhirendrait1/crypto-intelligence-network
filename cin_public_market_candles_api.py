@@ -652,14 +652,22 @@ def compare_provider_candles(
     providers = {}
     for name, rows in normalized.items():
         missing = [stamp for stamp in all_times if stamp not in rows]
+        first_open, last_open = min(rows), max(rows)
+        leading_missing = [stamp for stamp in missing if stamp < first_open]
+        trailing_missing = [stamp for stamp in missing if stamp > last_open]
+        internal_missing = [stamp for stamp in missing if first_open < stamp < last_open]
         providers[name] = {
             "candle_count": len(rows),
             "missing_timestamps": missing,
             "missing_timestamp_count": len(missing),
-            "first_open_time": min(rows),
-            "last_open_time": max(rows),
-            "first_open_time_utc": datetime.fromtimestamp(min(rows) / 1000, timezone.utc).isoformat(),
-            "last_open_time_utc": datetime.fromtimestamp(max(rows) / 1000, timezone.utc).isoformat(),
+            "leading_window_mismatch_count": len(leading_missing),
+            "trailing_window_mismatch_count": len(trailing_missing),
+            "internal_missing_timestamp_count": len(internal_missing),
+            "snapshot_union_coverage_ratio": round(len(rows) / len(all_times), 4) if all_times else 0.0,
+            "first_open_time": first_open,
+            "last_open_time": last_open,
+            "first_open_time_utc": datetime.fromtimestamp(first_open / 1000, timezone.utc).isoformat(),
+            "last_open_time_utc": datetime.fromtimestamp(last_open / 1000, timezone.utc).isoformat(),
         }
 
     provider_missing_interval_count = sum(item["missing_timestamp_count"] for item in providers.values())
@@ -687,8 +695,16 @@ def compare_provider_candles(
                     volume_deltas.append(0.0)
             max_price = max(price_deltas, default=None)
             max_volume = max(volume_deltas, default=None)
+            left_only = sorted(set(left) - set(right))
+            right_only = sorted(set(right) - set(left))
             pairwise.append({
                 "providers": [left_name, right_name],
+                "left_only_candle_count": len(left_only),
+                "right_only_candle_count": len(right_only),
+                "left_only_before_shared_window_count": sum(stamp < shared[0] for stamp in left_only) if shared else len(left_only),
+                "left_only_after_shared_window_count": sum(stamp > shared[-1] for stamp in left_only) if shared else 0,
+                "right_only_before_shared_window_count": sum(stamp < shared[0] for stamp in right_only) if shared else len(right_only),
+                "right_only_after_shared_window_count": sum(stamp > shared[-1] for stamp in right_only) if shared else 0,
                 "shared_candle_count": len(shared),
                 "shared_timestamp_ratio": round(
                     len(shared) / len(set(left) | set(right)), 4
@@ -744,7 +760,7 @@ def compare_provider_candles(
             "price_and_volume_tolerances_are_diagnostic_only": True,
         },
         "limitations": [
-            "Inputs must represent the same symbol and quote asset; this helper does not verify market identity.",
+            "Market identity must be supplied explicitly to obtain a consistency result; absent identity is reported as unverified.",
             "Provider snapshots are compared at exact candle-open timestamps; differing candle boundaries are not interpolated.",
             "A tolerance result is a diagnostic, not proof that either provider is correct or independently audited.",
             "Known provider names are checked against their supported candle boundaries; generic provider labels receive timeframe-duration validation without an assumed weekly anchor.",
