@@ -44,3 +44,8 @@ The `historical_window_integrity` response compares returned candle opens with t
 ### UTC boundary and provider timestamp validation
 
 CIN normalizes provider timestamps to integer Unix milliseconds before shared processing: Binance supplies milliseconds, while Kraken and Coinbase supply seconds. Candle opens are validated against UTC interval boundaries, and close timestamps must equal the exact interval end (including calendar-month lengths). Weekly boundaries are provider-specific: Binance Monday 00:00 UTC and Kraken Thursday 00:00 UTC; Coinbase weekly candles are unsupported. Monthly candles are currently supported only for Binance. These rules are UTC-based and do not follow a client device's local timezone or daylight-saving transitions. Unsupported or misaligned rows are rejected rather than shifted.
+
+
+### Fallback failure and partial-response contract
+
+Provider failover is deliberately narrow. Binance HTTP 418/429 rate limits return a retryable service error without fan-out; other Binance HTTP errors fail closed, and malformed/empty successful payloads are not treated as transport outages. A successful but short candle response remains a short response: CIN does not pad it with fabricated rows or silently switch providers to reach the requested count. When Binance is unavailable through an eligible transport failure or HTTP 451, a partial Kraken snapshot remains explicitly labeled as Kraken fallback data; Coinbase is considered only if Kraken itself fails or cannot serve the requested market/timeframe. Quote assets are never substituted (for example, USDT is not mapped to USD). Regression tests cover these behaviors; test execution must be confirmed by exact-head CI before release.
