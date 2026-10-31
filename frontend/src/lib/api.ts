@@ -48,6 +48,8 @@ export function validateCoinbaseCandlesPayload(
   payload: unknown,
   expectedProductId: string,
   expectedGranularity: string,
+  expectedStart?: number,
+  expectedEnd?: number,
 ): { valid: boolean; message: string } {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return { valid: false, message: "Response must be a JSON object." };
   const body = payload as Record<string, unknown>;
@@ -61,6 +63,9 @@ export function validateCoinbaseCandlesPayload(
   const requestedStart = Date.parse(body.requested_start_utc as string) / 1000;
   const requestedEnd = Date.parse(body.requested_end_utc as string) / 1000;
   if (requestedStart > requestedEnd) return { valid: false, message: "Requested candle window starts after it ends." };
+  if ((expectedStart !== undefined && requestedStart !== expectedStart) || (expectedEnd !== undefined && requestedEnd !== expectedEnd)) {
+    return { valid: false, message: "Response request window does not match the client request parameters." };
+  }
   let previousOpenTime = -Infinity;
   for (const [index, item] of body.data.entries()) {
     if (!item || typeof item !== "object" || Array.isArray(item)) return { valid: false, message: `Candle ${index + 1} is not an object.` };
@@ -106,7 +111,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<ApiResult<T
     }
     if (path.startsWith("/coinbase/market-candles")) {
       const params = new URLSearchParams(path.split("?")[1] ?? "");
-      const contract = validateCoinbaseCandlesPayload(payload, params.get("product_id") ?? "", params.get("granularity") ?? "");
+      const expectedStart = Number(params.get("start"));
+      const expectedEnd = Number(params.get("end"));
+      const contract = validateCoinbaseCandlesPayload(
+        payload,
+        params.get("product_id") ?? "",
+        params.get("granularity") ?? "",
+        Number.isFinite(expectedStart) ? expectedStart : undefined,
+        Number.isFinite(expectedEnd) ? expectedEnd : undefined,
+      );
       if (!contract.valid) return { state: "unknown", data: null, retrievedAt, source, message: contract.message };
       const stale = typeof body.stale_data_warning === "string" && body.stale_data_warning.length > 0;
       return { state: stale ? "stale" : "fresh", data: payload as T, retrievedAt, source, message: stale ? body.stale_data_warning as string : contract.message };
