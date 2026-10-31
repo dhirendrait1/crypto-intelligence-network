@@ -338,6 +338,34 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.exception.status_code, 422)
         self.assertIn("five completed candles", ctx.exception.detail)
 
+    def test_provider_snapshot_provenance_rejects_mixed_provider_rows(self):
+        rows = [dict(SAMPLE[0]), dict(SAMPLE[1])]
+        source = "Kraken public OHLC API (fallback after Binance HTTP 451)"
+        for row in rows:
+            row.update({"_provider": "kraken", "_source": source,
+                        "_source_endpoint": api.KRAKEN_OHLC_URL})
+        rows[1]["_provider"] = "binance"
+        with self.assertRaisesRegex(ValueError, "mixed or mismatched provenance"):
+            api._validate_provider_snapshot_provenance(
+                rows, "kraken", source, api.KRAKEN_OHLC_URL, "Binance HTTP 451"
+            )
+
+    def test_provider_snapshot_provenance_rejects_source_endpoint_mismatch(self):
+        rows = [dict(SAMPLE[0], _provider="kraken", _source="Kraken public OHLC API (fallback after Binance HTTP 451)",
+                     _source_endpoint=api.BINANCE_KLINES_URL)]
+        with self.assertRaisesRegex(ValueError, "does not match its selected provider"):
+            api._validate_provider_snapshot_provenance(
+                rows, "kraken", rows[0]["_source"], api.BINANCE_KLINES_URL, "Binance HTTP 451"
+            )
+
+    def test_provider_snapshot_provenance_rejects_fallback_reason_mismatch(self):
+        rows = [dict(SAMPLE[0], _provider="kraken", _source="Kraken public OHLC API (fallback after Binance HTTP 451)",
+                     _source_endpoint=api.KRAKEN_OHLC_URL)]
+        with self.assertRaisesRegex(ValueError, "fallback reason does not match"):
+            api._validate_provider_snapshot_provenance(
+                rows, "kraken", rows[0]["_source"], api.KRAKEN_OHLC_URL, "Binance transport failure"
+            )
+
     async def test_451_falls_back_to_kraken_and_labels_source(self):
         import asyncio
         with patch.object(api, "_fetch_binance", side_effect=urllib.error.HTTPError(
