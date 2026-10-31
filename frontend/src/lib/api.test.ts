@@ -35,4 +35,18 @@ describe("Coinbase candle response contract", () => {
     expect(result.message).toContain("strictly increasing");
     expect(result.message).toContain("no duplicates");
   });
+
+  it("rejects UTC timestamps that disagree with numeric epoch fields", () => {
+    const mismatched = { ...candle(60), open_time_utc: new Date(61_000).toISOString() };
+    const result = validateCoinbaseCandlesPayload(validPayload([mismatched]), "BTC-USD", "1m");
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain("UTC timestamps do not match");
+  });
+
+  it("rejects a mismatched close-time UTC value", () => {
+    const mismatched = { ...candle(60), close_time_utc: new Date(121_000).toISOString() };
+    const result = validateCoinbaseCandlesPayload(validPayload([mismatched]), "BTC-USD", "1m");
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain("UTC timestamps do not match");
+  });
 });
