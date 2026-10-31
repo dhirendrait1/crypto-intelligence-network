@@ -163,6 +163,38 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(ValueError, "did not match the resolved requested market"):
                 api._fetch_kraken("BTCUSDT", "1h", 5)
 
+    async def test_kraken_rejects_missing_or_invalid_ohlc_pagination_cursor(self):
+        rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
+        asset_pairs = {"error": [], "result": {
+            "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "base": "XXBT", "quote": "USDT"}
+        }}
+        for result in ({"XBTUSDT": rows}, {"XBTUSDT": rows, "last": None},
+                       {"XBTUSDT": rows, "last": True}, {"XBTUSDT": rows, "last": 1700000000.5}):
+            with patch.object(api, "_request_json", side_effect=[asset_pairs, {"error": [], "result": result}]):
+                with self.assertRaisesRegex(ValueError, "pagination cursor"):
+                    api._fetch_kraken("BTCUSDT", "1h", 5)
+
+    async def test_kraken_rejects_cursor_older_than_latest_returned_candle(self):
+        rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
+        asset_pairs = {"error": [], "result": {
+            "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "base": "XXBT", "quote": "USDT"}
+        }}
+        payload = {"error": [], "result": {"XBTUSDT": rows, "last": 1699999999}}
+        with patch.object(api, "_request_json", side_effect=[asset_pairs, payload]):
+            with self.assertRaisesRegex(ValueError, "cursor precedes the latest"):
+                api._fetch_kraken("BTCUSDT", "1h", 5)
+
+    async def test_kraken_rejects_non_list_error_envelope(self):
+        rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
+        asset_pairs = {"error": [], "result": {
+            "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "base": "XXBT", "quote": "USDT"}
+        }}
+        for errors in (None, "error", {"message": "bad"}):
+            payload = {"error": errors, "result": {"XBTUSDT": rows, "last": 1700000000}}
+            with patch.object(api, "_request_json", side_effect=[asset_pairs, payload]):
+                with self.assertRaisesRegex(ValueError, "error envelope"):
+                    api._fetch_kraken("BTCUSDT", "1h", 5)
+
     async def test_kraken_accepts_single_market_result_with_cursor_metadata(self):
         rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
         payload = {"error": [], "result": {"XBTUSDT": rows, "last": 1700000000}}

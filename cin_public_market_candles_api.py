@@ -388,8 +388,11 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     requested_pair = f"{base}{quote}"
     pair_query = urllib.parse.urlencode({"pair": requested_pair})
     pair_payload = _request_json(f"{KRAKEN_ASSET_PAIRS_URL}?{pair_query}")
-    if not isinstance(pair_payload, dict) or (pair_payload.get("error") or []):
-        raise ValueError("Kraken AssetPairs lookup failed")
+    if not isinstance(pair_payload, dict):
+        raise ValueError("Kraken AssetPairs response was not an object")
+    pair_errors = pair_payload.get("error")
+    if not isinstance(pair_errors, list) or pair_errors:
+        raise ValueError("Kraken AssetPairs returned an invalid error envelope")
     pair_result = pair_payload.get("result")
     if not isinstance(pair_result, dict) or len(pair_result) != 1:
         raise ValueError("Kraken AssetPairs did not resolve exactly one requested market")
@@ -410,12 +413,24 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     payload = _request_json(f"{KRAKEN_OHLC_URL}?{query}")
     if not isinstance(payload, dict):
         raise ValueError("Kraken response was not an object")
-    errors = payload.get("error") or []
+    errors = payload.get("error")
+    if not isinstance(errors, list):
+        raise ValueError("Kraken OHLC response had an invalid error envelope")
     if errors:
         raise ValueError("Kraken rejected pair/timeframe: " + "; ".join(str(e) for e in errors))
     result = payload.get("result")
-    if not isinstance(result, dict):
-        raise ValueError("Kraken response had no result")
+    if not isinstance(result, dict) or "last" not in result:
+        raise ValueError("Kraken OHLC response had no result or pagination cursor")
+    cursor = result.get("last")
+    if isinstance(cursor, bool):
+        raise ValueError("Kraken OHLC pagination cursor was not an integer Unix timestamp")
+    try:
+        cursor_value = float(cursor)
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError("Kraken OHLC pagination cursor was not an integer Unix timestamp") from None
+    if not math.isfinite(cursor_value) or not cursor_value.is_integer() or cursor_value < 0:
+        raise ValueError("Kraken OHLC pagination cursor was not an integer Unix timestamp")
+    cursor_seconds = int(cursor_value)
     pair_keys = [key for key in result if key != "last"]
     accepted_keys = {canonical_key, altname, wsname.replace("/", "")}
     if len(pair_keys) != 1 or pair_keys[0] not in accepted_keys:
@@ -460,6 +475,8 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
             raise _MalformedProviderResponse("Kraken returned a malformed candle row") from None
     if not candles:
         raise ValueError("Kraken returned no valid candles")
+    if cursor_seconds < max(row["open_time"] // 1000 for row in candles):
+        raise ValueError("Kraken OHLC pagination cursor precedes the latest returned candle")
     return candles[-limit:]
 
 

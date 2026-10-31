@@ -59,3 +59,8 @@ A successful HTTP response is not considered a healthy candle snapshot merely be
 ### Coinbase page-boundary integrity
 
 Each Coinbase response page is checked against its own UTC-granularity window. CIN permits the single immediately preceding candle that Coinbase may include at a page start, and permits the shared page-end boundary so an identical repeated candle can be deduplicated. Rows older than that one-candle allowance or later than the requested page end fail closed as a malformed pagination response. Identical repeated boundary rows are retained once; conflicting rows for the same open timestamp remain a hard integrity failure. This page-level check is separate from the overall requested-window filter and does not create or repair candles.
+
+
+### Kraken response-envelope and cursor integrity
+
+Kraken AssetPairs and OHLC responses must provide an object envelope with an explicitly present, empty-list `error` field. The OHLC `result` must contain exactly one resolved market key plus the `last` pagination cursor. The cursor must be a finite, non-negative integer Unix timestamp and must not precede the latest returned candle open. Missing, malformed, boolean, fractional, or stale cursors fail closed; CIN does not guess a cursor or retry with a different market key to conceal an invalid envelope. The cursor is validated as response metadata and is not used to fabricate additional candle rows.
