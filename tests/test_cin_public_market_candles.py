@@ -258,6 +258,32 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(ValueError, "exceeded the 300-candle per-request limit"):
                 api._fetch_coinbase("BTCUSD", "1h", 5)
 
+
+    def test_coinbase_pagination_windows_are_granularity_aligned_and_adjacent(self):
+        requests = []
+        def capture(url):
+            requests.append(urllib.parse.urlparse(url).query)
+            return []
+        with patch.object(api, "_request_json", side_effect=capture):
+            with patch.object(api.datetime, "now", wraps=api.datetime.now) as clock:
+                api._fetch_coinbase("BTCUSD", "1m", 500)
+        self.assertEqual(len(requests), 2)
+        first = urllib.parse.parse_qs(requests[0])
+        second = urllib.parse.parse_qs(requests[1])
+        first_start = int(datetime.fromisoformat(first["start"][0]).timestamp())
+        first_end = int(datetime.fromisoformat(first["end"][0]).timestamp())
+        second_start = int(datetime.fromisoformat(second["start"][0]).timestamp())
+        self.assertEqual(first_start % 60, 0)
+        self.assertEqual(second_start % 60, 0)
+        self.assertEqual(first_end, second_start)
+        self.assertEqual((first_end - first_start) // 60, 300)
+
+    def test_coinbase_deduplicates_rows_repeated_at_page_boundaries(self):
+        row = [1700000000, "99", "103", "100", "102", "10"]
+        with patch.object(api, "_request_json", return_value=[row]):
+            rows = api._fetch_coinbase("BTCUSD", "1m", 500)
+        self.assertEqual(sum(1 for item in rows if item["open_time"] == 1700000000000), 1)
+
     def test_coinbase_paginates_requested_history_in_bounded_chunks(self):
         payload = [[1700000000, "99", "103", "100", "102", "10"]]
         with patch.object(api, "_request_json", return_value=payload) as request:
