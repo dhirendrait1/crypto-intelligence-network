@@ -31,10 +31,21 @@ describe("Integrity diagnostics", () => {
     expect(screen.getByText("1 returned / 1 declared")).toBeTruthy();
   });
 
+  it("classifies stale accepted data as a warning without calling it malformed", () => {
+    render(<IntegrityDiagnostics result={{ ...result, state: "stale", message: "Provider data is stale." }} />);
+    expect(screen.getByText("Response state: stale. Provider data is stale.")).toBeTruthy();
+    expect(screen.getByText("WARN")).toBeTruthy();
+  });
+
+  it("surfaces contract rejection separately when no validated payload is available", () => {
+    render(<IntegrityDiagnostics result={{ ...result, data: null, state: "unknown", message: "Candle timestamps do not match." }} />);
+    expect(screen.getByText("Response state: unknown. Candle timestamps do not match.")).toBeTruthy();
+  });
+
   it("does not infer integrity when no validated payload exists", () => {
     render(<IntegrityDiagnostics result={{ ...result, data: null, state: "unknown" }} />);
     expect(screen.getByText("No validated candle payload is available.")).toBeTruthy();
-    expect(screen.getAllByText("UNAVAILABLE").length).toBe(5);
+    expect(screen.getAllByText("UNAVAILABLE").length).toBe(6);
   });
 
   it("does not report candle-level checks as passed for an empty response", () => {
