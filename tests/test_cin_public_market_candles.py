@@ -1078,6 +1078,32 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("ambiguous candle sequence", ctx.exception.detail)
 
 
+    def test_provider_utc_boundaries_are_timezone_independent(self):
+        # The same UTC instant must align regardless of the caller's local timezone.
+        utc_hour = int(api.datetime(2025, 3, 30, 1, tzinfo=api.timezone.utc).timestamp() * 1000)
+        self.assertTrue(api._is_aligned_candle_open(utc_hour, "1h", "binance"))
+        self.assertFalse(api._is_aligned_candle_open(utc_hour + 1, "1h", "binance"))
+        utc_day = int(api.datetime(2025, 3, 30, tzinfo=api.timezone.utc).timestamp() * 1000)
+        self.assertTrue(api._is_aligned_candle_open(utc_day, "1d", "kraken"))
+        self.assertFalse(api._is_aligned_candle_open(utc_day + 60_000, "1d", "kraken"))
+
+    def test_monthly_boundary_and_duration_cover_leap_february(self):
+        february = int(api.datetime(2024, 2, 1, tzinfo=api.timezone.utc).timestamp() * 1000)
+        march = int(api.datetime(2024, 3, 1, tzinfo=api.timezone.utc).timestamp() * 1000)
+        self.assertTrue(api._is_aligned_candle_open(february, "1M", "binance"))
+        self.assertEqual(api._interval_duration_ms("1M", february), 29 * 86_400_000)
+        self.assertEqual(february + api._interval_duration_ms("1M", february), march)
+        self.assertFalse(api._is_aligned_candle_open(february + 86_400_000, "1M", "binance"))
+
+    def test_normalization_rejects_provider_specific_weekly_anchor_mismatch(self):
+        monday = int(api.datetime(2025, 1, 6, tzinfo=api.timezone.utc).timestamp() * 1000)
+        candle = dict(SAMPLE[0], open_time=monday, close_time=monday + 604_800_000 - 1)
+        with self.assertRaisesRegex(ValueError, "UTC timeframe boundary"):
+            api._normalize_candle_sequence([candle], "1w", "kraken")
+        thursday = int(api.datetime(2025, 1, 9, tzinfo=api.timezone.utc).timestamp() * 1000)
+        kraken_candle = dict(SAMPLE[0], open_time=thursday, close_time=thursday + 604_800_000 - 1)
+        self.assertEqual(api._normalize_candle_sequence([kraken_candle], "1w", "kraken")[0]["open_time"], thursday)
+
     def test_weekly_candle_alignment_is_provider_specific(self):
         monday = int(api.datetime(2025, 1, 6, tzinfo=api.timezone.utc).timestamp() * 1000)
         thursday = int(api.datetime(2025, 1, 9, tzinfo=api.timezone.utc).timestamp() * 1000)
