@@ -62,4 +62,15 @@ describe("Coinbase candle response contract", () => {
     expect(result.valid).toBe(false);
     expect(result.message).toContain("starts after it ends");
   });
+
+  it("rejects response window metadata that differs from the actual client request", () => {
+    const result = validateCoinbaseCandlesPayload(validPayload([candle(60)]), "BTC-USD", "1m", 30, 120);
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain("does not match the client request parameters");
+  });
+
+  it("accepts response window metadata that exactly matches the client request", () => {
+    const result = validateCoinbaseCandlesPayload(validPayload([candle(60)]), "BTC-USD", "1m", 0, 120);
+    expect(result.valid).toBe(true);
+  });
 });
