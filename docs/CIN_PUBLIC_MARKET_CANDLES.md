@@ -74,3 +74,8 @@ Kraken OHLC rows are checked in their original provider response order before th
 ### Kraken UTC interval-boundary and forming-candle handling
 
 Kraken candle opens are validated against the provider-specific UTC timeframe anchor at the adapter boundary, before rows enter shared normalization. The adapter verifies that the interval duration used to derive each close timestamp matches CIN's supported timeframe duration. Misaligned opens fail closed as malformed provider data. The current/incomplete candle returned by Kraken remains in the response when otherwise valid; freshness and quality metadata distinguish it from completed candles rather than silently dropping or rewriting it. Weekly candles use Kraken's Thursday 00:00 UTC anchor. No local-time or daylight-saving adjustment is applied.
+
+
+### Kraken fallback error classification
+
+A malformed successful Kraken response is a data-integrity failure, not provider unavailability. AssetPairs/OHLC envelope shape, explicit error-list contract, resolved market identity, OHLC result key, pagination cursor, row count, candle rows, chronology, and UTC timeframe alignment are validated as malformed-provider failures. Invalid JSON/Unicode and oversized successful response bodies are classified the same way. These failures return HTTP 502 and do not trigger Coinbase fallback. Network/transport failures remain transport failures; eligible Kraken HTTP errors retain the documented fallback behavior, while rate limits remain retryable HTTP 503 and do not fan out. An actual Kraken API error list or unsupported requested market/timeframe remains distinguishable from a malformed response and may be handled by the existing fallback policy.
