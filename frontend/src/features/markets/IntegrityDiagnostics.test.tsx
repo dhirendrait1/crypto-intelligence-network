@@ -69,7 +69,7 @@ describe("Integrity diagnostics", () => {
   it("does not infer integrity when no validated payload exists", () => {
     render(<IntegrityDiagnostics result={{ ...result, data: null, state: "unknown" }} />);
     expect(screen.getByText("No validated candle payload is available.")).toBeTruthy();
-    expect(screen.getAllByText("UNAVAILABLE").length).toBe(10);
+    expect(screen.getAllByText("UNAVAILABLE").length).toBe(12);
     expect(screen.queryByText("PASS")).toBeNull();
   });
 
@@ -80,7 +80,7 @@ describe("Integrity diagnostics", () => {
     };
     render(<IntegrityDiagnostics result={empty} />);
     expect(screen.getByText("No candle rows are available to inspect.")).toBeTruthy();
-    expect(screen.getAllByText("UNAVAILABLE").length).toBe(6);
+    expect(screen.getAllByText("UNAVAILABLE").length).toBe(8);
   });
 
   it("warns about missing intervals between returned candles without rejecting the payload", () => {
@@ -142,6 +142,46 @@ describe("Integrity diagnostics", () => {
     expect(screen.getByText("One or more candles contain non-finite values or violate OHLC/volume bounds.")).toBeTruthy();
     const boundsRow = screen.getByText("OHLC and volume bounds").closest("li");
     expect(boundsRow?.querySelector(".integrity-check-warn")).toBeTruthy();
+  });
+
+  it("detects numeric epoch and UTC string mismatches independently", () => {
+    render(<IntegrityDiagnostics result={result} />);
+    const epochRow = screen.getByText("Epoch/UTC timestamp consistency").closest("li");
+    expect(epochRow?.querySelector(".integrity-check-warn")).toBeTruthy();
+  });
+
+  it("passes epoch/UTC and close-state checks when metadata agrees", () => {
+    const validOpen = 1790812800;
+    const validClose = validOpen + 59;
+    const retrievedAt = validClose + 1;
+    const consistent = {
+      ...result,
+      data: {
+        ...result.data!,
+        retrieved_at: new Date(retrievedAt * 1000).toISOString(),
+        data: [{
+          ...candle,
+          open_time: validOpen,
+          close_time: validClose,
+          open_time_utc: new Date(validOpen * 1000).toISOString(),
+          close_time_utc: new Date(validClose * 1000).toISOString(),
+          is_closed: true,
+        }],
+      },
+    };
+    render(<IntegrityDiagnostics result={consistent} />);
+    expect(screen.getByText("Numeric open/close epochs match their UTC timestamp strings.")).toBeTruthy();
+    expect(screen.getByText("Each is_closed flag agrees with close_time and response retrieval time.")).toBeTruthy();
+  });
+
+  it("warns when close-state flags conflict with response retrieval time", () => {
+    const inconsistent = {
+      ...result,
+      data: { ...result.data!, data: [{ ...candle, is_closed: false }] },
+    };
+    render(<IntegrityDiagnostics result={inconsistent} />);
+    const closeStateRow = screen.getByText("Candle close-state consistency").closest("li");
+    expect(closeStateRow?.querySelector(".integrity-check-warn")).toBeTruthy();
   });
 
   it("detects count, ordering, bounds, and timestamp inconsistencies independently", () => {
