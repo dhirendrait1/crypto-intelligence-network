@@ -741,6 +741,7 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
                 "Binance": {"base_asset": "BTC", "quote_asset": "USD"},
                 "Kraken": {"base_asset": "BTC", "quote_asset": "USD"},
             },
+            volume_unit_by_provider={"Binance": "BTC", "Kraken": "BTC"},
         )
         self.assertEqual(report["consistency_status"], "consistent_within_configured_tolerances")
         self.assertEqual(report["pairwise_comparisons"][0]["shared_candle_count"], 5)
@@ -764,11 +765,38 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         report = api.compare_provider_candles(
             {"Binance": left, "Kraken": right}, "1h",
             price_tolerance_bps=25, volume_tolerance_bps=100,
+            volume_unit_by_provider={"Binance": "BTC", "Kraken": "BTC"},
         )
         comparison = report["pairwise_comparisons"][0]
         self.assertFalse(comparison["price_within_tolerance"])
         self.assertFalse(comparison["volume_within_tolerance"])
         self.assertEqual(report["consistency_status"], "discrepancies_or_gaps_detected")
+
+    def test_cross_provider_comparison_withholds_volume_delta_without_verified_units(self):
+        rows_a = [dict(row) for row in SAMPLE[:3]]
+        rows_b = [dict(row) for row in SAMPLE[:3]]
+        report = api.compare_provider_candles(
+            {"Binance": rows_a, "Kraken": rows_b}, "1h",
+            market_identity_by_provider={
+                "Binance": {"base_asset": "BTC", "quote_asset": "USD"},
+                "Kraken": {"base_asset": "BTC", "quote_asset": "USD"},
+            },
+        )
+        pair = report["pairwise_comparisons"][0]
+        self.assertIsNone(pair["volume_discrepancy_bps_max"])
+        self.assertFalse(pair["volume_within_tolerance"])
+        self.assertEqual(pair["volume_comparability"], "unverified_or_incompatible_units")
+        self.assertEqual(report["consistency_status"], "volume_units_unverified")
+
+    def test_cross_provider_comparison_rejects_different_declared_volume_units(self):
+        rows_a = [dict(row) for row in SAMPLE[:3]]
+        rows_b = [dict(row) for row in SAMPLE[:3]]
+        report = api.compare_provider_candles(
+            {"Binance": rows_a, "Kraken": rows_b}, "1h",
+            volume_unit_by_provider={"Binance": "BTC", "Kraken": "XBT"},
+        )
+        self.assertFalse(report["volume_units_comparable"])
+        self.assertIsNone(report["pairwise_comparisons"][0]["volume_discrepancy_bps_max"])
 
     def test_cross_provider_comparison_reports_missing_timestamps_and_gaps(self):
         left = [dict(row) for row in SAMPLE[:5]]
