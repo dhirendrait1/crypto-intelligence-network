@@ -402,11 +402,14 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((first_end - first_start) // 60, 300)
 
     def test_coinbase_excludes_rows_outside_requested_utc_window(self):
+        requested_bounds = {}
         def response(url):
             query = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
             start_seconds = int(datetime.fromisoformat(query["start"][0]).timestamp())
             end_seconds = int(datetime.fromisoformat(query["end"][0]).timestamp())
             latest_open = (end_seconds // 3600) * 3600
+            requested_bounds["start"] = start_seconds * 1000
+            requested_bounds["latest_open"] = latest_open * 1000
             def candle(timestamp):
                 return [timestamp, "99", "103", "100", "102", "10"]
             return [
@@ -418,10 +421,7 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(api, "_request_json", side_effect=response):
             rows = api._fetch_coinbase("BTCUSD", "1h", 5)
         opens = [row["open_time"] for row in rows]
-        self.assertEqual(len(opens), 2)
-        self.assertEqual(opens[0] % 3_600_000, 0)
-        self.assertEqual(opens[1] % 3_600_000, 0)
-        self.assertNotIn(opens[0] - 3_600_000, opens)
+        self.assertEqual(opens, [requested_bounds["start"], requested_bounds["latest_open"]])
 
     def test_coinbase_deduplicates_rows_repeated_at_page_boundaries(self):
         row = [1700000000, "99", "103", "100", "102", "10"]
