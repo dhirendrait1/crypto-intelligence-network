@@ -1,5 +1,36 @@
 export type DataState = "fresh" | "stale" | "partial" | "conflicting" | "unavailable" | "unknown" | "error";
 export interface ApiResult<T> { state: DataState; data: T | null; retrievedAt: string | null; source: string | null; message: string; }
+export interface CoinbaseCandle {
+  open_time: number;
+  close_time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  open_time_utc: string;
+  close_time_utc: string;
+  is_closed: boolean;
+}
+export interface CoinbaseCandlesResponse {
+  service: "cin";
+  mode: "read_only";
+  source: string;
+  source_endpoint: string;
+  product_id: string;
+  quote_currency: "USD";
+  granularity: string;
+  requested_start_utc: string;
+  requested_end_utc: string;
+  retrieved_at: string;
+  count: number;
+  latest_closed_candle_close_time_utc: string | null;
+  latest_closed_candle_age_seconds: number | null;
+  stale_threshold_seconds: number;
+  stale_data_warning: string | null;
+  data: CoinbaseCandle[];
+  limitations: string[];
+}
 const API_BASE = (import.meta.env.VITE_CIN_API_BASE_URL ?? "").trim().replace(/\/$/, "");
 const REQUEST_TIMEOUT_MS = 12_000;
 
@@ -29,6 +60,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<ApiResult<T
       const healthy = body.status === "ok" || body.status === "ready";
       return { state: healthy ? "fresh" : "unavailable", data: payload as T, retrievedAt, source, message: healthy ? "CIN service endpoint responded successfully." : "CIN service did not report a healthy state." };
     }
+    if (path.startsWith("/coinbase/market-candles")) {
+      if (body.mode !== "read_only" || body.quote_currency !== "USD" || !Array.isArray(body.data)) {
+        return { state: "unknown", data: payload as T, retrievedAt, source, message: "Coinbase response failed the expected read-only USD contract." };
+      }
+      const stale = typeof body.stale_data_warning === "string" && body.stale_data_warning.length > 0;
+      return { state: stale ? "stale" : "fresh", data: payload as T, retrievedAt, source, message: stale ? body.stale_data_warning as string : "Coinbase public USD candle response received; latest completed candle is within the API freshness threshold." };
+    }
     if (!Array.isArray(body.data)) return { state: "unknown", data: payload as T, retrievedAt, source, message: "Response received, but its data collection is missing or has an unsupported shape." };
     const rows = body.data as unknown[];
     const rowStates = rows.map((row) => row && typeof row === "object" ? (row as Record<string, unknown>).freshness_status : undefined);
@@ -49,4 +87,8 @@ export const cinApi = {
   configured: Boolean(API_BASE),
   getHealth() { return request<Record<string, unknown>>("/health"); },
   getReadiness() { return request<Record<string, unknown>>("/ready"); },
+  getCoinbaseCandles(productId: string, granularity: "1m" | "5m" | "15m" | "1h" | "6h" | "1d", start: number, end: number) {
+    const query = new URLSearchParams({ product_id: productId, granularity, start: String(start), end: String(end) });
+    return request<CoinbaseCandlesResponse>(`/coinbase/market-candles?${query.toString()}`);
+  },
 };
