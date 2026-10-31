@@ -439,5 +439,20 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.exception.status_code, 502)
         self.assertIn("ambiguous candle sequence", ctx.exception.detail)
 
+    async def test_load_rejects_candle_duration_mismatched_to_requested_interval(self):
+        malformed = dict(SAMPLE[0])
+        malformed["close_time"] -= 1
+        with patch.object(api, "_fetch_binance", return_value=[malformed]):
+            with self.assertRaises(HTTPException) as ctx:
+                await api._load("BTCUSDT", "1h", 5)
+        self.assertEqual(ctx.exception.status_code, 502)
+        self.assertIn("ambiguous candle sequence", ctx.exception.detail)
+
+    def test_valid_candle_rejects_fractional_and_boolean_timestamps(self):
+        fractional = dict(SAMPLE[0], open_time=SAMPLE[0]["open_time"] + 0.5)
+        boolean = dict(SAMPLE[0], close_time=True)
+        self.assertFalse(api._is_valid_candle(fractional))
+        self.assertFalse(api._is_valid_candle(boolean))
+
 if __name__ == "__main__":
     unittest.main()
