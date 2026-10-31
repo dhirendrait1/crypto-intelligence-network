@@ -65,8 +65,8 @@ export function validateCoinbaseCandlesPayload(
     if (numeric.some((key) => typeof candle[key] !== "number" || !Number.isFinite(candle[key]))) return { valid: false, message: `Candle ${index + 1} contains a non-finite numeric field.` };
     const openTime = candle.open_time as number, closeTime = candle.close_time as number;
     const open = candle.open as number, high = candle.high as number, low = candle.low as number, close = candle.close as number, volume = candle.volume as number;
-    if (closeTime < openTime || openTime < previousOpenTime || volume < 0 || low > high || low > open || open > high || low > close || close > high) {
-      return { valid: false, message: `Candle ${index + 1} failed OHLC, volume, or chronological validation.` };
+    if (closeTime < openTime || openTime <= previousOpenTime || volume < 0 || low > high || low > open || open > high || low > close || close > high) {
+      return { valid: false, message: `Candle ${index + 1} failed OHLC, volume, or chronological validation. Candle open timestamps must be strictly increasing with no duplicates.` };
     }
     if (!isIsoTimestamp(candle.open_time_utc) || !isIsoTimestamp(candle.close_time_utc) || typeof candle.is_closed !== "boolean") {
       return { valid: false, message: `Candle ${index + 1} has invalid timestamps or close-state metadata.` };
