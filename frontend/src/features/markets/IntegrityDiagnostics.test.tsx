@@ -37,6 +37,16 @@ describe("Integrity diagnostics", () => {
     expect(screen.getAllByText("UNAVAILABLE").length).toBe(5);
   });
 
+  it("does not report candle-level checks as passed for an empty response", () => {
+    const empty = {
+      ...result,
+      data: { ...result.data!, count: 0, data: [] },
+    };
+    render(<IntegrityDiagnostics result={empty} />);
+    expect(screen.getByText("No candle rows are available to inspect.")).toBeTruthy();
+    expect(screen.getAllByText("UNAVAILABLE").length).toBe(3);
+  });
+
   it("warns when candle OHLCV values are non-finite", () => {
     const malformed = {
       ...result,
