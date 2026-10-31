@@ -658,6 +658,8 @@ def compare_provider_candles(
             "missing_timestamp_count": len(missing),
             "first_open_time": min(rows),
             "last_open_time": max(rows),
+            "first_open_time_utc": datetime.fromtimestamp(min(rows) / 1000, timezone.utc).isoformat(),
+            "last_open_time_utc": datetime.fromtimestamp(max(rows) / 1000, timezone.utc).isoformat(),
         }
 
     provider_missing_interval_count = sum(item["missing_timestamp_count"] for item in providers.values())
@@ -688,6 +690,17 @@ def compare_provider_candles(
             pairwise.append({
                 "providers": [left_name, right_name],
                 "shared_candle_count": len(shared),
+                "shared_timestamp_ratio": round(
+                    len(shared) / len(set(left) | set(right)), 4
+                ) if (set(left) | set(right)) else 0.0,
+                "shared_window_start_utc": (
+                    datetime.fromtimestamp(shared[0] / 1000, timezone.utc).isoformat()
+                    if shared else None
+                ),
+                "shared_window_end_utc": (
+                    datetime.fromtimestamp(shared[-1] / 1000, timezone.utc).isoformat()
+                    if shared else None
+                ),
                 "price_discrepancy_bps_max": round(max_price, 4) if max_price is not None and math.isfinite(max_price) else max_price,
                 "volume_discrepancy_bps_max": round(max_volume, 4) if max_volume is not None and math.isfinite(max_volume) else max_volume,
                 "price_within_tolerance": max_price is not None and max_price <= price_tolerance_bps,
@@ -716,9 +729,20 @@ def compare_provider_candles(
         "pairwise_comparisons": pairwise,
         "price_tolerance_bps": float(price_tolerance_bps),
         "volume_tolerance_bps": float(volume_tolerance_bps),
-        "consistency_status": "consistent_within_configured_tolerances" if within_tolerance and not timeline_gaps and provider_missing_interval_count == 0 else (
-            "insufficient_timestamp_overlap" if not has_alignment else "discrepancies_or_gaps_detected"
+        "consistency_status": (
+            "market_identity_unverified" if normalized_market_identities is None else
+            "consistent_within_configured_tolerances"
+            if within_tolerance and not timeline_gaps and provider_missing_interval_count == 0 else
+            "insufficient_timestamp_overlap" if not has_alignment else
+            "discrepancies_or_gaps_detected"
         ),
+        "comparability_requirements": {
+            "market_identity_verified": normalized_market_identities is not None,
+            "exact_timestamp_overlap_required": True,
+            "all_provider_pairs_have_overlap": has_alignment,
+            "coverage_must_be_reviewed": True,
+            "price_and_volume_tolerances_are_diagnostic_only": True,
+        },
         "limitations": [
             "Inputs must represent the same symbol and quote asset; this helper does not verify market identity.",
             "Provider snapshots are compared at exact candle-open timestamps; differing candle boundaries are not interpolated.",
