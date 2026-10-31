@@ -26,6 +26,31 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self._catalogue_patch.start()
         self.addCleanup(self._catalogue_patch.stop)
 
+    def test_provider_scalar_schema_rejects_boolean_and_nested_values(self):
+        self.assertFalse(api._is_provider_scalar(True))
+        self.assertFalse(api._is_provider_scalar(False))
+        self.assertFalse(api._is_provider_scalar(None))
+        self.assertFalse(api._is_provider_scalar({"value": "1"}))
+        self.assertFalse(api._is_provider_scalar(["1"]))
+        self.assertTrue(api._is_provider_scalar("1.25"))
+        self.assertTrue(api._is_provider_scalar(1.25))
+        self.assertTrue(api._is_provider_scalar(1))
+
+    def test_binance_rejects_boolean_ohlcv_field_before_numeric_coercion(self):
+        payload = [[1700000000000, "100", "102", "99", "101", True, 1700003599999]]
+        with patch.object(api, "_request_json", return_value=payload):
+            with self.assertRaisesRegex(ValueError, "field type"):
+                api._fetch_binance("BTCUSDT", "1h", 5)
+
+    async def test_kraken_rejects_non_string_error_envelope_entries(self):
+        asset_pairs = {"error": [], "result": {
+            "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
+        }}
+        ohlc = {"error": [7], "result": {"XBTUSDT": [], "last": 1700000000}}
+        with patch.object(api, "_request_json", side_effect=[asset_pairs, ohlc]):
+            with self.assertRaisesRegex(ValueError, "invalid error envelope"):
+                api._fetch_kraken("BTCUSDT", "1m", 5)
+
     def test_request_json_rejects_incomplete_successful_http_body(self):
         response = MagicMock()
         response.status = 200
