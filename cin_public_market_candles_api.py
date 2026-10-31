@@ -26,6 +26,7 @@ BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines"
 KRAKEN_OHLC_URL = "https://api.kraken.com/0/public/OHLC"
 KRAKEN_ASSET_PAIRS_URL = "https://api.kraken.com/0/public/AssetPairs"
 MAX_KRAKEN_OHLC_ROWS = 720
+MAX_BINANCE_KLINE_LIMIT = 1000
 MAX_PROVIDER_RESPONSE_BYTES = 2 * 1024 * 1024
 # Largest millisecond Unix timestamp representable by Python datetime (year 9999).
 MAX_TIMESTAMP_MS = 253402300799999
@@ -192,6 +193,10 @@ def _is_valid_candle(candle: dict[str, Any]) -> bool:
 
 
 def _fetch_binance(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
+    # Binance Spot REST permits at most 1000 klines per request. The public
+    # CIN route is stricter (5–500); keep this adapter safe for direct callers.
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= MAX_BINANCE_KLINE_LIMIT:
+        raise ValueError("Binance candle request limit must be an integer from 1 to 1000")
     query = urllib.parse.urlencode({"symbol": symbol, "interval": interval, "limit": limit})
     payload = _request_json(f"{BINANCE_KLINES_URL}?{query}")
     if not isinstance(payload, list):
