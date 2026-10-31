@@ -309,6 +309,15 @@ def _request_json(url: str) -> Any:
         return json.loads(body.decode("utf-8"))
 
 
+
+def _kraken_request_json(url: str) -> Any:
+    """Classify invalid successful Kraken response bodies as malformed, not outages."""
+    try:
+        return _request_json(url)
+    except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
+        raise _MalformedProviderResponse("Kraken returned an invalid successful response body") from None
+
+
 def _is_valid_candle(candle: dict[str, Any]) -> bool:
     """Reject non-finite values, impossible OHLC ranges, and invalid timestamps."""
     try:
@@ -387,18 +396,18 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     # use its exact altname for OHLC and verify the returned key against that record.
     requested_pair = f"{base}{quote}"
     pair_query = urllib.parse.urlencode({"pair": requested_pair})
-    pair_payload = _request_json(f"{KRAKEN_ASSET_PAIRS_URL}?{pair_query}")
+    pair_payload = _kraken_request_json(f"{KRAKEN_ASSET_PAIRS_URL}?{pair_query}")
     if not isinstance(pair_payload, dict):
-        raise ValueError("Kraken AssetPairs response was not an object")
+        raise _MalformedProviderResponse("Kraken AssetPairs response was not an object")
     pair_errors = pair_payload.get("error")
     if not isinstance(pair_errors, list) or pair_errors:
-        raise ValueError("Kraken AssetPairs returned an invalid error envelope")
+        raise _MalformedProviderResponse("Kraken AssetPairs returned an invalid error envelope")
     pair_result = pair_payload.get("result")
     if not isinstance(pair_result, dict) or len(pair_result) != 1:
         raise ValueError("Kraken AssetPairs did not resolve exactly one requested market")
     canonical_key, pair_info = next(iter(pair_result.items()))
     if not isinstance(pair_info, dict):
-        raise ValueError("Kraken AssetPairs returned invalid market metadata")
+        raise _MalformedProviderResponse("Kraken AssetPairs returned invalid market metadata")
     altname = pair_info.get("altname")
     wsname = pair_info.get("wsname")
     expected_wsname = f"{base}/{quote}"
@@ -408,43 +417,43 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
         or not isinstance(wsname, str)
         or wsname.upper() != expected_wsname
     ):
-        raise ValueError("Kraken AssetPairs base/quote identity did not match the requested market")
+        raise _MalformedProviderResponse("Kraken AssetPairs base/quote identity did not match the requested market")
     query = urllib.parse.urlencode({"pair": altname, "interval": KRAKEN_INTERVALS[interval]})
-    payload = _request_json(f"{KRAKEN_OHLC_URL}?{query}")
+    payload = _kraken_request_json(f"{KRAKEN_OHLC_URL}?{query}")
     if not isinstance(payload, dict):
-        raise ValueError("Kraken response was not an object")
+        raise _MalformedProviderResponse("Kraken response was not an object")
     errors = payload.get("error")
     if not isinstance(errors, list):
-        raise ValueError("Kraken OHLC response had an invalid error envelope")
+        raise _MalformedProviderResponse("Kraken OHLC response had an invalid error envelope")
     if errors:
         raise ValueError("Kraken rejected pair/timeframe: " + "; ".join(str(e) for e in errors))
     result = payload.get("result")
     if not isinstance(result, dict) or "last" not in result:
-        raise ValueError("Kraken OHLC response had no result or pagination cursor")
+        raise _MalformedProviderResponse("Kraken OHLC response had no result or pagination cursor")
     cursor = result.get("last")
     if isinstance(cursor, bool):
-        raise ValueError("Kraken OHLC pagination cursor was not an integer Unix timestamp")
+        raise _MalformedProviderResponse("Kraken OHLC pagination cursor was not an integer Unix timestamp")
     try:
         cursor_value = float(cursor)
     except (TypeError, ValueError, OverflowError):
-        raise ValueError("Kraken OHLC pagination cursor was not an integer Unix timestamp") from None
+        raise _MalformedProviderResponse("Kraken OHLC pagination cursor was not an integer Unix timestamp") from None
     if not math.isfinite(cursor_value) or not cursor_value.is_integer() or cursor_value < 0:
-        raise ValueError("Kraken OHLC pagination cursor was not an integer Unix timestamp")
+        raise _MalformedProviderResponse("Kraken OHLC pagination cursor was not an integer Unix timestamp")
     cursor_seconds = int(cursor_value)
     pair_keys = [key for key in result if key != "last"]
     accepted_keys = {canonical_key, altname, wsname.replace("/", "")}
     if len(pair_keys) != 1 or pair_keys[0] not in accepted_keys:
-        raise ValueError("Kraken OHLC result key did not match the resolved requested market")
+        raise _MalformedProviderResponse("Kraken OHLC result key did not match the resolved requested market")
     pair_key = pair_keys[0]
     rows = result.get(pair_key)
     if not isinstance(rows, list):
-        raise ValueError("Kraken returned no candle rows")
+        raise _MalformedProviderResponse("Kraken returned no candle rows")
     # Kraken's REST OHLC endpoint is capped at 720 time steps and always
     # includes the current, not-yet-committed frame. The public API route caps
     # requested history at 500, so one bounded response is sufficient; never
     # silently truncate an unexpectedly oversized provider payload.
     if len(rows) > MAX_KRAKEN_OHLC_ROWS:
-        raise ValueError("Kraken returned more OHLC rows than its documented 720-row cap")
+        raise _MalformedProviderResponse("Kraken returned more OHLC rows than its documented 720-row cap")
     candles = []
     # Validate rows before applying the requested limit so malformed tail rows
     # do not unnecessarily reduce the number of usable recent candles.
@@ -488,7 +497,7 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     if not candles:
         raise ValueError("Kraken returned no valid candles")
     if cursor_seconds < max(row["open_time"] // 1000 for row in candles):
-        raise ValueError("Kraken OHLC pagination cursor precedes the latest returned candle")
+        raise _MalformedProviderResponse("Kraken OHLC pagination cursor precedes the latest returned candle")
     return candles[-limit:]
 
 
