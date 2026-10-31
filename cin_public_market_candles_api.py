@@ -1511,7 +1511,9 @@ async def get_market_candles(
     """Retrieve timestamped public OHLCV candles with source provenance."""
     normalized = _validate(symbol, interval, limit)
     rows = await _load(normalized, interval, limit)
-    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    response_time = datetime.now(timezone.utc)
+    now_ms = int(response_time.timestamp() * 1000)
+    retrieved_at = response_time.isoformat()
     try:
         freshness = _freshness_metadata(rows, interval, now_ms)
     except (KeyError, TypeError, ValueError):
@@ -1543,7 +1545,7 @@ async def get_market_candles(
     )
     return {
         "service": "cin", "mode": "read_only", "source": source, "source_endpoint": endpoint,
-        "retrieved_at": datetime.now(timezone.utc).isoformat(), "symbol": normalized,
+        "retrieved_at": retrieved_at, "symbol": normalized,
         "timeframe": interval, "count": len(rows),
         "volume_semantics": _provider_volume_semantics(provider),
         "coverage": _coverage_metadata(rows, limit),
@@ -1580,7 +1582,9 @@ async def analyze_public_market(
     """Fetch public OHLCV and run CIN's existing deterministic technical analysis."""
     normalized = _validate(symbol, interval, limit)
     rows = await _load(normalized, interval, limit)
-    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    response_time = datetime.now(timezone.utc)
+    now_ms = int(response_time.timestamp() * 1000)
+    retrieved_at = response_time.isoformat()
     closed_rows = [row for row in rows if row["close_time"] < now_ms]
     if len(closed_rows) < 5:
         raise HTTPException(status_code=422, detail="At least five completed candles are required for market technical analysis.")
@@ -1597,7 +1601,7 @@ async def analyze_public_market(
         raise HTTPException(status_code=502, detail="Fetched public candles failed technical-analysis integrity validation.") from None
     analysis["input"].update({
         "symbol": normalized, "timeframe": interval, "source": source, "source_endpoint": endpoint,
-        "retrieved_at": datetime.now(timezone.utc).isoformat(),
+        "retrieved_at": retrieved_at,
         "requested_candle_count": limit,
         "returned_candle_count": len(rows),
         "candle_count_shortfall": max(0, limit - len(rows)),
