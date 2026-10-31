@@ -735,10 +735,25 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
     def test_cross_provider_comparison_reports_consistent_aligned_candles(self):
         left = [dict(row) for row in SAMPLE[:5]]
         right = [dict(row) for row in SAMPLE[:5]]
-        report = api.compare_provider_candles({"Binance": left, "Kraken": right}, "1h")
+        report = api.compare_provider_candles(
+            {"Binance": left, "Kraken": right}, "1h",
+            market_identity_by_provider={
+                "Binance": {"base_asset": "BTC", "quote_asset": "USD"},
+                "Kraken": {"base_asset": "BTC", "quote_asset": "USD"},
+            },
+        )
         self.assertEqual(report["consistency_status"], "consistent_within_configured_tolerances")
         self.assertEqual(report["pairwise_comparisons"][0]["shared_candle_count"], 5)
+        self.assertEqual(report["pairwise_comparisons"][0]["shared_timestamp_ratio"], 1.0)
+        self.assertIsNotNone(report["pairwise_comparisons"][0]["shared_window_start_utc"])
         self.assertEqual(report["timeline_gap_count"], 0)
+
+    def test_cross_provider_comparison_never_claims_consistency_without_verified_market_identity(self):
+        rows_a = [dict(row) for row in SAMPLE[:3]]
+        rows_b = [dict(row) for row in SAMPLE[:3]]
+        report = api.compare_provider_candles({"Binance": rows_a, "Kraken": rows_b}, "1h")
+        self.assertEqual(report["consistency_status"], "market_identity_unverified")
+        self.assertFalse(report["comparability_requirements"]["market_identity_verified"])
 
     def test_cross_provider_comparison_flags_price_and_volume_discrepancies(self):
         left = [dict(row) for row in SAMPLE[:5]]
@@ -853,7 +868,11 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         binance_row = dict(SAMPLE[0], _provider="binance")
         kraken_row = dict(SAMPLE[0], _provider="kraken")
         report = api.compare_provider_candles(
-            {"Binance": [binance_row], "Kraken": [kraken_row]}, "1h"
+            {"Binance": [binance_row], "Kraken": [kraken_row]}, "1h",
+            market_identity_by_provider={
+                "Binance": {"base_asset": "BTC", "quote_asset": "USD"},
+                "Kraken": {"base_asset": "BTC", "quote_asset": "USD"},
+            },
         )
         self.assertEqual(report["consistency_status"], "consistent_within_configured_tolerances")
 
