@@ -40,6 +40,24 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["close"], 101.0)
 
+
+    async def test_kraken_rejects_ambiguous_multiple_market_result_keys(self):
+        rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
+        payload = {
+            "error": [],
+            "result": {"XBTUSDT": rows, "ETHUSDT": rows, "last": 1700000000},
+        }
+        with patch.object(api, "_request_json", return_value=payload):
+            with self.assertRaisesRegex(ValueError, "exactly one requested market"):
+                api._fetch_kraken("BTCUSDT", "1h", 5)
+
+    async def test_kraken_accepts_single_market_result_with_cursor_metadata(self):
+        rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
+        payload = {"error": [], "result": {"XBTUSDT": rows, "last": 1700000000}}
+        with patch.object(api, "_request_json", return_value=payload):
+            candles = api._fetch_kraken("BTCUSDT", "1h", 5)
+        self.assertEqual(len(candles), 1)
+
     async def test_kraken_fills_limit_from_valid_rows_when_tail_row_is_invalid(self):
         rows = [
             [1700000000 + i * 3600, "100", "102", "99", "101", "100.5", "10", 4]
