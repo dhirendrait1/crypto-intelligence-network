@@ -504,6 +504,8 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
         payload = _request_json(url)
         if not isinstance(payload, list):
             raise ValueError("Coinbase response was not a list")
+        if len(payload) > 300:
+            raise ValueError("Coinbase response exceeded the 300-candle per-request limit")
         for row in payload:
             if not isinstance(row, list) or len(row) < 6:
                 continue
