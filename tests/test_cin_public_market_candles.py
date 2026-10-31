@@ -418,5 +418,26 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Binance transport failure", ctx.exception.detail)
 
 
+
+    async def test_load_rejects_invalid_ohlcv_row_from_provider(self):
+        invalid = dict(SAMPLE[0])
+        invalid["high"] = invalid["low"] - 1
+        with patch.object(api, "_fetch_binance", return_value=[invalid]):
+            with self.assertRaises(HTTPException) as ctx:
+                await api._load("BTCUSDT", "1h", 5)
+        self.assertEqual(ctx.exception.status_code, 502)
+        self.assertIn("ambiguous candle sequence", ctx.exception.detail)
+
+    async def test_load_rejects_overlapping_candle_time_ranges(self):
+        first = dict(SAMPLE[0])
+        second = dict(SAMPLE[1])
+        second["open_time"] = first["open_time"] + 1
+        second["close_time"] = first["close_time"] + 3_600_000
+        with patch.object(api, "_fetch_binance", return_value=[first, second]):
+            with self.assertRaises(HTTPException) as ctx:
+                await api._load("BTCUSDT", "1h", 5)
+        self.assertEqual(ctx.exception.status_code, 502)
+        self.assertIn("ambiguous candle sequence", ctx.exception.detail)
+
 if __name__ == "__main__":
     unittest.main()
