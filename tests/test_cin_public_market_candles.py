@@ -405,6 +405,50 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.exception.status_code, 503)
         self.assertIn("fallbacks unavailable", ctx.exception.detail)
 
+
+    async def test_binance_malformed_success_response_fails_closed_without_fallback(self):
+        with patch.object(api, "_fetch_binance", side_effect=ValueError("malformed JSON")), patch.object(
+            api, "_fetch_kraken"
+        ) as kraken, patch.object(api, "_fetch_coinbase") as coinbase:
+            with self.assertRaises(HTTPException) as ctx:
+                await api._load("BTCUSDT", "1h", 5)
+        self.assertEqual(ctx.exception.status_code, 502)
+        self.assertEqual(ctx.exception.detail, "Binance public market-data provider returned an invalid response.")
+        kraken.assert_not_called()
+        coinbase.assert_not_called()
+
+    async def test_market_candles_maps_timeline_integrity_failure_to_safe_502(self):
+        rows = [dict(row) for row in SAMPLE[:5]]
+        with patch.object(api, "_load", return_value=rows), patch.object(
+            api, "_timeline_integrity_metadata", side_effect=ValueError("internal timestamp detail")
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await api.get_market_candles("BTCUSDT", "1h", 5)
+        self.assertEqual(ctx.exception.status_code, 502)
+        self.assertEqual(ctx.exception.detail, "Public market-data provider returned inconsistent candle timeline metadata.")
+        self.assertNotIn("internal timestamp detail", ctx.exception.detail)
+
+    async def test_technical_analysis_maps_integrity_failure_to_safe_502(self):
+        rows = [dict(row) for row in SAMPLE[:10]]
+        with patch.object(api, "_load", return_value=rows), patch.object(
+            api, "_timeline_integrity_metadata", side_effect=ValueError("private validation detail")
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await api.analyze_public_market("BTCUSDT", "1h", 10)
+        self.assertEqual(ctx.exception.status_code, 502)
+        self.assertEqual(ctx.exception.detail, "Fetched public candles failed technical-analysis integrity validation.")
+        self.assertNotIn("private validation detail", ctx.exception.detail)
+
+    async def test_technical_analysis_sanitizes_analysis_validation_errors(self):
+        rows = [dict(row) for row in SAMPLE[:10]]
+        with patch.object(api, "_load", return_value=rows), patch.object(
+            api, "analyze_ohlc", side_effect=ValueError("internal indicator detail")
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await api.analyze_public_market("BTCUSDT", "1h", 10)
+        self.assertEqual(ctx.exception.status_code, 502)
+        self.assertNotIn("internal indicator detail", ctx.exception.detail)
+
     async def test_rejects_bad_symbol(self):
         with self.assertRaises(HTTPException) as ctx:
             await api.get_market_candles("BTC/USDT", "1h", 50)
