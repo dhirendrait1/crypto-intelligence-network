@@ -1372,6 +1372,29 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["is_stale"])
         self.assertIn("freshness threshold", result["stale_data_warning"])
 
+    def test_freshness_threshold_boundary_is_inclusive(self):
+        now_ms = 1_700_000_000_000
+        rows = [dict(SAMPLE[0])]
+        threshold_ms = 2 * 3_600_000
+        rows[0]["close_time"] = now_ms - threshold_ms
+        result = api._freshness_metadata(rows, "1h", now_ms)
+        self.assertEqual(result["stale_threshold_seconds"], 7200)
+        self.assertEqual(result["latest_closed_candle_age_seconds"], 7200)
+        self.assertEqual(result["freshness_status"], "fresh")
+        self.assertFalse(result["is_stale"])
+        self.assertIsNone(result["stale_data_warning"])
+
+    def test_freshness_threshold_marks_one_millisecond_over_as_stale(self):
+        now_ms = 1_700_000_000_000
+        rows = [dict(SAMPLE[0])]
+        threshold_ms = 2 * 3_600_000
+        rows[0]["close_time"] = now_ms - threshold_ms - 1
+        result = api._freshness_metadata(rows, "1h", now_ms)
+        self.assertEqual(result["freshness_status"], "stale")
+        self.assertTrue(result["is_stale"])
+        self.assertEqual(result["latest_closed_candle_age_seconds"], 7200.001)
+
+
     def test_freshness_metadata_distinguishes_forming_only_data(self):
         now_ms = 1_700_000_000_000
         rows = [dict(SAMPLE[0])]
@@ -1471,6 +1494,20 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rows[0]["_provider"], "binance")
         self.assertEqual(rows[0]["_source_endpoint"], api.BINANCE_KLINES_URL)
         self.assertNotIn("synthetic", rows[0])
+        kraken.assert_not_called()
+        coinbase.assert_not_called()
+
+    async def test_stale_primary_snapshot_is_labelled_not_replaced_by_fallback(self):
+        stale = [dict(SAMPLE[0])]
+        with patch.object(api, "_fetch_binance", return_value=stale), patch.object(
+            api, "_fetch_kraken"
+        ) as kraken, patch.object(api, "_fetch_coinbase") as coinbase:
+            rows = await api._load("BTCUSDT", "1h", 5)
+        now_ms = int(api.datetime.now(api.timezone.utc).timestamp() * 1000)
+        freshness = api._freshness_metadata(rows, "1h", now_ms)
+        self.assertEqual(rows[0]["_provider"], "binance")
+        self.assertEqual(freshness["freshness_status"], "stale")
+        self.assertTrue(freshness["is_stale"])
         kraken.assert_not_called()
         coinbase.assert_not_called()
 
