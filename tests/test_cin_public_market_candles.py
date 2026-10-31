@@ -2076,3 +2076,84 @@ class ProviderResponseOrderingNormalizationTests(unittest.TestCase):
             [row["open_time"] for row in normalized],
             sorted(row["open_time"] for row in fetched),
         )
+
+
+
+class ProviderSnapshotContractIntegrityTests(unittest.IsolatedAsyncioTestCase):
+    """Validate bounded, canonical, source-coherent provider snapshots."""
+
+    def _attributed_rows(self, provider="binance", source=None, endpoint=None):
+        source = source or {
+            "binance": "Binance public market-data API",
+            "kraken": "Kraken public OHLC API (fallback after Binance HTTP 451)",
+            "coinbase": "Coinbase Exchange public candles API (fallback after Binance transport failure; Kraken transport/data failure (TimeoutError))",
+        }[provider]
+        endpoint = endpoint or {
+            "binance": api.BINANCE_KLINES_URL,
+            "kraken": api.KRAKEN_OHLC_URL,
+            "coinbase": api.COINBASE_CANDLES_URL,
+        }[provider]
+        return [dict(SAMPLE[0], _provider=provider, _source=source, _source_endpoint=endpoint)], source, endpoint
+
+    def test_partial_snapshot_is_valid_but_remains_explicitly_partial(self):
+        rows, source, endpoint = self._attributed_rows()
+        api._validate_provider_snapshot_provenance(
+            rows, "binance", source, endpoint, None, requested_limit=5
+        )
+        coverage = api._coverage_metadata(rows, 5)
+        self.assertEqual(coverage["coverage_status"], "partial")
+        self.assertEqual(coverage["candle_count_shortfall"], 4)
+
+    def test_snapshot_rejects_more_rows_than_requested(self):
+        rows, source, endpoint = self._attributed_rows()
+        rows = rows * 2
+        with self.assertRaisesRegex(ValueError, "exceeds its valid requested limit"):
+            api._validate_provider_snapshot_provenance(
+                rows, "binance", source, endpoint, None, requested_limit=1
+            )
+
+    def test_snapshot_rejects_noncanonical_missing_fields(self):
+        rows, source, endpoint = self._attributed_rows()
+        rows[0].pop("volume")
+        with self.assertRaisesRegex(ValueError, "outside the canonical normalized schema"):
+            api._validate_provider_snapshot_provenance(
+                rows, "binance", source, endpoint, None, requested_limit=5
+            )
+
+    def test_snapshot_rejects_nonchronological_or_duplicate_records(self):
+        rows, source, endpoint = self._attributed_rows()
+        second = dict(SAMPLE[1], _provider="binance", _source=source, _source_endpoint=endpoint)
+        rows = [second, rows[0]]
+        with self.assertRaisesRegex(ValueError, "not strictly chronological and unique"):
+            api._validate_provider_snapshot_provenance(
+                rows, "binance", source, endpoint, None, requested_limit=5
+            )
+
+    async def test_all_adapters_emit_the_same_canonical_candle_field_contract(self):
+        expected = {"open_time", "open", "high", "low", "close", "volume", "close_time",
+                    "_provider", "_source", "_source_endpoint"}
+        cases = (
+            ("binance", None),
+            ("kraken", "451"),
+            ("coinbase", "transport"),
+        )
+        observed = []
+        for provider, trigger in cases:
+            with self.subTest(provider=provider):
+                if provider == "binance":
+                    with patch.object(api, "_fetch_binance", return_value=[dict(SAMPLE[0])]):
+                        rows = await api._load("BTCUSDT", "1h", 5)
+                elif provider == "kraken":
+                    with patch.object(api, "_fetch_binance", side_effect=urllib.error.HTTPError(
+                        api.BINANCE_KLINES_URL, 451, "unavailable", {}, None
+                    )), patch.object(api, "_fetch_kraken", return_value=[dict(SAMPLE[0])]):
+                        rows = await api._load("BTCUSDT", "1h", 5)
+                else:
+                    with patch.object(api, "_fetch_binance", side_effect=urllib.error.URLError("offline")), patch.object(
+                        api, "_fetch_kraken", side_effect=TimeoutError("offline")
+                    ), patch.object(api, "_fetch_coinbase", return_value=[dict(SAMPLE[0])]):
+                        rows = await api._load("BTCUSD", "1h", 5)
+                self.assertEqual(set(rows[0]), expected)
+                self.assertEqual(rows[0]["_provider"], provider)
+                observed.append(set(rows[0]))
+        self.assertTrue(all(fields == observed[0] for fields in observed))
