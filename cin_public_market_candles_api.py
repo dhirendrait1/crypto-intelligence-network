@@ -422,31 +422,36 @@ def _fetch_klines(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
 
 
 async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
+    """Load one provider snapshot; only transport failures and HTTP 451 fail over."""
+    fallback_reason = None
     try:
         rows = await asyncio.to_thread(_fetch_binance, symbol, interval, limit)
         source, endpoint = "Binance public market-data API", BINANCE_KLINES_URL
     except urllib.error.HTTPError as exc:
+        if exc.code in (418, 429):
+            raise HTTPException(status_code=503, detail="Public market-data rate limit reached; retry later.") from exc
         if exc.code != 451:
-            if exc.code in (418, 429):
-                raise HTTPException(status_code=503, detail="Public market-data rate limit reached; retry later.") from exc
             raise HTTPException(status_code=502, detail=f"Binance public market-data provider returned HTTP {exc.code}.") from exc
+        fallback_reason = "Binance HTTP 451"
+    except (urllib.error.URLError, TimeoutError, OSError):
+        fallback_reason = "Binance transport failure"
+
+    if fallback_reason is not None:
         try:
             rows = await asyncio.to_thread(_fetch_kraken, symbol, interval, limit)
-            source, endpoint = "Kraken public OHLC API (fallback after Binance HTTP 451)", KRAKEN_OHLC_URL
+            source = f"Kraken public OHLC API (fallback after {fallback_reason})"
+            endpoint = KRAKEN_OHLC_URL
         except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
             try:
                 rows = await asyncio.to_thread(_fetch_coinbase, symbol, interval, limit)
-                source, endpoint = "Coinbase Exchange public candles API (fallback after Binance HTTP 451)", COINBASE_CANDLES_URL
+                source = f"Coinbase Exchange public candles API (fallback after {fallback_reason})"
+                endpoint = COINBASE_CANDLES_URL
             except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as coinbase_exc:
-                # Do not disguise provider failure or return stale/empty data as live.
                 reason = "Kraken and Coinbase fallbacks unavailable or pair/timeframe unsupported"
                 if isinstance(coinbase_exc, urllib.error.HTTPError):
                     reason += f" (Coinbase HTTP {coinbase_exc.code})"
-                raise HTTPException(status_code=503, detail=reason + "; Binance returned HTTP 451.") from None
-    except (urllib.error.URLError, TimeoutError, OSError):
-        raise HTTPException(status_code=503, detail="Binance public market-data provider is temporarily unavailable.") from None
-    except (ValueError, json.JSONDecodeError):
-        raise HTTPException(status_code=502, detail="Binance public market-data provider returned an invalid response.") from None
+                raise HTTPException(status_code=503, detail=reason + f"; {fallback_reason}.") from None
+
     try:
         rows = _normalize_candle_sequence(rows)
     except (KeyError, TypeError, ValueError):
