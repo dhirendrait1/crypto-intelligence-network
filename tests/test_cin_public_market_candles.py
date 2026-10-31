@@ -808,6 +808,40 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(report["missing_interval_count"], 2)
         self.assertEqual(report["gaps"][0]["expected_next_open_time"], month_open(2025, 2))
 
+    def test_provider_data_quality_reports_forming_tail_and_zero_volume(self):
+        now_ms = 1_700_000_000_000
+        rows = [dict(SAMPLE[0]), dict(SAMPLE[1])]
+        rows[0]["close_time"] = now_ms - 30_000
+        rows[1]["open_time"] = now_ms - 1_000
+        rows[1]["close_time"] = now_ms + 3_599_000
+        rows[1]["volume"] = 0
+        result = api._provider_data_quality_metadata(rows, "1h", now_ms)
+        self.assertEqual(result["quality_status"], "warning")
+        self.assertEqual(result["completed_candle_count"], 1)
+        self.assertEqual(result["forming_candle_count"], 1)
+        self.assertTrue(result["latest_candle_is_forming"])
+        self.assertEqual(result["zero_volume_candle_count"], 1)
+        self.assertFalse(result["data_repaired_or_synthesized"])
+
+    def test_provider_data_quality_rejects_invalid_ohlcv(self):
+        rows = [dict(SAMPLE[0])]
+        rows[0]["high"] = rows[0]["low"] - 1
+        with self.assertRaisesRegex(ValueError, "invalid OHLCV candle"):
+            api._provider_data_quality_metadata(rows, "1h", 1_700_000_000_000)
+
+    def test_provider_data_quality_rejects_duplicate_open_times(self):
+        rows = [dict(SAMPLE[0]), dict(SAMPLE[0])]
+        with self.assertRaisesRegex(ValueError, "duplicate candle open timestamps"):
+            api._provider_data_quality_metadata(rows, "1h", 1_700_000_000_000)
+
+    def test_provider_data_quality_rejects_future_open_time(self):
+        now_ms = 1_700_000_000_000
+        rows = [dict(SAMPLE[0])]
+        rows[0]["open_time"] = now_ms + 1
+        rows[0]["close_time"] = now_ms + 3_600_000
+        with self.assertRaisesRegex(ValueError, "future open timestamp"):
+            api._provider_data_quality_metadata(rows, "1h", now_ms)
+
     def test_freshness_metadata_marks_recent_completed_candle_fresh(self):
         now_ms = 1_700_000_000_000
         rows = [dict(SAMPLE[0])]
