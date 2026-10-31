@@ -8,9 +8,9 @@ from fastapi import HTTPException
 import cin_public_market_candles_api as api
 
 SAMPLE = [
-    {"open_time": 1700000000000 + i * 3600000, "open": 100 + i, "high": 102 + i,
+    {"open_time": 1699999200000 + i * 3600000, "open": 100 + i, "high": 102 + i,
      "low": 99 + i, "close": 101 + i, "volume": 10.0,
-     "close_time": 1700003599999 + i * 3600000}
+     "close_time": 1700002799999 + i * 3600000}
     for i in range(50)
 ]
 
@@ -464,6 +464,29 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
     async def test_load_rejects_candle_duration_mismatched_to_requested_interval(self):
         malformed = dict(SAMPLE[0])
         malformed["close_time"] -= 1
+        with patch.object(api, "_fetch_binance", return_value=[malformed]):
+            with self.assertRaises(HTTPException) as ctx:
+                await api._load("BTCUSDT", "1h", 5)
+        self.assertEqual(ctx.exception.status_code, 502)
+        self.assertIn("ambiguous candle sequence", ctx.exception.detail)
+
+
+    def test_candle_open_alignment_uses_utc_timeframe_boundaries(self):
+        aligned_hour = 1699999200000
+        self.assertTrue(api._is_aligned_candle_open(aligned_hour, "1h"))
+        self.assertFalse(api._is_aligned_candle_open(aligned_hour + 1, "1h"))
+        self.assertTrue(api._is_aligned_candle_open(86_400_000, "1d"))
+        self.assertFalse(api._is_aligned_candle_open(86_400_001, "1d"))
+        monday = int(api.datetime(2025, 1, 6, tzinfo=api.timezone.utc).timestamp() * 1000)
+        self.assertTrue(api._is_aligned_candle_open(monday, "1w"))
+        self.assertFalse(api._is_aligned_candle_open(monday + 86_400_000, "1w"))
+        month_start = int(api.datetime(2025, 2, 1, tzinfo=api.timezone.utc).timestamp() * 1000)
+        self.assertTrue(api._is_aligned_candle_open(month_start, "1M"))
+        self.assertFalse(api._is_aligned_candle_open(month_start + 86_400_000, "1M"))
+
+    async def test_load_rejects_misaligned_provider_candle_open(self):
+        malformed = dict(SAMPLE[0], open_time=SAMPLE[0]["open_time"] + 1,
+                         close_time=SAMPLE[0]["close_time"] + 1)
         with patch.object(api, "_fetch_binance", return_value=[malformed]):
             with self.assertRaises(HTTPException) as ctx:
                 await api._load("BTCUSDT", "1h", 5)

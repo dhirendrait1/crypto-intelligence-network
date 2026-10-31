@@ -242,6 +242,20 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     return candles[-limit:]
 
 
+def _is_aligned_candle_open(open_time_ms: int, interval: str) -> bool:
+    """Check UTC timeframe boundaries; crypto markets have no daily session close."""
+    if interval not in TIMEFRAMES or isinstance(open_time_ms, bool) or not isinstance(open_time_ms, int):
+        return False
+    if interval == "1M":
+        value = datetime.fromtimestamp(open_time_ms / 1000, timezone.utc)
+        return value.day == 1 and value.hour == value.minute == value.second == value.microsecond == 0
+    duration = _INTERVAL_MS[interval]
+    if interval == "1w":
+        # Unix epoch began on Thursday; Monday 00:00 UTC is four days later.
+        return (open_time_ms - 4 * 86_400_000) % duration == 0
+    return open_time_ms % duration == 0
+
+
 def _normalize_candle_sequence(rows: list[dict[str, Any]], interval: str) -> list[dict[str, Any]]:
     """Validate OHLCV values and exact timeframe duration before ordering candles."""
     if interval not in TIMEFRAMES:
@@ -251,6 +265,8 @@ def _normalize_candle_sequence(rows: list[dict[str, Any]], interval: str) -> lis
     for row in rows:
         if not isinstance(row, dict) or not _is_valid_candle(row):
             raise ValueError("Provider returned an invalid OHLCV candle")
+        if not _is_aligned_candle_open(row["open_time"], interval):
+            raise ValueError("Provider candle open timestamp is not aligned to the UTC timeframe boundary")
         expected_close = row["open_time"] + _interval_duration_ms(interval, row["open_time"]) - 1
         if row["close_time"] != expected_close:
             raise ValueError("Provider candle timestamps do not match the requested timeframe")
