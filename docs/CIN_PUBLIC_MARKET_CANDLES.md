@@ -54,3 +54,8 @@ Provider failover is deliberately narrow. Binance HTTP 418/429 rate limits retur
 ### Malformed provider-row handling
 
 A successful HTTP response is not considered a healthy candle snapshot merely because some rows can be parsed. Binance, Kraken, and Coinbase adapters reject a snapshot when any in-window candle row has an invalid structure, timestamp, or OHLCV value; malformed rows are not silently skipped to make the remaining response appear complete. Kraken/Coinbase no-trade interval omissions remain a distinct provider behavior and are still represented through timeline/coverage diagnostics. Coinbase rows outside the explicitly requested UTC window are filtered as out-of-window data before candle validation; this is not treated as a malformed in-window candle. Malformed successful provider payloads fail closed with a sanitized provider error and are not used to trigger another provider as a way to hide the defect. No rows are repaired, imputed, or synthesized.
+
+
+### Coinbase page-boundary integrity
+
+Each Coinbase response page is checked against its own UTC-granularity window. CIN permits the single immediately preceding candle that Coinbase may include at a page start, and permits the shared page-end boundary so an identical repeated candle can be deduplicated. Rows older than that one-candle allowance or later than the requested page end fail closed as a malformed pagination response. Identical repeated boundary rows are retained once; conflicting rows for the same open timestamp remain a hard integrity failure. This page-level check is separate from the overall requested-window filter and does not create or repair candles.
