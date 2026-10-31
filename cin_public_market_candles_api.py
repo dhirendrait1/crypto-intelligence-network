@@ -715,9 +715,16 @@ def compare_provider_candles(
                 raise ValueError("Each provider market identity must be an object")
             base_asset = identity.get("base_asset")
             quote_asset = identity.get("quote_asset")
+            if not isinstance(base_asset, str) or not isinstance(quote_asset, str):
+                raise ValueError("Market identity requires valid base_asset and quote_asset values")
+            # Normalize presentation only. Do not infer equivalence between exchange
+            # aliases (for example BTC and XBT); callers must supply one canonical
+            # asset identity consistently for every provider being compared.
+            base_asset = base_asset.strip().upper()
+            quote_asset = quote_asset.strip().upper()
             if (
-                not isinstance(base_asset, str) or not re.fullmatch(r"[A-Z0-9]{2,20}", base_asset)
-                or not isinstance(quote_asset, str) or not re.fullmatch(r"[A-Z0-9]{2,20}", quote_asset)
+                not re.fullmatch(r"[A-Z0-9]{2,20}", base_asset)
+                or not re.fullmatch(r"[A-Z0-9]{2,20}", quote_asset)
             ):
                 raise ValueError("Market identity requires valid base_asset and quote_asset values")
             normalized_market_identities[provider_name] = (base_asset, quote_asset)
