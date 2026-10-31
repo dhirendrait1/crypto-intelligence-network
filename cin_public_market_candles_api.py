@@ -404,7 +404,7 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
         raise _MalformedProviderResponse("Kraken AssetPairs returned an invalid error envelope")
     pair_result = pair_payload.get("result")
     if not isinstance(pair_result, dict) or len(pair_result) != 1:
-        raise ValueError("Kraken AssetPairs did not resolve exactly one requested market")
+        raise _MalformedProviderResponse("Kraken AssetPairs did not resolve exactly one requested market")
     canonical_key, pair_info = next(iter(pair_result.items()))
     if not isinstance(pair_info, dict):
         raise _MalformedProviderResponse("Kraken AssetPairs returned invalid market metadata")
@@ -733,6 +733,14 @@ COINBASE_CANDLES_URL = "https://api.exchange.coinbase.com/products/{product_id}/
 COINBASE_GRANULARITY = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "6h": 21600, "1d": 86400}
 
 
+def _coinbase_request_json(url: str) -> Any:
+    """Classify invalid successful Coinbase response bodies as malformed, not outages."""
+    try:
+        return _request_json(url)
+    except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
+        raise _MalformedProviderResponse("Coinbase returned an invalid successful response body") from None
+
+
 def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
     """Fetch public Coinbase Exchange candles when primary providers are blocked."""
     if interval not in COINBASE_GRANULARITY:
@@ -765,11 +773,11 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
             "end": datetime.fromtimestamp(chunk_end, timezone.utc).isoformat(),
         })
         url = COINBASE_CANDLES_URL.format(product_id=urllib.parse.quote(product_id, safe="")) + "?" + query
-        payload = _request_json(url)
+        payload = _coinbase_request_json(url)
         if not isinstance(payload, list):
-            raise ValueError("Coinbase response was not a list")
+            raise _MalformedProviderResponse("Coinbase response was not a list")
         if len(payload) > 300:
-            raise ValueError("Coinbase response exceeded the 300-candle per-request limit")
+            raise _MalformedProviderResponse("Coinbase response exceeded the 300-candle per-request limit")
         for row in payload:
             if not isinstance(row, list) or len(row) < 6:
                 raise _MalformedProviderResponse("Coinbase returned a malformed candle row")
@@ -802,7 +810,7 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
             if start <= timestamp_seconds_int <= latest_open:
                 previous_row = rows_by_time.get(timestamp_seconds_int)
                 if previous_row is not None and previous_row != row:
-                    raise ValueError(
+                    raise _MalformedProviderResponse(
                         "Coinbase returned conflicting candle rows for the same open timestamp"
                     )
                 rows_by_time[timestamp_seconds_int] = row
@@ -829,7 +837,7 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
         except (TypeError, ValueError, OverflowError):
             raise _MalformedProviderResponse("Coinbase returned a malformed candle row") from None
     if not candles:
-        raise ValueError("Coinbase returned no valid candles")
+        raise _MalformedProviderResponse("Coinbase returned no valid candles")
     return candles[-limit:]
 
 
@@ -906,7 +914,7 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
                 source = f"Coinbase Exchange public candles API (fallback after {fallback_reason})"
                 endpoint = COINBASE_CANDLES_URL
             except _MalformedProviderResponse:
-                raise HTTPException(status_code=502, detail="Coinbase public market-data provider returned a malformed candle row.") from None
+                raise HTTPException(status_code=502, detail="Coinbase public market-data provider returned a malformed response.") from None
             except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as coinbase_exc:
                 reason = "Kraken and Coinbase fallbacks unavailable or pair/timeframe unsupported"
                 if isinstance(coinbase_exc, urllib.error.HTTPError):
@@ -921,7 +929,7 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
                 source = f"Coinbase Exchange public candles API (fallback after {fallback_reason})"
                 endpoint = COINBASE_CANDLES_URL
             except _MalformedProviderResponse:
-                raise HTTPException(status_code=502, detail="Coinbase public market-data provider returned a malformed candle row.") from None
+                raise HTTPException(status_code=502, detail="Coinbase public market-data provider returned a malformed response.") from None
             except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as coinbase_exc:
                 reason = "Kraken and Coinbase fallbacks unavailable or pair/timeframe unsupported"
                 if isinstance(coinbase_exc, urllib.error.HTTPError):
