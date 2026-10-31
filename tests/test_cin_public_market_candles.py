@@ -1484,6 +1484,67 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         kraken.assert_not_called()
         coinbase.assert_not_called()
 
+    async def test_kraken_http_server_error_falls_back_and_records_full_chain(self):
+        upstream_error = urllib.error.HTTPError(
+            api.KRAKEN_OHLC_URL, 503, "provider unavailable", {}, None
+        )
+        with patch.object(api, "_fetch_binance", side_effect=TimeoutError("primary timeout")), patch.object(
+            api, "_fetch_kraken", side_effect=upstream_error
+        ), patch.object(api, "_fetch_coinbase", return_value=[dict(SAMPLE[0])]):
+            rows = await api._load("BTCUSD", "1h", 5)
+        self.assertEqual(rows[0]["_provider"], "coinbase")
+        self.assertIn("Binance transport failure", rows[0]["_source"])
+        self.assertIn("Kraken HTTP 503", rows[0]["_source"])
+        self.assertEqual(rows[0]["_source_endpoint"], api.COINBASE_CANDLES_URL)
+        api._validate_provider_snapshot_provenance(
+            rows, "coinbase", rows[0]["_source"], api.COINBASE_CANDLES_URL,
+            "Binance transport failure",
+        )
+
+    async def test_kraken_access_denial_stops_fallback_chain(self):
+        for status in (401, 403):
+            upstream_error = urllib.error.HTTPError(
+                api.KRAKEN_OHLC_URL, status, "access denied", {}, None
+            )
+            with self.subTest(status=status), patch.object(
+                api, "_fetch_binance", side_effect=TimeoutError("primary timeout")
+            ), patch.object(api, "_fetch_kraken", side_effect=upstream_error), patch.object(
+                api, "_fetch_coinbase"
+            ) as coinbase:
+                with self.assertRaises(HTTPException) as ctx:
+                    await api._load("BTCUSD", "1h", 5)
+            self.assertEqual(ctx.exception.status_code, 502)
+            self.assertIn(f"HTTP {status}", ctx.exception.detail)
+            coinbase.assert_not_called()
+
+    async def test_kraken_rate_limit_stops_fallback_chain(self):
+        for status in (418, 429):
+            upstream_error = urllib.error.HTTPError(
+                api.KRAKEN_OHLC_URL, status, "rate limited", {}, None
+            )
+            with self.subTest(status=status), patch.object(
+                api, "_fetch_binance", side_effect=TimeoutError("primary timeout")
+            ), patch.object(api, "_fetch_kraken", side_effect=upstream_error), patch.object(
+                api, "_fetch_coinbase"
+            ) as coinbase:
+                with self.assertRaises(HTTPException) as ctx:
+                    await api._load("BTCUSD", "1h", 5)
+            self.assertEqual(ctx.exception.status_code, 503)
+            self.assertIn("rate limit", ctx.exception.detail)
+            coinbase.assert_not_called()
+
+    async def test_coinbase_rate_limit_is_reported_without_retry_or_provider_fanout(self):
+        rate_limit = urllib.error.HTTPError(
+            api.COINBASE_CANDLES_URL, 429, "rate limited", {}, None
+        )
+        with patch.object(api, "_fetch_binance", side_effect=TimeoutError("primary timeout")), patch.object(
+            api, "_fetch_kraken", side_effect=TimeoutError("Kraken timeout")
+        ), patch.object(api, "_fetch_coinbase", side_effect=rate_limit):
+            with self.assertRaises(HTTPException) as ctx:
+                await api._load("BTCUSD", "1h", 5)
+        self.assertEqual(ctx.exception.status_code, 503)
+        self.assertIn("Coinbase HTTP 429", ctx.exception.detail)
+
     async def test_partial_primary_snapshot_is_returned_without_padding_or_fallback(self):
         partial = [dict(SAMPLE[0])]
         with patch.object(api, "_fetch_binance", return_value=partial), patch.object(

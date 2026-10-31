@@ -1266,8 +1266,9 @@ def _validate_provider_snapshot_provenance(
 
 
 async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
-    """Load one provider snapshot; only transport failures and HTTP 451 fail over."""
+    """Load one provider snapshot with classified failures and explicit fallback provenance."""
     fallback_reason = None
+    fallback_context = None
     provider = "binance"
     try:
         rows = await asyncio.to_thread(_fetch_binance, symbol, interval, limit)
@@ -1286,6 +1287,7 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
         raise HTTPException(status_code=502, detail="Binance public market-data provider returned an invalid response.") from None
 
     if fallback_reason is not None:
+        fallback_context = fallback_reason
         try:
             rows = await asyncio.to_thread(_fetch_kraken, symbol, interval, limit)
             provider = "kraken"
@@ -1296,10 +1298,13 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
         except urllib.error.HTTPError as exc:
             if exc.code in (418, 429):
                 raise HTTPException(status_code=503, detail="Kraken public market-data rate limit reached; retry later.") from None
+            if exc.code in (401, 403):
+                raise HTTPException(status_code=502, detail=f"Kraken public market-data provider access denied (HTTP {exc.code}); fallback stopped.") from None
+            fallback_context = f"{fallback_reason}; Kraken HTTP {exc.code}"
             try:
                 rows = await asyncio.to_thread(_fetch_coinbase, symbol, interval, limit)
                 provider = "coinbase"
-                source = f"Coinbase Exchange public candles API (fallback after {fallback_reason})"
+                source = f"Coinbase Exchange public candles API (fallback after {fallback_context})"
                 endpoint = COINBASE_CANDLES_URL
             except _MalformedProviderResponse:
                 raise HTTPException(status_code=502, detail="Coinbase public market-data provider returned a malformed response.") from None
@@ -1307,14 +1312,15 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
                 reason = "Kraken and Coinbase fallbacks unavailable or pair/timeframe unsupported"
                 if isinstance(coinbase_exc, urllib.error.HTTPError):
                     reason += f" (Coinbase HTTP {coinbase_exc.code})"
-                raise HTTPException(status_code=503, detail=reason + f"; {fallback_reason}.") from None
+                raise HTTPException(status_code=503, detail=reason + f"; {fallback_context}.") from None
         except _MalformedProviderResponse:
             raise HTTPException(status_code=502, detail="Kraken public market-data provider returned a malformed candle row.") from None
-        except (urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as kraken_exc:
+            fallback_context = f"{fallback_reason}; Kraken transport/data failure ({type(kraken_exc).__name__})"
             try:
                 rows = await asyncio.to_thread(_fetch_coinbase, symbol, interval, limit)
                 provider = "coinbase"
-                source = f"Coinbase Exchange public candles API (fallback after {fallback_reason})"
+                source = f"Coinbase Exchange public candles API (fallback after {fallback_context})"
                 endpoint = COINBASE_CANDLES_URL
             except _MalformedProviderResponse:
                 raise HTTPException(status_code=502, detail="Coinbase public market-data provider returned a malformed response.") from None
@@ -1322,7 +1328,7 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
                 reason = "Kraken and Coinbase fallbacks unavailable or pair/timeframe unsupported"
                 if isinstance(coinbase_exc, urllib.error.HTTPError):
                     reason += f" (Coinbase HTTP {coinbase_exc.code})"
-                raise HTTPException(status_code=503, detail=reason + f"; {fallback_reason}.") from None
+                raise HTTPException(status_code=503, detail=reason + f"; {fallback_context}.") from None
 
     try:
         rows = _normalize_candle_sequence(rows, interval, provider)
