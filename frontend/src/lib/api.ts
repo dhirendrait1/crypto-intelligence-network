@@ -71,6 +71,9 @@ export function validateCoinbaseCandlesPayload(
     if (!isIsoTimestamp(candle.open_time_utc) || !isIsoTimestamp(candle.close_time_utc) || typeof candle.is_closed !== "boolean") {
       return { valid: false, message: `Candle ${index + 1} has invalid timestamps or close-state metadata.` };
     }
+    if (Date.parse(candle.open_time_utc as string) / 1000 !== openTime || Date.parse(candle.close_time_utc as string) / 1000 !== closeTime) {
+      return { valid: false, message: `Candle ${index + 1} UTC timestamps do not match their numeric epoch fields.` };
+    }
     previousOpenTime = openTime;
   }
   return { valid: true, message: "Coinbase public USD candles passed the frontend response contract." };
