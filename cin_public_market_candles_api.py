@@ -55,12 +55,23 @@ def _timeline_integrity_metadata(rows: list[dict[str, Any]], interval: str) -> d
     """Report missing expected opens between returned candles; never fill gaps."""
     if interval not in TIMEFRAMES:
         raise ValueError("Unsupported timeline interval")
+    if not isinstance(rows, list) or not rows:
+        raise ValueError("Timeline requires a non-empty candle list")
+    for row in rows:
+        if (
+            not isinstance(row, dict)
+            or isinstance(row.get("open_time"), bool)
+            or not isinstance(row.get("open_time"), int)
+        ):
+            raise ValueError("Timeline contains an invalid candle open timestamp")
     ordered = sorted(rows, key=lambda row: row["open_time"])
     gaps = []
     missing_total = 0
     for previous, current in zip(ordered, ordered[1:]):
         expected = previous["open_time"] + _interval_duration_ms(interval, previous["open_time"])
-        if current["open_time"] <= expected:
+        if current["open_time"] < expected:
+            raise ValueError("Timeline contains duplicate or overlapping candle intervals")
+        if current["open_time"] == expected:
             continue
         cursor, missing = expected, 0
         while cursor < current["open_time"]:
@@ -334,6 +345,14 @@ def compare_provider_candles(
                 raise ValueError(f"{provider} supplied a non-integer candle timestamp")
             if timestamp in by_time:
                 raise ValueError(f"{provider} supplied duplicate candle timestamps")
+            expected_close = timestamp + _interval_duration_ms(interval, timestamp) - 1
+            if row["close_time"] != expected_close:
+                raise ValueError(f"{provider} supplied a candle with an invalid timeframe duration")
+            provider_key = provider.strip().lower()
+            if provider_key in {"binance", "kraken", "coinbase"} and not _is_aligned_candle_open(
+                timestamp, interval, provider_key
+            ):
+                raise ValueError(f"{provider} supplied a candle open outside its provider timeframe boundary")
             by_time[timestamp] = row
         normalized[provider] = by_time
 
@@ -421,7 +440,7 @@ def compare_provider_candles(
             "Inputs must represent the same symbol and quote asset; this helper does not verify market identity.",
             "Provider snapshots are compared at exact candle-open timestamps; differing candle boundaries are not interpolated.",
             "A tolerance result is a diagnostic, not proof that either provider is correct or independently audited.",
-            "Monthly interval gap estimation uses a fixed-duration approximation for the missing-interval count.",
+            "Known provider names are checked against their supported candle boundaries; generic provider labels receive timeframe-duration validation without an assumed weekly anchor.",
         ],
     }
 
