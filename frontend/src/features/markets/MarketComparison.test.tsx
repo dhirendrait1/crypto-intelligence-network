@@ -15,7 +15,7 @@ describe("Market comparison", () => {
     render(<MarketComparison primaryProduct="BTC-USD" primaryCandles={[candle(200, 110, 110), candle(100, 100, 110)]} secondaryProduct="ETH-USD" secondaryCandles={[candle(100, 100, 105)]} />);
     expect(screen.getByText("+10.00%")).toBeTruthy();
     expect(screen.getByText("+5.00%")).toBeTruthy();
-    expect(screen.getByText("+5.00%", { selector: "strong" })).toBeTruthy();
+    expect(screen.getAllByText("+5.00%", { selector: "strong" })).toHaveLength(2);
     expect(screen.getByText("BTC-USD outperformed")).toBeTruthy();
   });
 
