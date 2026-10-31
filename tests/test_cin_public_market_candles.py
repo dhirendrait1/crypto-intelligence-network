@@ -2227,3 +2227,43 @@ class ProviderSnapshotContractIntegrityTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(rows[0]["_provider"], provider)
                 observed.append(set(rows[0]))
         self.assertTrue(all(fields == observed[0] for fields in observed))
+
+
+    def test_provider_fallback_metadata_identifies_primary_and_selected_provider(self):
+        direct = [dict(SAMPLE[0], _provider="binance", _source="Binance public market-data API",
+                       _source_endpoint=api.BINANCE_KLINES_URL)]
+        self.assertEqual(api._provider_fallback_metadata(direct), {
+            "primary_provider": "binance", "selected_provider": "binance",
+            "fallback_used": False, "fallback_trigger": None,
+            "intermediate_failures": [], "attribution_status": "verified",
+        })
+        kraken_source = "Kraken public OHLC API (fallback after Binance HTTP 451)"
+        kraken = [dict(SAMPLE[0], _provider="kraken", _source=kraken_source,
+                       _source_endpoint=api.KRAKEN_OHLC_URL)]
+        metadata = api._provider_fallback_metadata(kraken)
+        self.assertEqual(metadata["selected_provider"], "kraken")
+        self.assertTrue(metadata["fallback_used"])
+        self.assertEqual(metadata["fallback_trigger"], "Binance HTTP 451")
+
+    def test_provider_fallback_metadata_preserves_intermediate_failure_chain(self):
+        source = ("Coinbase Exchange public candles API (fallback after "
+                  "Binance transport failure; Kraken HTTP 503)")
+        rows = [dict(SAMPLE[0], _provider="coinbase", _source=source,
+                     _source_endpoint=api.COINBASE_CANDLES_URL)]
+        metadata = api._provider_fallback_metadata(rows)
+        self.assertEqual(metadata["primary_provider"], "binance")
+        self.assertEqual(metadata["selected_provider"], "coinbase")
+        self.assertEqual(metadata["fallback_trigger"], "Binance transport failure")
+        self.assertEqual(metadata["intermediate_failures"], ["Kraken HTTP 503"])
+
+    def test_provider_fallback_metadata_rejects_mixed_source_rows(self):
+        rows = [
+            dict(SAMPLE[0], _provider="kraken",
+                 _source="Kraken public OHLC API (fallback after Binance HTTP 451)",
+                 _source_endpoint=api.KRAKEN_OHLC_URL),
+            dict(SAMPLE[1], _provider="binance",
+                 _source="Binance public market-data API",
+                 _source_endpoint=api.BINANCE_KLINES_URL),
+        ]
+        with self.assertRaisesRegex(ValueError, "mixed or mismatched provenance"):
+            api._provider_fallback_metadata(rows)
