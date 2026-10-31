@@ -39,3 +39,8 @@ This fetches public candles and passes OHLC values into CIN's existing determini
 ### Historical request-window integrity
 
 The `historical_window_integrity` response compares returned candle opens with the provider-aligned rolling window implied by the requested interval count and retrieval time. It reports expected start/end opens, missing leading and trailing intervals, and rows outside the expected window. A partial edge window is a coverage observation, not proof of provider feed loss: Kraken and Coinbase may omit intervals with no trades. CIN never fills or synthesizes missing candles. Unsupported provider/timeframe boundary combinations fail validation rather than guessing an anchor.
+
+
+### UTC boundary and provider timestamp validation
+
+CIN normalizes provider timestamps to integer Unix milliseconds before shared processing: Binance supplies milliseconds, while Kraken and Coinbase supply seconds. Candle opens are validated against UTC interval boundaries, and close timestamps must equal the exact interval end (including calendar-month lengths). Weekly boundaries are provider-specific: Binance Monday 00:00 UTC and Kraken Thursday 00:00 UTC; Coinbase weekly candles are unsupported. Monthly candles are currently supported only for Binance. These rules are UTC-based and do not follow a client device's local timezone or daylight-saving transitions. Unsupported or misaligned rows are rejected rather than shifted.
