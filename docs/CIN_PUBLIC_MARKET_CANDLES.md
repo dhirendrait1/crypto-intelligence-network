@@ -104,3 +104,8 @@ The offline comparator validates finite, positive OHLC prices, internally consis
 ### Price-scale and OHLC outlier diagnostics
 
 For each provider pair, the offline comparison now summarizes left-to-right OHLC price ratios across exact shared candle opens (minimum, median, maximum, and max/min spread). It also returns up to five largest individual OHLC discrepancies with timestamp, field, both observed prices, ratio, and symmetric basis-point difference. These are ranked observations, not automatic rejection thresholds: the report does not decide which provider is correct, rescale prices, or infer a unit conversion. Market identity and exact timestamp alignment remain prerequisites, and volume comparability remains independently gated by explicit common-unit declarations.
+
+
+### Zero, missing, and unusual volume diagnostics
+
+Accepted candle rows must contain an explicit finite, non-negative volume value. A missing volume field is malformed and is never defaulted to zero; negative, NaN, and infinite volume values fail validation. Explicit zero-volume candles remain valid and are counted, with consecutive zero-volume runs reported by their first and last candle opens. Adjacent volume changes (including zero-to-positive and positive-to-zero transitions) and the largest observations relative to the positive-volume median are ranked for inspection. These rankings do not use a universal spike threshold, do not imply manipulation or provider failure, and do not reject otherwise valid candles. A zero-volume interval may reflect venue-specific no-trade semantics; interpretation requires provider context. Volume comparisons across providers remain withheld unless every provider explicitly declares the same volume-unit identifier.
