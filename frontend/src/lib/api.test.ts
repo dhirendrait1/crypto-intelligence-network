@@ -37,7 +37,7 @@ describe("Coinbase candle response contract", () => {
   });
 
   it("accepts a candle timestamp aligned to a five-minute UTC boundary", () => {
-    const payload = { ...validPayload([candle(300)]), granularity: "5m" };
+    const payload = { ...validPayload([candle(300)]), requested_start_utc: new Date(300_000).toISOString(), requested_end_utc: new Date(600_000).toISOString(), granularity: "5m" };
     expect(validateCoinbaseCandlesPayload(payload, "BTC-USD", "5m").valid).toBe(true);
   });
 
