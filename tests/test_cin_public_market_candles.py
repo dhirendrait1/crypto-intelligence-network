@@ -250,6 +250,17 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(integrity["gap_interpretation"], "missing_intervals_may_indicate_no_trades")
         self.assertIn("not proof of feed loss", integrity["interpretation_note"])
 
+    async def test_coinbase_market_candle_gaps_may_reflect_no_trades_not_feed_loss(self):
+        first = dict(SAMPLE[0], _source="Coinbase public candles API", _source_endpoint=api.COINBASE_CANDLES_URL, _provider="coinbase")
+        later = dict(SAMPLE[2], _source="Coinbase public candles API", _source_endpoint=api.COINBASE_CANDLES_URL, _provider="coinbase")
+        with patch.object(api, "_load", new=AsyncMock(return_value=[first, later])):
+            result = await api.get_market_candles("BTCUSD", "1h", 5)
+        integrity = result["timeline_integrity"]
+        self.assertTrue(integrity["has_gaps"])
+        self.assertEqual(integrity["provider"], "coinbase")
+        self.assertEqual(integrity["gap_interpretation"], "missing_intervals_may_indicate_no_trades")
+        self.assertIn("not proof of feed loss", integrity["interpretation_note"])
+
     async def test_unknown_provider_gap_cause_remains_unclassified(self):
         first = dict(SAMPLE[0], _source="Unknown public source", _source_endpoint="https://example.invalid", _provider="unknown")
         later = dict(SAMPLE[2], _source="Unknown public source", _source_endpoint="https://example.invalid", _provider="unknown")
@@ -389,6 +400,28 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(second_start % 60, 0)
         self.assertEqual(first_end, second_start)
         self.assertEqual((first_end - first_start) // 60, 300)
+
+    def test_coinbase_excludes_rows_outside_requested_utc_window(self):
+        def response(url):
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+            start_seconds = int(datetime.fromisoformat(query["start"][0]).timestamp())
+            end_seconds = int(datetime.fromisoformat(query["end"][0]).timestamp())
+            latest_open = (end_seconds // 3600) * 3600
+            def candle(timestamp):
+                return [timestamp, "99", "103", "100", "102", "10"]
+            return [
+                candle(start_seconds - 3600),
+                candle(start_seconds),
+                candle(latest_open),
+                candle(latest_open + 3600),
+            ]
+        with patch.object(api, "_request_json", side_effect=response):
+            rows = api._fetch_coinbase("BTCUSD", "1h", 5)
+        opens = [row["open_time"] for row in rows]
+        self.assertEqual(len(opens), 2)
+        self.assertEqual(opens[0] % 3_600_000, 0)
+        self.assertEqual(opens[1] % 3_600_000, 0)
+        self.assertNotIn(opens[0] - 3_600_000, opens)
 
     def test_coinbase_deduplicates_rows_repeated_at_page_boundaries(self):
         row = [1700000000, "99", "103", "100", "102", "10"]
