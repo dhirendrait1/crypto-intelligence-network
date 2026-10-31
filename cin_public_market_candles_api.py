@@ -119,6 +119,50 @@ def _coverage_metadata(rows: list[dict[str, Any]], requested_limit: int) -> dict
     }
 
 
+def _provider_data_quality_metadata(rows: list[dict[str, Any]], interval: str, now_ms: int) -> dict[str, Any]:
+    """Summarize candle validity, forming-tail status, and freshness without repairing data."""
+    if interval not in TIMEFRAMES:
+        raise ValueError("Unsupported data-quality interval")
+    if not isinstance(rows, list) or not rows:
+        raise ValueError("Data-quality assessment requires non-empty candles")
+    seen_open_times = set()
+    for row in rows:
+        if not isinstance(row, dict) or not _is_valid_candle(row):
+            raise ValueError("Provider returned an invalid OHLCV candle")
+        open_time = row["open_time"]
+        if open_time > now_ms:
+            raise ValueError("Provider returned a candle with a future open timestamp")
+        if open_time in seen_open_times:
+            raise ValueError("Provider returned duplicate candle open timestamps")
+        seen_open_times.add(open_time)
+    ordered = sorted(rows, key=lambda row: row["open_time"])
+    if any(current["open_time"] < previous["open_time"] for previous, current in zip(ordered, ordered[1:])):
+        raise ValueError("Provider candle timestamps are not chronological")
+    freshness = _freshness_metadata(ordered, interval, now_ms)
+    forming = [row for row in ordered if row["close_time"] >= now_ms]
+    zero_volume_count = sum(1 for row in ordered if float(row["volume"]) == 0)
+    warnings = []
+    if freshness["is_stale"]:
+        warnings.append("latest_completed_candle_is_stale")
+    if forming:
+        warnings.append("latest_candle_may_be_forming")
+    if zero_volume_count:
+        warnings.append("zero_volume_candles_present_review_provider_semantics")
+    return {
+        "quality_status": "warning" if warnings else "ok",
+        "candle_count": len(ordered),
+        "completed_candle_count": len(ordered) - len(forming),
+        "forming_candle_count": len(forming),
+        "latest_candle_is_forming": bool(forming and forming[-1] is ordered[-1]),
+        "zero_volume_candle_count": zero_volume_count,
+        "invalid_candle_count": 0,
+        "freshness_status": freshness["freshness_status"],
+        "latest_completed_candle_age_seconds": freshness["latest_closed_candle_age_seconds"],
+        "warnings": warnings,
+        "data_repaired_or_synthesized": False,
+    }
+
+
 def _freshness_metadata(rows: list[dict[str, Any]], interval: str, now_ms: int) -> dict[str, Any]:
     """Report completed-candle freshness and reject candles opening in the future."""
     if any(row["open_time"] > now_ms for row in rows):
@@ -734,6 +778,10 @@ async def get_market_candles(
         timeline_integrity = _timeline_integrity_metadata(rows, interval)
     except (KeyError, TypeError, ValueError):
         raise HTTPException(status_code=502, detail="Public market-data provider returned inconsistent candle timeline metadata.") from None
+    try:
+        data_quality = _provider_data_quality_metadata(rows, interval, now_ms)
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(status_code=502, detail="Public market-data provider returned invalid OHLCV data quality metadata.") from None
     source = rows[0].get("_source", "Binance public market-data API")
     endpoint = rows[0].get("_source_endpoint", BINANCE_KLINES_URL)
     provider = rows[0].get("_provider", "unknown")
@@ -757,6 +805,7 @@ async def get_market_candles(
         "timeframe": interval, "count": len(rows),
         "coverage": _coverage_metadata(rows, limit),
         **freshness,
+        "data_quality": data_quality,
         "timeline_integrity": timeline_integrity,
         "data": [
             {
