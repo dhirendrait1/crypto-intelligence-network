@@ -39,6 +39,7 @@ export function MarketsScreen() {
     const start = end - 24 * 60 * 60;
     const response = await cinApi.getCoinbaseCandles(productId, granularity, start, end);
     setResult(response);
+    setQualityHistory((current) => [toQualityObservation(productId, granularity, response, "single"), ...current].slice(0, 12));
     setLoading(false);
   }
 
@@ -52,6 +53,11 @@ export function MarketsScreen() {
       cinApi.getCoinbaseCandles(otherProduct, granularity, start, end),
     ]);
     setComparison({ primary, secondary });
+    setQualityHistory((current) => [
+      toQualityObservation(otherProduct, granularity, secondary, "comparison-secondary"),
+      toQualityObservation(productId, granularity, primary, "comparison-primary"),
+      ...current,
+    ].slice(0, 12));
     setComparisonLoading(false);
   }
 
@@ -103,7 +109,8 @@ export function MarketsScreen() {
           <p className="markets-footnote">Showing the latest {displayCandles.length} returned rows. Values are provider-reported candle fields, not a trading interface.</p>
         </>}
       </div>}
-      <MarketQualityHistory observations={qualityHistory} />\n      <p className="footer-note">Research and monitoring only. No order placement, trade execution, wallet access, private keys or fund movement.</p>
+      <MarketQualityHistory observations={qualityHistory} />
+      <p className="footer-note">Research and monitoring only. No order placement, trade execution, wallet access, private keys or fund movement.</p>
     </section>
   );
 }
