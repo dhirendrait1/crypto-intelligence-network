@@ -1437,7 +1437,9 @@ def _provider_fallback_metadata(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "fallback_used": False, "fallback_trigger": None,
             "intermediate_failures": [], "attribution_status": "verified",
         }
-    reason_text = source.split(prefix, 1)[1].rstrip(")")
+    reason_text = source.split(prefix, 1)[1]
+    if reason_text.endswith(")"):
+        reason_text = reason_text[:-1]
     chain_parts = [part.strip() for part in reason_text.split(";") if part.strip()]
     if not chain_parts or provider == "binance":
         raise ValueError("Fallback source does not identify a valid provider chain")
