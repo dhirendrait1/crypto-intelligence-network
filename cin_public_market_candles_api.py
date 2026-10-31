@@ -374,6 +374,7 @@ def compare_provider_candles(
     interval: str,
     price_tolerance_bps: float = 50.0,
     volume_tolerance_bps: float = 500.0,
+    market_identity_by_provider: dict[str, dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Compare same-market provider snapshots without fetching data or choosing a winner.
 
@@ -384,6 +385,26 @@ def compare_provider_candles(
         raise ValueError("Unsupported comparison interval")
     if not isinstance(provider_candles, dict) or len(provider_candles) < 2:
         raise ValueError("At least two named providers are required")
+    normalized_market_identities = None
+    if market_identity_by_provider is not None:
+        if not isinstance(market_identity_by_provider, dict):
+            raise ValueError("Market identities must be supplied as a provider mapping")
+        if set(market_identity_by_provider) != set(provider_candles):
+            raise ValueError("Market identity entries must match the compared provider names")
+        normalized_market_identities = {}
+        for provider_name, identity in market_identity_by_provider.items():
+            if not isinstance(identity, dict):
+                raise ValueError("Each provider market identity must be an object")
+            base_asset = identity.get("base_asset")
+            quote_asset = identity.get("quote_asset")
+            if (
+                not isinstance(base_asset, str) or not re.fullmatch(r"[A-Z0-9]{2,20}", base_asset)
+                or not isinstance(quote_asset, str) or not re.fullmatch(r"[A-Z0-9]{2,20}", quote_asset)
+            ):
+                raise ValueError("Market identity requires valid base_asset and quote_asset values")
+            normalized_market_identities[provider_name] = (base_asset, quote_asset)
+        if len(set(normalized_market_identities.values())) != 1:
+            raise ValueError("Provider market identities do not match: base/quote assets differ")
     try:
         price_tolerance_bps = float(price_tolerance_bps)
         volume_tolerance_bps = float(volume_tolerance_bps)
@@ -497,6 +518,13 @@ def compare_provider_candles(
         "mode": "read_only",
         "interval": interval,
         "provider_count": len(normalized),
+        "market_identity": (
+            {"base_asset": next(iter(normalized_market_identities.values()))[0],
+             "quote_asset": next(iter(normalized_market_identities.values()))[1],
+             "verified_across_inputs": True}
+            if normalized_market_identities is not None else
+            {"verified_across_inputs": False, "note": "Market identity was not supplied to this offline comparison."}
+        ),
         "providers": providers,
         "timeline_gaps": timeline_gaps,
         "timeline_gap_count": len(timeline_gaps),
