@@ -35,6 +35,16 @@ export function IntegrityDiagnostics({ result }: IntegrityDiagnosticsProps) {
     Number.isFinite(Date.parse(candle.close_time_utc))
   );
   const countMatches = payload !== null && payload.count === candles.length;
+  const providerAccountingAvailable = payload !== null &&
+    Number.isInteger(payload.provider_rows_received) &&
+    Number.isInteger(payload.provider_rows_invalid) &&
+    Number.isInteger(payload.provider_rows_duplicate) &&
+    Number.isInteger(payload.provider_rows_valid_before_deduplication) &&
+    Number.isInteger(payload.normalized_rows_count);
+  const providerAccountingConsistent = providerAccountingAvailable &&
+    payload.provider_rows_received === payload.provider_rows_invalid! + payload.provider_rows_valid_before_deduplication! &&
+    payload.provider_rows_duplicate! <= payload.provider_rows_valid_before_deduplication! &&
+    payload.normalized_rows_count === payload.provider_rows_valid_before_deduplication! - payload.provider_rows_duplicate!;
   const intervalSeconds: Record<string, number> = { "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "6h": 21600, "1d": 86400 };
   const interval = payload ? intervalSeconds[payload.granularity] : undefined;
   const missingIntervals = interval && candles.length > 1
@@ -52,6 +62,8 @@ export function IntegrityDiagnostics({ result }: IntegrityDiagnosticsProps) {
     { label: "Response contract", state: hasPayload ? "PASS" : "UNAVAILABLE", detail: hasPayload ? "The frontend API contract accepted this payload." : "No validated candle payload is available." },
     { label: "API response classification", state: result.state === "fresh" ? "PASS" : result.state === "stale" || result.state === "partial" || result.state === "conflicting" ? "WARN" : "UNAVAILABLE", detail: `Response state: ${result.state}. ${result.message}` },
     { label: "Declared candle count", state: hasPayload ? countMatches ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasPayload ? `${candles.length} returned / ${payload.count} declared` : "Cannot compare counts without a payload." },
+    { label: "Provider row accounting", state: !hasPayload || !providerAccountingAvailable ? "UNAVAILABLE" : !providerAccountingConsistent || payload.provider_rows_invalid! > 0 || payload.provider_rows_duplicate! > 0 ? "WARN" : "PASS", detail: !hasPayload || !providerAccountingAvailable ? "Provider row accounting metadata is not available." : `Received ${payload.provider_rows_received}; invalid ${payload.provider_rows_invalid}; duplicate ${payload.provider_rows_duplicate}; normalized ${payload.normalized_rows_count}.` },
+    { label: "Requested-window coverage", state: "UNAVAILABLE", detail: "The provider response does not establish complete coverage of the requested time window." },
     { label: "Chronological ordering", state: hasCandles ? chronological ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasCandles ? chronological ? "Open times are non-decreasing." : "One or more candles are out of chronological order." : "No candle rows are available to inspect." },
     { label: "OHLC and volume bounds", state: hasCandles ? ohlcValid ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasCandles ? ohlcValid ? "OHLCV values are finite and price/volume bounds are consistent." : "One or more candles contain non-finite values or violate OHLC/volume bounds." : "No candle values are available to inspect." },
     { label: "Candle timestamps", state: hasCandles ? timestampsValid ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasCandles ? timestampsValid ? "Candle timestamps are parseable." : "One or more candle timestamps are invalid." : "No candle timestamps are available to inspect." },
@@ -72,7 +84,7 @@ export function IntegrityDiagnostics({ result }: IntegrityDiagnosticsProps) {
           </li>
         ))}
       </ul>
-      <p className="markets-footnote">These are structural checks on the returned payload only. They do not verify exchange authenticity, market correctness, edge coverage outside the returned series, exchange authenticity, market correctness, or provider uptime.</p>
+      <p className="markets-footnote">These are structural checks on the returned payload only. They do not verify exchange authenticity, market correctness, requested-window coverage, exchange authenticity, market correctness, or provider uptime.</p>
     </section>
   );
 }
