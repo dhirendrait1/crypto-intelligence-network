@@ -20,12 +20,12 @@ SAMPLE = [
 class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
     def test_historical_window_integrity_detects_missing_leading_and_trailing_intervals(self):
         hour = 3_600_000
-        rows = [dict(SAMPLE[0], open_time=8 * hour), dict(SAMPLE[0], open_time=9 * hour)]
+        rows = [dict(SAMPLE[0], open_time=9 * hour), dict(SAMPLE[0], open_time=10 * hour)]
         for row in rows:
             row["close_time"] = row["open_time"] + hour - 1
         result = api._historical_window_integrity_metadata(rows, "1h", 5, "binance", 12 * hour)
         self.assertEqual(result["window_status"], "partial")
-        self.assertEqual(result["leading_missing_interval_count"], 3)
+        self.assertEqual(result["leading_missing_interval_count"], 1)
         self.assertEqual(result["trailing_missing_interval_count"], 2)
         self.assertEqual(result["out_of_window_candle_count"], 0)
         self.assertFalse(result["missing_candles_synthesized"])
