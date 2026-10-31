@@ -62,6 +62,4 @@ jobs:
           python -m py_compile tests/test_cin_coinbase_market_data_api.py
       - name: Run Coinbase backend contract tests
         run: |
-          python -m unittest -v \
-            tests.test_cin_coinbase_public_market_data \
-            tests.test_cin_coinbase_market_data_api
+          python -m unittest discover -s tests -p 'test_cin_coinbase_*.py' -v
