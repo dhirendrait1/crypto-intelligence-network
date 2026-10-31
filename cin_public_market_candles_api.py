@@ -560,7 +560,18 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     raw_quote = pair_info.get("quote")
     asset_class_base = pair_info.get("aclass_base")
     asset_class_quote = pair_info.get("aclass_quote")
+    market_status = pair_info.get("status")
     expected_wsname = f"{base}/{quote}"
+    if not isinstance(market_status, str) or not market_status:
+        raise _MalformedProviderResponse("Kraken AssetPairs market status is missing or invalid")
+    known_market_statuses = {
+        "online", "cancel_only", "post_only", "limit_only", "reduce_only",
+        "maintenance", "delisted", "suspended", "hidden",
+    }
+    if market_status not in known_market_statuses:
+        raise _MalformedProviderResponse("Kraken AssetPairs market status is unknown")
+    if market_status != "online":
+        raise ValueError(f"Kraken market is unavailable for candle eligibility (status: {market_status})")
     if (
         not isinstance(altname, str)
         or altname.upper() != requested_pair
