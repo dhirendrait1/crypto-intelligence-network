@@ -64,3 +64,8 @@ Each Coinbase response page is checked against its own UTC-granularity window. C
 ### Kraken response-envelope and cursor integrity
 
 Kraken AssetPairs and OHLC responses must provide an object envelope with an explicitly present, empty-list `error` field. The OHLC `result` must contain exactly one resolved market key plus the `last` pagination cursor. The cursor must be a finite, non-negative integer Unix timestamp and must not precede the latest returned candle open. Missing, malformed, boolean, fractional, or stale cursors fail closed; CIN does not guess a cursor or retry with a different market key to conceal an invalid envelope. The cursor is validated as response metadata and is not used to fabricate additional candle rows.
+
+
+### Kraken candle ordering and duplicate integrity
+
+Kraken OHLC rows are checked in their original provider response order before the shared normalization stage. Open timestamps must be strictly increasing; duplicate or descending timestamps are malformed provider data and fail closed rather than being sorted into an apparently valid sequence. The pagination cursor is independently checked against the latest returned candle open. CIN does not deduplicate or reorder a malformed Kraken response to conceal provider-side chronology defects.
