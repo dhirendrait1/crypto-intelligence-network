@@ -1196,6 +1196,11 @@ def _verify_coinbase_product(product_id: str, base: str, quote: str) -> None:
     ):
         raise _MalformedProviderResponse("Coinbase product catalogue base/quote identity did not match the requested market")
 
+MAX_COINBASE_CANDLE_PAGE_SIZE = 300
+# The public candle route accepts at most 500 rows, so no request may need >2 pages.
+MAX_COINBASE_CANDLE_REQUEST_LIMIT = 500
+MAX_COINBASE_CANDLE_PAGES = 2
+
 COINBASE_GRANULARITY = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "6h": 21600, "1d": 86400}
 
 
@@ -1211,6 +1216,8 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
     """Fetch public Coinbase Exchange candles when primary providers are blocked."""
     if interval not in COINBASE_GRANULARITY:
         raise ValueError(f"Coinbase fallback does not support interval {interval}")
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= MAX_COINBASE_CANDLE_REQUEST_LIMIT:
+        raise ValueError("Coinbase candle request limit must be an integer from 1 to 500")
     base, quote = _parse_fallback_market_symbol(symbol, "Coinbase")
     # Never substitute a USD market for a USDT request: quote assets are not interchangeable.
     if quote != "USD":
@@ -1229,8 +1236,14 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
     # granularity-aligned windows. Timestamp-keyed collection deduplicates any
     # boundary row repeated by the upstream API.
     cursor = start
+    page_count = 0
     while cursor < now:
-        chunk_end = min(now, cursor + 300 * duration)
+        if page_count >= MAX_COINBASE_CANDLE_PAGES:
+            raise _MalformedProviderResponse("Coinbase pagination exceeded CIN’s bounded two-page recovery limit")
+        chunk_end = min(now, cursor + MAX_COINBASE_CANDLE_PAGE_SIZE * duration)
+        if chunk_end <= cursor:
+            raise _MalformedProviderResponse("Coinbase pagination cursor failed to advance")
+        page_count += 1
         query = urllib.parse.urlencode({
             "granularity": duration,
             "start": datetime.fromtimestamp(cursor, timezone.utc).isoformat(),
@@ -1240,7 +1253,7 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
         payload = _coinbase_request_json(url)
         if not isinstance(payload, list):
             raise _MalformedProviderResponse("Coinbase response was not a list")
-        if len(payload) > 300:
+        if len(payload) > MAX_COINBASE_CANDLE_PAGE_SIZE:
             raise _MalformedProviderResponse("Coinbase response exceeded the 300-candle per-request limit")
         for row in payload:
             if not isinstance(row, list) or len(row) < 6:
