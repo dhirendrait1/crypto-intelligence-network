@@ -88,6 +88,8 @@ describe("Markets screen", () => {
 
     resolveRequests.forEach((resolve) => resolve(response));
     await waitFor(() => expect((screen.getByRole("button", { name: "Load comparison" }) as HTMLButtonElement).disabled).toBe(false));
+    expect(screen.getAllByText("Freshness & integrity")).toHaveLength(2);
+    expect(screen.getAllByText("Latest closed candle age")).toHaveLength(2);
     expect((screen.getByRole("combobox", { name: "Market" }) as HTMLSelectElement).disabled).toBe(false);
     expect((screen.getByRole("combobox", { name: "Interval" }) as HTMLSelectElement).disabled).toBe(false);
   });
