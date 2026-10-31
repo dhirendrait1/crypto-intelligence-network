@@ -293,6 +293,54 @@ def _volume_quality_metadata(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _provider_volume_semantics(provider: str) -> dict[str, Any]:
+    """Describe documented raw candle-volume semantics without guessing units."""
+    descriptors = {
+        "binance": {
+            "provider": "binance",
+            "source_field": "kline[5]",
+            "source_field_label": "Volume",
+            "unit_basis": "base_asset",
+            "unit_asset": "market_base_asset",
+            "evidence_status": "provider_schema_distinguishes_volume_from_quote_asset_volume",
+            "provenance": "Binance Spot REST klines response schema",
+            "independent_unit_verification": True,
+        },
+        "kraken": {
+            "provider": "kraken",
+            "source_field": "ohlc_row[6]",
+            "source_field_label": "volume",
+            "unit_basis": "unknown",
+            "unit_asset": None,
+            "evidence_status": "response_schema_labels_volume_but_does_not_specify_asset_basis",
+            "provenance": "Kraken Spot REST OHLC response schema",
+            "independent_unit_verification": False,
+        },
+        "coinbase": {
+            "provider": "coinbase",
+            "source_field": "candle_row[5]",
+            "source_field_label": "volume",
+            "unit_basis": "unknown",
+            "unit_asset": None,
+            "evidence_status": "response_schema_labels_volume_but_does_not_specify_asset_basis",
+            "provenance": "Coinbase Exchange REST product candles response schema",
+            "independent_unit_verification": False,
+        },
+    }
+    if provider not in descriptors:
+        return {
+            "provider": provider,
+            "source_field": None,
+            "source_field_label": None,
+            "unit_basis": "unknown",
+            "unit_asset": None,
+            "evidence_status": "unsupported_provider_semantics",
+            "provenance": None,
+            "independent_unit_verification": False,
+        }
+    return dict(descriptors[provider])
+
+
 def _provider_data_quality_metadata(rows: list[dict[str, Any]], interval: str, now_ms: int) -> dict[str, Any]:
     """Summarize candle validity, forming-tail status, and freshness without repairing data."""
     if interval not in TIMEFRAMES:
@@ -1211,6 +1259,7 @@ async def get_market_candles(
         "service": "cin", "mode": "read_only", "source": source, "source_endpoint": endpoint,
         "retrieved_at": datetime.now(timezone.utc).isoformat(), "symbol": normalized,
         "timeframe": interval, "count": len(rows),
+        "volume_semantics": _provider_volume_semantics(provider),
         "coverage": _coverage_metadata(rows, limit),
         "historical_window_integrity": _historical_window_integrity_metadata(
             rows, interval, limit, provider, now_ms
