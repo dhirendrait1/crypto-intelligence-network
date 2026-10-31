@@ -1502,5 +1502,22 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(api._is_valid_candle(fractional))
         self.assertFalse(api._is_valid_candle(boolean))
 
+    def test_provider_volume_semantics_only_claims_explicitly_supported_unit_basis(self):
+        binance = api._provider_volume_semantics("binance")
+        self.assertEqual(binance["unit_basis"], "base_asset")
+        self.assertTrue(binance["independent_unit_verification"])
+        for provider in ("kraken", "coinbase"):
+            with self.subTest(provider=provider):
+                semantics = api._provider_volume_semantics(provider)
+                self.assertEqual(semantics["unit_basis"], "unknown")
+                self.assertIsNone(semantics["unit_asset"])
+                self.assertFalse(semantics["independent_unit_verification"])
+                self.assertIn("does_not_specify_asset_basis", semantics["evidence_status"])
+
+    def test_unknown_provider_volume_semantics_fail_closed_to_unknown(self):
+        semantics = api._provider_volume_semantics("custom-feed")
+        self.assertEqual(semantics["unit_basis"], "unknown")
+        self.assertFalse(semantics["independent_unit_verification"])
+
 if __name__ == "__main__":
     unittest.main()
