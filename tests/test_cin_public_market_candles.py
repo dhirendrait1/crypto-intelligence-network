@@ -1027,6 +1027,47 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("fallback after Binance transport failure", rows[0]["_source"])
         self.assertEqual(rows[0]["_source_endpoint"], api.COINBASE_CANDLES_URL)
 
+    async def test_binance_http_server_error_fails_closed_without_provider_fanout(self):
+        upstream_error = urllib.error.HTTPError(
+            api.BINANCE_KLINES_URL, 500, "upstream failure", {}, None
+        )
+        with patch.object(api, "_fetch_binance", side_effect=upstream_error), patch.object(
+            api, "_fetch_kraken"
+        ) as kraken, patch.object(api, "_fetch_coinbase") as coinbase:
+            with self.assertRaises(HTTPException) as ctx:
+                await api._load("BTCUSDT", "1h", 5)
+        self.assertEqual(ctx.exception.status_code, 502)
+        self.assertIn("HTTP 500", ctx.exception.detail)
+        kraken.assert_not_called()
+        coinbase.assert_not_called()
+
+    async def test_partial_primary_snapshot_is_returned_without_padding_or_fallback(self):
+        partial = [dict(SAMPLE[0])]
+        with patch.object(api, "_fetch_binance", return_value=partial), patch.object(
+            api, "_fetch_kraken"
+        ) as kraken, patch.object(api, "_fetch_coinbase") as coinbase:
+            rows = await api._load("BTCUSDT", "1h", 5)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["_provider"], "binance")
+        self.assertEqual(rows[0]["_source_endpoint"], api.BINANCE_KLINES_URL)
+        self.assertNotIn("synthetic", rows[0])
+        kraken.assert_not_called()
+        coinbase.assert_not_called()
+
+    async def test_partial_fallback_snapshot_preserves_provider_identity_and_count(self):
+        partial = [dict(SAMPLE[0])]
+        with patch.object(api, "_fetch_binance", side_effect=urllib.error.HTTPError(
+            api.BINANCE_KLINES_URL, 451, "unavailable for legal reasons", {}, None
+        )), patch.object(api, "_fetch_kraken", return_value=partial), patch.object(
+            api, "_fetch_coinbase"
+        ) as coinbase:
+            rows = await api._load("BTCUSDT", "1h", 5)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["_provider"], "kraken")
+        self.assertIn("fallback after Binance HTTP 451", rows[0]["_source"])
+        self.assertEqual(rows[0]["_source_endpoint"], api.KRAKEN_OHLC_URL)
+        coinbase.assert_not_called()
+
     async def test_binance_rate_limit_does_not_trigger_fallback_requests(self):
         with patch.object(api, "_fetch_binance", side_effect=urllib.error.HTTPError(
             api.BINANCE_KLINES_URL, 429, "rate limited", {}, None
