@@ -36,11 +36,11 @@ export function IntegrityDiagnostics({ result }: IntegrityDiagnosticsProps) {
   );
   const countMatches = payload !== null && payload.count === candles.length;
   const providerAccountingAvailable = payload !== null &&
-    Number.isInteger(payload.provider_rows_received) &&
-    Number.isInteger(payload.provider_rows_invalid) &&
-    Number.isInteger(payload.provider_rows_duplicate) &&
-    Number.isInteger(payload.provider_rows_valid_before_deduplication) &&
-    Number.isInteger(payload.normalized_rows_count);
+    Number.isInteger(payload.provider_rows_received) && payload.provider_rows_received! >= 0 &&
+    Number.isInteger(payload.provider_rows_invalid) && payload.provider_rows_invalid! >= 0 &&
+    Number.isInteger(payload.provider_rows_duplicate) && payload.provider_rows_duplicate! >= 0 &&
+    Number.isInteger(payload.provider_rows_valid_before_deduplication) && payload.provider_rows_valid_before_deduplication! >= 0 &&
+    Number.isInteger(payload.normalized_rows_count) && payload.normalized_rows_count! >= 0;
   const providerAccountingConsistent = providerAccountingAvailable &&
     payload.provider_rows_received === payload.provider_rows_invalid! + payload.provider_rows_valid_before_deduplication! &&
     payload.provider_rows_duplicate! <= payload.provider_rows_valid_before_deduplication! &&
