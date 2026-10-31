@@ -69,3 +69,8 @@ Kraken AssetPairs and OHLC responses must provide an object envelope with an exp
 ### Kraken candle ordering and duplicate integrity
 
 Kraken OHLC rows are checked in their original provider response order before the shared normalization stage. Open timestamps must be strictly increasing; duplicate or descending timestamps are malformed provider data and fail closed rather than being sorted into an apparently valid sequence. The pagination cursor is independently checked against the latest returned candle open. CIN does not deduplicate or reorder a malformed Kraken response to conceal provider-side chronology defects.
+
+
+### Kraken UTC interval-boundary and forming-candle handling
+
+Kraken candle opens are validated against the provider-specific UTC timeframe anchor at the adapter boundary, before rows enter shared normalization. The adapter verifies that the interval duration used to derive each close timestamp matches CIN's supported timeframe duration. Misaligned opens fail closed as malformed provider data. The current/incomplete candle returned by Kraken remains in the response when otherwise valid; freshness and quality metadata distinguish it from completed candles rather than silently dropping or rewriting it. Weekly candles use Kraken's Thursday 00:00 UTC anchor. No local-time or daylight-saving adjustment is applied.

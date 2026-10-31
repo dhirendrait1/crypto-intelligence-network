@@ -163,6 +163,31 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(ValueError, "did not match the resolved requested market"):
                 api._fetch_kraken("BTCUSDT", "1h", 5)
 
+    async def test_kraken_rejects_misaligned_utc_candle_open_at_adapter_boundary(self):
+        asset_pairs = {"error": [], "result": {
+            "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "base": "XXBT", "quote": "USDT"}
+        }}
+        for interval, timestamp in (("1h", 1700000060), ("1w", 1736121600)):
+            rows = [[timestamp, "100", "102", "99", "101", "100.5", "10", 4]]
+            payload = {"error": [], "result": {"XBTUSDT": rows, "last": timestamp}}
+            with patch.object(api, "_request_json", side_effect=[asset_pairs, payload]):
+                with self.assertRaisesRegex(api._MalformedProviderResponse, "UTC timeframe boundary"):
+                    api._fetch_kraken("BTCUSDT", interval, 5)
+
+    async def test_kraken_preserves_exact_interval_close_time_for_daily_and_four_hour_rows(self):
+        asset_pairs = {"error": [], "result": {
+            "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "base": "XXBT", "quote": "USDT"}
+        }}
+        for interval, timestamp, duration_ms in (
+            ("4h", 1700006400, 14_400_000),
+            ("1d", 1700006400, 86_400_000),
+        ):
+            rows = [[timestamp, "100", "102", "99", "101", "100.5", "10", 4]]
+            payload = {"error": [], "result": {"XBTUSDT": rows, "last": timestamp}}
+            with patch.object(api, "_request_json", side_effect=[asset_pairs, payload]):
+                candles = api._fetch_kraken("BTCUSDT", interval, 5)
+            self.assertEqual(candles[0]["close_time"], timestamp * 1000 + duration_ms - 1)
+
     async def test_kraken_rejects_duplicate_candle_timestamps_in_provider_order(self):
         row = [1700000000, "100", "102", "99", "101", "100.5", "10", 4]
         rows = [row, list(row)]
