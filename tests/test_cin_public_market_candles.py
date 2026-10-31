@@ -2034,3 +2034,45 @@ class KrakenAssetPairsMarketStatusIntegrityTests(unittest.TestCase):
                 with self.assertRaisesRegex(api._MalformedProviderResponse, "market status is unknown"):
                     api._fetch_kraken("BTCUSD", "1h", 5)
                 request.assert_called_once()
+
+
+class ProviderResponseOrderingNormalizationTests(unittest.TestCase):
+    """Exercise deterministic ordering and duplicate policy across adapters."""
+
+    def test_normalizer_orders_out_of_order_rows_deterministically_without_mutating_input(self):
+        rows = [dict(row) for row in reversed(SAMPLE[:4])]
+        original_order = [row["open_time"] for row in rows]
+        normalized = api._normalize_candle_sequence(rows, "1h", "binance")
+        expected = sorted(row["open_time"] for row in rows)
+        self.assertEqual([row["open_time"] for row in normalized], expected)
+        self.assertEqual([row["open_time"] for row in rows], original_order)
+        permuted = [dict(row) for row in (SAMPLE[2], SAMPLE[0], SAMPLE[3], SAMPLE[1])]
+        again = api._normalize_candle_sequence(permuted, "1h", "binance")
+        self.assertEqual(normalized, again)
+
+    def test_normalizer_rejects_identical_duplicate_timestamp(self):
+        first = dict(SAMPLE[0])
+        duplicate = dict(first)
+        with self.assertRaisesRegex(ValueError, "identical duplicate candle open timestamp"):
+            api._normalize_candle_sequence([first, duplicate], "1h", "binance")
+
+    def test_normalizer_rejects_conflicting_duplicate_timestamp(self):
+        first = dict(SAMPLE[0])
+        conflict = dict(first, close=first["close"] + 0.25)
+        with self.assertRaisesRegex(ValueError, "conflicting candle rows for the same open timestamp"):
+            api._normalize_candle_sequence([first, conflict], "1h", "binance")
+
+    async def test_binance_out_of_order_payload_is_canonicalized_by_shared_normalizer(self):
+        payload = []
+        for row in reversed(SAMPLE[:3]):
+            payload.append([
+                row["open_time"], str(row["open"]), str(row["high"]), str(row["low"]),
+                str(row["close"]), str(row["volume"]), row["close_time"],
+            ])
+        with patch.object(api, "_request_json", return_value=payload):
+            fetched = api._fetch_binance("BTCUSDT", "1h", 5)
+        normalized = api._normalize_candle_sequence(fetched, "1h", "binance")
+        self.assertEqual(
+            [row["open_time"] for row in normalized],
+            sorted(row["open_time"] for row in fetched),
+        )
