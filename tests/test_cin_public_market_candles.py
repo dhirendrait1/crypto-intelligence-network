@@ -26,6 +26,16 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self._catalogue_patch.start()
         self.addCleanup(self._catalogue_patch.stop)
 
+    def test_provider_timestamp_units_are_explicit_and_timezone_is_utc(self):
+        self.assertEqual(api._parse_provider_timestamp("1700000000000", "milliseconds"), 1700000000000)
+        self.assertEqual(api._parse_provider_timestamp("1700000000", "seconds"), 1700000000000)
+        for value, unit in ((1700000000, "milliseconds"), (1700000000000, "seconds"),
+                            (True, "milliseconds"), (1.5, "seconds"), (-1, "seconds"),
+                            (float("inf"), "seconds")):
+            with self.subTest(value=value, unit=unit):
+                with self.assertRaises(ValueError):
+                    api._parse_provider_timestamp(value, unit)
+
     def test_provider_scalar_schema_rejects_boolean_and_nested_values(self):
         self.assertFalse(api._is_provider_scalar(True))
         self.assertFalse(api._is_provider_scalar(False))
