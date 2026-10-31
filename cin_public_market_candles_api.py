@@ -25,6 +25,7 @@ router = APIRouter(tags=["public-market-candles"])
 BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines"
 KRAKEN_OHLC_URL = "https://api.kraken.com/0/public/OHLC"
 KRAKEN_ASSET_PAIRS_URL = "https://api.kraken.com/0/public/AssetPairs"
+MAX_KRAKEN_OHLC_ROWS = 720
 MAX_PROVIDER_RESPONSE_BYTES = 2 * 1024 * 1024
 # Largest millisecond Unix timestamp representable by Python datetime (year 9999).
 MAX_TIMESTAMP_MS = 253402300799999
@@ -273,6 +274,12 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     rows = result.get(pair_key)
     if not isinstance(rows, list):
         raise ValueError("Kraken returned no candle rows")
+    # Kraken's REST OHLC endpoint is capped at 720 time steps and always
+    # includes the current, not-yet-committed frame. The public API route caps
+    # requested history at 500, so one bounded response is sufficient; never
+    # silently truncate an unexpectedly oversized provider payload.
+    if len(rows) > MAX_KRAKEN_OHLC_ROWS:
+        raise ValueError("Kraken returned more OHLC rows than its documented 720-row cap")
     candles = []
     # Validate rows before applying the requested limit so malformed tail rows
     # do not unnecessarily reduce the number of usable recent candles.
