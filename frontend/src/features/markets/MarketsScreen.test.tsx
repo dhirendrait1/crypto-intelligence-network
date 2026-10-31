@@ -37,7 +37,7 @@ describe("Markets screen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Load candles" }));
     await waitFor(() => expect(cinApi.getCoinbaseCandles).toHaveBeenCalledTimes(1));
     expect(cinApi.getCoinbaseCandles).toHaveBeenCalledWith("BTC-USD", "1h", expect.any(Number), expect.any(Number));
-    expect(await screen.findByText("FRESH")).toBeTruthy();
+    expect(await screen.findAllByText("FRESH")).toHaveLength(2);
     expect(screen.getByText("Source: coinbase_exchange_public")).toBeTruthy();
     expect(screen.getByText("105")).toBeTruthy();
     expect(screen.getByText(/No order placement, trade execution/i)).toBeTruthy();
