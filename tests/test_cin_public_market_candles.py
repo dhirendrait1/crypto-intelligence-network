@@ -1,6 +1,8 @@
 """Offline safety and contract tests for public market candle endpoints."""
 import unittest
 import urllib.error
+import urllib.parse
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
@@ -265,8 +267,7 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             requests.append(urllib.parse.urlparse(url).query)
             return []
         with patch.object(api, "_request_json", side_effect=capture):
-            with patch.object(api.datetime, "now", wraps=api.datetime.now) as clock:
-                api._fetch_coinbase("BTCUSD", "1m", 500)
+            api._fetch_coinbase("BTCUSD", "1m", 500)
         self.assertEqual(len(requests), 2)
         first = urllib.parse.parse_qs(requests[0])
         second = urllib.parse.parse_qs(requests[1])
