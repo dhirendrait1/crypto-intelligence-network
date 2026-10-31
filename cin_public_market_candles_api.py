@@ -96,6 +96,85 @@ def _timeline_integrity_metadata(rows: list[dict[str, Any]], interval: str) -> d
     }
 
 
+def _expected_window_opens(interval: str, requested_limit: int, provider: str, now_ms: int) -> list[int]:
+    """Build provider-aligned expected candle opens ending at the current interval."""
+    if interval not in TIMEFRAMES or provider not in {"binance", "kraken", "coinbase"}:
+        raise ValueError("Unsupported provider/timeframe window")
+    if provider == "coinbase" and interval == "1w":
+        raise ValueError("Coinbase weekly candle boundary is not supported")
+    if provider != "binance" and interval == "3d":
+        raise ValueError("Three-day candle boundary is not supported by this provider")
+    if interval == "1M":
+        if provider != "binance":
+            raise ValueError("Monthly candle boundary is not supported by this provider")
+        current = datetime.fromtimestamp(now_ms / 1000, timezone.utc)
+        cursor = int(datetime(current.year, current.month, 1, tzinfo=timezone.utc).timestamp() * 1000)
+    else:
+        duration = _INTERVAL_MS[interval]
+        anchor_ms = 4 * 86_400_000 if interval == "1w" and provider == "binance" else 0
+        cursor = ((now_ms - anchor_ms) // duration) * duration + anchor_ms
+    opens = [cursor]
+    for _ in range(requested_limit - 1):
+        previous = opens[-1]
+        if interval == "1M":
+            current = datetime.fromtimestamp(previous / 1000, timezone.utc)
+            if current.month == 1:
+                previous = int(datetime(current.year - 1, 12, 1, tzinfo=timezone.utc).timestamp() * 1000)
+            else:
+                previous = int(datetime(current.year, current.month - 1, 1, tzinfo=timezone.utc).timestamp() * 1000)
+        else:
+            previous -= _INTERVAL_MS[interval]
+        opens.append(previous)
+    return list(reversed(opens))
+
+
+def _historical_window_integrity_metadata(
+    rows: list[dict[str, Any]], interval: str, requested_limit: int,
+    provider: str, now_ms: int,
+) -> dict[str, Any]:
+    """Report missing leading/trailing opens in the requested rolling window without imputing them."""
+    if not isinstance(rows, list) or not rows:
+        raise ValueError("Historical window requires non-empty candles")
+    if isinstance(requested_limit, bool) or not isinstance(requested_limit, int) or requested_limit < 1:
+        raise ValueError("Historical window requires a positive integer request limit")
+    expected = _expected_window_opens(interval, requested_limit, provider, now_ms)
+    actual = []
+    for row in rows:
+        if not isinstance(row, dict) or isinstance(row.get("open_time"), bool) or not isinstance(row.get("open_time"), int):
+            raise ValueError("Historical window contains an invalid candle open timestamp")
+        actual.append(row["open_time"])
+    if actual != sorted(actual) or len(actual) != len(set(actual)):
+        raise ValueError("Historical window candle opens must be unique and chronological")
+    expected_set = set(expected)
+    in_window = [stamp for stamp in actual if stamp in expected_set]
+    leading = 0
+    for stamp in expected:
+        if stamp in set(in_window):
+            break
+        leading += 1
+    trailing = 0
+    for stamp in reversed(expected):
+        if stamp in set(in_window):
+            break
+        trailing += 1
+    outside = [stamp for stamp in actual if stamp not in expected_set]
+    complete = leading == 0 and trailing == 0 and not outside
+    return {
+        "window_status": "complete" if complete else "partial",
+        "provider": provider,
+        "requested_interval_count": requested_limit,
+        "expected_window_start_open_time_utc": datetime.fromtimestamp(expected[0] / 1000, timezone.utc).isoformat(),
+        "expected_window_end_open_time_utc": datetime.fromtimestamp(expected[-1] / 1000, timezone.utc).isoformat(),
+        "leading_missing_interval_count": leading,
+        "trailing_missing_interval_count": trailing,
+        "out_of_window_candle_count": len(outside),
+        "observed_in_window_candle_count": len(in_window),
+        "window_warning": None if complete else "Requested window has missing edge intervals or out-of-window rows; provider-specific no-trade omissions may explain some absences.",
+        "interpretation_scope": "requested_rolling_window_edges_only; not_proof_of_provider_feed_loss",
+        "missing_candles_synthesized": False,
+    }
+
+
 def _coverage_metadata(rows: list[dict[str, Any]], requested_limit: int) -> dict[str, Any]:
     """Report returned row count against the requested limit, not continuity."""
     if (
@@ -855,6 +934,9 @@ async def get_market_candles(
         "retrieved_at": datetime.now(timezone.utc).isoformat(), "symbol": normalized,
         "timeframe": interval, "count": len(rows),
         "coverage": _coverage_metadata(rows, limit),
+        "historical_window_integrity": _historical_window_integrity_metadata(
+            rows, interval, limit, provider, now_ms
+        ),
         **freshness,
         "data_quality": data_quality,
         "timeline_integrity": timeline_integrity,
