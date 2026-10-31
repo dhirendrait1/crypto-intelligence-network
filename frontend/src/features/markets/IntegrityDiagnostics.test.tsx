@@ -17,7 +17,7 @@ const result: ApiResult<CoinbaseCandlesResponse> = {
     source_endpoint: "/products/BTC-USD/candles", product_id: "BTC-USD", quote_currency: "USD",
     granularity: "1m", requested_start_utc: "2026-10-31T00:00:00Z",
     requested_end_utc: "2026-10-31T00:01:00Z", retrieved_at: "2026-10-31T00:01:00Z",
-    count: 1, latest_closed_candle_close_time_utc: "2026-10-31T00:00:59Z",
+    count: 1, provider_rows_received: 1, provider_rows_invalid: 0, provider_rows_duplicate: 0, provider_rows_valid_before_deduplication: 1, normalized_rows_count: 1, provider_window_coverage: "not_established", latest_closed_candle_close_time_utc: "2026-10-31T00:00:59Z",
     latest_closed_candle_age_seconds: 1, stale_threshold_seconds: 300,
     stale_data_warning: null, data: [candle], limitations: [],
   },
@@ -29,6 +29,18 @@ describe("Integrity diagnostics", () => {
     expect(screen.getByText("Chronological ordering")).toBeTruthy();
     expect(screen.getByText("OHLC and volume bounds")).toBeTruthy();
     expect(screen.getByText("1 returned / 1 declared")).toBeTruthy();
+  });
+
+  it("reports provider row accounting and keeps requested-window coverage unestablished", () => {
+    const accounted = {
+      ...result,
+      data: { ...result.data!, provider_rows_received: 4, provider_rows_invalid: 1, provider_rows_duplicate: 1, provider_rows_valid_before_deduplication: 3, normalized_rows_count: 2 },
+    };
+    render(<IntegrityDiagnostics result={accounted} />);
+    expect(screen.getByText("Received 4; invalid 1; duplicate 1; normalized 2.")).toBeTruthy();
+    expect(screen.getByText("The provider response does not establish complete coverage of the requested time window.")).toBeTruthy();
+    expect(screen.getAllByText("WARN").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("UNAVAILABLE").length).toBeGreaterThan(0);
   });
 
   it("classifies stale accepted data as a warning without calling it malformed", () => {
@@ -45,7 +57,7 @@ describe("Integrity diagnostics", () => {
   it("does not infer integrity when no validated payload exists", () => {
     render(<IntegrityDiagnostics result={{ ...result, data: null, state: "unknown" }} />);
     expect(screen.getByText("No validated candle payload is available.")).toBeTruthy();
-    expect(screen.getAllByText("UNAVAILABLE").length).toBe(7);
+    expect(screen.getAllByText("UNAVAILABLE").length).toBe(9);
     expect(screen.queryByText("PASS")).toBeNull();
   });
 
@@ -56,7 +68,7 @@ describe("Integrity diagnostics", () => {
     };
     render(<IntegrityDiagnostics result={empty} />);
     expect(screen.getByText("No candle rows are available to inspect.")).toBeTruthy();
-    expect(screen.getAllByText("UNAVAILABLE").length).toBe(4);
+    expect(screen.getAllByText("UNAVAILABLE").length).toBe(6);
   });
 
   it("warns about missing intervals between returned candles without rejecting the payload", () => {
