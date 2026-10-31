@@ -228,3 +228,12 @@ describe("Integrity diagnostics", () => {
     expect(screen.getByText("One or more candle timestamps are invalid.")).toBeTruthy();
   });
 });
+
+  it("keeps requested-window coverage unavailable even when all returned candles are within bounds", () => {
+    render(<IntegrityDiagnostics result={result} />);
+    const boundsRow = screen.getByText("Requested-window candle bounds").closest("li");
+    const coverageRow = screen.getByText("Requested-window coverage").closest("li");
+    expect(boundsRow?.querySelector(".integrity-check-pass")).toBeTruthy();
+    expect(coverageRow?.querySelector(".integrity-check-unavailable")).toBeTruthy();
+    expect(screen.getByText("The provider response does not establish complete coverage of the requested time window.")).toBeTruthy();
+  });
