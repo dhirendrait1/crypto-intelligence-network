@@ -612,6 +612,12 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         request_json.assert_not_called()
 
 
+    def test_coinbase_rejects_request_limit_above_bounded_route_cap_before_network(self):
+        with patch.object(api, "_request_json") as request:
+            with self.assertRaisesRegex(ValueError, "request limit must be an integer from 1 to 500"):
+                api._fetch_coinbase("BTCUSD", "1m", 501)
+        request.assert_not_called()
+
     def test_coinbase_rejects_response_over_provider_page_limit(self):
         payload = [[1700000000 + index * 3600, "99", "103", "100", "102", "10"] for index in range(301)]
         with patch.object(api, "_request_json", return_value=payload):
@@ -702,6 +708,11 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
                 ValueError, "conflicting candle rows for the same open timestamp"
             ):
                 api._fetch_coinbase("BTCUSD", "1m", 500)
+
+    def test_coinbase_page_budget_is_exactly_two_for_maximum_route_window(self):
+        self.assertEqual(api.MAX_COINBASE_CANDLE_PAGE_SIZE, 300)
+        self.assertEqual(api.MAX_COINBASE_CANDLE_REQUEST_LIMIT, 500)
+        self.assertEqual(api.MAX_COINBASE_CANDLE_PAGES, 2)
 
     def test_coinbase_paginates_requested_history_in_bounded_chunks(self):
         payload = [[1700000000, "99", "103", "100", "102", "10"]]
