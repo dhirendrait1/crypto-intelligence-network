@@ -334,6 +334,49 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
                  "Kraken": [candle(january), candle(off_grid)]}, "1M"
             )
 
+
+    def test_timeline_integrity_rejects_overlapping_and_duplicate_opens(self):
+        first = dict(SAMPLE[0])
+        overlapping = dict(SAMPLE[1], open_time=first["open_time"] + 1)
+        with self.assertRaisesRegex(ValueError, "overlapping"):
+            api._timeline_integrity_metadata([first, overlapping], "1h")
+        with self.assertRaisesRegex(ValueError, "overlapping"):
+            api._timeline_integrity_metadata([first, dict(first)], "1h")
+
+    def test_timeline_integrity_rejects_invalid_open_timestamp(self):
+        with self.assertRaisesRegex(ValueError, "invalid candle open timestamp"):
+            api._timeline_integrity_metadata([{"open_time": True}], "1h")
+
+    def test_provider_comparison_validates_duration_and_known_provider_boundaries(self):
+        malformed = dict(SAMPLE[0], close_time=SAMPLE[0]["close_time"] - 1)
+        with self.assertRaisesRegex(ValueError, "invalid timeframe duration"):
+            api.compare_provider_candles(
+                {"Binance": [malformed], "Kraken": [dict(SAMPLE[0])]}, "1h"
+            )
+        monday = int(api.datetime(2025, 1, 6, tzinfo=api.timezone.utc).timestamp() * 1000)
+        candle = {"open_time": monday, "close_time": monday + 604_800_000 - 1,
+                  "open": 100.0, "high": 102.0, "low": 99.0, "close": 101.0, "volume": 10.0}
+        thursday = monday + 3 * 86_400_000
+        kraken_candle = dict(candle, open_time=thursday, close_time=thursday + 604_800_000 - 1)
+        with self.assertRaisesRegex(ValueError, "provider timeframe boundary"):
+            api.compare_provider_candles(
+                {"Binance": [candle], "Kraken": [candle]}, "1w"
+            )
+        # Arbitrary labels remain usable without inventing a provider-specific weekly anchor.
+        report = api.compare_provider_candles(
+            {"Feed A": [candle], "Feed B": [dict(candle)]}, "1w"
+        )
+        self.assertEqual(report["provider_count"], 2)
+
+    def test_provider_comparison_checks_kraken_thursday_weekly_anchor(self):
+        thursday = int(api.datetime(2025, 1, 9, tzinfo=api.timezone.utc).timestamp() * 1000)
+        candle = {"open_time": thursday, "close_time": thursday + 604_800_000 - 1,
+                  "open": 100.0, "high": 102.0, "low": 99.0, "close": 101.0, "volume": 10.0}
+        report = api.compare_provider_candles(
+            {"Kraken": [candle], "Other": [dict(candle)]}, "1w"
+        )
+        self.assertEqual(report["provider_count"], 2)
+
     def test_cross_provider_comparison_rejects_duplicate_or_invalid_rows(self):
         duplicate = [dict(SAMPLE[0]), dict(SAMPLE[0])]
         with self.assertRaisesRegex(ValueError, "duplicate candle timestamps"):
