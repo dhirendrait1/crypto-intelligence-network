@@ -794,6 +794,34 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreater(pair["price_discrepancy_bps_max"], 10000)
         self.assertEqual(report["consistency_status"], "discrepancies_or_gaps_detected")
 
+    def test_cross_provider_volume_diagnostics_rank_discrepancies_and_zero_mismatches(self):
+        left = [dict(row) for row in SAMPLE[:4]]
+        right = [dict(row) for row in SAMPLE[:4]]
+        left[0]["volume"] = 0
+        right[0]["volume"] = 5
+        left[2]["volume"] = 100
+        right[2]["volume"] = 10
+        report = api.compare_provider_candles(
+            {"Binance": left, "Kraken": right}, "1h",
+            volume_unit_by_provider={"Binance": "BTC", "Kraken": "BTC"},
+        )
+        pair = report["pairwise_comparisons"][0]
+        self.assertEqual(pair["zero_positive_volume_mismatch_count"], 1)
+        self.assertEqual(pair["largest_volume_discrepancies"][0]["volume_pattern"], "zero_vs_positive")
+        self.assertEqual(pair["largest_volume_discrepancies"][0]["open_time"], SAMPLE[0]["open_time"])
+        self.assertEqual(pair["largest_volume_discrepancies"][1]["volume_pattern"], "both_positive")
+        self.assertGreater(pair["volume_discrepancy_bps_max"], 0)
+
+    def test_cross_provider_volume_diagnostics_are_withheld_without_matching_units(self):
+        left = [dict(row) for row in SAMPLE[:3]]
+        right = [dict(row) for row in SAMPLE[:3]]
+        left[1]["volume"] = 0
+        report = api.compare_provider_candles({"Binance": left, "Kraken": right}, "1h")
+        pair = report["pairwise_comparisons"][0]
+        self.assertIsNone(pair["zero_positive_volume_mismatch_count"])
+        self.assertIsNone(pair["largest_volume_discrepancies"])
+        self.assertIsNone(pair["volume_discrepancy_bps_max"])
+
     def test_cross_provider_comparison_withholds_volume_delta_without_verified_units(self):
         rows_a = [dict(row) for row in SAMPLE[:3]]
         rows_b = [dict(row) for row in SAMPLE[:3]]
