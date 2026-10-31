@@ -62,6 +62,9 @@ export function validateCoinbaseCandlesPayload(
   if (!isIsoTimestamp(body.requested_start_utc) || !isIsoTimestamp(body.requested_end_utc)) return { valid: false, message: "Requested candle window must contain valid UTC timestamps." };
   const requestedStart = Date.parse(body.requested_start_utc as string) / 1000;
   const requestedEnd = Date.parse(body.requested_end_utc as string) / 1000;
+  const intervalSeconds: Record<string, number> = { "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "6h": 21600, "1d": 86400 };
+  const expectedIntervalSeconds = intervalSeconds[expectedGranularity];
+  if (expectedIntervalSeconds === undefined) return { valid: false, message: "Requested candle interval is not supported by the frontend contract." };
   if (requestedStart > requestedEnd) return { valid: false, message: "Requested candle window starts after it ends." };
   if ((expectedStart !== undefined && requestedStart !== expectedStart) || (expectedEnd !== undefined && requestedEnd !== expectedEnd)) {
     return { valid: false, message: "Response request window does not match the client request parameters." };
@@ -74,6 +77,7 @@ export function validateCoinbaseCandlesPayload(
     if (numeric.some((key) => typeof candle[key] !== "number" || !Number.isFinite(candle[key]))) return { valid: false, message: `Candle ${index + 1} contains a non-finite numeric field.` };
     const openTime = candle.open_time as number, closeTime = candle.close_time as number;
     if (openTime < requestedStart || openTime > requestedEnd) return { valid: false, message: `Candle ${index + 1} open timestamp falls outside the requested UTC window.` };
+    if (openTime % expectedIntervalSeconds !== 0) return { valid: false, message: `Candle ${index + 1} open timestamp is not aligned to the requested interval boundary.` };
     const open = candle.open as number, high = candle.high as number, low = candle.low as number, close = candle.close as number, volume = candle.volume as number;
     if (closeTime < openTime || openTime <= previousOpenTime || volume < 0 || low > high || low > open || open > high || low > close || close > high) {
       return { valid: false, message: `Candle ${index + 1} failed OHLC, volume, or chronological validation. Candle open timestamps must be strictly increasing with no duplicates.` };
