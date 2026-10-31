@@ -555,6 +555,9 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
                 raise HTTPException(status_code=503, detail="Kraken public market-data rate limit reached; retry later.") from None
             try:
                 rows = await asyncio.to_thread(_fetch_coinbase, symbol, interval, limit)
+                provider = "coinbase"
+                source = f"Coinbase Exchange public candles API (fallback after {fallback_reason})"
+                endpoint = COINBASE_CANDLES_URL
             except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as coinbase_exc:
                 reason = "Kraken and Coinbase fallbacks unavailable or pair/timeframe unsupported"
                 if isinstance(coinbase_exc, urllib.error.HTTPError):
