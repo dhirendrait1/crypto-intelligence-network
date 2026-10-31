@@ -53,6 +53,15 @@ class CoinbasePublicCandleTests(unittest.TestCase):
             rows = coinbase.fetch_candles("BTC-USD", "1h", 1700000000, 1700007200)
         self.assertEqual([row["open_time"] for row in rows], [1700000000000, 1700003600000])
 
+    def test_rejects_conflicting_rows_with_the_same_timestamp(self):
+        payload = [
+            [1700000000, "99", "103", "100", "102", "12"],
+            [1700000000, "99", "104", "100", "103", "12"],
+        ]
+        with patch.object(coinbase, "_request_json", return_value=payload):
+            with self.assertRaisesRegex(ValueError, "conflicting candle rows"):
+                coinbase.fetch_candles("BTC-USD", "1h", 1700000000, 1700003600)
+
     def test_skips_nonfinite_and_impossible_rows(self):
         payload = [
             [1700000000, "99", "103", "100", "102", "12"],
