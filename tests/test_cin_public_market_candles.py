@@ -18,6 +18,27 @@ SAMPLE = [
 
 
 class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
+    def test_coverage_metadata_reports_partial_row_ratio_without_claiming_feed_loss(self):
+        rows = [dict(row) for row in SAMPLE[:3]]
+        result = api._coverage_metadata(rows, 5)
+        self.assertEqual(result["coverage_status"], "partial")
+        self.assertEqual(result["candle_count_shortfall"], 2)
+        self.assertEqual(result["returned_row_ratio"], 0.6)
+        self.assertIn("inspect timeline_integrity", result["coverage_warning"])
+        self.assertIn("not_a_continuity_or_feed_health_claim", result["coverage_scope"])
+
+    def test_coverage_metadata_marks_full_requested_row_count(self):
+        result = api._coverage_metadata([dict(row) for row in SAMPLE[:5]], 5)
+        self.assertEqual(result["coverage_status"], "complete")
+        self.assertEqual(result["returned_row_ratio"], 1.0)
+        self.assertIsNone(result["coverage_warning"])
+
+    def test_coverage_metadata_rejects_invalid_request_limits(self):
+        for limit in (0, -1, True, 2.5, "5"):
+            with self.subTest(limit=limit):
+                with self.assertRaisesRegex(ValueError, "positive integer"):
+                    api._coverage_metadata([], limit)
+
     async def test_provider_response_size_is_bounded(self):
         response = MagicMock()
         response.status = 200
