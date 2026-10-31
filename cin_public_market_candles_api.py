@@ -518,6 +518,11 @@ def _kraken_request_json(url: str) -> Any:
         raise _MalformedProviderResponse("Kraken returned an invalid successful response body") from None
 
 
+def _is_provider_scalar(value: Any) -> bool:
+    """Accept JSON scalar field values only; booleans are never numeric market data."""
+    return not isinstance(value, bool) and isinstance(value, (str, int, float))
+
+
 def _is_valid_candle(candle: dict[str, Any]) -> bool:
     """Reject non-finite values, impossible OHLC ranges, and invalid timestamps."""
     try:
@@ -557,8 +562,8 @@ def _fetch_binance(symbol: str, interval: str, limit: int) -> list[dict[str, Any
         raise ValueError("Binance returned more candles than requested")
     candles = []
     for row in payload:
-        if not isinstance(row, list) or len(row) < 7:
-            raise _MalformedProviderResponse("Binance returned a malformed candle row")
+        if not isinstance(row, list) or len(row) < 7 or any(not _is_provider_scalar(row[index]) for index in range(7)):
+            raise _MalformedProviderResponse("Binance returned a malformed candle row or field type")
         try:
             # Do not silently discard malformed source rows or truncate timestamps.
             if isinstance(row[0], bool) or isinstance(row[6], bool):
@@ -597,8 +602,10 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     if not isinstance(pair_payload, dict):
         raise _MalformedProviderResponse("Kraken AssetPairs response was not an object")
     pair_errors = pair_payload.get("error")
-    if not isinstance(pair_errors, list) or pair_errors:
+    if not isinstance(pair_errors, list) or any(not isinstance(item, str) for item in pair_errors):
         raise _MalformedProviderResponse("Kraken AssetPairs returned an invalid error envelope")
+    if pair_errors:
+        raise _MalformedProviderResponse("Kraken AssetPairs returned provider errors")
     pair_result = pair_payload.get("result")
     if not isinstance(pair_result, dict) or len(pair_result) != 1:
         raise _MalformedProviderResponse("Kraken AssetPairs did not resolve exactly one requested market")
@@ -651,7 +658,7 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     if not isinstance(payload, dict):
         raise _MalformedProviderResponse("Kraken response was not an object")
     errors = payload.get("error")
-    if not isinstance(errors, list):
+    if not isinstance(errors, list) or any(not isinstance(item, str) for item in errors):
         raise _MalformedProviderResponse("Kraken OHLC response had an invalid error envelope")
     if errors:
         raise ValueError("Kraken rejected pair/timeframe: " + "; ".join(str(e) for e in errors))
@@ -686,8 +693,8 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     # Validate rows before applying the requested limit so malformed tail rows
     # do not unnecessarily reduce the number of usable recent candles.
     for row in rows:
-        if not isinstance(row, list) or len(row) < 7:
-            raise _MalformedProviderResponse("Kraken returned a malformed candle row")
+        if not isinstance(row, list) or len(row) < 7 or any(not _is_provider_scalar(row[index]) for index in (0, 1, 2, 3, 4, 6)):
+            raise _MalformedProviderResponse("Kraken returned a malformed candle row or field type")
         try:
             # Reject malformed timestamps and values; do not silently understate
             # provider row counts by dropping invalid source rows.
