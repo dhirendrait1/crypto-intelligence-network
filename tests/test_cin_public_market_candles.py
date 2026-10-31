@@ -579,6 +579,25 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("fallbacks unavailable", ctx.exception.detail)
         request_json.assert_not_called()
 
+    def test_fallback_symbol_parser_prefers_longest_supported_quote_suffix(self):
+        self.assertEqual(api._parse_fallback_market_symbol("BTCUSDT", "test"), ("BTC", "USDT"))
+        self.assertEqual(api._parse_fallback_market_symbol("BTCUSD", "test"), ("BTC", "USD"))
+        self.assertEqual(api._parse_fallback_market_symbol("ETHUSDT", "test"), ("ETH", "USDT"))
+
+    def test_fallback_symbol_parser_rejects_unsupported_or_ambiguous_symbols(self):
+        for symbol in ("BTCUSDC", "BTC-EUR", "BTC/USD", "BTC", "USDT", " BTCUSD", "btcusd"):
+            with self.subTest(symbol=symbol):
+                with self.assertRaisesRegex(ValueError, "fallback cannot map symbol"):
+                    api._parse_fallback_market_symbol(symbol, "test")
+
+    def test_fallback_adapters_reject_unlisted_quote_assets_before_network_access(self):
+        with patch.object(api, "_request_json") as request_json:
+            with self.assertRaisesRegex(ValueError, "Kraken fallback cannot map symbol"):
+                api._fetch_kraken("BTCUSDC", "1h", 5)
+            with self.assertRaisesRegex(ValueError, "Coinbase fallback cannot map symbol"):
+                api._fetch_coinbase("BTCUSDC", "1h", 5)
+        request_json.assert_not_called()
+
     def test_coinbase_rejects_usdt_without_substituting_usd(self):
         with patch.object(api, "_request_json") as request_json:
             with self.assertRaisesRegex(ValueError, "USDT requests are not mapped to USD"):
