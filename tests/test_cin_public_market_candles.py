@@ -2267,3 +2267,15 @@ class ProviderSnapshotContractIntegrityTests(unittest.IsolatedAsyncioTestCase):
         ]
         with self.assertRaisesRegex(ValueError, "mixed or mismatched provenance"):
             api._provider_fallback_metadata(rows)
+
+
+    def test_provider_fallback_metadata_preserves_transport_failure_class(self):
+        source = ("Coinbase Exchange public candles API (fallback after "
+                  "Binance transport failure; Kraken transport/data failure (TimeoutError))")
+        rows = [dict(SAMPLE[0], _provider="coinbase", _source=source,
+                     _source_endpoint=api.COINBASE_CANDLES_URL)]
+        metadata = api._provider_fallback_metadata(rows)
+        self.assertEqual(
+            metadata["intermediate_failures"],
+            ["Kraken transport/data failure (TimeoutError)"],
+        )
