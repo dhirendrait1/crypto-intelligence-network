@@ -84,17 +84,15 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
                 api._request_json("https://example.test/data")
         response.read.assert_called_once_with(api.MAX_PROVIDER_RESPONSE_BYTES + 1)
 
-    async def test_binance_skips_nonfinite_and_impossible_candles(self):
+    async def test_binance_rejects_snapshot_with_any_malformed_row(self):
         payload = [
             [1700000000000, "100", "102", "99", "101", "10", 1700003599999],
             [1700003600000, "100", "99", "101", "100", "10", 1700007199999],
             [1700007200000, "100", "NaN", "99", "101", "10", 1700010799999],
-            [1700010800000, "100", "102", "99", "101", "Infinity", 1700014399999],
         ]
         with patch.object(api, "_request_json", return_value=payload):
-            rows = api._fetch_binance("BTCUSDT", "1h", 5)
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["close"], 101.0)
+            with self.assertRaisesRegex(ValueError, "invalid OHLCV"):
+                api._fetch_binance("BTCUSDT", "1h", 5)
 
 
     async def test_kraken_rejects_ohlc_payload_over_documented_720_row_cap(self):
@@ -172,44 +170,34 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             candles = api._fetch_kraken("BTCUSDT", "1h", 5)
         self.assertEqual(len(candles), 1)
 
-    async def test_kraken_fills_limit_from_valid_rows_when_tail_row_is_invalid(self):
+    async def test_kraken_rejects_snapshot_with_any_malformed_row(self):
         rows = [
             [1700000000 + i * 3600, "100", "102", "99", "101", "100.5", "10", 4]
             for i in range(6)
         ]
-        # The newest provider row is malformed; earlier valid rows should fill the limit.
         rows[-1] = [1700018000, "100", "99", "101", "100", "100", "10", 4]
         payload = {"error": [], "result": {"XBTUSDT": rows, "last": 1700018000}}
         with patch.object(api, "_request_json", side_effect=[{"error":[],"result":{"XBTUSDT":{"altname":"XBTUSDT","wsname":"XBT/USDT","base":"XXBT","quote":"USDT"}}}, payload]):
-            candles = api._fetch_kraken("BTCUSDT", "1h", 5)
-        self.assertEqual(len(candles), 5)
-        self.assertEqual(candles[-1]["open_time"], 1700014400000)
+            with self.assertRaisesRegex(ValueError, "invalid OHLCV"):
+                api._fetch_kraken("BTCUSDT", "1h", 5)
 
-    async def test_kraken_skips_fractional_and_boolean_timestamps(self):
-        rows = [
-            [1700000000.5, "100", "102", "99", "101", "100.5", "10", 4],
-            [True, "100", "102", "99", "101", "100.5", "10", 4],
-            [1700000000, "100", "102", "99", "101", "100.5", "10", 4],
-        ]
-        payload = {"error": [], "result": {"XBTUSDT": rows, "last": 1700000000}}
-        asset_pairs = {"error": [], "result": {
-            "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "base": "XXBT", "quote": "USDT"}
-        }}
-        with patch.object(api, "_request_json", side_effect=[asset_pairs, payload]):
-            candles = api._fetch_kraken("BTCUSDT", "1h", 5)
-        self.assertEqual(len(candles), 1)
-        self.assertEqual(candles[0]["open_time"], 1700000000000)
+    async def test_kraken_rejects_fractional_or_boolean_source_timestamps(self):
+        for timestamp in (1700000000.5, True):
+            rows = [[timestamp, "100", "102", "99", "101", "100.5", "10", 4]]
+            payload = {"error": [], "result": {"XBTUSDT": rows, "last": 1700000000}}
+            asset_pairs = {"error": [], "result": {
+                "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "base": "XXBT", "quote": "USDT"}
+            }}
+            with patch.object(api, "_request_json", side_effect=[asset_pairs, payload]):
+                with self.assertRaisesRegex(ValueError, "timestamp"):
+                    api._fetch_kraken("BTCUSDT", "1h", 5)
 
-    async def test_binance_skips_fractional_and_boolean_timestamps(self):
-        payload = [
-            [1700000000000.5, "100", "102", "99", "101", "10", 1700003599999],
-            [True, "100", "102", "99", "101", "10", 1700003599999],
-            [1700000000000, "100", "102", "99", "101", "10", 1700003599999],
-        ]
-        with patch.object(api, "_request_json", return_value=payload):
-            rows = api._fetch_binance("BTCUSDT", "1h", 5)
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["open_time"], 1700000000000)
+    async def test_binance_rejects_fractional_or_boolean_source_timestamps(self):
+        for timestamp in (1700000000000.5, True):
+            payload = [[timestamp, "100", "102", "99", "101", "10", 1700003599999]]
+            with patch.object(api, "_request_json", return_value=payload):
+                with self.assertRaisesRegex(ValueError, "timestamp"):
+                    api._fetch_binance("BTCUSDT", "1h", 5)
 
     async def test_binance_rejects_request_limit_above_provider_max_without_request(self):
         with patch.object(api, "_request_json") as request:
@@ -235,21 +223,27 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(ValueError, "more candles than requested"):
                 api._fetch_binance("BTCUSDT", "1h", 5)
 
-    async def test_binance_skips_timestamps_outside_datetime_range(self):
-        payload = [
-            [10**30, "100", "102", "99", "101", "10", 10**30 + 3600000],
-            [1700000000000, "100", "102", "99", "101", "10", 1700003599999],
-        ]
+    async def test_binance_rejects_timestamp_outside_datetime_range(self):
+        payload = [[10**30, "100", "102", "99", "101", "10", 10**30 + 3600000]]
         with patch.object(api, "_request_json", return_value=payload):
-            rows = api._fetch_binance("BTCUSDT", "1h", 5)
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["open_time"], 1700000000000)
+            with self.assertRaisesRegex(ValueError, "invalid OHLCV"):
+                api._fetch_binance("BTCUSDT", "1h", 5)
 
     async def test_binance_fails_when_all_candles_are_invalid(self):
         payload = [[1700000000000, "100", "99", "101", "100", "10", 1700003599999]]
         with patch.object(api, "_request_json", return_value=payload):
             with self.assertRaisesRegex(ValueError, "no valid candles"):
                 api._fetch_binance("BTCUSDT", "1h", 5)
+
+    async def test_load_fails_closed_on_malformed_kraken_rows_without_coinbase_fanout(self):
+        with patch.object(api, "_fetch_binance", side_effect=urllib.error.URLError("offline")), patch.object(
+            api, "_fetch_kraken", side_effect=api._MalformedProviderResponse("bad row")
+        ), patch.object(api, "_fetch_coinbase") as coinbase:
+            with self.assertRaises(HTTPException) as ctx:
+                await api._load("BTCUSD", "1h", 5)
+        self.assertEqual(ctx.exception.status_code, 502)
+        self.assertIn("malformed candle row", ctx.exception.detail)
+        coinbase.assert_not_called()
 
     async def test_load_sorts_out_of_order_candles_chronologically(self):
         reversed_rows = [dict(SAMPLE[2]), dict(SAMPLE[0]), dict(SAMPLE[1])]
@@ -545,43 +539,31 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rows[0]["close"], 101.0)
         self.assertEqual(rows[0]["volume"], 10.5)
 
-    def test_coinbase_skips_nonfinite_and_impossible_ohlcv_rows(self):
+    def test_coinbase_rejects_snapshot_with_any_invalid_ohlcv_row(self):
         payload = [
             [1700000000, "99", "103", "100", "102", "10"],
             [1700003600, "99", "98", "100", "102", "10"],
-            [1700007200, "99", "NaN", "100", "102", "10"],
-            [1700010800, "99", "103", "100", "102", "Infinity"],
-            [1700014400, "99", "103", "100", "NaN", "10"],
         ]
         with patch.object(api, "_request_json", return_value=payload):
-            rows = api._fetch_coinbase("BTCUSD", "1h", 5)
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["close"], 102.0)
+            with self.assertRaisesRegex(ValueError, "invalid OHLCV"):
+                api._fetch_coinbase("BTCUSD", "1h", 5)
 
-    def test_coinbase_skips_fractional_boolean_and_out_of_range_timestamps(self):
-        payload = [
-            [1700000000.5, "99", "103", "100", "102", "10"],
-            [True, "99", "103", "100", "102", "10"],
-            [10**30, "99", "103", "100", "102", "10"],
-            [1700000000, "99", "103", "100", "102", "10"],
-        ]
-        with patch.object(api, "_request_json", return_value=payload):
-            rows = api._fetch_coinbase("BTCUSD", "1h", 5)
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["open_time"], 1700000000000)
+    def test_coinbase_rejects_fractional_boolean_and_out_of_range_timestamps(self):
+        for timestamp in (1700000000.5, True, 10**30):
+            payload = [[timestamp, "99", "103", "100", "102", "10"]]
+            with patch.object(api, "_request_json", return_value=payload):
+                with self.assertRaisesRegex(ValueError, "timestamp"):
+                    api._fetch_coinbase("BTCUSD", "1h", 5)
 
-    def test_coinbase_filters_invalid_rows_before_applying_requested_limit(self):
+    def test_coinbase_rejects_malformed_tail_instead_of_returning_partial_snapshot(self):
         payload = [
             [1700000000 + i * 3600, "99", "103", "100", "102", "10"]
             for i in range(6)
         ]
-        # The newest candle has an impossible OHLC range. It must not consume
-        # one of the five requested slots while an older valid row is available.
         payload[-1] = [1700018000, "99", "98", "100", "102", "10"]
         with patch.object(api, "_request_json", return_value=payload):
-            rows = api._fetch_coinbase("BTCUSD", "1h", 5)
-        self.assertEqual(len(rows), 5)
-        self.assertEqual(rows[-1]["open_time"], 1700014400000)
+            with self.assertRaisesRegex(ValueError, "invalid OHLCV"):
+                api._fetch_coinbase("BTCUSD", "1h", 5)
 
     def test_coinbase_fails_when_all_provider_candles_are_invalid(self):
         payload = [[1700000000, "99", "98", "100", "102", "10"]]
