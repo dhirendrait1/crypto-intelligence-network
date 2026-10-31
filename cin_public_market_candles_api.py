@@ -862,8 +862,6 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
                 endpoint = COINBASE_CANDLES_URL
             except _MalformedProviderResponse:
                 raise HTTPException(status_code=502, detail="Coinbase public market-data provider returned a malformed candle row.") from None
-            except _MalformedProviderResponse:
-                raise HTTPException(status_code=502, detail="Coinbase public market-data provider returned a malformed candle row.") from None
             except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as coinbase_exc:
                 reason = "Kraken and Coinbase fallbacks unavailable or pair/timeframe unsupported"
                 if isinstance(coinbase_exc, urllib.error.HTTPError):
@@ -877,6 +875,8 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
                 provider = "coinbase"
                 source = f"Coinbase Exchange public candles API (fallback after {fallback_reason})"
                 endpoint = COINBASE_CANDLES_URL
+            except _MalformedProviderResponse:
+                raise HTTPException(status_code=502, detail="Coinbase public market-data provider returned a malformed candle row.") from None
             except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as coinbase_exc:
                 reason = "Kraken and Coinbase fallbacks unavailable or pair/timeframe unsupported"
                 if isinstance(coinbase_exc, urllib.error.HTTPError):
