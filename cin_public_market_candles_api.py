@@ -225,9 +225,14 @@ def compare_provider_candles(
         raise ValueError("Unsupported comparison interval")
     if not isinstance(provider_candles, dict) or len(provider_candles) < 2:
         raise ValueError("At least two named providers are required")
-    if not math.isfinite(float(price_tolerance_bps)) or price_tolerance_bps < 0:
+    try:
+        price_tolerance_bps = float(price_tolerance_bps)
+        volume_tolerance_bps = float(volume_tolerance_bps)
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError("Tolerances must be finite non-negative numbers") from None
+    if not math.isfinite(price_tolerance_bps) or price_tolerance_bps < 0:
         raise ValueError("Price tolerance must be a finite non-negative number")
-    if not math.isfinite(float(volume_tolerance_bps)) or volume_tolerance_bps < 0:
+    if not math.isfinite(volume_tolerance_bps) or volume_tolerance_bps < 0:
         raise ValueError("Volume tolerance must be a finite non-negative number")
 
     normalized: dict[str, dict[int, dict[str, Any]]] = {}
@@ -320,7 +325,7 @@ def compare_provider_candles(
         "pairwise_comparisons": pairwise,
         "price_tolerance_bps": float(price_tolerance_bps),
         "volume_tolerance_bps": float(volume_tolerance_bps),
-        "consistency_status": "consistent_within_configured_tolerances" if within_tolerance and not timeline_gaps else (
+        "consistency_status": "consistent_within_configured_tolerances" if within_tolerance and not timeline_gaps and provider_missing_interval_count == 0 else (
             "insufficient_timestamp_overlap" if not has_alignment else "discrepancies_or_gaps_detected"
         ),
         "limitations": [
