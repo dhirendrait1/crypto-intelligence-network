@@ -756,7 +756,15 @@ def compare_provider_candles(
                 and descriptor.get("unit_basis") in {"base_asset", "quote_asset"}
                 and isinstance(descriptor.get("unit_asset"), str)
             ):
-                verified_units.append((descriptor["unit_basis"], descriptor["unit_asset"].upper()))
+                unit_asset = descriptor["unit_asset"].upper()
+                identity = normalized_market_identities.get(provider_name) if normalized_market_identities else None
+                if unit_asset == "MARKET_BASE_ASSET":
+                    unit_asset = identity[0] if identity else None
+                elif unit_asset == "MARKET_QUOTE_ASSET":
+                    unit_asset = identity[1] if identity else None
+                verified_units.append(
+                    (descriptor["unit_basis"], unit_asset) if unit_asset else None
+                )
             else:
                 verified_units.append(None)
         if (
