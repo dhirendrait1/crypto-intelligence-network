@@ -44,7 +44,8 @@ export function IntegrityDiagnostics({ result }: IntegrityDiagnosticsProps) {
   const providerAccountingConsistent = providerAccountingAvailable &&
     payload.provider_rows_received === payload.provider_rows_invalid! + payload.provider_rows_valid_before_deduplication! &&
     payload.provider_rows_duplicate! <= payload.provider_rows_valid_before_deduplication! &&
-    payload.normalized_rows_count === payload.provider_rows_valid_before_deduplication! - payload.provider_rows_duplicate!;
+    payload.normalized_rows_count === payload.provider_rows_valid_before_deduplication! - payload.provider_rows_duplicate! &&
+    payload.normalized_rows_count === payload.count;
   const intervalSeconds: Record<string, number> = { "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "6h": 21600, "1d": 86400 };
   const interval = payload ? intervalSeconds[payload.granularity] : undefined;
   const missingIntervals = interval && candles.length > 1
