@@ -5,18 +5,18 @@ import type { ApiResult, CoinbaseCandlesResponse } from "../../lib/api";
 
 const candle = {
   open_time: 100, close_time: 159, open: 10, high: 12, low: 9, close: 11,
-  volume: 5, open_time_utc: "2026-10-31T00:00:00Z",
-  close_time_utc: "2026-10-31T00:00:59Z", is_closed: true,
+  volume: 5, open_time_utc: "1970-01-01T00:01:40Z",
+  close_time_utc: "1970-01-01T00:02:39Z", is_closed: true,
 };
 
 const result: ApiResult<CoinbaseCandlesResponse> = {
-  state: "fresh", retrievedAt: "2026-10-31T00:01:00Z", source: "coinbase_exchange_public",
+  state: "fresh", retrievedAt: "1970-01-01T00:03:00Z", source: "coinbase_exchange_public",
   message: "accepted",
   data: {
     service: "cin", mode: "read_only", source: "coinbase_exchange_public",
     source_endpoint: "/products/BTC-USD/candles", product_id: "BTC-USD", quote_currency: "USD",
-    granularity: "1m", requested_start_utc: "2026-10-31T00:00:00Z",
-    requested_end_utc: "2026-10-31T00:01:00Z", retrieved_at: "2026-10-31T00:01:00Z",
+    granularity: "1m", requested_start_utc: "1970-01-01T00:01:40Z",
+    requested_end_utc: "1970-01-01T00:03:00Z", retrieved_at: "1970-01-01T00:03:00Z",
     count: 1, provider_rows_received: 1, provider_rows_invalid: 0, provider_rows_duplicate: 0, provider_rows_valid_before_deduplication: 1, normalized_rows_count: 1, provider_window_coverage: "not_established", latest_closed_candle_close_time_utc: "2026-10-31T00:00:59Z",
     latest_closed_candle_age_seconds: 1, stale_threshold_seconds: 300,
     stale_data_warning: null, data: [candle], limitations: [],
@@ -131,6 +131,32 @@ describe("Integrity diagnostics", () => {
     };
     render(<IntegrityDiagnostics result={consecutive} />);
     expect(screen.getByText("No missing intervals detected between the first and last returned candles. Edge coverage is not inferred.")).toBeTruthy();
+  });
+
+  it("passes when numeric candle epochs match their UTC timestamp strings", () => {
+    render(<IntegrityDiagnostics result={result} />);
+    const row = screen.getByText("Epoch / UTC consistency").closest("li");
+    expect(row?.querySelector(".integrity-check-pass")).toBeTruthy();
+  });
+
+  it("warns when numeric candle epochs disagree with UTC timestamp strings", () => {
+    const mismatched = {
+      ...result,
+      data: { ...result.data!, data: [{ ...candle, open_time_utc: "1970-01-01T00:01:41Z" }] },
+    };
+    render(<IntegrityDiagnostics result={mismatched} />);
+    const row = screen.getByText("Epoch / UTC consistency").closest("li");
+    expect(row?.querySelector(".integrity-check-warn")).toBeTruthy();
+  });
+
+  it("warns when is_closed disagrees with close time and retrieval time", () => {
+    const mismatched = {
+      ...result,
+      data: { ...result.data!, data: [{ ...candle, close_time: 300, is_closed: true }] },
+    };
+    render(<IntegrityDiagnostics result={mismatched} />);
+    const row = screen.getByText("Closed-state metadata").closest("li");
+    expect(row?.querySelector(".integrity-check-warn")).toBeTruthy();
   });
 
   it("warns when candle OHLCV values are non-finite", () => {
