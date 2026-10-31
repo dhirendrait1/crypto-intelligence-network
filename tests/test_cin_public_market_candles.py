@@ -1766,7 +1766,7 @@ class KrakenAssetPairsMarketStatusIntegrityTests(unittest.TestCase):
     def _payload(self, status="online"):
         pair = {
             "altname": "XBTUSD", "wsname": "XBT/USD",
-            "aclass_base": "currency", "aclass_quote": "currency", "status": "online",
+            "aclass_base": "currency", "aclass_quote": "currency",
             "base": "XXBT", "quote": "ZUSD",
         }
         if status is not ...:
