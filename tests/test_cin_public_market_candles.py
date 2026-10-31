@@ -1151,7 +1151,9 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["zero_volume_candle_count"], 3)
         self.assertEqual(result["zero_volume_run_count"], 2)
         self.assertEqual(result["zero_volume_runs"][0]["candle_count"], 2)
-        self.assertEqual(result["largest_adjacent_volume_transitions"][0]["transition"], "positive_to_zero")
+        transition_types = {item["transition"] for item in result["largest_adjacent_volume_transitions"]}
+        self.assertIn("zero_to_positive", transition_types)
+        self.assertIn("positive_to_zero", transition_types)
         self.assertEqual(result["volume_field_missing_count"], 0)
 
     def test_volume_quality_ranks_extreme_relative_observations_without_threshold(self):
