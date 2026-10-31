@@ -243,18 +243,30 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
 
 
 def _is_aligned_candle_open(open_time_ms: int, interval: str, provider: str = "binance") -> bool:
-    """Check provider-specific UTC candle boundaries for 24/7 crypto markets."""
-    if interval not in TIMEFRAMES or isinstance(open_time_ms, bool) or not isinstance(open_time_ms, int):
+    """Check known provider-specific UTC candle boundaries for 24/7 crypto markets."""
+    if (
+        interval not in TIMEFRAMES
+        or provider not in {"binance", "kraken", "coinbase"}
+        or isinstance(open_time_ms, bool)
+        or not isinstance(open_time_ms, int)
+    ):
         return False
     if interval == "1M":
+        if provider != "binance":
+            return False
         value = datetime.fromtimestamp(open_time_ms / 1000, timezone.utc)
         return value.day == 1 and value.hour == value.minute == value.second == value.microsecond == 0
-    duration = _INTERVAL_MS[interval]
     if interval == "1w":
+        if provider == "coinbase":
+            return False
         # Binance weeks open Monday 00:00 UTC; Kraken weeks open Thursday 00:00 UTC.
         anchor_ms = 4 * 86_400_000 if provider == "binance" else 0
-        return (open_time_ms - anchor_ms) % duration == 0
-    return open_time_ms % duration == 0
+        return (open_time_ms - anchor_ms) % _INTERVAL_MS[interval] == 0
+    # Binance documents UTC intervals but does not specify a distinct 3d anchor;
+    # retain the current epoch-based fixed-duration check pending provider evidence.
+    if interval == "3d" and provider != "binance":
+        return False
+    return open_time_ms % _INTERVAL_MS[interval] == 0
 
 
 def _normalize_candle_sequence(
@@ -491,6 +503,7 @@ def _fetch_klines(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
 async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
     """Load one provider snapshot; only transport failures and HTTP 451 fail over."""
     fallback_reason = None
+    provider = "binance"
     try:
         rows = await asyncio.to_thread(_fetch_binance, symbol, interval, limit)
         source, endpoint = "Binance public market-data API", BINANCE_KLINES_URL
@@ -506,11 +519,13 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
     if fallback_reason is not None:
         try:
             rows = await asyncio.to_thread(_fetch_kraken, symbol, interval, limit)
+            provider = "kraken"
             source = f"Kraken public OHLC API (fallback after {fallback_reason})"
             endpoint = KRAKEN_OHLC_URL
         except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
             try:
                 rows = await asyncio.to_thread(_fetch_coinbase, symbol, interval, limit)
+                provider = "coinbase"
                 source = f"Coinbase Exchange public candles API (fallback after {fallback_reason})"
                 endpoint = COINBASE_CANDLES_URL
             except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as coinbase_exc:
@@ -520,7 +535,7 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
                 raise HTTPException(status_code=503, detail=reason + f"; {fallback_reason}.") from None
 
     try:
-        rows = _normalize_candle_sequence(rows, interval, "kraken" if source.startswith("Kraken ") else "binance")
+        rows = _normalize_candle_sequence(rows, interval, provider)
     except (KeyError, TypeError, ValueError):
         raise HTTPException(status_code=502, detail="Public market-data provider returned an ambiguous candle sequence.") from None
     for row in rows:

@@ -479,6 +479,24 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(api._is_aligned_candle_open(thursday, "1w", "kraken"))
         self.assertFalse(api._is_aligned_candle_open(monday, "1w", "kraken"))
 
+
+    def test_alignment_rejects_unknown_provider_and_unsupported_provider_intervals(self):
+        monday = int(api.datetime(2025, 1, 6, tzinfo=api.timezone.utc).timestamp() * 1000)
+        thursday = int(api.datetime(2025, 1, 9, tzinfo=api.timezone.utc).timestamp() * 1000)
+        self.assertFalse(api._is_aligned_candle_open(monday, "1w", "unknown"))
+        self.assertFalse(api._is_aligned_candle_open(monday, "1w", "coinbase"))
+        self.assertFalse(api._is_aligned_candle_open(thursday, "1w", "coinbase"))
+        self.assertFalse(api._is_aligned_candle_open(monday, "1M", "kraken"))
+        self.assertFalse(api._is_aligned_candle_open(monday, "3d", "kraken"))
+
+    def test_coinbase_fallback_uses_explicit_provider_identity(self):
+        with patch.object(api, "_fetch_binance", side_effect=urllib.error.URLError("network down")), patch.object(
+            api, "_fetch_kraken", side_effect=TimeoutError("kraken timed out")
+        ), patch.object(api, "_fetch_coinbase", return_value=[dict(SAMPLE[0])]):
+            rows = await api._load("BTCUSD", "1h", 5)
+        self.assertIn("Coinbase Exchange public candles API", rows[0]["_source"])
+        self.assertEqual(rows[0]["_source_endpoint"], api.COINBASE_CANDLES_URL)
+
     def test_candle_open_alignment_uses_utc_timeframe_boundaries(self):
         aligned_hour = 1699999200000
         self.assertTrue(api._is_aligned_candle_open(aligned_hour, "1h"))
