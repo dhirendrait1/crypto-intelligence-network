@@ -94,6 +94,10 @@ export function MarketsScreen() {
       <div className="markets-comparison-action"><div><strong>Compare both supported markets</strong><span>Fetch BTC-USD and ETH-USD for one shared 24-hour UTC window at the selected interval.</span></div><button type="button" onClick={loadComparison} disabled={requestsBusy}>{comparisonLoading ? "Comparing…" : "Load comparison"}</button></div>
       {comparison && <div className="panel markets-result">
         <div className="markets-comparison-state"><DataStatePanel state={comparison.primary.state} message={comparison.primary.message} source={comparison.primary.source} retrievedAt={comparison.primary.retrievedAt} /><DataStatePanel state={comparison.secondary.state} message={comparison.secondary.message} source={comparison.secondary.source} retrievedAt={comparison.secondary.retrievedAt} /></div>
+        <div className="markets-comparison-freshness">
+          <section aria-label="Primary market freshness"><h3>Primary market data quality</h3><MarketDataFreshness result={comparison.primary} /></section>
+          <section aria-label="Secondary market freshness"><h3>Secondary market data quality</h3><MarketDataFreshness result={comparison.secondary} /></section>
+        </div>
         {comparison.primary.data && comparison.secondary.data && <MarketComparison primaryProduct={comparison.primary.data.product_id} primaryCandles={comparison.primary.data.data} secondaryProduct={comparison.secondary.data.product_id} secondaryCandles={comparison.secondary.data.data} />}
       </div>}
       {!result && <div className="markets-empty"><strong>No market request made</strong><p>Select a market and interval, then load public candles to retrieve verified API data.</p></div>}
