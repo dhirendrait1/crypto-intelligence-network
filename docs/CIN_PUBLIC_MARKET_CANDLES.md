@@ -245,3 +245,20 @@ Freshness is calculated once per API response from the latest completed candle a
 
 Each market-candles or technical-analysis response samples the UTC clock once after its provider snapshot has been loaded. The same instant supplies the `retrieved_at` ISO-8601 UTC value, the millisecond reference used for completed-candle freshness, and the market-candles `is_closed` flags. This avoids intra-response disagreements caused by independently reading the system clock for each field. Retrieval time is response-generation time after loading, not the provider candle close time and not a provider-supplied exchange timestamp. Provider-specific request-window clocks remain separate implementation details and are not presented as response retrieval time. Offline frozen-clock tests verify the shared reference instant for both response types.
 
+
+
+### Machine-readable provider fallback provenance
+
+Both the market-candles response and the technical-analysis input now expose a
+`provider_provenance` object. It identifies the primary provider, the provider
+that actually supplied the returned snapshot, whether fallback occurred, the
+primary-provider trigger (HTTP 451 or transport failure), and any recorded
+intermediate Kraken failure. The existing human-readable `source` and exact
+`source_endpoint` remain authoritative and must agree with the selected
+provider. The metadata is emitted only after the snapshot's rows are checked
+for one coherent provider/source/endpoint tuple; mixed attribution fails
+closed. A direct Binance response is explicitly marked as no-fallback.
+Malformed successful responses, rate limits, access denials, and ambiguous
+provider data retain their existing stop/fail-closed behavior and are not
+reclassified as fallback-eligible outages. This is source attribution for
+read-only research data, not provider quality certification.
