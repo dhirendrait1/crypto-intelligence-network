@@ -796,10 +796,15 @@ def _normalize_candle_sequence(
         expected_close = row["open_time"] + _interval_duration_ms(interval, row["open_time"]) - 1
         if row["close_time"] != expected_close:
             raise ValueError("Provider candle timestamps do not match the requested timeframe")
+    # Python's sort is stable. Sort a new list so caller-owned provider rows
+    # are never mutated; unique open timestamps make the canonical order independent
+    # of the provider's input ordering.
     ordered = sorted(rows, key=lambda row: row["open_time"])
     for previous, current in zip(ordered, ordered[1:]):
         if current["open_time"] == previous["open_time"]:
-            raise ValueError("Provider returned duplicate candle open timestamps")
+            if current == previous:
+                raise ValueError("Provider returned an identical duplicate candle open timestamp")
+            raise ValueError("Provider returned conflicting candle rows for the same open timestamp")
         if previous["close_time"] >= current["open_time"]:
             raise ValueError("Provider returned overlapping candle time ranges")
     return ordered
