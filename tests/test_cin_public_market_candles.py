@@ -758,6 +758,28 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(ValueError, "Coinbase returned no valid candles"):
                 api._fetch_coinbase("BTCUSD", "1h", 5)
 
+    def test_historical_continuity_reports_internal_missing_intervals_without_backfill(self):
+        rows = [dict(row) for row in SAMPLE[:4]]
+        rows.pop(2)
+        report = api._historical_continuity_metadata(rows, "1h")
+        self.assertEqual(report["continuity_status"], "internal_gaps_detected")
+        self.assertEqual(report["observed_candle_count"], 3)
+        self.assertEqual(report["internal_gap_count"], 1)
+        self.assertEqual(report["missing_interval_count"], 1)
+        self.assertEqual(report["internal_gaps"][0]["missing_intervals"], 1)
+        self.assertFalse(report["historical_data_repaired_or_backfilled"])
+        self.assertEqual(report["window_completeness"], "unknown_without_requested_start_and_end")
+
+    def test_historical_continuity_rejects_duplicate_or_misaligned_source_candles(self):
+        duplicate_rows = [dict(row) for row in SAMPLE[:3]]
+        duplicate_rows[1]["open_time"] = duplicate_rows[0]["open_time"]
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            api._historical_continuity_metadata(duplicate_rows, "1h")
+        misaligned_rows = [dict(row) for row in SAMPLE[:3]]
+        misaligned_rows[1]["open_time"] += 1000
+        with self.assertRaisesRegex(ValueError, "aligned"):
+            api._historical_continuity_metadata(misaligned_rows, "1h")
+
     def test_cross_provider_comparison_reports_consistent_aligned_candles(self):
         left = [dict(row) for row in SAMPLE[:5]]
         right = [dict(row) for row in SAMPLE[:5]]
