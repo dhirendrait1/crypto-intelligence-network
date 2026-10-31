@@ -163,6 +163,29 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(ValueError, "did not match the resolved requested market"):
                 api._fetch_kraken("BTCUSDT", "1h", 5)
 
+    async def test_kraken_rejects_duplicate_candle_timestamps_in_provider_order(self):
+        row = [1700000000, "100", "102", "99", "101", "100.5", "10", 4]
+        rows = [row, list(row)]
+        asset_pairs = {"error": [], "result": {
+            "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "base": "XXBT", "quote": "USDT"}
+        }}
+        payload = {"error": [], "result": {"XBTUSDT": rows, "last": 1700000000}}
+        with patch.object(api, "_request_json", side_effect=[asset_pairs, payload]):
+            with self.assertRaisesRegex(api._MalformedProviderResponse, "duplicate or out-of-order"):
+                api._fetch_kraken("BTCUSDT", "1h", 5)
+
+    async def test_kraken_rejects_out_of_order_candles_instead_of_sorting_them(self):
+        first = [1700000000, "100", "102", "99", "101", "100.5", "10", 4]
+        later = [1700003600, "101", "103", "100", "102", "101.5", "8", 4]
+        rows = [later, first]
+        asset_pairs = {"error": [], "result": {
+            "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "base": "XXBT", "quote": "USDT"}
+        }}
+        payload = {"error": [], "result": {"XBTUSDT": rows, "last": 1700003600}}
+        with patch.object(api, "_request_json", side_effect=[asset_pairs, payload]):
+            with self.assertRaisesRegex(api._MalformedProviderResponse, "duplicate or out-of-order"):
+                api._fetch_kraken("BTCUSDT", "1h", 5)
+
     async def test_kraken_rejects_missing_or_invalid_ohlc_pagination_cursor(self):
         rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
         asset_pairs = {"error": [], "result": {
