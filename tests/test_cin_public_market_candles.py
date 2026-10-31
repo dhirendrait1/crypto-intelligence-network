@@ -630,6 +630,36 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(report["consistency_status"], "consistent_within_configured_tolerances")
 
+    def test_cross_provider_comparison_rejects_mismatched_base_quote_identity(self):
+        with self.assertRaisesRegex(ValueError, "base/quote assets differ"):
+            api.compare_provider_candles(
+                {"Binance": [dict(SAMPLE[0])], "Kraken": [dict(SAMPLE[0])]}, "1h",
+                market_identity_by_provider={
+                    "Binance": {"base_asset": "BTC", "quote_asset": "USDT"},
+                    "Kraken": {"base_asset": "BTC", "quote_asset": "USD"},
+                },
+            )
+
+    def test_cross_provider_comparison_accepts_matching_market_identity(self):
+        report = api.compare_provider_candles(
+            {"Binance": [dict(SAMPLE[0])], "Kraken": [dict(SAMPLE[0])]}, "1h",
+            market_identity_by_provider={
+                "Binance": {"base_asset": "BTC", "quote_asset": "USD"},
+                "Kraken": {"base_asset": "BTC", "quote_asset": "USD"},
+            },
+        )
+        self.assertTrue(report["market_identity"]["verified_across_inputs"])
+        self.assertEqual(report["market_identity"]["quote_asset"], "USD")
+
+    def test_cross_provider_comparison_requires_identity_for_each_provider(self):
+        with self.assertRaisesRegex(ValueError, "match the compared provider names"):
+            api.compare_provider_candles(
+                {"Binance": [dict(SAMPLE[0])], "Kraken": [dict(SAMPLE[0])]}, "1h",
+                market_identity_by_provider={
+                    "Binance": {"base_asset": "BTC", "quote_asset": "USD"}
+                },
+            )
+
     def test_cross_provider_comparison_rejects_duplicate_or_invalid_rows(self):
         duplicate = [dict(SAMPLE[0]), dict(SAMPLE[0])]
         with self.assertRaisesRegex(ValueError, "duplicate candle timestamps"):
