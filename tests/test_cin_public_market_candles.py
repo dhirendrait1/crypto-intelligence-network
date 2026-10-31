@@ -45,7 +45,7 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
                 api._request_json("https://provider.test/data")
 
     def test_request_json_rejects_invalid_utf8_and_truncated_json(self):
-        for payload, message in ((b"\\xff", "valid UTF-8"), (b'{"partial":', "valid JSON")):
+        for payload, message in ((b"\xff", "valid UTF-8"), (b'{"partial":', "valid JSON")):
             response = MagicMock()
             response.status = 200
             response.__enter__.return_value = response
