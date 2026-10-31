@@ -136,3 +136,8 @@ The source links exposed in `volume_semantics.evidence_url` identify the exact p
 - Coinbase Exchange REST product candles: the official endpoint describes the final array item as `volume` / "volume of trading activity" but does not state whether it is denominated in the base or quote asset. CIN therefore retains `unit_basis: unknown`. Coinbase Data Marketplace OHLCV documentation is a different product dataset and is not evidence for the Exchange REST candle endpoint; its base-currency definition is not imported into this adapter.
 
 These findings are deliberately endpoint-specific. A field name, positional example, SDK type named `volume`, or analogous dataset from another API family is not sufficient to upgrade an unknown basis. A future registry change requires direct documentation for the exact endpoint and an explicit denomination statement. The evidence URL is provenance for the review, not a claim that the source page guarantees data correctness.
+
+
+### Canonical market-identity token handling
+
+The offline cross-provider comparator trims surrounding whitespace and uppercases explicitly supplied base-asset and quote-asset identifiers before comparing them. This is presentation normalization only; CIN does not infer that exchange-specific aliases are equivalent. For example, `BTC` and `XBT` remain different identities unless the caller supplies the same reviewed canonical asset identifier for both provider snapshots. Quote assets are never substituted: `USD` and `USDT` remain distinct. Empty or malformed identifiers fail closed. This normalization does not parse trading symbols, resolve exchange products, or independently verify that caller-supplied market identity matches the provider response.
