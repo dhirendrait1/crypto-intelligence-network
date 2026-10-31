@@ -43,6 +43,18 @@ describe("Integrity diagnostics", () => {
     expect(screen.getAllByText("UNAVAILABLE").length).toBeGreaterThan(0);
   });
 
+  it("warns when provider row accounting contains negative counters", () => {
+    const malformed = {
+      ...result,
+      data: { ...result.data!, provider_rows_received: -1, provider_rows_invalid: -1, provider_rows_duplicate: 0, provider_rows_valid_before_deduplication: 0, normalized_rows_count: 0, count: 0, data: [] },
+    };
+    render(<IntegrityDiagnostics result={malformed} />);
+    expect(screen.getByText("Received -1; invalid -1; duplicate 0; normalized 0.")).toBeTruthy();
+    const accountingRow = screen.getByText("Provider row accounting").closest("li");
+    expect(accountingRow?.querySelector(".integrity-check-warn")).toBeTruthy();
+    expect(accountingRow?.querySelector(".integrity-check-pass")).toBeNull();
+  });
+
   it("classifies stale accepted data as a warning without calling it malformed", () => {
     render(<IntegrityDiagnostics result={{ ...result, state: "stale", message: "Provider data is stale." }} />);
     expect(screen.getByText("Response state: stale. Provider data is stale.")).toBeTruthy();
