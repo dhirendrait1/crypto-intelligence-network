@@ -72,6 +72,24 @@ class CoinbasePublicCandleTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "more than 300"):
                 coinbase.fetch_candles("BTC-USD", "1m", 1700000000, 1700018000)
 
+    def test_reports_invalid_and_duplicate_provider_rows_without_claiming_coverage(self):
+        payload = [
+            [1700000000, "99", "103", "100", "102", "12"],
+            [1700000000, "99", "103", "100", "102", "12"],
+            [1700003600, "99", "98", "100", "102", "12"],
+            ["bad", "99", "103", "100", "102", "12"],
+        ]
+        with patch.object(coinbase, "_request_json", return_value=payload):
+            rows, diagnostics = coinbase.fetch_candles_with_diagnostics(
+                "BTC-USD", "1h", 1700000000, 1700007200
+            )
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(diagnostics["provider_rows_received"], 4)
+        self.assertEqual(diagnostics["provider_rows_invalid"], 2)
+        self.assertEqual(diagnostics["provider_rows_duplicate"], 1)
+        self.assertEqual(diagnostics["provider_rows_valid_before_deduplication"], 2)
+        self.assertEqual(diagnostics["normalized_rows_count"], 1)
+
     def test_rejects_non_list_provider_payload(self):
         with patch.object(coinbase, "_request_json", return_value={"message": "bad"}):
             with self.assertRaisesRegex(ValueError, "not a list"):
