@@ -688,6 +688,7 @@ def compare_provider_candles(
     volume_tolerance_bps: float = 500.0,
     market_identity_by_provider: dict[str, dict[str, str]] | None = None,
     volume_unit_by_provider: dict[str, str] | None = None,
+    volume_semantics_by_provider: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Compare same-market provider snapshots without fetching data or choosing a winner.
 
@@ -727,7 +728,60 @@ def compare_provider_candles(
             if not isinstance(unit, str) or not re.fullmatch(r"[A-Za-z0-9_./-]{1,40}", unit.strip()):
                 raise ValueError("Each provider volume unit must be a non-empty explicit identifier")
             normalized_volume_units[provider_name] = unit.strip().upper()
-    volume_units_comparable = normalized_volume_units is not None and len(set(normalized_volume_units.values())) == 1
+    caller_declared_units_match = (
+        normalized_volume_units is not None
+        and len(set(normalized_volume_units.values())) == 1
+    )
+    normalized_volume_semantics = None
+    volume_units_comparable = False
+    if volume_semantics_by_provider is not None:
+        if (
+            not isinstance(volume_semantics_by_provider, dict)
+            or set(volume_semantics_by_provider) != set(provider_candles)
+        ):
+            raise ValueError("Volume semantics must be supplied for exactly the compared providers")
+        normalized_volume_semantics = {}
+        verified_units = []
+        for provider_name, descriptor in volume_semantics_by_provider.items():
+            provider_key = provider_name.strip().lower() if isinstance(provider_name, str) else ""
+            expected = _provider_volume_semantics(provider_key)
+            if not isinstance(descriptor, dict):
+                raise ValueError("Each provider volume semantics descriptor must be an object")
+            # Accept only the exact source descriptor maintained by CIN's provider registry.
+            if descriptor != expected:
+                raise ValueError("Volume semantics descriptor does not match CIN's provider evidence registry")
+            normalized_volume_semantics[provider_name] = dict(descriptor)
+            if (
+                descriptor.get("independent_unit_verification") is True
+                and descriptor.get("unit_basis") in {"base_asset", "quote_asset"}
+                and isinstance(descriptor.get("unit_asset"), str)
+            ):
+                unit_asset = descriptor["unit_asset"].upper()
+                identity = normalized_market_identities.get(provider_name) if normalized_market_identities else None
+                if unit_asset == "MARKET_BASE_ASSET":
+                    unit_asset = identity[0] if identity else None
+                elif unit_asset == "MARKET_QUOTE_ASSET":
+                    unit_asset = identity[1] if identity else None
+                verified_units.append(
+                    (descriptor["unit_basis"], unit_asset) if unit_asset else None
+                )
+            else:
+                verified_units.append(None)
+        if (
+            normalized_market_identities is not None
+            and all(unit is not None for unit in verified_units)
+            and len(set(verified_units)) == 1
+            and all(
+                unit[1] == normalized_market_identities[provider_name][0 if unit[0] == "base_asset" else 1]
+                for provider_name, unit in zip(provider_candles, verified_units)
+            )
+        ):
+            volume_units_comparable = True
+    volume_comparability_status = (
+        "source_verified_common_unit" if volume_units_comparable else
+        "caller_declared_matching_unit_only" if caller_declared_units_match else
+        "unverified_or_incompatible_units"
+    )
 
     try:
         price_tolerance_bps = float(price_tolerance_bps)
@@ -927,7 +981,7 @@ def compare_provider_candles(
                 "largest_volume_discrepancies": largest_volume_discrepancies,
                 "price_within_tolerance": max_price is not None and max_price <= price_tolerance_bps,
                 "volume_within_tolerance": volume_units_comparable and max_volume is not None and max_volume <= volume_tolerance_bps,
-                "volume_comparability": "verified_common_unit" if volume_units_comparable else "unverified_or_incompatible_units",
+                "volume_comparability": volume_comparability_status,
             })
 
     has_alignment = all(item["shared_candle_count"] > 0 for item in pairwise)
@@ -954,6 +1008,9 @@ def compare_provider_candles(
         "volume_tolerance_bps": float(volume_tolerance_bps),
         "volume_units_by_provider": normalized_volume_units,
         "volume_units_comparable": volume_units_comparable,
+        "caller_declared_volume_units_match": caller_declared_units_match,
+        "volume_comparability_status": volume_comparability_status,
+        "volume_semantics_by_provider": normalized_volume_semantics,
         "consistency_status": (
             "market_identity_unverified" if normalized_market_identities is None else
             "volume_units_unverified" if not volume_units_comparable and has_alignment and all(item["price_within_tolerance"] for item in pairwise) else
@@ -969,14 +1026,16 @@ def compare_provider_candles(
             "coverage_must_be_reviewed": True,
             "price_and_volume_tolerances_are_diagnostic_only": True,
             "volume_unit_identity_verified": volume_units_comparable,
+            "caller_declared_units_are_not_independent_evidence": True,
+            "source_verified_volume_semantics_required": True,
         },
         "limitations": [
             "Market identity must be supplied explicitly to obtain a consistency result; absent identity is reported as unverified.",
             "Provider snapshots are compared at exact candle-open timestamps; differing candle boundaries are not interpolated.",
             "A tolerance result is a diagnostic, not proof that either provider is correct or independently audited.",
-            "Volume deltas are withheld unless every provider explicitly declares the same volume unit; exchange-specific units are not inferred.",
+            "Volume deltas are withheld unless every provider has matching source-verified volume semantics and asset identity; caller-declared unit labels alone are insufficient.",
             "Large price discrepancies include the five largest exact-overlap OHLC observations and signed left/right price-ratio summaries; no undocumented outlier threshold or trusted-provider ranking is applied.",
-            "Cross-provider volume observations are reported only for exact shared timestamps and explicitly matching caller-declared volume units; zero-versus-positive disagreements are separately counted and ranked without inferring which provider is correct.",
+            "Caller-declared matching volume labels are reported as declarations only and never authorize volume deltas. Cross-provider volume observations require an exact CIN-registry source-verified semantics match, including basis and market asset identity.",
             "Known provider names are checked against their supported candle boundaries; generic provider labels receive timeframe-duration validation without an assumed weekly anchor.",
         ],
     }

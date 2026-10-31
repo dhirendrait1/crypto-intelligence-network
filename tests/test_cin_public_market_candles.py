@@ -743,7 +743,7 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             },
             volume_unit_by_provider={"Binance": "BTC", "Kraken": "BTC"},
         )
-        self.assertEqual(report["consistency_status"], "consistent_within_configured_tolerances")
+        self.assertEqual(report["consistency_status"], "volume_units_unverified")
         self.assertEqual(report["pairwise_comparisons"][0]["shared_candle_count"], 5)
         self.assertEqual(report["pairwise_comparisons"][0]["shared_timestamp_ratio"], 1.0)
         self.assertIsNotNone(report["pairwise_comparisons"][0]["shared_window_start_utc"])
@@ -770,6 +770,8 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         comparison = report["pairwise_comparisons"][0]
         self.assertFalse(comparison["price_within_tolerance"])
         self.assertFalse(comparison["volume_within_tolerance"])
+        self.assertIsNone(comparison["volume_discrepancy_bps_max"])
+        self.assertEqual(comparison["volume_comparability"], "caller_declared_matching_unit_only")
         self.assertEqual(report["consistency_status"], "discrepancies_or_gaps_detected")
 
     def test_cross_provider_comparison_reports_price_scale_ratio_and_largest_outliers(self):
@@ -806,11 +808,68 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             volume_unit_by_provider={"Binance": "BTC", "Kraken": "BTC"},
         )
         pair = report["pairwise_comparisons"][0]
-        self.assertEqual(pair["zero_positive_volume_mismatch_count"], 1)
-        self.assertEqual(pair["largest_volume_discrepancies"][0]["volume_pattern"], "zero_vs_positive")
-        self.assertEqual(pair["largest_volume_discrepancies"][0]["open_time"], SAMPLE[0]["open_time"])
-        self.assertEqual(pair["largest_volume_discrepancies"][1]["volume_pattern"], "both_positive")
-        self.assertGreater(pair["volume_discrepancy_bps_max"], 0)
+        self.assertIsNone(pair["zero_positive_volume_mismatch_count"])
+        self.assertIsNone(pair["largest_volume_discrepancies"])
+        self.assertIsNone(pair["volume_discrepancy_bps_max"])
+        self.assertEqual(pair["volume_comparability"], "caller_declared_matching_unit_only")
+        self.assertTrue(report["caller_declared_volume_units_match"])
+        self.assertFalse(report["volume_units_comparable"])
+
+    def test_matching_caller_volume_labels_do_not_authorize_verified_comparison(self):
+        rows_a = [dict(row) for row in SAMPLE[:3]]
+        rows_b = [dict(row) for row in SAMPLE[:3]]
+        report = api.compare_provider_candles(
+            {"Binance": rows_a, "Kraken": rows_b}, "1h",
+            market_identity_by_provider={
+                "Binance": {"base_asset": "BTC", "quote_asset": "USD"},
+                "Kraken": {"base_asset": "BTC", "quote_asset": "USD"},
+            },
+            volume_unit_by_provider={"Binance": "BTC", "Kraken": "BTC"},
+        )
+        self.assertTrue(report["caller_declared_volume_units_match"])
+        self.assertFalse(report["volume_units_comparable"])
+        self.assertEqual(report["volume_comparability_status"], "caller_declared_matching_unit_only")
+        self.assertIsNone(report["pairwise_comparisons"][0]["volume_discrepancy_bps_max"])
+
+    def test_source_verified_volume_semantics_require_exact_registry_and_asset_match(self):
+        rows_a = [dict(row) for row in SAMPLE[:3]]
+        rows_b = [dict(row) for row in SAMPLE[:3]]
+        report = api.compare_provider_candles(
+            {"Binance": rows_a, "Kraken": rows_b}, "1h",
+            market_identity_by_provider={
+                "Binance": {"base_asset": "BTC", "quote_asset": "USD"},
+                "Kraken": {"base_asset": "BTC", "quote_asset": "USD"},
+            },
+            volume_semantics_by_provider={
+                "Binance": api._provider_volume_semantics("binance"),
+                "Kraken": api._provider_volume_semantics("kraken"),
+            },
+        )
+        self.assertFalse(report["volume_units_comparable"])
+        self.assertEqual(report["volume_comparability_status"], "unverified_or_incompatible_units")
+        self.assertIsNone(report["pairwise_comparisons"][0]["volume_discrepancy_bps_max"])
+
+    def test_volume_semantics_descriptor_cannot_be_caller_forged(self):
+        rows_a = [dict(row) for row in SAMPLE[:3]]
+        rows_b = [dict(row) for row in SAMPLE[:3]]
+        forged = api._provider_volume_semantics("kraken")
+        forged.update({
+            "unit_basis": "base_asset",
+            "unit_asset": "BTC",
+            "independent_unit_verification": True,
+        })
+        with self.assertRaisesRegex(ValueError, "does not match CIN's provider evidence registry"):
+            api.compare_provider_candles(
+                {"Binance": rows_a, "Kraken": rows_b}, "1h",
+                market_identity_by_provider={
+                    "Binance": {"base_asset": "BTC", "quote_asset": "USD"},
+                    "Kraken": {"base_asset": "BTC", "quote_asset": "USD"},
+                },
+                volume_semantics_by_provider={
+                    "Binance": api._provider_volume_semantics("binance"),
+                    "Kraken": forged,
+                },
+            )
 
     def test_cross_provider_volume_diagnostics_are_withheld_without_matching_units(self):
         left = [dict(row) for row in SAMPLE[:3]]
