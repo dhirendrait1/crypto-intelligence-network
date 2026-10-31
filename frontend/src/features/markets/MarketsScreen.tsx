@@ -4,6 +4,7 @@ import { CandleChart } from "./CandleChart";
 import { MarketSnapshot } from "./MarketSnapshot";
 import { MarketWatchlist } from "./MarketWatchlist";
 import { MarketComparison } from "./MarketComparison";
+import { MarketDataFreshness } from "./MarketDataFreshness";
 import { cinApi, type ApiResult, type CoinbaseCandlesResponse } from "../../lib/api";
 import "./markets.css";
 
@@ -73,6 +74,7 @@ export function MarketsScreen() {
       {!result && <div className="markets-empty"><strong>No market request made</strong><p>Select a market and interval, then load public candles to retrieve verified API data.</p></div>}
       {result && <div className="panel markets-result">
         <DataStatePanel state={result.state} message={result.message} source={result.source} retrievedAt={result.retrievedAt} />
+        <MarketDataFreshness result={result} />
         {result.data && <>
           <div className="markets-meta"><span>{result.data.product_id} · {result.data.granularity}</span><span>{result.data.count} candles returned</span></div>
           {result.data.stale_data_warning && <p className="markets-warning">{result.data.stale_data_warning}</p>}
