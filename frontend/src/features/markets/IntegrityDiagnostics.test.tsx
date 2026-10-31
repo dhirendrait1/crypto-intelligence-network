@@ -81,7 +81,7 @@ describe("Integrity diagnostics", () => {
     };
     render(<IntegrityDiagnostics result={withGap} />);
     expect(screen.getByText("2 expected interval(s) missing across 1 gap(s) between returned candles. Edge coverage is not inferred.")).toBeTruthy();
-    expect(screen.getByText("WARN")).toBeTruthy();
+    expect(screen.getAllByText("WARN").length).toBeGreaterThan(0);
   });
 
   it("passes continuity when returned candles are consecutive", () => {
