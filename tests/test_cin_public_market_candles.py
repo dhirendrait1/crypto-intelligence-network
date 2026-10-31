@@ -352,5 +352,33 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.exception.status_code, 503)
 
 
+    def test_freshness_metadata_marks_recent_completed_candle_fresh(self):
+        now_ms = 1_700_000_000_000
+        rows = [dict(SAMPLE[0])]
+        rows[0]["close_time"] = now_ms - 30_000
+        result = api._freshness_metadata(rows, "1h", now_ms)
+        self.assertEqual(result["freshness_status"], "fresh")
+        self.assertFalse(result["is_stale"])
+        self.assertIsNone(result["stale_data_warning"])
+
+    def test_freshness_metadata_marks_old_completed_candle_stale(self):
+        now_ms = 1_700_000_000_000
+        rows = [dict(SAMPLE[0])]
+        rows[0]["close_time"] = now_ms - (2 * 3_600_000 + 1)
+        result = api._freshness_metadata(rows, "1h", now_ms)
+        self.assertEqual(result["freshness_status"], "stale")
+        self.assertTrue(result["is_stale"])
+        self.assertIn("freshness threshold", result["stale_data_warning"])
+
+    def test_freshness_metadata_distinguishes_forming_only_data(self):
+        now_ms = 1_700_000_000_000
+        rows = [dict(SAMPLE[0])]
+        rows[0]["close_time"] = now_ms + 60_000
+        result = api._freshness_metadata(rows, "1h", now_ms)
+        self.assertEqual(result["freshness_status"], "no_completed_candle")
+        self.assertIsNone(result["is_stale"])
+        self.assertIsNone(result["latest_closed_candle_age_seconds"])
+
+
 if __name__ == "__main__":
     unittest.main()

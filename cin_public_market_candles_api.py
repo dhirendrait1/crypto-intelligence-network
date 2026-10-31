@@ -61,14 +61,19 @@ def _freshness_metadata(rows: list[dict[str, Any]], interval: str, now_ms: int) 
         return {
             "latest_closed_candle_close_time_utc": None,
             "latest_closed_candle_age_seconds": None,
+            "freshness_status": "no_completed_candle",
+            "is_stale": None,
             "stale_data_warning": "No completed candle is available; do not treat a forming candle as closed data.",
             "stale_threshold_seconds": threshold_seconds,
         }
     age_seconds = max(0.0, (now_ms - latest["close_time"]) / 1000)
-    warning = f"Latest completed candle is older than the interval {interval} freshness threshold." if age_seconds > threshold_seconds else None
+    is_stale = age_seconds > threshold_seconds
+    warning = f"Latest completed candle is older than the interval {interval} freshness threshold." if is_stale else None
     return {
         "latest_closed_candle_close_time_utc": datetime.fromtimestamp(latest["close_time"] / 1000, timezone.utc).isoformat(),
         "latest_closed_candle_age_seconds": round(age_seconds, 3),
+        "freshness_status": "stale" if is_stale else "fresh",
+        "is_stale": is_stale,
         "stale_data_warning": warning,
         "stale_threshold_seconds": threshold_seconds,
     }
