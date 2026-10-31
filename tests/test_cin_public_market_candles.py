@@ -2062,7 +2062,7 @@ class ProviderResponseOrderingNormalizationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "conflicting candle rows for the same open timestamp"):
             api._normalize_candle_sequence([first, conflict], "1h", "binance")
 
-    async def test_binance_out_of_order_payload_is_canonicalized_by_shared_normalizer(self):
+    def test_binance_out_of_order_payload_is_canonicalized_by_shared_normalizer(self):
         payload = []
         for row in reversed(SAMPLE[:3]):
             payload.append([
