@@ -6,8 +6,11 @@ import { MarketWatchlist } from "./MarketWatchlist";
 import { MarketComparison } from "./MarketComparison";
 import { MarketDataFreshness } from "./MarketDataFreshness";
 import { MarketQualityHistory, type MarketQualityObservation } from "./MarketQualityHistory";
+import { IntegrityDiagnostics } from "./IntegrityDiagnostics";
 import { cinApi, type ApiResult, type CoinbaseCandlesResponse } from "../../lib/api";
 import "./markets.css";
+
+const INTEGRITY_DIAGNOSTICS_ENABLED = false;
 
 type ProductId = "BTC-USD" | "ETH-USD";
 type Granularity = "1m" | "5m" | "15m" | "1h" | "6h" | "1d";
@@ -96,6 +99,7 @@ export function MarketsScreen() {
       {result && <div className="panel markets-result">
         <DataStatePanel state={result.state} message={result.message} source={result.source} retrievedAt={result.retrievedAt} />
         <MarketDataFreshness result={result} />
+        {INTEGRITY_DIAGNOSTICS_ENABLED && <IntegrityDiagnostics result={result} />}
         {result.data && <>
           <div className="markets-meta"><span>{result.data.product_id} · {result.data.granularity}</span><span>{result.data.count} candles returned</span></div>
           {result.data.stale_data_warning && <p className="markets-warning">{result.data.stale_data_warning}</p>}
