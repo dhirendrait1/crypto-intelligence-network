@@ -1360,9 +1360,9 @@ def _fetch_klines(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
 
 def _validate_provider_snapshot_provenance(
     rows: list[dict[str, Any]], provider: str, source: str, endpoint: str,
-    fallback_reason: str | None,
+    fallback_reason: str | None, requested_limit: int | None = None,
 ) -> None:
-    """Fail closed unless every returned candle carries one coherent provider identity."""
+    """Validate one bounded canonical snapshot and its single-provider provenance."""
     expected = {
         "binance": ("Binance public market-data API", BINANCE_KLINES_URL),
         "kraken": ("Kraken public OHLC API", KRAKEN_OHLC_URL),
@@ -1370,6 +1370,11 @@ def _validate_provider_snapshot_provenance(
     }
     if provider not in expected or not isinstance(rows, list) or not rows:
         raise ValueError("Provider snapshot provenance is incomplete")
+    if requested_limit is not None and (
+        isinstance(requested_limit, bool) or not isinstance(requested_limit, int)
+        or requested_limit < 1 or len(rows) > requested_limit
+    ):
+        raise ValueError("Provider snapshot row count exceeds its valid requested limit")
     expected_source, expected_endpoint = expected[provider]
     if endpoint != expected_endpoint or not isinstance(source, str) or not source.startswith(expected_source):
         raise ValueError("Provider snapshot source does not match its selected provider")
@@ -1378,15 +1383,26 @@ def _validate_provider_snapshot_provenance(
             raise ValueError("Unexpected provider fallback metadata")
     elif fallback_reason not in {"Binance HTTP 451", "Binance transport failure"} or fallback_reason not in source:
         raise ValueError("Provider fallback reason does not match its source label")
+    required_fields = {
+        "open_time", "open", "high", "low", "close", "volume", "close_time",
+        "_provider", "_source", "_source_endpoint",
+    }
+    previous_open = None
     for row in rows:
-        if not isinstance(row, dict):
-            raise ValueError("Provider snapshot contains a non-object candle")
+        if not isinstance(row, dict) or not required_fields.issubset(row):
+            raise ValueError("Provider snapshot contains a candle outside the canonical normalized schema")
         if (
             row.get("_provider") != provider
             or row.get("_source") != source
             or row.get("_source_endpoint") != endpoint
         ):
             raise ValueError("Provider snapshot contains mixed or mismatched provenance metadata")
+        open_time = row.get("open_time")
+        if isinstance(open_time, bool) or not isinstance(open_time, int):
+            raise ValueError("Provider snapshot contains an invalid canonical open timestamp")
+        if previous_open is not None and open_time <= previous_open:
+            raise ValueError("Provider snapshot is not strictly chronological and unique")
+        previous_open = open_time
 
 
 async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
@@ -1463,7 +1479,7 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
         row["_source_endpoint"] = endpoint
         row["_provider"] = provider
     try:
-        _validate_provider_snapshot_provenance(rows, provider, source, endpoint, fallback_reason)
+        _validate_provider_snapshot_provenance(rows, provider, source, endpoint, fallback_reason, requested_limit=limit)
     except (AttributeError, TypeError, ValueError):
         raise HTTPException(status_code=502, detail="Public market-data provider returned inconsistent source provenance.") from None
     return rows
