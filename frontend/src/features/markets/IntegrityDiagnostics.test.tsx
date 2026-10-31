@@ -80,7 +80,7 @@ describe("Integrity diagnostics", () => {
     };
     render(<IntegrityDiagnostics result={empty} />);
     expect(screen.getByText("No candle rows are available to inspect.")).toBeTruthy();
-    expect(screen.getAllByText("UNAVAILABLE").length).toBe(5);
+    expect(screen.getAllByText("UNAVAILABLE").length).toBe(6);
   });
 
   it("warns about missing intervals between returned candles without rejecting the payload", () => {
@@ -106,6 +106,19 @@ describe("Integrity diagnostics", () => {
     };
     render(<IntegrityDiagnostics result={duplicated} />);
     expect(screen.getByText("One or more candle timestamps are duplicated or out of chronological order.")).toBeTruthy();
+  });
+
+  it("does not round irregular timestamp deltas into a false missing-interval count", () => {
+    const irregular = {
+      ...result,
+      data: { ...result.data!, data: [
+        { ...candle, open_time: 0, close_time: 59 },
+        { ...candle, open_time: 90, close_time: 149 },
+      ], count: 2 },
+    };
+    render(<IntegrityDiagnostics result={irregular} />);
+    expect(screen.getByText("One or more candle open timestamps are not aligned to the UTC interval boundary.")).toBeTruthy();
+    expect(screen.getByText("1 transition(s) do not follow an exact interval multiple; missing-slot count is not inferred for those transitions.")).toBeTruthy();
   });
 
   it("passes continuity when returned candles are consecutive", () => {
