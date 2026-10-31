@@ -101,7 +101,7 @@ def _normalize_rows_with_diagnostics(payload: Any, granularity: str) -> tuple[li
             invalid_rows += 1
             continue
         if (
-            min(timestamp_seconds, 0) < 0
+            timestamp_seconds < 0
             or any(value is None for value in (low, high, open_price, close))
             or not math.isfinite(volume) or volume < 0
             or high < max(open_price, close, low)
@@ -111,9 +111,7 @@ def _normalize_rows_with_diagnostics(payload: Any, granularity: str) -> tuple[li
             continue
         valid_rows += 1
         open_ms = timestamp_seconds * 1000
-        if timestamp_seconds in by_timestamp:
-            duplicate_rows += 1
-        by_timestamp[timestamp_seconds] = {
+        normalized_row = {
             "open_time": open_ms,
             "close_time": open_ms + duration_ms - 1,
             "open": open_price,
@@ -122,6 +120,14 @@ def _normalize_rows_with_diagnostics(payload: Any, granularity: str) -> tuple[li
             "close": close,
             "volume": volume,
         }
+        if timestamp_seconds in by_timestamp:
+            duplicate_rows += 1
+            if by_timestamp[timestamp_seconds] != normalized_row:
+                raise ValueError(
+                    "Coinbase returned conflicting candle rows for the same timestamp."
+                )
+            continue
+        by_timestamp[timestamp_seconds] = normalized_row
     rows = [by_timestamp[key] for key in sorted(by_timestamp)]
     if not rows:
         raise ValueError("Coinbase returned no valid candles.")
