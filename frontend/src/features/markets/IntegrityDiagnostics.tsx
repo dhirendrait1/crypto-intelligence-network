@@ -85,7 +85,7 @@ export function IntegrityDiagnostics({ result }: IntegrityDiagnosticsProps) {
           </li>
         ))}
       </ul>
-      <p className="markets-footnote">These are structural checks on the returned payload only. They do not verify exchange authenticity, market correctness, requested-window coverage, exchange authenticity, market correctness, or provider uptime.</p>
+      <p className="markets-footnote">These are structural checks on the returned payload only. They do not verify requested-window coverage, exchange authenticity, market correctness, or provider uptime.</p>
     </section>
   );
 }
