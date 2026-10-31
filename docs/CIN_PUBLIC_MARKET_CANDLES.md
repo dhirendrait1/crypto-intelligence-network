@@ -19,7 +19,7 @@ This fetches public candles and passes OHLC values into CIN's existing determini
 
 ## Reliability and safety notes
 
-- Data is from the public Binance market-data API and is not independently audited by CIN.
+- Data comes from the selected public exchange provider (Binance, Kraken, or eligible Coinbase fallback) and is not independently audited by CIN.
 - The most recent candle may still be forming. Use timestamped snapshots and account for that when comparing signals.
 - Binance HTTP 451 may trigger Kraken and then Coinbase public-data fallback; provider rate limits and unavailable fallbacks return a retryable 503 rather than stale data.
 - Coinbase fallback is restricted to USD-quoted pairs (for example, `BTCUSD`). A USDT request is not substituted with a USD product; quote assets are not interchangeable.
