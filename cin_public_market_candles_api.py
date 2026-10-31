@@ -691,13 +691,25 @@ def compare_provider_candles(
             left, right = normalized[left_name], normalized[right_name]
             shared = sorted(set(left) & set(right))
             price_deltas = []
+            price_observations = []
+            left_right_price_ratios = []
             volume_deltas = []
             for stamp in shared:
                 a, b = left[stamp], right[stamp]
                 for field in ("open", "high", "low", "close"):
-                    midpoint = (float(a[field]) + float(b[field])) / 2
-                    delta = abs(float(a[field]) - float(b[field])) / midpoint * 10_000
+                    left_price, right_price = float(a[field]), float(b[field])
+                    midpoint = (left_price + right_price) / 2
+                    delta = abs(left_price - right_price) / midpoint * 10_000
                     price_deltas.append(delta)
+                    left_right_price_ratios.append(left_price / right_price)
+                    price_observations.append({
+                        "open_time": stamp,
+                        "field": field,
+                        "left_price": left_price,
+                        "right_price": right_price,
+                        "left_to_right_ratio": round(left_price / right_price, 8),
+                        "discrepancy_bps": round(delta, 4),
+                    })
                 if volume_units_comparable:
                     volume_midpoint = (float(a["volume"]) + float(b["volume"])) / 2
                     if volume_midpoint > 0:
@@ -708,6 +720,26 @@ def compare_provider_candles(
                         volume_deltas.append(0.0)
             max_price = max(price_deltas, default=None)
             max_volume = max(volume_deltas, default=None)
+            ordered_ratios = sorted(left_right_price_ratios)
+            if ordered_ratios:
+                middle = len(ordered_ratios) // 2
+                median_ratio = (
+                    ordered_ratios[middle] if len(ordered_ratios) % 2
+                    else (ordered_ratios[middle - 1] + ordered_ratios[middle]) / 2
+                )
+                price_ratio_summary = {
+                    "left_to_right_min": round(ordered_ratios[0], 8),
+                    "left_to_right_median": round(median_ratio, 8),
+                    "left_to_right_max": round(ordered_ratios[-1], 8),
+                    "max_to_min_ratio_spread": round(ordered_ratios[-1] / ordered_ratios[0], 8),
+                }
+            else:
+                price_ratio_summary = None
+            largest_price_discrepancies = sorted(
+                price_observations,
+                key=lambda item: item["discrepancy_bps"],
+                reverse=True,
+            )[:5]
             left_only = sorted(set(left) - set(right))
             right_only = sorted(set(right) - set(left))
             pairwise.append({
@@ -731,6 +763,8 @@ def compare_provider_candles(
                     if shared else None
                 ),
                 "price_discrepancy_bps_max": round(max_price, 4) if max_price is not None and math.isfinite(max_price) else max_price,
+                "price_ratio_summary": price_ratio_summary,
+                "largest_price_discrepancies": largest_price_discrepancies,
                 "volume_discrepancy_bps_max": round(max_volume, 4) if max_volume is not None and math.isfinite(max_volume) else max_volume,
                 "price_within_tolerance": max_price is not None and max_price <= price_tolerance_bps,
                 "volume_within_tolerance": volume_units_comparable and max_volume is not None and max_volume <= volume_tolerance_bps,
@@ -782,7 +816,7 @@ def compare_provider_candles(
             "Provider snapshots are compared at exact candle-open timestamps; differing candle boundaries are not interpolated.",
             "A tolerance result is a diagnostic, not proof that either provider is correct or independently audited.",
             "Volume deltas are withheld unless every provider explicitly declares the same volume unit; exchange-specific units are not inferred.",
-            "Large price discrepancies are reported without applying an undocumented outlier threshold or choosing a trusted provider.",
+            "Large price discrepancies include the five largest exact-overlap OHLC observations and signed left/right price-ratio summaries; no undocumented outlier threshold or trusted-provider ranking is applied.",
             "Known provider names are checked against their supported candle boundaries; generic provider labels receive timeframe-duration validation without an assumed weekly anchor.",
         ],
     }
