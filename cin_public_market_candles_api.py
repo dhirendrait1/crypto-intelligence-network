@@ -404,6 +404,13 @@ def compare_provider_candles(
         for row in rows:
             if not isinstance(row, dict) or not _is_valid_candle(row):
                 raise ValueError(f"{provider} supplied an invalid candle")
+            provider_key = provider.strip().lower()
+            declared_provider = row.get("_provider")
+            if provider_key in {"binance", "kraken", "coinbase"} and declared_provider is not None:
+                if not isinstance(declared_provider, str) or declared_provider.strip().lower() != provider_key:
+                    raise ValueError(
+                        f"{provider} snapshot contains a candle with mismatched provider provenance"
+                    )
             timestamp = row["open_time"]
             if isinstance(timestamp, bool) or not isinstance(timestamp, int):
                 raise ValueError(f"{provider} supplied a non-integer candle timestamp")
