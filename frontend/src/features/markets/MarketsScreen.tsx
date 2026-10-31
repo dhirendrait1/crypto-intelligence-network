@@ -2,6 +2,7 @@ import { useState } from "react";
 import { DataStatePanel } from "../../components/DataState";
 import { CandleChart } from "./CandleChart";
 import { MarketSnapshot } from "./MarketSnapshot";
+import { MarketWatchlist } from "./MarketWatchlist";
 import { cinApi, type ApiResult, type CoinbaseCandlesResponse } from "../../lib/api";
 import "./markets.css";
 
@@ -33,6 +34,7 @@ export function MarketsScreen() {
         <span className="read-only">READ ONLY</span>
       </div>
       <p className="markets-intro">Coinbase Exchange public USD candles. Requests are read-only and are made only when you select Load candles.</p>
+      <MarketWatchlist selectedProduct={productId} onSelect={(product) => { setProductId(product); setResult(null); }} />
       <div className="markets-controls">
         <label>Market
           <select aria-label="Market" value={productId} onChange={(event) => { setProductId(event.target.value as ProductId); setResult(null); }}>
