@@ -24,6 +24,12 @@ export interface CoinbaseCandlesResponse {
   requested_end_utc: string;
   retrieved_at: string;
   count: number;
+  provider_rows_received?: number;
+  provider_rows_invalid?: number;
+  provider_rows_duplicate?: number;
+  provider_rows_valid_before_deduplication?: number;
+  normalized_rows_count?: number;
+  provider_window_coverage?: "not_established";
   latest_closed_candle_close_time_utc: string | null;
   latest_closed_candle_age_seconds: number | null;
   stale_threshold_seconds: number;
