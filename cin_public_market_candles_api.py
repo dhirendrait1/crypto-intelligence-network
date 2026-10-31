@@ -1066,6 +1066,27 @@ def compare_provider_candles(
 
 
 COINBASE_CANDLES_URL = "https://api.exchange.coinbase.com/products/{product_id}/candles"
+
+COINBASE_PRODUCTS_URL = "https://api.exchange.coinbase.com/products"
+
+
+def _verify_coinbase_product(product_id: str, base: str, quote: str) -> None:
+    """Require one exact public product-catalogue record before requesting candles."""
+    payload = _coinbase_request_json(COINBASE_PRODUCTS_URL)
+    if not isinstance(payload, list):
+        raise _MalformedProviderResponse("Coinbase product catalogue response was not a list")
+    matches = [item for item in payload if isinstance(item, dict) and item.get("id") == product_id]
+    if len(matches) > 1:
+        raise _MalformedProviderResponse("Coinbase product catalogue contained duplicate product identifiers")
+    if not matches:
+        raise ValueError(f"Coinbase product {product_id} is not listed in the public product catalogue")
+    product = matches[0]
+    if (
+        product.get("base_currency") != base
+        or product.get("quote_currency") != quote
+    ):
+        raise _MalformedProviderResponse("Coinbase product catalogue base/quote identity did not match the requested market")
+
 COINBASE_GRANULARITY = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "6h": 21600, "1d": 86400}
 
 
@@ -1086,6 +1107,7 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
     if quote != "USD":
         raise ValueError("Coinbase fallback supports USD-quoted pairs only; USDT requests are not mapped to USD.")
     product_id = f"{base}-USD"
+    _verify_coinbase_product(product_id, base, quote)
     duration = COINBASE_GRANULARITY[interval]
     now = int(datetime.now(timezone.utc).timestamp())
     # Anchor the requested history window to the provider's UTC granularity.

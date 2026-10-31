@@ -19,6 +19,13 @@ SAMPLE = [
 
 
 class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        # Existing adapter contract tests isolate candle-page behavior; catalogue
+        # verification has dedicated end-to-end adapter tests below.
+        self._catalogue_patch = patch.object(api, "_verify_coinbase_product", return_value=None)
+        self._catalogue_patch.start()
+        self.addCleanup(self._catalogue_patch.stop)
+
     def test_historical_window_integrity_detects_missing_leading_and_trailing_intervals(self):
         hour = 3_600_000
         rows = [dict(SAMPLE[0], open_time=9 * hour), dict(SAMPLE[0], open_time=10 * hour)]
@@ -1639,3 +1646,39 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class CoinbaseProductCatalogueTests(unittest.TestCase):
+    def test_coinbase_verifies_exact_product_id_and_base_quote_before_candles(self):
+        catalogue = [{"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD"}]
+        candle_rows = [[1700000000, "99", "103", "100", "102", "10"]]
+        with patch.object(api, "_coinbase_request_json", side_effect=[catalogue, candle_rows]) as request:
+            rows = api._fetch_coinbase("BTCUSD", "1h", 5)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(request.call_count, 2)
+        self.assertEqual(request.call_args_list[0].args[0], api.COINBASE_PRODUCTS_URL)
+        self.assertIn("/products/BTC-USD/candles?", request.call_args_list[1].args[0])
+
+    def test_coinbase_rejects_product_catalogue_base_quote_mismatch(self):
+        catalogue = [{"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USDT"}]
+        with patch.object(api, "_coinbase_request_json", return_value=catalogue) as request:
+            with self.assertRaisesRegex(api._MalformedProviderResponse, "base/quote identity"):
+                api._fetch_coinbase("BTCUSD", "1h", 5)
+        self.assertEqual(request.call_count, 1)
+
+    def test_coinbase_rejects_duplicate_product_ids_in_catalogue(self):
+        record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD"}
+        with patch.object(api, "_coinbase_request_json", return_value=[record, dict(record)]):
+            with self.assertRaisesRegex(api._MalformedProviderResponse, "duplicate product identifiers"):
+                api._fetch_coinbase("BTCUSD", "1h", 5)
+
+    def test_coinbase_rejects_missing_product_before_candle_request(self):
+        with patch.object(api, "_coinbase_request_json", return_value=[]) as request:
+            with self.assertRaisesRegex(ValueError, "is not listed"):
+                api._fetch_coinbase("BTCUSD", "1h", 5)
+        request.assert_called_once_with(api.COINBASE_PRODUCTS_URL)
+
+    def test_coinbase_rejects_malformed_catalogue_envelope(self):
+        with patch.object(api, "_coinbase_request_json", return_value={"products": []}):
+            with self.assertRaisesRegex(api._MalformedProviderResponse, "catalogue response was not a list"):
+                api._fetch_coinbase("BTCUSD", "1h", 5)
+

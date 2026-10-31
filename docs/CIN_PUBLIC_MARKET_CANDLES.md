@@ -146,3 +146,8 @@ The offline cross-provider comparator trims surrounding whitespace and uppercase
 ### Explicit fallback symbol parsing boundary
 
 Kraken and Coinbase fallback adapters now share one parser for concatenated symbols and recognize only the explicitly supported quote suffixes `USDT` and `USD`, checking the longer suffix first. This prevents an unsupported quote such as `USDC` from being split into a plausible but incorrect base/quote pair. Coinbase still refuses to substitute a USD product for a USDT request. The parser is syntactic validation only: it does not prove that a base asset or product is listed by an exchange. Kraken performs its separate AssetPairs catalogue lookup and verifies the returned `altname`, `wsname`, and OHLC result key. Coinbase product-catalogue verification remains a separate follow-up; the current candle adapter constructs the requested USD product identifier but does not independently retrieve its product metadata.
+
+
+### Coinbase product-catalogue identity verification
+
+Before requesting fallback candles, CIN retrieves the public Coinbase Exchange products catalogue and requires exactly one record with the constructed product `id`. Its `base_currency` and `quote_currency` must exactly match the requested base/quote assets. A missing product is treated as an unavailable market; a malformed catalogue, duplicate product identifier, or base/quote mismatch is rejected as a provider data-integrity failure. The candle endpoint is not called after any of those failures. This is a read-only catalogue cross-check, not a guarantee of liquidity, tradability, or data correctness; the returned candle rows remain subject to the existing independent integrity checks.
