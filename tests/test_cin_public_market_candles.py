@@ -406,6 +406,41 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("fallbacks unavailable", ctx.exception.detail)
 
 
+
+    async def test_kraken_rate_limits_fail_closed_without_coinbase_fanout(self):
+        for code in (418, 429):
+            with self.subTest(status=code):
+                rate_limit = urllib.error.HTTPError(
+                    api.KRAKEN_OHLC_URL, code, "rate limited", {}, None
+                )
+                with patch.object(api, "_fetch_binance", side_effect=urllib.error.HTTPError(
+                    api.BINANCE_KLINES_URL, 451, "unavailable for legal reasons", {}, None
+                )), patch.object(api, "_fetch_kraken", side_effect=rate_limit), patch.object(
+                    api, "_fetch_coinbase"
+                ) as coinbase:
+                    with self.assertRaises(HTTPException) as ctx:
+                        await api._load("BTCUSD", "1h", 5)
+                self.assertEqual(ctx.exception.status_code, 503)
+                self.assertEqual(
+                    ctx.exception.detail,
+                    "Kraken public market-data rate limit reached; retry later."
+                )
+                coinbase.assert_not_called()
+
+    async def test_coinbase_rate_limit_returns_safe_503_without_retry(self):
+        rate_limit = urllib.error.HTTPError(
+            api.COINBASE_CANDLES_URL, 429, "rate limited", {}, None
+        )
+        with patch.object(api, "_fetch_binance", side_effect=urllib.error.HTTPError(
+            api.BINANCE_KLINES_URL, 451, "unavailable for legal reasons", {}, None
+        )), patch.object(api, "_fetch_kraken", side_effect=ValueError("pair unavailable")), patch.object(
+            api, "_fetch_coinbase", side_effect=rate_limit
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await api._load("BTCUSD", "1h", 5)
+        self.assertEqual(ctx.exception.status_code, 503)
+        self.assertIn("Coinbase HTTP 429", ctx.exception.detail)
+
     async def test_binance_malformed_success_response_fails_closed_without_fallback(self):
         with patch.object(api, "_fetch_binance", side_effect=ValueError("malformed JSON")), patch.object(
             api, "_fetch_kraken"

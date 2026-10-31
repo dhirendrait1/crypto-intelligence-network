@@ -550,7 +550,20 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
             provider = "kraken"
             source = f"Kraken public OHLC API (fallback after {fallback_reason})"
             endpoint = KRAKEN_OHLC_URL
-        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
+        except urllib.error.HTTPError as exc:
+            if exc.code in (418, 429):
+                raise HTTPException(status_code=503, detail="Kraken public market-data rate limit reached; retry later.") from None
+            try:
+                rows = await asyncio.to_thread(_fetch_coinbase, symbol, interval, limit)
+                provider = "coinbase"
+                source = f"Coinbase Exchange public candles API (fallback after {fallback_reason})"
+                endpoint = COINBASE_CANDLES_URL
+            except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as coinbase_exc:
+                reason = "Kraken and Coinbase fallbacks unavailable or pair/timeframe unsupported"
+                if isinstance(coinbase_exc, urllib.error.HTTPError):
+                    reason += f" (Coinbase HTTP {coinbase_exc.code})"
+                raise HTTPException(status_code=503, detail=reason + f"; {fallback_reason}.") from None
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
             try:
                 rows = await asyncio.to_thread(_fetch_coinbase, symbol, interval, limit)
                 provider = "coinbase"
