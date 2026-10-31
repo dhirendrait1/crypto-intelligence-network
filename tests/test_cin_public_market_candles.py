@@ -76,7 +76,7 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             "result": {"XBTUSDT": rows, "ETHUSDT": rows, "last": 1700000000},
         }
         with patch.object(api, "_request_json", side_effect=[{"error":[],"result":{"XBTUSDT":{"altname":"XBTUSDT","wsname":"XBT/USDT","base":"XXBT","quote":"USDT"}}}, payload]):
-            with self.assertRaisesRegex(ValueError, "exactly one requested market"):
+            with self.assertRaisesRegex(ValueError, "did not match the resolved requested market"):
                 api._fetch_kraken("BTCUSDT", "1h", 5)
 
     async def test_kraken_accepts_single_market_result_with_cursor_metadata(self):
@@ -106,7 +106,10 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             [1700000000, "100", "102", "99", "101", "100.5", "10", 4],
         ]
         payload = {"error": [], "result": {"XBTUSDT": rows, "last": 1700000000}}
-        with patch.object(api, "_request_json", return_value=payload):
+        asset_pairs = {"error": [], "result": {
+            "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "base": "XXBT", "quote": "USDT"}
+        }}
+        with patch.object(api, "_request_json", side_effect=[asset_pairs, payload]):
             candles = api._fetch_kraken("BTCUSDT", "1h", 5)
         self.assertEqual(len(candles), 1)
         self.assertEqual(candles[0]["open_time"], 1700000000000)
