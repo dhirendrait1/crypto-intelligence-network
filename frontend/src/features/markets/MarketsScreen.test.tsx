@@ -43,4 +43,55 @@ describe("Markets screen", () => {
     expect(screen.getByText("105")).toBeTruthy();
     expect(screen.getByText(/No order placement, trade execution/i)).toBeTruthy();
   });
+
+  it("locks market, interval, comparison, and watchlist controls during a candle request", async () => {
+    let resolveRequest!: (value: typeof response) => void;
+    vi.mocked(cinApi.getCoinbaseCandles).mockReturnValue(
+      new Promise((resolve) => { resolveRequest = resolve; }),
+    );
+    render(<MarketsScreen />);
+    fireEvent.click(screen.getByRole("button", { name: "Load candles" }));
+
+    expect((screen.getByRole("combobox", { name: "Market" }) as HTMLSelectElement).disabled).toBe(true);
+    expect((screen.getByRole("combobox", { name: "Interval" }) as HTMLSelectElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Loading…" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Load comparison" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: /Bitcoin/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: /Ethereum/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Remove BTC-USD from watchlist" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Remove ETH-USD from watchlist" }) as HTMLButtonElement).disabled).toBe(true);
+
+    resolveRequest(response);
+    await waitFor(() => expect((screen.getByRole("button", { name: "Load candles" }) as HTMLButtonElement).disabled).toBe(false));
+    expect((screen.getByRole("combobox", { name: "Market" }) as HTMLSelectElement).disabled).toBe(false);
+    expect((screen.getByRole("combobox", { name: "Interval" }) as HTMLSelectElement).disabled).toBe(false);
+  });
+
+
+  it("locks market and candle controls during a comparison request", async () => {
+    const resolveRequests: Array<(value: typeof response) => void> = [];
+    vi.mocked(cinApi.getCoinbaseCandles).mockImplementation(
+      () => new Promise((resolve) => { resolveRequests.push(resolve); }),
+    );
+    render(<MarketsScreen />);
+    fireEvent.click(screen.getByRole("button", { name: "Load comparison" }));
+
+    expect(cinApi.getCoinbaseCandles).toHaveBeenCalledTimes(2);
+    expect((screen.getByRole("combobox", { name: "Market" }) as HTMLSelectElement).disabled).toBe(true);
+    expect((screen.getByRole("combobox", { name: "Interval" }) as HTMLSelectElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Load candles" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Comparing…" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: /Bitcoin/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: /Ethereum/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Remove BTC-USD from watchlist" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Remove ETH-USD from watchlist" }) as HTMLButtonElement).disabled).toBe(true);
+
+    resolveRequests.forEach((resolve) => resolve(response));
+    await waitFor(() => expect((screen.getByRole("button", { name: "Load comparison" }) as HTMLButtonElement).disabled).toBe(false));
+    expect(screen.getAllByText("Freshness & integrity")).toHaveLength(2);
+    expect(screen.getAllByText("Latest closed candle age")).toHaveLength(2);
+    expect((screen.getByRole("combobox", { name: "Market" }) as HTMLSelectElement).disabled).toBe(false);
+    expect((screen.getByRole("combobox", { name: "Interval" }) as HTMLSelectElement).disabled).toBe(false);
+  });
+
 });

@@ -36,6 +36,7 @@ export function MarketsScreen() {
   const [comparison, setComparison] = useState<{ primary: ApiResult<CoinbaseCandlesResponse>; secondary: ApiResult<CoinbaseCandlesResponse> } | null>(null);
   const [comparisonLoading, setComparisonLoading] = useState(false);
   const [qualityHistory, setQualityHistory] = useState<MarketQualityObservation[]>([]);
+  const requestsBusy = loading || comparisonLoading;
 
   async function loadCandles() {
     setLoading(true);
@@ -75,24 +76,28 @@ export function MarketsScreen() {
         <span className="read-only">READ ONLY</span>
       </div>
       <p className="markets-intro">Coinbase Exchange public USD candles. Requests are read-only and are made only when you select Load candles.</p>
-      <MarketWatchlist selectedProduct={productId} onSelect={(product) => { setProductId(product); setResult(null); setComparison(null); }} />
+      <MarketWatchlist disabled={requestsBusy} selectedProduct={productId} onSelect={(product) => { setProductId(product); setResult(null); setComparison(null); }} />
       <div className="markets-controls">
         <label>Market
-          <select aria-label="Market" value={productId} onChange={(event) => { setProductId(event.target.value as ProductId); setResult(null); setComparison(null); }}>
+          <select aria-label="Market" disabled={requestsBusy} value={productId} onChange={(event) => { setProductId(event.target.value as ProductId); setResult(null); setComparison(null); }}>
             <option value="BTC-USD">BTC / USD</option><option value="ETH-USD">ETH / USD</option>
           </select>
         </label>
         <label>Interval
-          <select aria-label="Interval" value={granularity} onChange={(event) => { setGranularity(event.target.value as Granularity); setResult(null); setComparison(null); }}>
+          <select aria-label="Interval" disabled={requestsBusy} value={granularity} onChange={(event) => { setGranularity(event.target.value as Granularity); setResult(null); setComparison(null); }}>
             <option value="1m">1 minute</option><option value="5m">5 minutes</option><option value="15m">15 minutes</option>
             <option value="1h">1 hour</option><option value="6h">6 hours</option><option value="1d">1 day</option>
           </select>
         </label>
-        <button type="button" onClick={loadCandles} disabled={loading}>{loading ? "Loading…" : "Load candles"}</button>
+        <button type="button" onClick={loadCandles} disabled={requestsBusy}>{loading ? "Loading…" : "Load candles"}</button>
       </div>
-      <div className="markets-comparison-action"><div><strong>Compare both supported markets</strong><span>Fetch BTC-USD and ETH-USD for one shared 24-hour UTC window at the selected interval.</span></div><button type="button" onClick={loadComparison} disabled={comparisonLoading}>{comparisonLoading ? "Comparing…" : "Load comparison"}</button></div>
+      <div className="markets-comparison-action"><div><strong>Compare both supported markets</strong><span>Fetch BTC-USD and ETH-USD for one shared 24-hour UTC window at the selected interval.</span></div><button type="button" onClick={loadComparison} disabled={requestsBusy}>{comparisonLoading ? "Comparing…" : "Load comparison"}</button></div>
       {comparison && <div className="panel markets-result">
         <div className="markets-comparison-state"><DataStatePanel state={comparison.primary.state} message={comparison.primary.message} source={comparison.primary.source} retrievedAt={comparison.primary.retrievedAt} /><DataStatePanel state={comparison.secondary.state} message={comparison.secondary.message} source={comparison.secondary.source} retrievedAt={comparison.secondary.retrievedAt} /></div>
+        <div className="markets-comparison-freshness">
+          <section aria-label="Primary market freshness"><h3>Primary market data quality</h3><MarketDataFreshness result={comparison.primary} /></section>
+          <section aria-label="Secondary market freshness"><h3>Secondary market data quality</h3><MarketDataFreshness result={comparison.secondary} /></section>
+        </div>
         {comparison.primary.data && comparison.secondary.data && <MarketComparison primaryProduct={comparison.primary.data.product_id} primaryCandles={comparison.primary.data.data} secondaryProduct={comparison.secondary.data.product_id} secondaryCandles={comparison.secondary.data.data} />}
       </div>}
       {!result && <div className="markets-empty"><strong>No market request made</strong><p>Select a market and interval, then load public candles to retrieve verified API data.</p></div>}

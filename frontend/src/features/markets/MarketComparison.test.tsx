@@ -24,6 +24,12 @@ describe("Market comparison", () => {
     expect(screen.getAllByText("Unavailable").length).toBeGreaterThanOrEqual(2);
   });
 
+  it("does not compare markets when returned candle timestamps do not overlap", () => {
+    render(<MarketComparison primaryProduct="BTC-USD" primaryCandles={[candle(100, 100, 110)]} secondaryProduct="ETH-USD" secondaryCandles={[candle(200, 100, 105)]} />);
+    expect(screen.getByText("0 shared candle timestamps")).toBeTruthy();
+    expect(screen.getAllByText("Unavailable").length).toBeGreaterThanOrEqual(3);
+  });
+
   it("identifies negative relative performance", () => {
     render(<MarketComparison primaryProduct="BTC-USD" primaryCandles={[candle(100, 100, 90)]} secondaryProduct="ETH-USD" secondaryCandles={[candle(100, 100, 105)]} />);
     expect(screen.getByText("ETH-USD outperformed")).toBeTruthy();
