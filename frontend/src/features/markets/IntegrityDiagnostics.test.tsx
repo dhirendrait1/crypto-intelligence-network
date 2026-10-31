@@ -34,7 +34,7 @@ describe("Integrity diagnostics", () => {
   it("does not infer integrity when no validated payload exists", () => {
     render(<IntegrityDiagnostics result={{ ...result, data: null, state: "unknown" }} />);
     expect(screen.getByText("No validated candle payload is available.")).toBeTruthy();
-    expect(screen.getAllByText("UNAVAILABLE").length).toBe(5);
+    expect(screen.getAllByText("UNAVAILABLE").length).toBe(6);
   });
 
   it("does not report candle-level checks as passed for an empty response", () => {
@@ -44,7 +44,7 @@ describe("Integrity diagnostics", () => {
     };
     render(<IntegrityDiagnostics result={empty} />);
     expect(screen.getByText("No candle rows are available to inspect.")).toBeTruthy();
-    expect(screen.getAllByText("UNAVAILABLE").length).toBe(3);
+    expect(screen.getAllByText("UNAVAILABLE").length).toBe(4);
   });
 
   it("warns about missing intervals between returned candles without rejecting the payload", () => {
