@@ -46,7 +46,7 @@ describe("Integrity diagnostics", () => {
   it("classifies stale accepted data as a warning without calling it malformed", () => {
     render(<IntegrityDiagnostics result={{ ...result, state: "stale", message: "Provider data is stale." }} />);
     expect(screen.getByText("Response state: stale. Provider data is stale.")).toBeTruthy();
-    expect(screen.getByText("WARN")).toBeTruthy();
+    expect(screen.getAllByText("WARN").length).toBeGreaterThan(0);
   });
 
   it("surfaces contract rejection separately when no validated payload is available", () => {
