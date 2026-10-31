@@ -54,14 +54,14 @@ export function IntegrityDiagnostics({ result }: IntegrityDiagnosticsProps) {
     payload.normalized_rows_count === payload.count;
   const intervalSeconds: Record<string, number> = { "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "6h": 21600, "1d": 86400 };
   const interval = payload ? intervalSeconds[payload.granularity] : undefined;
-  const missingIntervals = interval && candles.length > 1
-    ? candles.slice(1).reduce((total, candle, index) => {
-      const delta = candle.open_time - candles[index].open_time;
-      return total + (delta > interval ? Math.max(0, Math.round(delta / interval) - 1) : 0);
-    }, 0)
-    : 0;
-  const gapCount = interval && candles.length > 1
-    ? candles.slice(1).filter((candle, index) => candle.open_time - candles[index].open_time > interval).length
+  const intervalAligned = interval !== undefined && candles.every((candle) => candle.open_time % interval === 0);
+  const intervalDeltas = interval && candles.length > 1
+    ? candles.slice(1).map((candle, index) => candle.open_time - candles[index].open_time)
+    : [];
+  const misalignedTransitions = intervalDeltas.filter((delta) => delta <= 0 || delta % interval! !== 0).length;
+  const missingIntervals = intervalDeltas.reduce((total, delta) =>
+    delta > interval! && delta % interval! === 0 ? total + delta / interval! - 1 : total, 0);
+  const gapCount = intervalDeltas.filter((delta) => delta > interval!).length;
     : 0;
 
 
@@ -74,7 +74,8 @@ export function IntegrityDiagnostics({ result }: IntegrityDiagnosticsProps) {
     { label: "Chronological ordering", state: hasCandles ? chronological ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasCandles ? chronological ? "Open times are strictly increasing; duplicate timestamps are not accepted." : "One or more candle timestamps are duplicated or out of chronological order." : "No candle rows are available to inspect." },
     { label: "OHLC and volume bounds", state: hasCandles ? ohlcValid ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasCandles ? ohlcValid ? "OHLCV values are finite and price/volume bounds are consistent." : "One or more candles contain non-finite values or violate OHLC/volume bounds." : "No candle values are available to inspect." },
     { label: "Candle timestamps", state: hasCandles ? timestampsValid ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasCandles ? timestampsValid ? "Candle timestamps are parseable." : "One or more candle timestamps are invalid." : "No candle timestamps are available to inspect." },
-    { label: "Observed interval continuity", state: !hasCandles ? "UNAVAILABLE" : interval === undefined ? "WARN" : missingIntervals > 0 ? "WARN" : "PASS", detail: !hasCandles ? "No candle rows are available to assess interval continuity." : interval === undefined ? "The interval is unsupported; continuity cannot be assessed." : missingIntervals > 0 ? `${missingIntervals} expected interval(s) missing across ${gapCount} gap(s) between returned candles. Edge coverage is not inferred.` : "No missing intervals detected between the first and last returned candles. Edge coverage is not inferred." },
+    { label: "Interval boundary alignment", state: !hasCandles ? "UNAVAILABLE" : interval === undefined ? "WARN" : intervalAligned ? "PASS" : "WARN", detail: !hasCandles ? "No candle rows are available to assess interval alignment." : interval === undefined ? "The interval is unsupported; boundary alignment cannot be assessed." : intervalAligned ? "Every candle open timestamp aligns to its UTC interval boundary." : "One or more candle open timestamps are not aligned to the UTC interval boundary." },
+    { label: "Observed interval continuity", state: !hasCandles ? "UNAVAILABLE" : interval === undefined ? "WARN" : misalignedTransitions > 0 || missingIntervals > 0 ? "WARN" : "PASS", detail: !hasCandles ? "No candle rows are available to assess interval continuity." : interval === undefined ? "The interval is unsupported; continuity cannot be assessed." : misalignedTransitions > 0 ? `${misalignedTransitions} transition(s) do not follow an exact interval multiple; missing-slot count is not inferred for those transitions.` : missingIntervals > 0 ? `${missingIntervals} expected interval(s) missing across ${gapCount} gap(s) between returned candles. Edge coverage is not inferred.` : "No missing intervals detected between the first and last returned candles. Edge coverage is not inferred." },
   ];
 
   return (
