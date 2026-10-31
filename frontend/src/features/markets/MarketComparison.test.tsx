@@ -12,7 +12,7 @@ const candle = (time: number, open: number, close: number): CoinbaseCandle => ({
 
 describe("Market comparison", () => {
   it("compares percentage performance and identifies relative outperformance", () => {
-    render(<MarketComparison primaryProduct="BTC-USD" primaryCandles={[candle(200, 110, 121), candle(100, 100, 110)]} secondaryProduct="ETH-USD" secondaryCandles={[candle(100, 100, 105)]} />);
+    render(<MarketComparison primaryProduct="BTC-USD" primaryCandles={[candle(200, 110, 110), candle(100, 100, 110)]} secondaryProduct="ETH-USD" secondaryCandles={[candle(100, 100, 105)]} />);
     expect(screen.getByText("+10.00%")).toBeTruthy();
     expect(screen.getByText("+5.00%")).toBeTruthy();
     expect(screen.getByText("+5.00%", { selector: "strong" })).toBeTruthy();
