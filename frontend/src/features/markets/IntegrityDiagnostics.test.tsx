@@ -36,4 +36,14 @@ describe("Integrity diagnostics", () => {
     expect(screen.getByText("No validated candle payload is available.")).toBeTruthy();
     expect(screen.getAllByText("UNAVAILABLE").length).toBe(5);
   });
+
+  it("warns when candle OHLCV values are non-finite", () => {
+    const malformed = {
+      ...result,
+      data: { ...result.data!, data: [{ ...candle, high: Number.NaN }] },
+    };
+    render(<IntegrityDiagnostics result={malformed} />);
+    expect(screen.getByText("One or more candles contain non-finite values or violate OHLC/volume bounds.")).toBeTruthy();
+    expect(screen.getByText("WARN")).toBeTruthy();
+  });
 });
