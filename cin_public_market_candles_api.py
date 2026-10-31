@@ -730,6 +730,21 @@ def _normalize_candle_sequence(
     return ordered
 
 
+def _discrepancy_severity(max_discrepancy_bps: float | None, tolerance_bps: float) -> str:
+    """Classify observed discrepancy relative to its configured tolerance."""
+    if max_discrepancy_bps is None:
+        return "not_assessable"
+    if not math.isfinite(max_discrepancy_bps):
+        return "critical"
+    if max_discrepancy_bps <= tolerance_bps:
+        return "within_tolerance"
+    if max_discrepancy_bps <= tolerance_bps * 2:
+        return "minor"
+    if max_discrepancy_bps <= tolerance_bps * 5:
+        return "elevated"
+    return "critical"
+
+
 def compare_provider_candles(
     provider_candles: dict[str, list[dict[str, Any]]],
     interval: str,
@@ -1038,6 +1053,11 @@ def compare_provider_candles(
                 "price_within_tolerance": max_price is not None and max_price <= price_tolerance_bps,
                 "volume_within_tolerance": volume_units_comparable and max_volume is not None and max_volume <= volume_tolerance_bps,
                 "volume_comparability": volume_comparability_status,
+                "price_discrepancy_severity": _discrepancy_severity(max_price, price_tolerance_bps),
+                "volume_discrepancy_severity": (
+                    _discrepancy_severity(max_volume, volume_tolerance_bps)
+                    if volume_units_comparable else "not_assessable"
+                ),
             })
 
     has_alignment = all(item["shared_candle_count"] > 0 for item in pairwise)
@@ -1060,6 +1080,24 @@ def compare_provider_candles(
         "timeline_gap_count": len(timeline_gaps),
         "provider_missing_interval_count": provider_missing_interval_count,
         "pairwise_comparisons": pairwise,
+        "discrepancy_severity_summary": {
+            "critical_pair_count": sum(
+                item["price_discrepancy_severity"] == "critical"
+                or item["volume_discrepancy_severity"] == "critical"
+                for item in pairwise
+            ),
+            "elevated_pair_count": sum(
+                item["price_discrepancy_severity"] == "elevated"
+                or item["volume_discrepancy_severity"] == "elevated"
+                for item in pairwise
+            ),
+            "minor_pair_count": sum(
+                item["price_discrepancy_severity"] == "minor"
+                or item["volume_discrepancy_severity"] == "minor"
+                for item in pairwise
+            ),
+            "severity_is_advisory_not_a_provider_ranking": True,
+        },
         "price_tolerance_bps": float(price_tolerance_bps),
         "volume_tolerance_bps": float(volume_tolerance_bps),
         "volume_units_by_provider": normalized_volume_units,

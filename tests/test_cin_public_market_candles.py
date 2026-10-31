@@ -775,6 +775,35 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(report["pairwise_comparisons"][0]["shared_window_start_utc"])
         self.assertEqual(report["timeline_gap_count"], 0)
 
+    def test_cross_provider_discrepancy_severity_uses_configured_tolerance_bands(self):
+        classify = api._discrepancy_severity
+        self.assertEqual(classify(None, 50), "not_assessable")
+        self.assertEqual(classify(50, 50), "within_tolerance")
+        self.assertEqual(classify(75, 50), "minor")
+        self.assertEqual(classify(150, 50), "elevated")
+        self.assertEqual(classify(251, 50), "critical")
+        self.assertEqual(classify(float("inf"), 50), "critical")
+
+    def test_cross_provider_report_exposes_severity_without_ranking_sources(self):
+        left = [dict(row) for row in SAMPLE[:3]]
+        right = [dict(row) for row in SAMPLE[:3]]
+        for row in right:
+            for field in ("open", "high", "low", "close"):
+                row[field] *= 1.10
+        report = api.compare_provider_candles(
+            {"Binance": left, "Kraken": right}, "1h",
+            price_tolerance_bps=50,
+            market_identity_by_provider={
+                "Binance": {"base_asset": "BTC", "quote_asset": "USD"},
+                "Kraken": {"base_asset": "BTC", "quote_asset": "USD"},
+            },
+        )
+        pair = report["pairwise_comparisons"][0]
+        self.assertEqual(pair["price_discrepancy_severity"], "critical")
+        self.assertEqual(pair["volume_discrepancy_severity"], "not_assessable")
+        self.assertEqual(report["discrepancy_severity_summary"]["critical_pair_count"], 1)
+        self.assertTrue(report["discrepancy_severity_summary"]["severity_is_advisory_not_a_provider_ranking"])
+
     def test_cross_provider_comparison_never_claims_consistency_without_verified_market_identity(self):
         rows_a = [dict(row) for row in SAMPLE[:3]]
         rows_b = [dict(row) for row in SAMPLE[:3]]
