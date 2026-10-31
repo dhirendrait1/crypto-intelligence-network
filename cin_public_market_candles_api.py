@@ -94,7 +94,9 @@ def _timeline_integrity_metadata(rows: list[dict[str, Any]], interval: str) -> d
 
 
 def _freshness_metadata(rows: list[dict[str, Any]], interval: str, now_ms: int) -> dict[str, Any]:
-    """Report completed-candle freshness without implying provider verification."""
+    """Report completed-candle freshness and reject candles opening in the future."""
+    if any(row["open_time"] > now_ms for row in rows):
+        raise ValueError("Provider returned a candle with a future open timestamp")
     closed_rows = [row for row in rows if row["close_time"] < now_ms]
     latest = max(closed_rows, key=lambda row: row["close_time"]) if closed_rows else None
     duration_ms = _interval_duration_ms(interval, latest["open_time"] if latest else None)
@@ -606,7 +608,10 @@ async def get_market_candles(
     normalized = _validate(symbol, interval, limit)
     rows = await _load(normalized, interval, limit)
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-    freshness = _freshness_metadata(rows, interval, now_ms)
+    try:
+        freshness = _freshness_metadata(rows, interval, now_ms)
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(status_code=502, detail="Public market-data provider returned invalid candle freshness timestamps.") from None
     try:
         timeline_integrity = _timeline_integrity_metadata(rows, interval)
     except (KeyError, TypeError, ValueError):
@@ -650,7 +655,10 @@ async def analyze_public_market(
     closed_rows = [row for row in rows if row["close_time"] < now_ms]
     if len(closed_rows) < 5:
         raise HTTPException(status_code=422, detail="At least five completed candles are required for market technical analysis.")
-    freshness = _freshness_metadata(rows, interval, now_ms)
+    try:
+        freshness = _freshness_metadata(rows, interval, now_ms)
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(status_code=502, detail="Public market-data provider returned invalid candle freshness timestamps.") from None
     source = rows[0].get("_source", "Binance public market-data API")
     endpoint = rows[0].get("_source_endpoint", BINANCE_KLINES_URL)
     try:

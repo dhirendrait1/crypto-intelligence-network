@@ -553,6 +553,53 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(result["latest_closed_candle_age_seconds"])
 
 
+
+    def test_freshness_metadata_rejects_future_open_timestamp(self):
+        now_ms = 1_700_000_000_000
+        rows = [dict(SAMPLE[0])]
+        rows[0]["open_time"] = now_ms + 1
+        with self.assertRaisesRegex(ValueError, "future open timestamp"):
+            api._freshness_metadata(rows, "1h", now_ms)
+
+    async def test_market_candles_maps_future_open_timestamp_to_safe_502(self):
+        now_ms = int(api.datetime.now(api.timezone.utc).timestamp() * 1000)
+        rows = [dict(row) for row in SAMPLE[:5]]
+        rows[0]["open_time"] = now_ms + 3_600_000
+        rows[0]["close_time"] = rows[0]["open_time"] + 3_600_000 - 1
+        with patch.object(api, "_load", return_value=rows):
+            with self.assertRaises(HTTPException) as ctx:
+                await api.get_market_candles("BTCUSDT", "1h", 5)
+        self.assertEqual(ctx.exception.status_code, 502)
+        self.assertEqual(
+            ctx.exception.detail,
+            "Public market-data provider returned inconsistent candle timeline metadata."
+        )
+
+    async def test_technical_analysis_maps_future_open_timestamp_to_safe_502(self):
+        now_ms = int(api.datetime.now(api.timezone.utc).timestamp() * 1000)
+        rows = [
+            {
+                "open_time": now_ms - (index + 2) * 3_600_000,
+                "open": 100 + index, "high": 103 + index, "low": 99 + index,
+                "close": 102 + index, "volume": 10.0,
+                "close_time": now_ms - (index + 1) * 3_600_000,
+            }
+            for index in range(5)
+        ]
+        rows.append({
+            "open_time": now_ms + 3_600_000, "open": 105.0, "high": 108.0,
+            "low": 104.0, "close": 107.0, "volume": 11.0,
+            "close_time": now_ms + 2 * 3_600_000 - 1,
+        })
+        with patch.object(api, "_load", return_value=rows):
+            with self.assertRaises(HTTPException) as ctx:
+                await api.analyze_public_market("BTCUSDT", "1h", 6)
+        self.assertEqual(ctx.exception.status_code, 502)
+        self.assertEqual(
+            ctx.exception.detail,
+            "Public market-data provider returned invalid candle freshness timestamps."
+        )
+
     async def test_binance_timeout_falls_back_to_kraken_and_labels_source(self):
         with patch.object(api, "_fetch_binance", side_effect=TimeoutError("read timed out")), patch.object(
             api, "_fetch_kraken", return_value=[dict(SAMPLE[0])]
