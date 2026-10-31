@@ -429,6 +429,15 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             rows = api._fetch_coinbase("BTCUSD", "1m", 500)
         self.assertEqual(sum(1 for item in rows if item["open_time"] == 1700000000000), 1)
 
+    def test_coinbase_rejects_conflicting_rows_with_same_open_timestamp(self):
+        first = [1700000000, "99", "103", "100", "102", "10"]
+        conflicting = [1700000000, "99", "103", "100", "101", "10"]
+        with patch.object(api, "_request_json", return_value=[first, conflicting]):
+            with self.assertRaisesRegex(
+                ValueError, "conflicting candle rows for the same open timestamp"
+            ):
+                api._fetch_coinbase("BTCUSD", "1m", 500)
+
     def test_coinbase_paginates_requested_history_in_bounded_chunks(self):
         payload = [[1700000000, "99", "103", "100", "102", "10"]]
         with patch.object(api, "_request_json", return_value=payload) as request:
