@@ -151,7 +151,7 @@ describe("Integrity diagnostics", () => {
     };
     render(<IntegrityDiagnostics result={malformed} />);
     expect(screen.getByText("2 returned / 1 declared")).toBeTruthy();
-    expect(screen.getByText("One or more candles are out of chronological order.")).toBeTruthy();
+    expect(screen.getByText("One or more candle timestamps are duplicated or out of chronological order.")).toBeTruthy();
     expect(screen.getByText("One or more candles contain non-finite values or violate OHLC/volume bounds.")).toBeTruthy();
     expect(screen.getByText("One or more candle timestamps are invalid.")).toBeTruthy();
   });
