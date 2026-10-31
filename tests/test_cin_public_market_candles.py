@@ -237,6 +237,37 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rows[0]["close"], 101.0)
         self.assertEqual(rows[0]["volume"], 10.5)
 
+    def test_coinbase_skips_nonfinite_and_impossible_ohlcv_rows(self):
+        payload = [
+            [1700000000, "99", "103", "100", "102", "10"],
+            [1700003600, "99", "98", "100", "102", "10"],
+            [1700007200, "99", "NaN", "100", "102", "10"],
+            [1700010800, "99", "103", "100", "102", "Infinity"],
+            [1700014400, "99", "103", "100", "NaN", "10"],
+        ]
+        with patch.object(api, "_request_json", return_value=payload):
+            rows = api._fetch_coinbase("BTCUSD", "1h", 5)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["close"], 102.0)
+
+    def test_coinbase_skips_fractional_boolean_and_out_of_range_timestamps(self):
+        payload = [
+            [1700000000.5, "99", "103", "100", "102", "10"],
+            [True, "99", "103", "100", "102", "10"],
+            [10**30, "99", "103", "100", "102", "10"],
+            [1700000000, "99", "103", "100", "102", "10"],
+        ]
+        with patch.object(api, "_request_json", return_value=payload):
+            rows = api._fetch_coinbase("BTCUSD", "1h", 5)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["open_time"], 1700000000000)
+
+    def test_coinbase_fails_when_all_provider_candles_are_invalid(self):
+        payload = [[1700000000, "99", "98", "100", "102", "10"]]
+        with patch.object(api, "_request_json", return_value=payload):
+            with self.assertRaisesRegex(ValueError, "Coinbase returned no valid candles"):
+                api._fetch_coinbase("BTCUSD", "1h", 5)
+
     async def test_451_and_fallback_failure_returns_clear_503(self):
         with patch.object(api, "_fetch_binance", side_effect=urllib.error.HTTPError(
             api.BINANCE_KLINES_URL, 451, "unavailable for legal reasons", {}, None
