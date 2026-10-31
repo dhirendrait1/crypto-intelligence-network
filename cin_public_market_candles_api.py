@@ -1411,6 +1411,48 @@ def _validate_provider_snapshot_provenance(
         previous_open = open_time
 
 
+def _provider_fallback_metadata(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Expose machine-readable source selection and fallback causes for one snapshot."""
+    if not isinstance(rows, list) or not rows or not isinstance(rows[0], dict):
+        raise ValueError("Provider provenance requires a non-empty snapshot")
+    provider = rows[0].get("_provider")
+    source = rows[0].get("_source")
+    endpoint = rows[0].get("_source_endpoint")
+    if provider not in {"binance", "kraken", "coinbase"} or not isinstance(source, str) or not isinstance(endpoint, str):
+        raise ValueError("Provider provenance is incomplete")
+    if any(
+        not isinstance(row, dict)
+        or row.get("_provider") != provider
+        or row.get("_source") != source
+        or row.get("_source_endpoint") != endpoint
+        for row in rows
+    ):
+        raise ValueError("Provider snapshot contains mixed or mismatched provenance metadata")
+    prefix = "fallback after "
+    if prefix not in source:
+        if provider != "binance" or source != "Binance public market-data API":
+            raise ValueError("Selected provider source has an unrecognized fallback state")
+        return {
+            "primary_provider": "binance", "selected_provider": "binance",
+            "fallback_used": False, "fallback_trigger": None,
+            "intermediate_failures": [], "attribution_status": "verified",
+        }
+    reason_text = source.split(prefix, 1)[1].rstrip(")")
+    chain_parts = [part.strip() for part in reason_text.split(";") if part.strip()]
+    if not chain_parts or provider == "binance":
+        raise ValueError("Fallback source does not identify a valid provider chain")
+    trigger = chain_parts[0]
+    if trigger not in {"Binance HTTP 451", "Binance transport failure"}:
+        raise ValueError("Fallback source contains an unknown primary-provider trigger")
+    return {
+        "primary_provider": "binance", "selected_provider": provider,
+        "fallback_used": True, "fallback_trigger": trigger,
+        "intermediate_failures": chain_parts[1:],
+        "attribution_status": "verified",
+    }
+
+
+
 async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
     """Load one provider snapshot with classified failures and explicit fallback provenance."""
     fallback_reason = None
@@ -1529,6 +1571,10 @@ async def get_market_candles(
     source = rows[0].get("_source", "Binance public market-data API")
     endpoint = rows[0].get("_source_endpoint", BINANCE_KLINES_URL)
     provider = rows[0].get("_provider", "unknown")
+    try:
+        provider_provenance = _provider_fallback_metadata(rows)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=502, detail="Public market-data provider returned inconsistent fallback provenance.") from None
     # Kraken and Coinbase document that historical candle intervals without
     # trades may be omitted. Keep gaps visible without implying feed loss.
     no_trade_gap_provider = provider in {"kraken", "coinbase"}
@@ -1545,6 +1591,7 @@ async def get_market_candles(
     )
     return {
         "service": "cin", "mode": "read_only", "source": source, "source_endpoint": endpoint,
+        "provider_provenance": provider_provenance,
         "retrieved_at": retrieved_at, "symbol": normalized,
         "timeframe": interval, "count": len(rows),
         "volume_semantics": _provider_volume_semantics(provider),
@@ -1595,12 +1642,17 @@ async def analyze_public_market(
     source = rows[0].get("_source", "Binance public market-data API")
     endpoint = rows[0].get("_source_endpoint", BINANCE_KLINES_URL)
     try:
+        provider_provenance = _provider_fallback_metadata(rows)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=502, detail="Public market-data provider returned inconsistent fallback provenance.") from None
+    try:
         analysis = analyze_ohlc([{key: row[key] for key in ("open", "high", "low", "close")} for row in closed_rows])
         timeline_integrity = _timeline_integrity_metadata(rows, interval)
     except (KeyError, TypeError, ValueError):
         raise HTTPException(status_code=502, detail="Fetched public candles failed technical-analysis integrity validation.") from None
     analysis["input"].update({
         "symbol": normalized, "timeframe": interval, "source": source, "source_endpoint": endpoint,
+        "provider_provenance": provider_provenance,
         "retrieved_at": retrieved_at,
         "requested_candle_count": limit,
         "returned_candle_count": len(rows),
