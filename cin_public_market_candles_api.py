@@ -489,9 +489,15 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
     product_id = f"{base}-USD"
     duration = COINBASE_GRANULARITY[interval]
     now = int(datetime.now(timezone.utc).timestamp())
-    start = now - limit * duration
+    # Anchor the requested history window to the provider's UTC granularity.
+    # This prevents fractional first/last buckets and keeps adjacent page
+    # boundaries on exact candle-open timestamps.
+    latest_open = (now // duration) * duration
+    start = latest_open - limit * duration
     rows_by_time: dict[int, list[Any]] = {}
-    # Coinbase caps each response at 300 candles; fetch bounded adjacent windows.
+    # Coinbase caps each response at 300 candles; fetch non-overlapping,
+    # granularity-aligned windows. Timestamp-keyed collection deduplicates any
+    # boundary row repeated by the upstream API.
     cursor = start
     while cursor < now:
         chunk_end = min(now, cursor + 300 * duration)
