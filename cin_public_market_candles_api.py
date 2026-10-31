@@ -207,11 +207,18 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
 
 
 def _normalize_candle_sequence(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Return candles in chronological order and reject ambiguous duplicate timestamps."""
+    """Validate provider candle rows, order them, and reject ambiguous timelines."""
+    if not isinstance(rows, list) or not rows:
+        raise ValueError("Provider returned an empty or invalid candle sequence")
+    for row in rows:
+        if not isinstance(row, dict) or not _is_valid_candle(row):
+            raise ValueError("Provider returned an invalid OHLCV candle")
     ordered = sorted(rows, key=lambda row: row["open_time"])
     for previous, current in zip(ordered, ordered[1:]):
         if current["open_time"] == previous["open_time"]:
             raise ValueError("Provider returned duplicate candle open timestamps")
+        if previous["close_time"] >= current["open_time"]:
+            raise ValueError("Provider returned overlapping candle time ranges")
     return ordered
 
 
