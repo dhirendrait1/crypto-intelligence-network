@@ -69,7 +69,7 @@ describe("Integrity diagnostics", () => {
   it("does not infer integrity when no validated payload exists", () => {
     render(<IntegrityDiagnostics result={{ ...result, data: null, state: "unknown" }} />);
     expect(screen.getByText("No validated candle payload is available.")).toBeTruthy();
-    expect(screen.getAllByText("UNAVAILABLE").length).toBe(9);
+    expect(screen.getAllByText("UNAVAILABLE").length).toBe(10);
     expect(screen.queryByText("PASS")).toBeNull();
   });
 
@@ -140,7 +140,8 @@ describe("Integrity diagnostics", () => {
     };
     render(<IntegrityDiagnostics result={malformed} />);
     expect(screen.getByText("One or more candles contain non-finite values or violate OHLC/volume bounds.")).toBeTruthy();
-    expect(screen.getByText("WARN")).toBeTruthy();
+    const boundsRow = screen.getByText("OHLC and volume bounds").closest("li");
+    expect(boundsRow?.querySelector(".integrity-check-warn")).toBeTruthy();
   });
 
   it("detects count, ordering, bounds, and timestamp inconsistencies independently", () => {
