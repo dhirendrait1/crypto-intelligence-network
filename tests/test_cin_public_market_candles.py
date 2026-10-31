@@ -785,6 +785,28 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(report["consistency_status"], "discrepancies_or_gaps_detected")
 
 
+    def test_cross_provider_comparison_separates_window_edges_from_internal_missing_rows(self):
+        left = [dict(row) for row in SAMPLE[:5]]
+        right = [dict(row) for row in SAMPLE[2:7]]
+        report = api.compare_provider_candles({"Binance": left, "Kraken": right}, "1h")
+        self.assertEqual(report["providers"]["Binance"]["trailing_window_mismatch_count"], 2)
+        self.assertEqual(report["providers"]["Binance"]["internal_missing_timestamp_count"], 0)
+        self.assertEqual(report["providers"]["Kraken"]["leading_window_mismatch_count"], 2)
+        self.assertEqual(report["providers"]["Kraken"]["internal_missing_timestamp_count"], 0)
+        pair = report["pairwise_comparisons"][0]
+        self.assertEqual(pair["shared_candle_count"], 3)
+        self.assertEqual(pair["left_only_after_shared_window_count"], 2)
+        self.assertEqual(pair["right_only_before_shared_window_count"], 2)
+        self.assertEqual(report["consistency_status"], "discrepancies_or_gaps_detected")
+
+    def test_cross_provider_comparison_reports_internal_holes_separately(self):
+        left = [dict(row) for row in SAMPLE[:5]]
+        right = [dict(row) for row in SAMPLE[:5] if row["open_time"] != SAMPLE[2]["open_time"]]
+        report = api.compare_provider_candles({"Binance": left, "Kraken": right}, "1h")
+        self.assertEqual(report["providers"]["Kraken"]["internal_missing_timestamp_count"], 1)
+        self.assertEqual(report["providers"]["Kraken"]["leading_window_mismatch_count"], 0)
+        self.assertEqual(report["providers"]["Kraken"]["trailing_window_mismatch_count"], 0)
+
     def test_cross_provider_comparison_counts_calendar_month_gaps_exactly(self):
         def month_open(year, month):
             return int(api.datetime(year, month, 1, tzinfo=api.timezone.utc).timestamp() * 1000)
