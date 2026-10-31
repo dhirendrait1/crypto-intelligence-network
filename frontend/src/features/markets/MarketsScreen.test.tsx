@@ -54,7 +54,7 @@ describe("Markets screen", () => {
 
     expect((screen.getByRole("combobox", { name: "Market" }) as HTMLSelectElement).disabled).toBe(true);
     expect((screen.getByRole("combobox", { name: "Interval" }) as HTMLSelectElement).disabled).toBe(true);
-    expect((screen.getByRole("button", { name: "Load candles" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Loading…" }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: "Load comparison" }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: /Bitcoin/ }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: /Ethereum/ }) as HTMLButtonElement).disabled).toBe(true);
