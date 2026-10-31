@@ -774,6 +774,8 @@ def compare_provider_candles(
             price_observations = []
             left_right_price_ratios = []
             volume_deltas = []
+            volume_observations = []
+            zero_positive_volume_mismatch_count = 0
             for stamp in shared:
                 a, b = left[stamp], right[stamp]
                 for field in ("open", "high", "low", "close"):
@@ -791,13 +793,32 @@ def compare_provider_candles(
                         "discrepancy_bps": round(delta, 4),
                     })
                 if volume_units_comparable:
-                    volume_midpoint = (float(a["volume"]) + float(b["volume"])) / 2
+                    left_volume, right_volume = float(a["volume"]), float(b["volume"])
+                    volume_midpoint = (left_volume + right_volume) / 2
                     if volume_midpoint > 0:
-                        volume_deltas.append(abs(float(a["volume"]) - float(b["volume"])) / volume_midpoint * 10_000)
-                    elif float(a["volume"]) != float(b["volume"]):
+                        volume_delta = abs(left_volume - right_volume) / volume_midpoint * 10_000
+                    else:
+                        volume_delta = 0.0
+                    one_sided_zero = (left_volume == 0) != (right_volume == 0)
+                    if one_sided_zero:
+                        zero_positive_volume_mismatch_count += 1
                         volume_deltas.append(float("inf"))
                     else:
-                        volume_deltas.append(0.0)
+                        volume_deltas.append(volume_delta)
+                    volume_observations.append({
+                        "open_time": stamp,
+                        "left_volume": left_volume,
+                        "right_volume": right_volume,
+                        "left_to_right_ratio": round(left_volume / right_volume, 8) if right_volume > 0 else None,
+                        "symmetric_discrepancy_bps": (
+                            round(volume_delta, 4) if math.isfinite(volume_delta) and not one_sided_zero else None
+                        ),
+                        "volume_pattern": (
+                            "zero_vs_positive" if one_sided_zero else
+                            "both_zero" if left_volume == 0 and right_volume == 0 else
+                            "both_positive"
+                        ),
+                    })
             max_price = max(price_deltas, default=None)
             max_volume = max(volume_deltas, default=None)
             ordered_ratios = sorted(left_right_price_ratios)
@@ -815,6 +836,14 @@ def compare_provider_candles(
                 }
             else:
                 price_ratio_summary = None
+            largest_volume_discrepancies = sorted(
+                volume_observations,
+                key=lambda item: (
+                    item["volume_pattern"] == "zero_vs_positive",
+                    item["symmetric_discrepancy_bps"] if item["symmetric_discrepancy_bps"] is not None else float("inf"),
+                ),
+                reverse=True,
+            )[:5] if volume_units_comparable else None
             largest_price_discrepancies = sorted(
                 price_observations,
                 key=lambda item: item["discrepancy_bps"],
@@ -846,6 +875,8 @@ def compare_provider_candles(
                 "price_ratio_summary": price_ratio_summary,
                 "largest_price_discrepancies": largest_price_discrepancies,
                 "volume_discrepancy_bps_max": round(max_volume, 4) if max_volume is not None and math.isfinite(max_volume) else max_volume,
+                "zero_positive_volume_mismatch_count": zero_positive_volume_mismatch_count if volume_units_comparable else None,
+                "largest_volume_discrepancies": largest_volume_discrepancies,
                 "price_within_tolerance": max_price is not None and max_price <= price_tolerance_bps,
                 "volume_within_tolerance": volume_units_comparable and max_volume is not None and max_volume <= volume_tolerance_bps,
                 "volume_comparability": "verified_common_unit" if volume_units_comparable else "unverified_or_incompatible_units",
@@ -897,6 +928,7 @@ def compare_provider_candles(
             "A tolerance result is a diagnostic, not proof that either provider is correct or independently audited.",
             "Volume deltas are withheld unless every provider explicitly declares the same volume unit; exchange-specific units are not inferred.",
             "Large price discrepancies include the five largest exact-overlap OHLC observations and signed left/right price-ratio summaries; no undocumented outlier threshold or trusted-provider ranking is applied.",
+            "Cross-provider volume observations are reported only for exact shared timestamps and explicitly matching caller-declared volume units; zero-versus-positive disagreements are separately counted and ranked without inferring which provider is correct.",
             "Known provider names are checked against their supported candle boundaries; generic provider labels receive timeframe-duration validation without an assumed weekly anchor.",
         ],
     }
