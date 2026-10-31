@@ -1566,6 +1566,48 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, "future open timestamp"):
             api._freshness_metadata(rows, "1h", now_ms)
 
+
+
+    async def test_market_candles_uses_one_utc_clock_sample_for_retrieval_and_freshness(self):
+        fixed = datetime(2026, 10, 31, 12, 34, 56, 789000, tzinfo=timezone.utc)
+        class FrozenDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return fixed if tz is not None else fixed.replace(tzinfo=None)
+        rows = [dict(row) for row in SAMPLE[:5]]
+        for row in rows:
+            row["close_time"] = min(row["close_time"], int(fixed.timestamp() * 1000) - 30_000)
+        with patch.object(api, "datetime", FrozenDateTime), patch.object(api, "_load", return_value=rows):
+            result = await api.get_market_candles("BTCUSDT", "1h", 5)
+        self.assertEqual(result["retrieved_at"], fixed.isoformat())
+        expected_age = (int(fixed.timestamp() * 1000) - max(r["close_time"] for r in rows)) / 1000
+        self.assertEqual(result["latest_closed_candle_age_seconds"], round(expected_age, 3))
+        self.assertTrue(all(item["is_closed"] for item in result["data"]))
+
+    async def test_technical_analysis_reuses_its_single_retrieval_clock_sample(self):
+        fixed = datetime(2026, 10, 31, 12, 34, 56, 789000, tzinfo=timezone.utc)
+        class FrozenDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return fixed if tz is not None else fixed.replace(tzinfo=None)
+        rows = []
+        base_ms = int(fixed.timestamp() * 1000)
+        for index in range(6):
+            open_time = base_ms - (index + 2) * 3_600_000
+            rows.append({
+                "open_time": open_time, "open": 100 + index, "high": 103 + index,
+                "low": 99 + index, "close": 102 + index, "volume": 10.0,
+                "close_time": open_time + 3_600_000 - 1,
+                "_provider": "binance", "_source": "Binance public market-data API",
+                "_source_endpoint": api.BINANCE_KLINES_URL,
+            })
+        rows.sort(key=lambda row: row["open_time"])
+        with patch.object(api, "datetime", FrozenDateTime), patch.object(api, "_load", return_value=rows):
+            result = await api.analyze_public_market("BTCUSDT", "1h", 6)
+        self.assertEqual(result["input"]["retrieved_at"], fixed.isoformat())
+        expected_age = (base_ms - rows[-1]["close_time"]) / 1000
+        self.assertEqual(result["input"]["latest_closed_candle_age_seconds"], round(expected_age, 3))
+
     async def test_market_candles_maps_future_open_timestamp_to_safe_502(self):
         now_ms = int(api.datetime.now(api.timezone.utc).timestamp() * 1000)
         rows = [dict(row) for row in SAMPLE[:5]]
