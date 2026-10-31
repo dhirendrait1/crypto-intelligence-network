@@ -88,6 +88,7 @@ def _normalize_rows_with_diagnostics(payload: Any, granularity: str) -> tuple[li
         try:
             timestamp_float = float(timestamp)
             if not math.isfinite(timestamp_float) or not timestamp_float.is_integer():
+                invalid_rows += 1
                 continue
             timestamp_seconds = int(timestamp_float)
             # Coinbase row order is [time, low, high, open, close, volume].
