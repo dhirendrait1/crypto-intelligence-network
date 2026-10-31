@@ -125,3 +125,14 @@ This descriptor is source-schema evidence, not a guarantee that every provider i
 ### Source-verified volume comparability gate
 
 Matching strings supplied through `volume_unit_by_provider` are caller declarations only. They are retained in the report as `caller_declared_volume_units_match`, with status `caller_declared_matching_unit_only`; they do not enable volume deltas, zero/positive mismatch counts, or volume tolerance results. To authorize those diagnostics, callers must provide `volume_semantics_by_provider` descriptors that exactly match CIN's maintained provider evidence registry, and every provider's verified basis and asset must match the explicitly supplied common market identity. A caller cannot upgrade an unknown provider basis by editing a descriptor: unrecognized or modified descriptors fail closed. Current registry evidence marks Binance Spot kline volume as base-asset volume, while Kraken OHLC and Coinbase Exchange candle volume remain unknown. Consequently, the currently supported Binance/Kraken/Coinbase combination does not yet qualify for source-verified cross-provider volume comparison. Price comparisons remain independently available. No unit conversion or provider ranking is performed.
+
+
+### Independent endpoint-schema evidence audit
+
+The source links exposed in `volume_semantics.evidence_url` identify the exact provider documentation reviewed for each adapter:
+
+- Binance Spot REST klines: the kline response schema distinguishes `Volume` ([5]) from `Quote asset volume` ([7]). CIN records [5] as base-asset volume; the descriptor remains scoped to this Spot endpoint and schema.
+- Kraken Spot REST OHLC: the official endpoint example shows positional OHLC rows and CIN maps `ohlc_row[6]` to its normalized `volume` field. The endpoint page does not define that position as base-asset or quote-asset quantity. The separate AssetPairs metadata identifies market assets, but does not, by itself, assign a denomination to the OHLC volume position. CIN therefore retains `unit_basis: unknown`.
+- Coinbase Exchange REST product candles: the official endpoint describes the final array item as `volume` / "volume of trading activity" but does not state whether it is denominated in the base or quote asset. CIN therefore retains `unit_basis: unknown`. Coinbase Data Marketplace OHLCV documentation is a different product dataset and is not evidence for the Exchange REST candle endpoint; its base-currency definition is not imported into this adapter.
+
+These findings are deliberately endpoint-specific. A field name, positional example, SDK type named `volume`, or analogous dataset from another API family is not sufficient to upgrade an unknown basis. A future registry change requires direct documentation for the exact endpoint and an explicit denomination statement. The evidence URL is provenance for the review, not a claim that the source page guarantees data correctness.

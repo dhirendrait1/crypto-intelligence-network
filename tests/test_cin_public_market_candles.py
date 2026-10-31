@@ -1565,9 +1565,17 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         binance = api._provider_volume_semantics("binance")
         self.assertEqual(binance["unit_basis"], "base_asset")
         self.assertTrue(binance["independent_unit_verification"])
-        for provider in ("kraken", "coinbase"):
+        self.assertEqual(
+            binance["evidence_url"],
+            "https://github.com/binance/binance-spot-api-docs/blob/master/rest-api.md",
+        )
+        for provider, evidence_url in (
+            ("kraken", "https://docs.kraken.com/api-reference/market-data/get-ohlc-data"),
+            ("coinbase", "https://docs.cdp.coinbase.com/api-reference/exchange-api/rest-api/products/get-product-candles"),
+        ):
             with self.subTest(provider=provider):
                 semantics = api._provider_volume_semantics(provider)
+                self.assertEqual(semantics["evidence_url"], evidence_url)
                 self.assertEqual(semantics["unit_basis"], "unknown")
                 self.assertIsNone(semantics["unit_asset"])
                 self.assertFalse(semantics["independent_unit_verification"])

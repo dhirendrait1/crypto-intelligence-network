@@ -304,6 +304,7 @@ def _provider_volume_semantics(provider: str) -> dict[str, Any]:
             "unit_asset": "market_base_asset",
             "evidence_status": "provider_schema_distinguishes_volume_from_quote_asset_volume",
             "provenance": "Binance Spot REST klines response schema",
+            "evidence_url": "https://github.com/binance/binance-spot-api-docs/blob/master/rest-api.md",
             "independent_unit_verification": True,
         },
         "kraken": {
@@ -314,6 +315,7 @@ def _provider_volume_semantics(provider: str) -> dict[str, Any]:
             "unit_asset": None,
             "evidence_status": "response_schema_labels_volume_but_does_not_specify_asset_basis",
             "provenance": "Kraken Spot REST OHLC response schema",
+            "evidence_url": "https://docs.kraken.com/api-reference/market-data/get-ohlc-data",
             "independent_unit_verification": False,
         },
         "coinbase": {
@@ -324,6 +326,7 @@ def _provider_volume_semantics(provider: str) -> dict[str, Any]:
             "unit_asset": None,
             "evidence_status": "response_schema_labels_volume_but_does_not_specify_asset_basis",
             "provenance": "Coinbase Exchange REST product candles response schema",
+            "evidence_url": "https://docs.cdp.coinbase.com/api-reference/exchange-api/rest-api/products/get-product-candles",
             "independent_unit_verification": False,
         },
     }
@@ -336,6 +339,7 @@ def _provider_volume_semantics(provider: str) -> dict[str, Any]:
             "unit_asset": None,
             "evidence_status": "unsupported_provider_semantics",
             "provenance": None,
+            "evidence_url": None,
             "independent_unit_verification": False,
         }
     return dict(descriptors[provider])
