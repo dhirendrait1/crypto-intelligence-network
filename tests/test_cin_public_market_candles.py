@@ -155,6 +155,20 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["open_time"], 1700000000000)
 
+    async def test_binance_rejects_request_limit_above_provider_max_without_request(self):
+        with patch.object(api, "_request_json") as request:
+            with self.assertRaisesRegex(ValueError, "integer from 1 to 1000"):
+                api._fetch_binance("BTCUSDT", "1h", 1001)
+        request.assert_not_called()
+
+    async def test_binance_rejects_boolean_or_non_integer_request_limit(self):
+        for invalid_limit in (True, 5.5, "5", 0):
+            with self.subTest(limit=invalid_limit):
+                with patch.object(api, "_request_json") as request:
+                    with self.assertRaisesRegex(ValueError, "integer from 1 to 1000"):
+                        api._fetch_binance("BTCUSDT", "1h", invalid_limit)
+                request.assert_not_called()
+
     async def test_binance_rejects_more_rows_than_requested(self):
         payload = [
             [1700000000000 + i * 3600000, "100", "102", "99", "101", "10",
