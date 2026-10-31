@@ -1141,6 +1141,47 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["zero_volume_candle_count"], 1)
         self.assertFalse(result["data_repaired_or_synthesized"])
 
+    def test_volume_quality_preserves_zero_volume_and_reports_runs_and_transitions(self):
+        hour = 3_600_000
+        rows = [
+            dict(SAMPLE[0], open_time=index * hour, close_time=(index + 1) * hour - 1, volume=value)
+            for index, value in enumerate((0, 0, 12, 0, 24))
+        ]
+        result = api._volume_quality_metadata(rows)
+        self.assertEqual(result["zero_volume_candle_count"], 3)
+        self.assertEqual(result["zero_volume_run_count"], 2)
+        self.assertEqual(result["zero_volume_runs"][0]["candle_count"], 2)
+        transition_types = {item["transition"] for item in result["largest_adjacent_volume_transitions"]}
+        self.assertIn("zero_to_positive", transition_types)
+        self.assertIn("positive_to_zero", transition_types)
+        self.assertEqual(result["volume_field_missing_count"], 0)
+
+    def test_volume_quality_ranks_extreme_relative_observations_without_threshold(self):
+        hour = 3_600_000
+        rows = [
+            dict(SAMPLE[0], open_time=index * hour, close_time=(index + 1) * hour - 1, volume=value)
+            for index, value in enumerate((10, 11, 12, 1200, 13))
+        ]
+        result = api._volume_quality_metadata(rows)
+        self.assertEqual(result["largest_volume_ratios_to_positive_median"][0]["volume"], 1200.0)
+        self.assertEqual(
+            result["volume_change_interpretation"],
+            "ranked_observations_only_no_spike_threshold_or_feed_failure_inference",
+        )
+
+    def test_provider_data_quality_rejects_missing_volume_instead_of_defaulting_to_zero(self):
+        row = dict(SAMPLE[0])
+        del row["volume"]
+        with self.assertRaisesRegex(ValueError, "invalid OHLCV candle"):
+            api._provider_data_quality_metadata([row], "1h", 1_700_000_000_000)
+
+    def test_provider_data_quality_rejects_negative_and_nonfinite_volume(self):
+        for value in (-1, float("nan"), float("inf"), float("-inf")):
+            row = dict(SAMPLE[0], volume=value)
+            with self.subTest(volume=value):
+                with self.assertRaisesRegex(ValueError, "invalid OHLCV candle"):
+                    api._provider_data_quality_metadata([row], "1h", 1_700_000_000_000)
+
     def test_provider_data_quality_rejects_invalid_ohlcv(self):
         rows = [dict(SAMPLE[0])]
         rows[0]["high"] = rows[0]["low"] - 1

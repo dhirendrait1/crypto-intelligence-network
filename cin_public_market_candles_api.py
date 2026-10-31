@@ -215,6 +215,84 @@ def _coverage_metadata(rows: list[dict[str, Any]], requested_limit: int) -> dict
     }
 
 
+def _volume_quality_metadata(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Describe zero-volume runs and ranked volume changes without threshold-based rejection."""
+    volumes = [float(row["volume"]) for row in rows]
+    zero_indices = [index for index, value in enumerate(volumes) if value == 0]
+    positive = sorted(value for value in volumes if value > 0)
+    if positive:
+        middle = len(positive) // 2
+        median_positive = (
+            positive[middle] if len(positive) % 2
+            else (positive[middle - 1] + positive[middle]) / 2
+        )
+    else:
+        median_positive = None
+
+    zero_runs = []
+    run_start = None
+    for index, value in enumerate(volumes + [None]):
+        if value == 0 and run_start is None:
+            run_start = index
+        elif value != 0 and run_start is not None:
+            zero_runs.append({
+                "start_open_time": rows[run_start]["open_time"],
+                "end_open_time": rows[index - 1]["open_time"],
+                "candle_count": index - run_start,
+            })
+            run_start = None
+
+    transitions = []
+    for index in range(1, len(volumes)):
+        previous, current = volumes[index - 1], volumes[index]
+        if previous == current:
+            continue
+        if previous == 0:
+            classification, ratio = "zero_to_positive" if current > 0 else "zero_to_zero", None
+        elif current == 0:
+            classification, ratio = "positive_to_zero", 0.0
+        else:
+            classification, ratio = "positive_to_positive", round(current / previous, 8)
+        transitions.append({
+            "from_open_time": rows[index - 1]["open_time"],
+            "to_open_time": rows[index]["open_time"],
+            "previous_volume": previous,
+            "current_volume": current,
+            "transition": classification,
+            "current_to_previous_ratio": ratio,
+        })
+    ranked_transitions = sorted(
+        transitions,
+        key=lambda item: (
+            item["transition"] in {"zero_to_positive", "positive_to_zero"},
+            abs(math.log(item["current_to_previous_ratio"]))
+            if item["current_to_previous_ratio"] not in (None, 0) else float("inf"),
+        ),
+        reverse=True,
+    )[:5]
+    median_ranked = []
+    if median_positive is not None:
+        median_ranked = sorted(
+            [{
+                "open_time": row["open_time"],
+                "volume": float(row["volume"]),
+                "ratio_to_positive_volume_median": round(float(row["volume"]) / median_positive, 8),
+            } for row in rows if float(row["volume"]) > 0],
+            key=lambda item: item["ratio_to_positive_volume_median"],
+            reverse=True,
+        )[:5]
+    return {
+        "volume_field_missing_count": 0,
+        "zero_volume_candle_count": len(zero_indices),
+        "zero_volume_run_count": len(zero_runs),
+        "zero_volume_runs": zero_runs,
+        "positive_volume_median": median_positive,
+        "largest_volume_ratios_to_positive_median": median_ranked,
+        "largest_adjacent_volume_transitions": ranked_transitions,
+        "volume_change_interpretation": "ranked_observations_only_no_spike_threshold_or_feed_failure_inference",
+    }
+
+
 def _provider_data_quality_metadata(rows: list[dict[str, Any]], interval: str, now_ms: int) -> dict[str, Any]:
     """Summarize candle validity, forming-tail status, and freshness without repairing data."""
     if interval not in TIMEFRAMES:
@@ -239,7 +317,8 @@ def _provider_data_quality_metadata(rows: list[dict[str, Any]], interval: str, n
     ordered = list(rows)
     freshness = _freshness_metadata(ordered, interval, now_ms)
     forming = [row for row in ordered if row["close_time"] >= now_ms]
-    zero_volume_count = sum(1 for row in ordered if float(row["volume"]) == 0)
+    volume_quality = _volume_quality_metadata(ordered)
+    zero_volume_count = volume_quality["zero_volume_candle_count"]
     warnings = []
     if freshness["is_stale"]:
         warnings.append("latest_completed_candle_is_stale")
@@ -254,6 +333,7 @@ def _provider_data_quality_metadata(rows: list[dict[str, Any]], interval: str, n
         "forming_candle_count": len(forming),
         "latest_candle_is_forming": bool(forming and forming[-1] is ordered[-1]),
         "zero_volume_candle_count": zero_volume_count,
+        "volume_quality": volume_quality,
         "invalid_candle_count": 0,
         "freshness_status": freshness["freshness_status"],
         "latest_completed_candle_age_seconds": freshness["latest_closed_candle_age_seconds"],
