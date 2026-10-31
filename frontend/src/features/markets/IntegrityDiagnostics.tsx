@@ -20,7 +20,7 @@ export function IntegrityDiagnostics({ result }: IntegrityDiagnosticsProps) {
   const chronological = candles.every((candle, index) =>
     Number.isFinite(candle.open_time) &&
     Number.isFinite(candle.close_time) &&
-    (index === 0 || candle.open_time >= candles[index - 1].open_time)
+    (index === 0 || candle.open_time > candles[index - 1].open_time)
   );
   const ohlcValid = candles.every((candle) =>
     [candle.open, candle.high, candle.low, candle.close, candle.volume].every(Number.isFinite) &&
@@ -34,28 +34,60 @@ export function IntegrityDiagnostics({ result }: IntegrityDiagnosticsProps) {
     Number.isFinite(Date.parse(candle.open_time_utc)) &&
     Number.isFinite(Date.parse(candle.close_time_utc))
   );
+  const epochUtcConsistent = candles.every((candle) =>
+    Number.isFinite(Date.parse(candle.open_time_utc)) &&
+    Number.isFinite(Date.parse(candle.close_time_utc)) &&
+    Date.parse(candle.open_time_utc) / 1000 === candle.open_time &&
+    Date.parse(candle.close_time_utc) / 1000 === candle.close_time
+  );
+  const retrievedAtSeconds = payload ? Date.parse(payload.retrieved_at) / 1000 : Number.NaN;
+  const closeStateAvailable = Number.isFinite(retrievedAtSeconds);
+  const closeStateConsistent = closeStateAvailable && candles.every((candle) =>
+    candle.is_closed === (candle.close_time <= retrievedAtSeconds)
+  );
   const countMatches = payload !== null && payload.count === candles.length;
+  const providerAccountingAvailable = payload !== null &&
+    Number.isInteger(payload.provider_rows_received) &&
+    Number.isInteger(payload.provider_rows_invalid) &&
+    Number.isInteger(payload.provider_rows_duplicate) &&
+    Number.isInteger(payload.provider_rows_valid_before_deduplication) &&
+    Number.isInteger(payload.normalized_rows_count);
+  const providerAccountingNonNegative = providerAccountingAvailable &&
+    payload.provider_rows_received! >= 0 &&
+    payload.provider_rows_invalid! >= 0 &&
+    payload.provider_rows_duplicate! >= 0 &&
+    payload.provider_rows_valid_before_deduplication! >= 0 &&
+    payload.normalized_rows_count! >= 0;
+  const providerAccountingConsistent = providerAccountingNonNegative &&
+    payload.provider_rows_received === payload.provider_rows_invalid! + payload.provider_rows_valid_before_deduplication! &&
+    payload.provider_rows_duplicate! <= payload.provider_rows_valid_before_deduplication! &&
+    payload.normalized_rows_count === payload.provider_rows_valid_before_deduplication! - payload.provider_rows_duplicate! &&
+    payload.normalized_rows_count === payload.count;
   const intervalSeconds: Record<string, number> = { "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "6h": 21600, "1d": 86400 };
   const interval = payload ? intervalSeconds[payload.granularity] : undefined;
-  const missingIntervals = interval && candles.length > 1
-    ? candles.slice(1).reduce((total, candle, index) => {
-      const delta = candle.open_time - candles[index].open_time;
-      return total + (delta > interval ? Math.max(0, Math.round(delta / interval) - 1) : 0);
-    }, 0)
-    : 0;
-  const gapCount = interval && candles.length > 1
-    ? candles.slice(1).filter((candle, index) => candle.open_time - candles[index].open_time > interval).length
-    : 0;
+  const intervalAligned = interval !== undefined && candles.every((candle) => candle.open_time % interval === 0);
+  const intervalDeltas = interval && candles.length > 1
+    ? candles.slice(1).map((candle, index) => candle.open_time - candles[index].open_time)
+    : [];
+  const misalignedTransitions = intervalDeltas.filter((delta) => delta <= 0 || delta % interval! !== 0).length;
+  const missingIntervals = intervalDeltas.reduce((total, delta) =>
+    delta > interval! && delta % interval! === 0 ? total + delta / interval! - 1 : total, 0);
+  const gapCount = intervalDeltas.filter((delta) => delta > interval!).length;
 
 
   const checks: Diagnostic[] = [
     { label: "Response contract", state: hasPayload ? "PASS" : "UNAVAILABLE", detail: hasPayload ? "The frontend API contract accepted this payload." : "No validated candle payload is available." },
     { label: "API response classification", state: result.state === "fresh" ? "PASS" : result.state === "stale" || result.state === "partial" || result.state === "conflicting" ? "WARN" : "UNAVAILABLE", detail: `Response state: ${result.state}. ${result.message}` },
     { label: "Declared candle count", state: hasPayload ? countMatches ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasPayload ? `${candles.length} returned / ${payload.count} declared` : "Cannot compare counts without a payload." },
-    { label: "Chronological ordering", state: hasCandles ? chronological ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasCandles ? chronological ? "Open times are non-decreasing." : "One or more candles are out of chronological order." : "No candle rows are available to inspect." },
+    { label: "Provider row accounting", state: !hasPayload || !providerAccountingAvailable ? "UNAVAILABLE" : !providerAccountingConsistent || payload.provider_rows_invalid! > 0 || payload.provider_rows_duplicate! > 0 ? "WARN" : "PASS", detail: !hasPayload || !providerAccountingAvailable ? "Provider row accounting metadata is not available." : `Received ${payload.provider_rows_received}; invalid ${payload.provider_rows_invalid}; duplicate ${payload.provider_rows_duplicate}; normalized ${payload.normalized_rows_count}.` },
+    { label: "Requested-window coverage", state: "UNAVAILABLE", detail: "The provider response does not establish complete coverage of the requested time window." },
+    { label: "Chronological ordering", state: hasCandles ? chronological ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasCandles ? chronological ? "Open times are strictly increasing; duplicate timestamps are not accepted." : "One or more candle timestamps are duplicated or out of chronological order." : "No candle rows are available to inspect." },
     { label: "OHLC and volume bounds", state: hasCandles ? ohlcValid ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasCandles ? ohlcValid ? "OHLCV values are finite and price/volume bounds are consistent." : "One or more candles contain non-finite values or violate OHLC/volume bounds." : "No candle values are available to inspect." },
     { label: "Candle timestamps", state: hasCandles ? timestampsValid ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasCandles ? timestampsValid ? "Candle timestamps are parseable." : "One or more candle timestamps are invalid." : "No candle timestamps are available to inspect." },
-    { label: "Observed interval continuity", state: !hasCandles ? "UNAVAILABLE" : interval === undefined ? "WARN" : missingIntervals > 0 ? "WARN" : "PASS", detail: !hasCandles ? "No candle rows are available to assess interval continuity." : interval === undefined ? "The interval is unsupported; continuity cannot be assessed." : missingIntervals > 0 ? `${missingIntervals} expected interval(s) missing across ${gapCount} gap(s) between returned candles. Edge coverage is not inferred.` : "No missing intervals detected between the first and last returned candles. Edge coverage is not inferred." },
+    { label: "Epoch/UTC timestamp consistency", state: !hasCandles ? "UNAVAILABLE" : epochUtcConsistent ? "PASS" : "WARN", detail: !hasCandles ? "No candle rows are available to compare numeric epochs with UTC strings." : epochUtcConsistent ? "Numeric open/close epochs match their UTC timestamp strings." : "One or more numeric candle epochs do not match their UTC timestamp strings." },
+    { label: "Candle close-state consistency", state: !hasCandles || !closeStateAvailable ? "UNAVAILABLE" : closeStateConsistent ? "PASS" : "WARN", detail: !hasCandles ? "No candle rows are available to assess close state." : !closeStateAvailable ? "A valid response retrieval timestamp is unavailable." : closeStateConsistent ? "Each is_closed flag agrees with close_time and response retrieval time." : "One or more is_closed flags conflict with close_time and response retrieval time." },
+    { label: "Interval boundary alignment", state: !hasCandles ? "UNAVAILABLE" : interval === undefined ? "WARN" : intervalAligned ? "PASS" : "WARN", detail: !hasCandles ? "No candle rows are available to assess interval alignment." : interval === undefined ? "The interval is unsupported; boundary alignment cannot be assessed." : intervalAligned ? "Every candle open timestamp aligns to its UTC interval boundary." : "One or more candle open timestamps are not aligned to the UTC interval boundary." },
+    { label: "Observed interval continuity", state: !hasCandles ? "UNAVAILABLE" : interval === undefined ? "WARN" : misalignedTransitions > 0 || missingIntervals > 0 ? "WARN" : "PASS", detail: !hasCandles ? "No candle rows are available to assess interval continuity." : interval === undefined ? "The interval is unsupported; continuity cannot be assessed." : misalignedTransitions > 0 ? `${misalignedTransitions} transition(s) do not follow an exact interval multiple; missing-slot count is not inferred for those transitions.` : missingIntervals > 0 ? `${missingIntervals} expected interval(s) missing across ${gapCount} gap(s) between returned candles. Edge coverage is not inferred.` : "No missing intervals detected between the first and last returned candles. Edge coverage is not inferred." },
   ];
 
   return (
@@ -72,7 +104,7 @@ export function IntegrityDiagnostics({ result }: IntegrityDiagnosticsProps) {
           </li>
         ))}
       </ul>
-      <p className="markets-footnote">These are structural checks on the returned payload only. They do not verify exchange authenticity, market correctness, edge coverage outside the returned series, exchange authenticity, market correctness, or provider uptime.</p>
+      <p className="markets-footnote">These are structural checks on the returned payload only. They do not verify requested-window coverage, exchange authenticity, market correctness, or provider uptime.</p>
     </section>
   );
 }
