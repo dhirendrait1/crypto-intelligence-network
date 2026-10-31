@@ -18,6 +18,41 @@ SAMPLE = [
 
 
 class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
+    def test_historical_window_integrity_detects_missing_leading_and_trailing_intervals(self):
+        hour = 3_600_000
+        rows = [dict(SAMPLE[0], open_time=8 * hour), dict(SAMPLE[0], open_time=9 * hour)]
+        for row in rows:
+            row["close_time"] = row["open_time"] + hour - 1
+        result = api._historical_window_integrity_metadata(rows, "1h", 5, "binance", 12 * hour)
+        self.assertEqual(result["window_status"], "partial")
+        self.assertEqual(result["leading_missing_interval_count"], 3)
+        self.assertEqual(result["trailing_missing_interval_count"], 2)
+        self.assertEqual(result["out_of_window_candle_count"], 0)
+        self.assertFalse(result["missing_candles_synthesized"])
+
+    def test_historical_window_integrity_marks_full_window(self):
+        hour = 3_600_000
+        rows = []
+        for open_time in (8 * hour, 9 * hour, 10 * hour):
+            row = dict(SAMPLE[0], open_time=open_time, close_time=open_time + hour - 1)
+            rows.append(row)
+        result = api._historical_window_integrity_metadata(rows, "1h", 3, "binance", 11 * hour)
+        self.assertEqual(result["window_status"], "complete")
+        self.assertEqual(result["leading_missing_interval_count"], 0)
+        self.assertEqual(result["trailing_missing_interval_count"], 0)
+        self.assertIsNone(result["window_warning"])
+
+    def test_historical_window_integrity_reports_out_of_window_rows(self):
+        hour = 3_600_000
+        rows = [dict(SAMPLE[0], open_time=7 * hour, close_time=8 * hour - 1)]
+        result = api._historical_window_integrity_metadata(rows, "1h", 2, "binance", 10 * hour)
+        self.assertEqual(result["out_of_window_candle_count"], 1)
+        self.assertEqual(result["window_status"], "partial")
+
+    def test_historical_window_integrity_rejects_unsupported_provider_boundaries(self):
+        with self.assertRaisesRegex(ValueError, "weekly candle boundary"):
+            api._historical_window_integrity_metadata([dict(SAMPLE[0])], "1w", 1, "coinbase", 1_800_000_000_000)
+
     def test_coverage_metadata_reports_partial_row_ratio_without_claiming_feed_loss(self):
         rows = [dict(row) for row in SAMPLE[:3]]
         result = api._coverage_metadata(rows, 5)
