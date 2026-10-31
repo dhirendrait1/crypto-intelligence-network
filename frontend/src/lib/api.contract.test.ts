@@ -34,13 +34,13 @@ describe("Coinbase public candle frontend contract", () => {
   it("rejects non-object payloads and responses not marked read-only", () => {
     expect(validateCoinbaseCandlesPayload(null, "BTC-USD", "1h").valid).toBe(false);
     const payload = validPayload();
-    payload.mode = "trading";
+    Object.assign(payload, { mode: "trading" });
     expect(validateCoinbaseCandlesPayload(payload, "BTC-USD", "1h").valid).toBe(false);
   });
   it("rejects a mismatched product, quote currency, or interval", () => {
     const payload = validPayload();
     expect(validateCoinbaseCandlesPayload(payload, "ETH-USD", "1h").valid).toBe(false);
-    payload.quote_currency = "USDT" as "USD";
+    Object.assign(payload, { quote_currency: "USDT" });
     expect(validateCoinbaseCandlesPayload(payload, "BTC-USD", "1h").valid).toBe(false);
     const otherInterval = validPayload();
     otherInterval.granularity = "5m";
