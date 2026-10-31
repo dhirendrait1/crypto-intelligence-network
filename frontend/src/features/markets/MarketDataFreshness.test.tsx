@@ -33,6 +33,6 @@ describe("Market data freshness panel", () => {
   it("does not invent freshness when the payload is unavailable", () => {
     render(<MarketDataFreshness result={result("unavailable", null)} />);
     expect(screen.getByText("UNAVAILABLE")).toBeTruthy();
-    expect(screen.getByText("Freshness cannot be established.")).toBeTruthy();
+    expect(screen.getByText(/No validated candle payload is available\. Freshness cannot be established\./)).toBeTruthy();
   });
 });
