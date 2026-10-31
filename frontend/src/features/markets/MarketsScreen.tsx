@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { DataStatePanel } from "../../components/DataState";
+import { CandleChart } from "./CandleChart";
 import { cinApi, type ApiResult, type CoinbaseCandlesResponse } from "../../lib/api";
 import "./markets.css";
 
@@ -51,6 +52,7 @@ export function MarketsScreen() {
         {result.data && <>
           <div className="markets-meta"><span>{result.data.product_id} · {result.data.granularity}</span><span>{result.data.count} candles returned</span></div>
           {result.data.stale_data_warning && <p className="markets-warning">{result.data.stale_data_warning}</p>}
+          <CandleChart candles={candles} productId={result.data.product_id} />
           <div className="markets-table-wrap"><table className="markets-table">
             <thead><tr><th>Open time (UTC)</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Volume</th></tr></thead>
             <tbody>{displayCandles.map((candle) => <tr key={candle.open_time}>
