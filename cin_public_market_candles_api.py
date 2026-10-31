@@ -37,6 +37,21 @@ class _MalformedProviderResponse(ValueError):
 TIMEFRAMES = {"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M"}
 KRAKEN_INTERVALS = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440, "1w": 10080}
 KRAKEN_SYMBOLS = {"BTC": "XBT"}
+
+FALLBACK_QUOTE_ASSETS = ("USDT", "USD")
+
+
+def _parse_fallback_market_symbol(symbol: str, provider: str) -> tuple[str, str]:
+    """Parse only explicitly supported concatenated base/quote symbols for fallbacks."""
+    if not isinstance(symbol, str) or not symbol or symbol != symbol.strip().upper():
+        raise ValueError(f"{provider} fallback cannot map symbol {symbol}")
+    for quote in FALLBACK_QUOTE_ASSETS:
+        if symbol.endswith(quote):
+            base = symbol[:-len(quote)]
+            if re.fullmatch(r"[A-Z0-9]{2,20}", base):
+                return base, quote
+    raise ValueError(f"{provider} fallback cannot map symbol {symbol}")
+
 _INTERVAL_MS = {
     "1m": 60_000, "3m": 180_000, "5m": 300_000, "15m": 900_000,
     "30m": 1_800_000, "1h": 3_600_000, "2h": 7_200_000,
@@ -518,10 +533,7 @@ def _fetch_binance(symbol: str, interval: str, limit: int) -> list[dict[str, Any
 def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
     if interval not in KRAKEN_INTERVALS:
         raise ValueError(f"Kraken fallback does not support interval {interval}")
-    pair = re.fullmatch(r"([A-Z0-9]+)(USDT|USD)", symbol)
-    if not pair:
-        raise ValueError(f"Kraken fallback cannot map symbol {symbol}")
-    base, quote = pair.groups()
+    base, quote = _parse_fallback_market_symbol(symbol, "Kraken")
     base = KRAKEN_SYMBOLS.get(base, base)
     # Resolve the requested base/quote against Kraken's public market catalogue.
     # AssetPairs exposes the canonical result key, altname, and websocket name;
@@ -1069,10 +1081,7 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
     """Fetch public Coinbase Exchange candles when primary providers are blocked."""
     if interval not in COINBASE_GRANULARITY:
         raise ValueError(f"Coinbase fallback does not support interval {interval}")
-    pair = re.fullmatch(r"([A-Z0-9]+)(USDT|USD)", symbol)
-    if not pair:
-        raise ValueError(f"Coinbase fallback cannot map symbol {symbol}")
-    base, quote = pair.groups()
+    base, quote = _parse_fallback_market_symbol(symbol, "Coinbase")
     # Never substitute a USD market for a USDT request: quote assets are not interchangeable.
     if quote != "USD":
         raise ValueError("Coinbase fallback supports USD-quoted pairs only; USDT requests are not mapped to USD.")
