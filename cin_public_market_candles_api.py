@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import http.client
 import json
 import math
 import re
@@ -490,10 +491,22 @@ def _request_json(url: str) -> Any:
     with urllib.request.urlopen(request, timeout=15) as response:
         if response.status != 200:
             raise RuntimeError(f"Provider returned HTTP {response.status}")
-        body = response.read(MAX_PROVIDER_RESPONSE_BYTES + 1)
+        try:
+            body = response.read(MAX_PROVIDER_RESPONSE_BYTES + 1)
+        except http.client.IncompleteRead:
+            # A 200 response with a truncated body is a malformed successful
+            # response, not a transport outage eligible for provider fallback.
+            raise ValueError("Provider response body was incomplete") from None
         if len(body) > MAX_PROVIDER_RESPONSE_BYTES:
             raise ValueError("Provider response exceeded the configured size limit")
-        return json.loads(body.decode("utf-8"))
+        try:
+            decoded = body.decode("utf-8")
+        except UnicodeDecodeError:
+            raise ValueError("Provider response was not valid UTF-8") from None
+        try:
+            return json.loads(decoded)
+        except json.JSONDecodeError:
+            raise ValueError("Provider response did not contain valid JSON") from None
 
 
 
