@@ -460,7 +460,15 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
             if not math.isfinite(start_seconds) or not start_seconds.is_integer():
                 raise _MalformedProviderResponse("Kraken returned a fractional or non-finite candle timestamp")
             start = int(start_seconds * 1000)
+            if not _is_aligned_candle_open(start, interval, "kraken"):
+                raise _MalformedProviderResponse(
+                    "Kraken returned a candle open outside its UTC timeframe boundary"
+                )
             duration_ms = KRAKEN_INTERVALS[interval] * 60_000
+            if duration_ms != _interval_duration_ms(interval, start):
+                raise _MalformedProviderResponse(
+                    "Kraken interval duration does not match the supported UTC timeframe"
+                )
             candle = {
                 "open_time": start, "open": float(row[1]), "high": float(row[2]),
                 "low": float(row[3]), "close": float(row[4]), "volume": float(row[6]),
