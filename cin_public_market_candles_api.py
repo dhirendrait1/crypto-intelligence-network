@@ -567,7 +567,11 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
                     or timestamp_seconds * 1000 > MAX_TIMESTAMP_MS
                 ):
                     continue
-                rows_by_time[int(timestamp_seconds)] = row
+                timestamp_seconds_int = int(timestamp_seconds)
+                # Coinbase may include buckets preceding the declared start.
+                # Keep only opens inside CIN's requested UTC history window.
+                if start <= timestamp_seconds_int <= latest_open:
+                    rows_by_time[timestamp_seconds_int] = row
             except (TypeError, ValueError, OverflowError):
                 continue
         cursor = chunk_end
@@ -693,17 +697,18 @@ async def get_market_candles(
     source = rows[0].get("_source", "Binance public market-data API")
     endpoint = rows[0].get("_source_endpoint", BINANCE_KLINES_URL)
     provider = rows[0].get("_provider", "unknown")
-    # Kraken documents that OHLC intervals without trades are omitted. Keep
-    # gaps visible, but avoid implying that every missing interval is data loss.
+    # Kraken and Coinbase document that historical candle intervals without
+    # trades may be omitted. Keep gaps visible without implying feed loss.
+    no_trade_gap_provider = provider in {"kraken", "coinbase"}
     timeline_integrity["provider"] = provider
     timeline_integrity["gap_interpretation"] = (
         "missing_intervals_may_indicate_no_trades"
-        if provider == "kraken" and timeline_integrity["has_gaps"]
+        if no_trade_gap_provider and timeline_integrity["has_gaps"]
         else "cause_not_inferred_from_candle_rows"
     )
     timeline_integrity["interpretation_note"] = (
-        "Kraken may omit intervals with no trades; a reported gap is not proof of feed loss."
-        if provider == "kraken" and timeline_integrity["has_gaps"]
+        f"{provider.title()} may omit intervals with no trades; a reported gap is not proof of feed loss."
+        if no_trade_gap_provider and timeline_integrity["has_gaps"]
         else "A timestamp gap identifies an absent interval only; its cause is not established by this snapshot."
     )
     return {
