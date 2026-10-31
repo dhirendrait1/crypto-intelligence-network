@@ -158,3 +158,10 @@ Before requesting fallback candles, CIN retrieves the public Coinbase Exchange p
 Before the OHLC request, CIN now requires the AssetPairs record to contain non-empty `base` and `quote` asset IDs in addition to the existing `altname` and `wsname` checks. It validates the canonical result key against the concatenated raw asset IDs and compares the requested base/quote only after applying a small explicit Kraken REST alias map (`XXBT` to `XBT`, `ZUSD` to `USD`). Other asset IDs are not inferred or rewritten. Missing fields, conflicting asset IDs, a result-key mismatch, or more than one returned market record fail closed before the OHLC request. This is market-identity validation only; it does not imply market liquidity, trading eligibility, or provider-data correctness.
 
 The field meanings and Kraken-specific symbol variants are documented in Kraken's [API symbols and tickers reference](https://support.kraken.com/articles/360000920306-api-symbols-and-tickers), which shows AssetPairs records carrying `base`, `quote`, `altname`, and `wsname` and explains the distinct REST/WebSocket symbol forms.
+
+
+### Kraken AssetPairs asset-class validation
+
+CIN now also requires `aclass_base` and `aclass_quote` to equal `currency` before accepting a Kraken AssetPairs record for this spot-currency candle adapter. Missing fields and other asset classes (including tokenized-asset classes) are rejected before the OHLC request. This keeps the adapter's supported scope explicit rather than treating every Kraken AssetPairs instrument as an interchangeable spot-currency market. Kraken documents these asset-class fields separately from the base and quote asset identifiers; the current spot-currency examples report `currency` for both sides.
+
+Reference: [Kraken API symbols and tickers](https://support.kraken.com/articles/360000920306-api-symbols-and-tickers) and [Kraken Spot AssetPairs response example](https://python-kraken-sdk.readthedocs.io/en/stable/04_spot/rest.html).
