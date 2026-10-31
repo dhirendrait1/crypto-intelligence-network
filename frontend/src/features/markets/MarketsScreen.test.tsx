@@ -43,4 +43,26 @@ describe("Markets screen", () => {
     expect(screen.getByText("105")).toBeTruthy();
     expect(screen.getByText(/No order placement, trade execution/i)).toBeTruthy();
   });
+
+  it("locks market, interval, comparison, and watchlist controls during a candle request", async () => {
+    let resolveRequest!: (value: typeof response) => void;
+    vi.mocked(cinApi.getCoinbaseCandles).mockReturnValue(
+      new Promise((resolve) => { resolveRequest = resolve; }),
+    );
+    render(<MarketsScreen />);
+    fireEvent.click(screen.getByRole("button", { name: "Load candles" }));
+
+    expect(screen.getByRole("combobox", { name: "Market" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Interval" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Load candles" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Load comparison" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Bitcoin/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Ethereum/ })).toBeDisabled();
+
+    resolveRequest(response);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Load candles" })).toBeEnabled());
+    expect(screen.getByRole("combobox", { name: "Market" })).toBeEnabled();
+    expect(screen.getByRole("combobox", { name: "Interval" })).toBeEnabled();
+  });
+
 });
