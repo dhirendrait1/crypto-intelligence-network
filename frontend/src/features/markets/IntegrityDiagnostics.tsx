@@ -16,8 +16,13 @@ export function IntegrityDiagnostics({ result }: IntegrityDiagnosticsProps) {
   const payload = result.data;
   const candles = payload?.data ?? [];
   const hasPayload = payload !== null;
-  const chronological = candles.every((candle, index) => index === 0 || candle.open_time >= candles[index - 1].open_time);
+  const chronological = candles.every((candle, index) =>
+    Number.isFinite(candle.open_time) &&
+    Number.isFinite(candle.close_time) &&
+    (index === 0 || candle.open_time >= candles[index - 1].open_time)
+  );
   const ohlcValid = candles.every((candle) =>
+    [candle.open, candle.high, candle.low, candle.close, candle.volume].every(Number.isFinite) &&
     candle.close_time >= candle.open_time &&
     candle.volume >= 0 &&
     candle.low <= candle.high &&
@@ -34,7 +39,7 @@ export function IntegrityDiagnostics({ result }: IntegrityDiagnosticsProps) {
     { label: "Response contract", state: hasPayload ? "PASS" : "UNAVAILABLE", detail: hasPayload ? "The frontend API contract accepted this payload." : "No validated candle payload is available." },
     { label: "Declared candle count", state: hasPayload ? countMatches ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasPayload ? `${candles.length} returned / ${payload.count} declared` : "Cannot compare counts without a payload." },
     { label: "Chronological ordering", state: hasPayload ? chronological ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasPayload ? chronological ? "Open times are non-decreasing." : "One or more candles are out of chronological order." : "No candle sequence to inspect." },
-    { label: "OHLC and volume bounds", state: hasPayload ? ohlcValid ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasPayload ? ohlcValid ? "Price bounds and non-negative volume are consistent." : "One or more candles violate OHLC or volume bounds." : "No candle values to inspect." },
+    { label: "OHLC and volume bounds", state: hasPayload ? ohlcValid ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasPayload ? ohlcValid ? "OHLCV values are finite and price/volume bounds are consistent." : "One or more candles contain non-finite values or violate OHLC/volume bounds." : "No candle values to inspect." },
     { label: "Candle timestamps", state: hasPayload ? timestampsValid ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasPayload ? timestampsValid ? "Candle timestamps are parseable." : "One or more candle timestamps are invalid." : "No candle timestamps to inspect." },
   ];
 
