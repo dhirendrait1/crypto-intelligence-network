@@ -380,5 +380,43 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(result["latest_closed_candle_age_seconds"])
 
 
+    async def test_binance_timeout_falls_back_to_kraken_and_labels_source(self):
+        with patch.object(api, "_fetch_binance", side_effect=TimeoutError("read timed out")), patch.object(
+            api, "_fetch_kraken", return_value=[dict(SAMPLE[0])]
+        ) as kraken:
+            rows = await api._load("BTCUSDT", "1h", 5)
+        kraken.assert_called_once_with("BTCUSDT", "1h", 5)
+        self.assertIn("fallback after Binance transport failure", rows[0]["_source"])
+        self.assertEqual(rows[0]["_source_endpoint"], api.KRAKEN_OHLC_URL)
+
+    async def test_binance_transport_and_kraken_failure_falls_back_to_coinbase(self):
+        with patch.object(api, "_fetch_binance", side_effect=urllib.error.URLError("network down")), patch.object(
+            api, "_fetch_kraken", side_effect=TimeoutError("kraken timed out")
+        ), patch.object(api, "_fetch_coinbase", return_value=[dict(SAMPLE[0])]) as coinbase:
+            rows = await api._load("BTCUSD", "1h", 5)
+        coinbase.assert_called_once_with("BTCUSD", "1h", 5)
+        self.assertIn("fallback after Binance transport failure", rows[0]["_source"])
+        self.assertEqual(rows[0]["_source_endpoint"], api.COINBASE_CANDLES_URL)
+
+    async def test_binance_rate_limit_does_not_trigger_fallback_requests(self):
+        with patch.object(api, "_fetch_binance", side_effect=urllib.error.HTTPError(
+            api.BINANCE_KLINES_URL, 429, "rate limited", {}, None
+        )), patch.object(api, "_fetch_kraken") as kraken, patch.object(api, "_fetch_coinbase") as coinbase:
+            with self.assertRaises(HTTPException) as ctx:
+                await api._load("BTCUSDT", "1h", 5)
+        self.assertEqual(ctx.exception.status_code, 503)
+        kraken.assert_not_called()
+        coinbase.assert_not_called()
+
+    async def test_transient_primary_and_all_fallback_failures_return_safe_503(self):
+        with patch.object(api, "_fetch_binance", side_effect=TimeoutError("primary timed out")), patch.object(
+            api, "_fetch_kraken", side_effect=ValueError("pair unavailable")
+        ), patch.object(api, "_fetch_coinbase", side_effect=ValueError("unsupported quote")):
+            with self.assertRaises(HTTPException) as ctx:
+                await api._load("BTCUSD", "1h", 5)
+        self.assertEqual(ctx.exception.status_code, 503)
+        self.assertIn("Binance transport failure", ctx.exception.detail)
+
+
 if __name__ == "__main__":
     unittest.main()
