@@ -539,6 +539,10 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
         fallback_reason = "Binance HTTP 451"
     except (urllib.error.URLError, TimeoutError, OSError):
         fallback_reason = "Binance transport failure"
+    except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
+        # A malformed or oversized successful response is not a transport outage:
+        # fail closed and do not fan out to another provider.
+        raise HTTPException(status_code=502, detail="Binance public market-data provider returned an invalid response.") from None
 
     if fallback_reason is not None:
         try:
@@ -590,7 +594,10 @@ async def get_market_candles(
     rows = await _load(normalized, interval, limit)
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     freshness = _freshness_metadata(rows, interval, now_ms)
-    timeline_integrity = _timeline_integrity_metadata(rows, interval)
+    try:
+        timeline_integrity = _timeline_integrity_metadata(rows, interval)
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(status_code=502, detail="Public market-data provider returned inconsistent candle timeline metadata.") from None
     source = rows[0].get("_source", "Binance public market-data API")
     endpoint = rows[0].get("_source_endpoint", BINANCE_KLINES_URL)
     return {
@@ -635,8 +642,9 @@ async def analyze_public_market(
     endpoint = rows[0].get("_source_endpoint", BINANCE_KLINES_URL)
     try:
         analysis = analyze_ohlc([{key: row[key] for key in ("open", "high", "low", "close")} for row in closed_rows])
-    except ValueError as exc:
-        raise HTTPException(status_code=502, detail=f"Fetched candles failed analysis validation: {exc}") from exc
+        timeline_integrity = _timeline_integrity_metadata(rows, interval)
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(status_code=502, detail="Fetched public candles failed technical-analysis integrity validation.") from None
     analysis["input"].update({
         "symbol": normalized, "timeframe": interval, "source": source, "source_endpoint": endpoint,
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
@@ -648,7 +656,7 @@ async def analyze_public_market(
         "last_candle_close_time_utc": datetime.fromtimestamp(closed_rows[-1]["close_time"] / 1000, timezone.utc).isoformat(),
         "volume_included_in_source_but_not_used_in_indicators": True,
         **freshness,
-        "timeline_integrity": _timeline_integrity_metadata(rows, interval),
+        "timeline_integrity": timeline_integrity,
     })
     analysis["limitations"].extend([
         "Public exchange data is not independently audited by CIN.",
