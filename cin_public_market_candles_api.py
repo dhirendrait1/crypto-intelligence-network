@@ -1312,7 +1312,7 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
                 reason = "Kraken and Coinbase fallbacks unavailable or pair/timeframe unsupported"
                 if isinstance(coinbase_exc, urllib.error.HTTPError):
                     reason += f" (Coinbase HTTP {coinbase_exc.code})"
-                raise HTTPException(status_code=503, detail=reason + f"; {fallback_reason}.") from None
+                raise HTTPException(status_code=503, detail=reason + f"; {fallback_context}.") from None
         except _MalformedProviderResponse:
             raise HTTPException(status_code=502, detail="Kraken public market-data provider returned a malformed candle row.") from None
         except (urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as kraken_exc:
@@ -1328,7 +1328,7 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
                 reason = "Kraken and Coinbase fallbacks unavailable or pair/timeframe unsupported"
                 if isinstance(coinbase_exc, urllib.error.HTTPError):
                     reason += f" (Coinbase HTTP {coinbase_exc.code})"
-                raise HTTPException(status_code=503, detail=reason + f"; {fallback_reason}.") from None
+                raise HTTPException(status_code=503, detail=reason + f"; {fallback_context}.") from None
 
     try:
         rows = _normalize_candle_sequence(rows, interval, provider)
