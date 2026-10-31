@@ -2279,3 +2279,70 @@ class ProviderSnapshotContractIntegrityTests(unittest.IsolatedAsyncioTestCase):
             metadata["intermediate_failures"],
             ["Kraken transport/data failure (TimeoutError)"],
         )
+
+
+    async def test_binance_fallback_eligibility_matrix(self):
+        eligible = {451}
+        stop_statuses = (418, 429, 403, 500)
+        for status in stop_statuses:
+            with self.subTest(binance_http_status=status):
+                error = urllib.error.HTTPError(
+                    api.BINANCE_KLINES_URL, status, "upstream response", {}, None
+                )
+                with patch.object(api, "_fetch_binance", side_effect=error), patch.object(
+                    api, "_fetch_kraken"
+                ) as kraken, patch.object(api, "_fetch_coinbase") as coinbase:
+                    with self.assertRaises(HTTPException):
+                        await api._load("BTCUSDT", "1h", 5)
+                kraken.assert_not_called()
+                coinbase.assert_not_called()
+        for status in eligible:
+            with self.subTest(binance_http_status=status):
+                error = urllib.error.HTTPError(
+                    api.BINANCE_KLINES_URL, status, "unavailable", {}, None
+                )
+                with patch.object(api, "_fetch_binance", side_effect=error), patch.object(
+                    api, "_fetch_kraken", return_value=[dict(SAMPLE[0])]
+                ) as kraken:
+                    rows = await api._load("BTCUSDT", "1h", 5)
+                kraken.assert_called_once()
+                self.assertEqual(rows[0]["_provider"], "kraken")
+                self.assertIn("Binance HTTP 451", rows[0]["_source"])
+
+    async def test_kraken_fallback_eligibility_matrix(self):
+        stop_statuses = (401, 403, 418, 429)
+        for status in stop_statuses:
+            with self.subTest(kraken_http_status=status):
+                error = urllib.error.HTTPError(
+                    api.KRAKEN_OHLC_URL, status, "upstream response", {}, None
+                )
+                with patch.object(api, "_fetch_binance", side_effect=TimeoutError("offline")), patch.object(
+                    api, "_fetch_kraken", side_effect=error
+                ) as kraken, patch.object(api, "_fetch_coinbase") as coinbase:
+                    with self.assertRaises(HTTPException) as ctx:
+                        await api._load("BTCUSD", "1h", 5)
+                kraken.assert_called_once()
+                coinbase.assert_not_called()
+                if status in (418, 429):
+                    self.assertEqual(ctx.exception.status_code, 503)
+                else:
+                    self.assertEqual(ctx.exception.status_code, 502)
+
+    async def test_malformed_successful_provider_responses_never_trigger_next_provider(self):
+        cases = (
+            ("binance", api._MalformedProviderResponse("malformed Binance payload")),
+            ("kraken", api._MalformedProviderResponse("malformed Kraken payload")),
+        )
+        for provider, malformed in cases:
+            with self.subTest(provider=provider):
+                with patch.object(api, "_fetch_binance", side_effect=(
+                    malformed if provider == "binance" else TimeoutError("offline")
+                )), patch.object(api, "_fetch_kraken", side_effect=(
+                    malformed if provider == "kraken" else [dict(SAMPLE[0])]
+                )) as kraken, patch.object(api, "_fetch_coinbase") as coinbase:
+                    with self.assertRaises(HTTPException) as ctx:
+                        await api._load("BTCUSD", "1h", 5)
+                self.assertEqual(ctx.exception.status_code, 502)
+                coinbase.assert_not_called()
+                if provider == "binance":
+                    kraken.assert_not_called()
