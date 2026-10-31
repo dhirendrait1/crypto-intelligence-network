@@ -34,3 +34,8 @@ This fetches public candles and passes OHLC values into CIN's existing determini
 - Volume is returned as provider context but is not yet used in indicator calculations.
 - No credentials, user accounts, order placement, or trade execution are involved.
 - RSI/MACD/ATR and structure labels are descriptive analytical outputs, not guaranteed predictions or financial advice.
+
+
+### Historical request-window integrity
+
+The `historical_window_integrity` response compares returned candle opens with the provider-aligned rolling window implied by the requested interval count and retrieval time. It reports expected start/end opens, missing leading and trailing intervals, and rows outside the expected window. A partial edge window is a coverage observation, not proof of provider feed loss: Kraken and Coinbase may omit intervals with no trades. CIN never fills or synthesizes missing candles. Unsupported provider/timeframe boundary combinations fail validation rather than guessing an anchor.
