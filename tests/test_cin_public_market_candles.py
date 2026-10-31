@@ -471,6 +471,14 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("ambiguous candle sequence", ctx.exception.detail)
 
 
+    def test_weekly_candle_alignment_is_provider_specific(self):
+        monday = int(api.datetime(2025, 1, 6, tzinfo=api.timezone.utc).timestamp() * 1000)
+        thursday = int(api.datetime(2025, 1, 9, tzinfo=api.timezone.utc).timestamp() * 1000)
+        self.assertTrue(api._is_aligned_candle_open(monday, "1w", "binance"))
+        self.assertFalse(api._is_aligned_candle_open(thursday, "1w", "binance"))
+        self.assertTrue(api._is_aligned_candle_open(thursday, "1w", "kraken"))
+        self.assertFalse(api._is_aligned_candle_open(monday, "1w", "kraken"))
+
     def test_candle_open_alignment_uses_utc_timeframe_boundaries(self):
         aligned_hour = 1699999200000
         self.assertTrue(api._is_aligned_candle_open(aligned_hour, "1h"))
