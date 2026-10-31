@@ -98,15 +98,28 @@ def _timeline_integrity_metadata(rows: list[dict[str, Any]], interval: str) -> d
 
 def _coverage_metadata(rows: list[dict[str, Any]], requested_limit: int) -> dict[str, Any]:
     """Report returned row count against the requested limit, not continuity."""
+    if (
+        not isinstance(rows, list)
+        or isinstance(requested_limit, bool)
+        or not isinstance(requested_limit, int)
+        or requested_limit < 1
+    ):
+        raise ValueError("Coverage requires a candle list and a positive integer request limit")
     returned_count = len(rows)
     first_open = rows[0]["open_time"] if rows else None
     last_open = rows[-1]["open_time"] if rows else None
     shortfall = max(0, requested_limit - returned_count)
+    ratio = min(1.0, returned_count / requested_limit)
     return {
         "requested_candle_limit": requested_limit,
         "returned_candle_count": returned_count,
         "candle_count_shortfall": shortfall,
+        "returned_row_ratio": round(ratio, 4),
         "coverage_status": "complete" if shortfall == 0 else "partial",
+        "coverage_warning": (
+            None if shortfall == 0 else
+            "Provider returned fewer rows than requested; inspect timeline_integrity and provider semantics before interpreting the shortfall."
+        ),
         "first_returned_candle_open_time_utc": (
             datetime.fromtimestamp(first_open / 1000, timezone.utc).isoformat()
             if first_open is not None else None
@@ -115,7 +128,7 @@ def _coverage_metadata(rows: list[dict[str, Any]], requested_limit: int) -> dict
             datetime.fromtimestamp(last_open / 1000, timezone.utc).isoformat()
             if last_open is not None else None
         ),
-        "coverage_scope": "returned_row_count_against_requested_limit; continuity_is_reported_separately",
+        "coverage_scope": "returned_row_count_against_requested_limit_only; not_a_continuity_or_feed_health_claim",
     }
 
 
