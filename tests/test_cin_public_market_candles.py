@@ -26,6 +26,34 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self._catalogue_patch.start()
         self.addCleanup(self._catalogue_patch.stop)
 
+    def test_request_json_rejects_incomplete_successful_http_body(self):
+        response = MagicMock()
+        response.status = 200
+        response.__enter__.return_value = response
+        response.read.side_effect = api.http.client.IncompleteRead(b'{"partial":', 12)
+        with patch.object(api.urllib.request, "urlopen", return_value=response):
+            with self.assertRaisesRegex(ValueError, "response body was incomplete"):
+                api._request_json("https://provider.test/data")
+
+    def test_request_json_rejects_oversized_successful_http_body(self):
+        response = MagicMock()
+        response.status = 200
+        response.__enter__.return_value = response
+        response.read.return_value = b"x" * (api.MAX_PROVIDER_RESPONSE_BYTES + 1)
+        with patch.object(api.urllib.request, "urlopen", return_value=response):
+            with self.assertRaisesRegex(ValueError, "exceeded the configured size limit"):
+                api._request_json("https://provider.test/data")
+
+    def test_request_json_rejects_invalid_utf8_and_truncated_json(self):
+        for payload, message in ((b"\\xff", "valid UTF-8"), (b'{"partial":', "valid JSON")):
+            response = MagicMock()
+            response.status = 200
+            response.__enter__.return_value = response
+            response.read.return_value = payload
+            with self.subTest(message=message), patch.object(api.urllib.request, "urlopen", return_value=response):
+                with self.assertRaisesRegex(ValueError, message):
+                    api._request_json("https://provider.test/data")
+
     def test_historical_window_integrity_detects_missing_leading_and_trailing_intervals(self):
         hour = 3_600_000
         rows = [dict(SAMPLE[0], open_time=9 * hour), dict(SAMPLE[0], open_time=10 * hour)]
