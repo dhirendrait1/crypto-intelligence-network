@@ -5,11 +5,25 @@ import { MarketSnapshot } from "./MarketSnapshot";
 import { MarketWatchlist } from "./MarketWatchlist";
 import { MarketComparison } from "./MarketComparison";
 import { MarketDataFreshness } from "./MarketDataFreshness";
+import { MarketQualityHistory, type MarketQualityObservation } from "./MarketQualityHistory";
 import { cinApi, type ApiResult, type CoinbaseCandlesResponse } from "../../lib/api";
 import "./markets.css";
 
 type ProductId = "BTC-USD" | "ETH-USD";
 type Granularity = "1m" | "5m" | "15m" | "1h" | "6h" | "1d";
+
+function toQualityObservation(productId: ProductId, granularity: Granularity, response: ApiResult<CoinbaseCandlesResponse>, suffix: string): MarketQualityObservation {
+  return {
+    id: `${Date.now()}-${suffix}-${productId}`,
+    productId,
+    granularity,
+    state: response.state,
+    observedAt: response.retrievedAt ?? response.data?.retrieved_at ?? null,
+    source: response.source ?? response.data?.source ?? null,
+    candleCount: response.data?.data.length ?? null,
+    integrity: response.data ? "Contract accepted" : "Not validated",
+  };
+}
 
 export function MarketsScreen() {
   const [productId, setProductId] = useState<ProductId>("BTC-USD");
@@ -18,6 +32,7 @@ export function MarketsScreen() {
   const [loading, setLoading] = useState(false);
   const [comparison, setComparison] = useState<{ primary: ApiResult<CoinbaseCandlesResponse>; secondary: ApiResult<CoinbaseCandlesResponse> } | null>(null);
   const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [qualityHistory, setQualityHistory] = useState<MarketQualityObservation[]>([]);
 
   async function loadCandles() {
     setLoading(true);
@@ -25,6 +40,7 @@ export function MarketsScreen() {
     const start = end - 24 * 60 * 60;
     const response = await cinApi.getCoinbaseCandles(productId, granularity, start, end);
     setResult(response);
+    setQualityHistory((current) => [toQualityObservation(productId, granularity, response, "single"), ...current].slice(0, 12));
     setLoading(false);
   }
 
@@ -38,6 +54,11 @@ export function MarketsScreen() {
       cinApi.getCoinbaseCandles(otherProduct, granularity, start, end),
     ]);
     setComparison({ primary, secondary });
+    setQualityHistory((current) => [
+      toQualityObservation(otherProduct, granularity, secondary, "comparison-secondary"),
+      toQualityObservation(productId, granularity, primary, "comparison-primary"),
+      ...current,
+    ].slice(0, 12));
     setComparisonLoading(false);
   }
 
@@ -89,6 +110,7 @@ export function MarketsScreen() {
           <p className="markets-footnote">Showing the latest {displayCandles.length} returned rows. Values are provider-reported candle fields, not a trading interface.</p>
         </>}
       </div>}
+      <MarketQualityHistory observations={qualityHistory} />
       <p className="footer-note">Research and monitoring only. No order placement, trade execution, wallet access, private keys or fund movement.</p>
     </section>
   );
