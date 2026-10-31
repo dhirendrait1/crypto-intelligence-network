@@ -1479,6 +1479,34 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, "future open timestamp"):
             api._provider_data_quality_metadata(rows, "1h", now_ms)
 
+
+
+    def test_data_quality_propagates_complete_staleness_contract(self):
+        now_ms = 1_700_000_000_000
+        rows = [dict(SAMPLE[0])]
+        rows[0]["close_time"] = now_ms - (2 * 3_600_000 + 1)
+        result = api._provider_data_quality_metadata(rows, "1h", now_ms)
+        self.assertEqual(result["freshness_status"], "stale")
+        self.assertTrue(result["is_stale"])
+        self.assertEqual(result["latest_completed_candle_age_seconds"], 7200.001)
+        self.assertEqual(result["stale_threshold_seconds"], 7200)
+        self.assertIsNotNone(result["latest_completed_candle_close_time_utc"])
+        self.assertIn("freshness threshold", result["stale_data_warning"])
+        self.assertIn("latest_completed_candle_is_stale", result["warnings"])
+        self.assertEqual(result["quality_status"], "warning")
+
+    def test_data_quality_warns_when_no_completed_candle_exists(self):
+        now_ms = 1_700_000_000_000
+        rows = [dict(SAMPLE[0])]
+        rows[0]["close_time"] = now_ms + 60_000
+        result = api._provider_data_quality_metadata(rows, "1h", now_ms)
+        self.assertEqual(result["freshness_status"], "no_completed_candle")
+        self.assertIsNone(result["is_stale"])
+        self.assertIsNone(result["latest_completed_candle_age_seconds"])
+        self.assertIsNone(result["latest_completed_candle_close_time_utc"])
+        self.assertIn("no_completed_candle_available", result["warnings"])
+        self.assertEqual(result["quality_status"], "warning")
+
     def test_freshness_metadata_marks_recent_completed_candle_fresh(self):
         now_ms = 1_700_000_000_000
         rows = [dict(SAMPLE[0])]
