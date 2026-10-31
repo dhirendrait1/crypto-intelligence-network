@@ -31,7 +31,8 @@ export function MarketsScreen() {
   const [result, setResult] = useState<ApiResult<CoinbaseCandlesResponse> | null>(null);
   const [loading, setLoading] = useState(false);
   const [comparison, setComparison] = useState<{ primary: ApiResult<CoinbaseCandlesResponse>; secondary: ApiResult<CoinbaseCandlesResponse> } | null>(null);
-  const [comparisonLoading, setComparisonLoading] = useState(false);\n  const [qualityHistory, setQualityHistory] = useState<MarketQualityObservation[]>([]);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [qualityHistory, setQualityHistory] = useState<MarketQualityObservation[]>([]);
 
   async function loadCandles() {
     setLoading(true);
