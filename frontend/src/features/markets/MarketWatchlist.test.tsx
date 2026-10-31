@@ -20,7 +20,7 @@ describe("Market watchlist", () => {
     render(<MarketWatchlist selectedProduct="BTC-USD" onSelect={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "Remove ETH-USD from watchlist" }));
     expect(screen.queryByRole("button", { name: /Ethereum/ })).toBeNull();
-    expect(screen.getByRole("button", { name: "Remove BTC-USD from watchlist" }).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Remove BTC-USD from watchlist" }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Add ETH-USD to watchlist" }));
     expect(screen.getByRole("button", { name: /Ethereum View/ })).toBeTruthy();
   });
