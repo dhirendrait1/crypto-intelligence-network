@@ -204,6 +204,18 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rows[0]["_source"], "Coinbase Exchange public candles API (fallback after Binance HTTP 451)")
         self.assertEqual(rows[0]["_source_endpoint"], api.COINBASE_CANDLES_URL)
 
+    async def test_451_usdt_fallback_never_requests_coinbase_usd_product(self):
+        with patch.object(api, "_fetch_binance", side_effect=urllib.error.HTTPError(
+            api.BINANCE_KLINES_URL, 451, "unavailable for legal reasons", {}, None
+        )), patch.object(api, "_fetch_kraken", side_effect=ValueError("pair unavailable")), patch.object(
+            api, "_request_json"
+        ) as request_json:
+            with self.assertRaises(HTTPException) as ctx:
+                await api._load("BTCUSDT", "1h", 5)
+        self.assertEqual(ctx.exception.status_code, 503)
+        self.assertIn("fallbacks unavailable", ctx.exception.detail)
+        request_json.assert_not_called()
+
     def test_coinbase_rejects_usdt_without_substituting_usd(self):
         with patch.object(api, "_request_json") as request_json:
             with self.assertRaisesRegex(ValueError, "USDT requests are not mapped to USD"):
