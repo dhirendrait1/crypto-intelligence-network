@@ -523,6 +523,27 @@ def _is_provider_scalar(value: Any) -> bool:
     return not isinstance(value, bool) and isinstance(value, (str, int, float))
 
 
+def _parse_provider_timestamp(value: Any, unit: str) -> int:
+    """Parse an integer Unix timestamp in the provider's documented unit."""
+    if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+        raise ValueError("Provider timestamp has an invalid scalar type")
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError("Provider timestamp is not numeric") from None
+    if not math.isfinite(numeric) or not numeric.is_integer() or numeric < 0:
+        raise ValueError("Provider timestamp must be a non-negative integer")
+    if unit == "milliseconds":
+        if numeric < 100_000_000_000 or numeric > MAX_TIMESTAMP_MS:
+            raise ValueError("Provider timestamp is not a valid millisecond Unix timestamp")
+    elif unit == "seconds":
+        if numeric > MAX_TIMESTAMP_MS // 1000:
+            raise ValueError("Provider timestamp is not a valid second Unix timestamp")
+    else:
+        raise ValueError("Unsupported provider timestamp unit")
+    return int(numeric * (1000 if unit == "seconds" else 1))
+
+
 def _is_valid_candle(candle: dict[str, Any]) -> bool:
     """Reject non-finite values, impossible OHLC ranges, and invalid timestamps."""
     try:
@@ -568,13 +589,12 @@ def _fetch_binance(symbol: str, interval: str, limit: int) -> list[dict[str, Any
             # Do not silently discard malformed source rows or truncate timestamps.
             if isinstance(row[0], bool) or isinstance(row[6], bool):
                 raise _MalformedProviderResponse("Binance returned a boolean candle timestamp")
-            open_time_value, close_time_value = float(row[0]), float(row[6])
-            if not open_time_value.is_integer() or not close_time_value.is_integer():
-                raise _MalformedProviderResponse("Binance returned a fractional candle timestamp")
+            open_time_ms = _parse_provider_timestamp(row[0], "milliseconds")
+            close_time_ms = _parse_provider_timestamp(row[6], "milliseconds")
             candle = {
-                "open_time": int(open_time_value), "open": float(row[1]), "high": float(row[2]),
+                "open_time": open_time_ms, "open": float(row[1]), "high": float(row[2]),
                 "low": float(row[3]), "close": float(row[4]), "volume": float(row[5]),
-                "close_time": int(close_time_value),
+                "close_time": close_time_ms,
             }
             if not _is_valid_candle(candle):
                 raise _MalformedProviderResponse("Binance returned invalid OHLCV values")
@@ -700,10 +720,7 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
             # provider row counts by dropping invalid source rows.
             if isinstance(row[0], bool):
                 raise _MalformedProviderResponse("Kraken returned a boolean candle timestamp")
-            start_seconds = float(row[0])
-            if not math.isfinite(start_seconds) or not start_seconds.is_integer():
-                raise _MalformedProviderResponse("Kraken returned a fractional or non-finite candle timestamp")
-            start = int(start_seconds * 1000)
+            start = _parse_provider_timestamp(row[0], "seconds")
             if not _is_aligned_candle_open(start, interval, "kraken"):
                 raise _MalformedProviderResponse(
                     "Kraken returned a candle open outside its UTC timeframe boundary"
@@ -1282,15 +1299,8 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
                 # Malformed timestamps must not disappear from the returned snapshot.
                 if isinstance(row[0], bool):
                     raise _MalformedProviderResponse("Coinbase returned a boolean candle timestamp")
-                timestamp_seconds = float(row[0])
-                if (
-                    not math.isfinite(timestamp_seconds)
-                    or not timestamp_seconds.is_integer()
-                    or timestamp_seconds < 0
-                    or timestamp_seconds * 1000 > MAX_TIMESTAMP_MS
-                ):
-                    raise _MalformedProviderResponse("Coinbase returned an invalid candle timestamp")
-                timestamp_seconds_int = int(timestamp_seconds)
+                timestamp_ms = _parse_provider_timestamp(row[0], "seconds")
+                timestamp_seconds_int = timestamp_ms // 1000
             except _MalformedProviderResponse:
                 raise
             except (TypeError, ValueError, OverflowError):
