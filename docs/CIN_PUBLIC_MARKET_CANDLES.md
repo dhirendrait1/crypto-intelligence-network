@@ -79,3 +79,8 @@ Kraken candle opens are validated against the provider-specific UTC timeframe an
 ### Kraken fallback error classification
 
 A malformed successful Kraken response is a data-integrity failure, not provider unavailability. AssetPairs/OHLC envelope shape, explicit error-list contract, resolved market identity, OHLC result key, pagination cursor, row count, candle rows, chronology, and UTC timeframe alignment are validated as malformed-provider failures. Invalid JSON/Unicode and oversized successful response bodies are classified the same way. These failures return HTTP 502 and do not trigger Coinbase fallback. Network/transport failures remain transport failures; eligible Kraken HTTP errors retain the documented fallback behavior, while rate limits remain retryable HTTP 503 and do not fan out. An actual Kraken API error list or unsupported requested market/timeframe remains distinguishable from a malformed response and may be handled by the existing fallback policy.
+
+
+### Coinbase fallback response classification
+
+A successful Coinbase HTTP response with an invalid JSON/Unicode body, non-list payload, oversized page, conflicting duplicate boundary row, malformed candle row, or empty usable candle set is a provider data-integrity failure and returns sanitized HTTP 502. It is not reported as ordinary provider unavailability (HTTP 503). Transport failures and HTTP errors remain separately classified. Kraken AssetPairs responses that do not resolve exactly one requested market are likewise malformed successful responses and must not be hidden by Coinbase fallback.
