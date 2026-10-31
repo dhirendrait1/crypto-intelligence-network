@@ -1682,3 +1682,58 @@ class CoinbaseProductCatalogueTests(unittest.TestCase):
             with self.assertRaisesRegex(api._MalformedProviderResponse, "catalogue response was not a list"):
                 api._fetch_coinbase("BTCUSD", "1h", 5)
 
+
+
+
+class KrakenAssetPairsIdentityIntegrityTests(unittest.TestCase):
+    """Verify every independent AssetPairs identity field before OHLC access."""
+
+    def _payload(self, *, key="XXBTZUSD", altname="XBTUSD", wsname="XBT/USD",
+                 base="XXBT", quote="ZUSD"):
+        return {"error": [], "result": {
+            key: {"altname": altname, "wsname": wsname, "base": base, "quote": quote}
+        }}
+
+    def test_accepts_reviewed_internal_asset_ids_and_requests_ohlc(self):
+        rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
+        with patch.object(api, "_request_json", side_effect=[
+            self._payload(), {"error": [], "result": {"XXBTZUSD": rows, "last": 1700000000}}
+        ]) as request:
+            candles = api._fetch_kraken("BTCUSD", "1h", 5)
+        self.assertEqual(len(candles), 1)
+        self.assertEqual(request.call_count, 2)
+
+    def test_rejects_missing_base_or_quote_metadata_before_ohlc(self):
+        for missing in ("base", "quote"):
+            pair = self._payload()["result"]["XXBTZUSD"].copy()
+            pair.pop(missing)
+            payload = {"error": [], "result": {"XXBTZUSD": pair}}
+            with self.subTest(missing=missing), patch.object(api, "_request_json", return_value=payload) as request:
+                with self.assertRaisesRegex(api._MalformedProviderResponse, "base/quote identity"):
+                    api._fetch_kraken("BTCUSD", "1h", 5)
+                request.assert_called_once()
+
+    def test_rejects_conflicting_base_or_quote_asset_ids_before_ohlc(self):
+        for changes in ({"base": "XETH"}, {"quote": "USDT"}):
+            pair = self._payload()["result"]["XXBTZUSD"].copy()
+            pair.update(changes)
+            payload = {"error": [], "result": {"XXBTZUSD": pair}}
+            with self.subTest(changes=changes), patch.object(api, "_request_json", return_value=payload) as request:
+                with self.assertRaisesRegex(api._MalformedProviderResponse, "base/quote identity"):
+                    api._fetch_kraken("BTCUSD", "1h", 5)
+                request.assert_called_once()
+
+    def test_rejects_canonical_pair_key_that_conflicts_with_asset_ids(self):
+        payload = self._payload(key="XETHZUSD")
+        with patch.object(api, "_request_json", return_value=payload) as request:
+            with self.assertRaisesRegex(api._MalformedProviderResponse, "base/quote identity"):
+                api._fetch_kraken("BTCUSD", "1h", 5)
+            request.assert_called_once()
+
+    def test_rejects_multiple_asset_pair_records_as_ambiguous(self):
+        payload = self._payload()
+        payload["result"]["XBTUSD"] = payload["result"]["XXBTZUSD"].copy()
+        with patch.object(api, "_request_json", return_value=payload) as request:
+            with self.assertRaisesRegex(api._MalformedProviderResponse, "exactly one requested market"):
+                api._fetch_kraken("BTCUSD", "1h", 5)
+            request.assert_called_once()

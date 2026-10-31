@@ -151,3 +151,10 @@ Kraken and Coinbase fallback adapters now share one parser for concatenated symb
 ### Coinbase product-catalogue identity verification
 
 Before requesting fallback candles, CIN retrieves the public Coinbase Exchange products catalogue and requires exactly one record with the constructed product `id`. Its `base_currency` and `quote_currency` must exactly match the requested base/quote assets. A missing product is treated as an unavailable market; a malformed catalogue, duplicate product identifier, or base/quote mismatch is rejected as a provider data-integrity failure. The candle endpoint is not called after any of those failures. This is a read-only catalogue cross-check, not a guarantee of liquidity, tradability, or data correctness; the returned candle rows remain subject to the existing independent integrity checks.
+
+
+### Kraken AssetPairs field-level market identity integrity
+
+Before the OHLC request, CIN now requires the AssetPairs record to contain non-empty `base` and `quote` asset IDs in addition to the existing `altname` and `wsname` checks. It validates the canonical result key against the concatenated raw asset IDs and compares the requested base/quote only after applying a small explicit Kraken REST alias map (`XXBT` to `XBT`, `ZUSD` to `USD`). Other asset IDs are not inferred or rewritten. Missing fields, conflicting asset IDs, a result-key mismatch, or more than one returned market record fail closed before the OHLC request. This is market-identity validation only; it does not imply market liquidity, trading eligibility, or provider-data correctness.
+
+The field meanings and Kraken-specific symbol variants are documented in Kraken's [API symbols and tickers reference](https://support.kraken.com/articles/360000920306-api-symbols-and-tickers), which shows AssetPairs records carrying `base`, `quote`, `altname`, and `wsname` and explains the distinct REST/WebSocket symbol forms.

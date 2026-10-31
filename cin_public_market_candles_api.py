@@ -37,6 +37,8 @@ class _MalformedProviderResponse(ValueError):
 TIMEFRAMES = {"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M"}
 KRAKEN_INTERVALS = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440, "1w": 10080}
 KRAKEN_SYMBOLS = {"BTC": "XBT"}
+# Explicit Kraken REST asset-ID aliases; unknown aliases are never guessed.
+KRAKEN_ASSET_CODE_ALIASES = {"XXBT": "XBT", "ZUSD": "USD"}
 
 FALLBACK_QUOTE_ASSETS = ("USDT", "USD")
 
@@ -550,16 +552,32 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     if not isinstance(pair_result, dict) or len(pair_result) != 1:
         raise _MalformedProviderResponse("Kraken AssetPairs did not resolve exactly one requested market")
     canonical_key, pair_info = next(iter(pair_result.items()))
-    if not isinstance(pair_info, dict):
+    if not isinstance(canonical_key, str) or not canonical_key or not isinstance(pair_info, dict):
         raise _MalformedProviderResponse("Kraken AssetPairs returned invalid market metadata")
     altname = pair_info.get("altname")
     wsname = pair_info.get("wsname")
+    raw_base = pair_info.get("base")
+    raw_quote = pair_info.get("quote")
     expected_wsname = f"{base}/{quote}"
     if (
         not isinstance(altname, str)
         or altname.upper() != requested_pair
         or not isinstance(wsname, str)
         or wsname.upper() != expected_wsname
+        or not isinstance(raw_base, str)
+        or not raw_base
+        or not isinstance(raw_quote, str)
+        or not raw_quote
+    ):
+        raise _MalformedProviderResponse("Kraken AssetPairs base/quote identity did not match the requested market")
+    # AssetPairs uses internal IDs such as XXBT and ZUSD. Translate only the
+    # explicitly reviewed aliases above, then independently verify the pair key.
+    canonical_base = KRAKEN_ASSET_CODE_ALIASES.get(raw_base, raw_base)
+    canonical_quote = KRAKEN_ASSET_CODE_ALIASES.get(raw_quote, raw_quote)
+    if (
+        canonical_base != base
+        or canonical_quote != quote
+        or canonical_key != f"{raw_base}{raw_quote}"
     ):
         raise _MalformedProviderResponse("Kraken AssetPairs base/quote identity did not match the requested market")
     query = urllib.parse.urlencode({"pair": altname, "interval": KRAKEN_INTERVALS[interval]})
