@@ -101,8 +101,13 @@ def _is_valid_candle(candle: dict[str, Any]) -> bool:
     try:
         prices = [float(candle[key]) for key in ("open", "high", "low", "close")]
         volume = float(candle["volume"])
-        open_time = int(candle["open_time"])
-        close_time = int(candle["close_time"])
+        raw_open_time, raw_close_time = candle["open_time"], candle["close_time"]
+        if isinstance(raw_open_time, bool) or isinstance(raw_close_time, bool):
+            return False
+        open_time_value, close_time_value = float(raw_open_time), float(raw_close_time)
+        if not open_time_value.is_integer() or not close_time_value.is_integer():
+            return False
+        open_time, close_time = int(open_time_value), int(close_time_value)
     except (KeyError, TypeError, ValueError, OverflowError):
         return False
     open_price, high, low, close = prices
@@ -206,13 +211,18 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     return candles[-limit:]
 
 
-def _normalize_candle_sequence(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Validate provider candle rows, order them, and reject ambiguous timelines."""
+def _normalize_candle_sequence(rows: list[dict[str, Any]], interval: str) -> list[dict[str, Any]]:
+    """Validate OHLCV values and exact timeframe duration before ordering candles."""
+    if interval not in TIMEFRAMES:
+        raise ValueError("Provider returned candles for an unsupported timeframe")
     if not isinstance(rows, list) or not rows:
         raise ValueError("Provider returned an empty or invalid candle sequence")
     for row in rows:
         if not isinstance(row, dict) or not _is_valid_candle(row):
             raise ValueError("Provider returned an invalid OHLCV candle")
+        expected_close = row["open_time"] + _interval_duration_ms(interval, row["open_time"]) - 1
+        if row["close_time"] != expected_close:
+            raise ValueError("Provider candle timestamps do not match the requested timeframe")
     ordered = sorted(rows, key=lambda row: row["open_time"])
     for previous, current in zip(ordered, ordered[1:]):
         if current["open_time"] == previous["open_time"]:
@@ -460,7 +470,7 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
                 raise HTTPException(status_code=503, detail=reason + f"; {fallback_reason}.") from None
 
     try:
-        rows = _normalize_candle_sequence(rows)
+        rows = _normalize_candle_sequence(rows, interval)
     except (KeyError, TypeError, ValueError):
         raise HTTPException(status_code=502, detail="Public market-data provider returned an ambiguous candle sequence.") from None
     for row in rows:
