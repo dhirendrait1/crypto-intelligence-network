@@ -47,9 +47,9 @@ Before market panels can be enabled, a dedicated read-only adapter and tests mus
 
 No exchange account authentication, private API keys, order endpoints, order execution, wallet access, trade routing, paid data services, or production deployment are part of F-24.
 
-## 6. Current disposition
+## 6. Initial audit disposition (superseded by subsequent gate records below)
 
-F-24 is **not complete**. The audit has established the provider mismatch and prevented unsafe dashboard wiring. The next implementation increment is Gate A: a Coinbase public-data adapter with fixture-driven tests, after confirming current Coinbase public API contract details. No existing Binance/Kraken route has been modified by this audit.
+The initial audit established the provider mismatch and prevented unsafe dashboard wiring. Subsequent sections record implementation and verification progress. No existing Binance/Kraken route has been modified by this audit.
 
 
 ## 7. Gate A implementation increment (2026-10-31)
@@ -64,7 +64,7 @@ The adapter:
 - Normalizes Coinbase's `[time, low, high, open, close, volume]` row shape into CIN OHLCV with UTC millisecond open/close times.
 - Filters malformed/non-finite/impossible rows, sorts chronologically, and de-duplicates identical timestamps.
 
-**Gate A status: implemented in an isolated adapter; awaiting CI evidence and live read-only smoke validation.** It is not registered as a production API route and is not connected to the dashboard. The existing Binance/Kraken route is unchanged; no claim is made that the current dashboard is Coinbase-powered.
+**Gate A status: implemented in an isolated adapter; CI evidence is recorded below.** It is not registered as a production API route and is not connected to the dashboard. The existing Binance/Kraken route is unchanged; no claim is made that the current dashboard is Coinbase-powered.
 
 
 ### Gate A/B verification evidence
@@ -88,9 +88,7 @@ The route requires explicit Unix-second `start` and `end` bounds, an explicit Co
 
 GitHub Actions [run #41146284133](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/41146284133) passed. The Coinbase adapter tests and API contract tests passed, together with the existing storage-boundary regression suite.
 
-**Gate C status: isolated router and contract tests implemented and CI-verified; production application registration remains blocked.** The audited feature branch does not contain an independently maintained FastAPI application entrypoint/router registry (the Render deployment app is packaged separately in the scaffold archive). This route has therefore not been mounted into the running service or exposed publicly. No archive, Render service, or deployment was changed.
-
-F-24 remains Partial. Remaining work includes safe integration into the actual deployment application source, API-level live read-only smoke validation, and dashboard wiring only after the deployed contract is verified.
+**Historical status:** At this point, deployment-app registration had not yet been verified. The later Gate C section below supersedes this status.
 
 
 ### Gate C — Render build-time router registration verified (2026-10-31)
@@ -106,3 +104,26 @@ Verification:
 - [Frontend CI #41146873995](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/41146873995) — success.
 
 **Gate C status: build-time route registration and packaged-app import verified in CI.** This does not mean the Render service has been deployed with the change. No deployment, Render configuration, or live service was modified. Live public Coinbase validation remains pending.
+
+
+### Gate E — live public Coinbase smoke check (2026-10-31)
+
+A bounded, unauthenticated live request was added to the GitHub Actions storage-boundary workflow. It requests the most recently completed BTC-USD one-hour UTC interval through the fixed public Coinbase Exchange candle endpoint. The workflow validates a non-empty normalized response and basic OHLC sanity; it does not use credentials, private account endpoints, or execution functionality.
+
+Evidence:
+- [Storage validation #41147602014](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/41147602014) — success.
+- The live step returned 2 BTC-USD hourly candle rows for 2026-10-30 22:00–23:00 UTC. The latest returned close was 77,176.16 USD at the time of that run.
+- [Storage validation #41147597708](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/41147597708) — success.
+- [Frontend CI #41147602010](https://github.com/dhirendrait1/crypto-intelligence-network/actions/runs/41147602010) — success.
+
+**Gate E status: live public provider smoke check passed in GitHub-hosted CI.** This proves the provider path from the CI runner at that timestamp only; it does not prove Render deployment, continuous availability, or browser CORS behavior.
+
+### Current F-24 disposition
+
+- Gate A: adapter implemented and offline-tested.
+- Gate B: adapter/API contract tests passed.
+- Gate C: packaged Render app route registration and mocked execution contract passed in CI.
+- Gate D: frontend integration remains blocked pending deployed API verification and browser/CORS validation.
+- Gate E: one bounded live Coinbase public request passed in CI.
+
+F-24 remains **Partial**. No Render deployment, production API activation, frontend market-data wiring, CORS change, PR merge, or provider fallback-policy change was performed.
