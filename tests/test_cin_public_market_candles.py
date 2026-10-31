@@ -301,7 +301,8 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         })
         report = api.compare_provider_candles({"Binance": left, "Kraken": right}, "1h")
         self.assertEqual(report["providers"]["Kraken"]["missing_timestamp_count"], 1)
-        self.assertEqual(report["timeline_gap_count"], 1)
+        self.assertEqual(report["timeline_gap_count"], 0)
+        self.assertEqual(report["provider_missing_interval_count"], 1)
         self.assertEqual(report["consistency_status"], "discrepancies_or_gaps_detected")
 
     def test_cross_provider_comparison_rejects_duplicate_or_invalid_rows(self):
