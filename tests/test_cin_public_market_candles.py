@@ -136,6 +136,26 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             rows = await api._load("BTCUSD", "1h", 5)
         self.assertEqual(rows[0]["_provider"], "coinbase")
 
+
+    async def test_coinbase_rejects_malformed_successful_top_level_payload(self):
+        with patch.object(api, "_request_json", return_value={"unexpected": "object"}):
+            with self.assertRaisesRegex(api._MalformedProviderResponse, "response was not a list"):
+                api._fetch_coinbase("BTCUSD", "1h", 5)
+
+    async def test_coinbase_invalid_success_body_is_malformed_not_transport(self):
+        with patch.object(api, "_request_json", side_effect=api.json.JSONDecodeError("bad json", "{", 0)):
+            with self.assertRaisesRegex(api._MalformedProviderResponse, "invalid successful response body"):
+                api._fetch_coinbase("BTCUSD", "1h", 5)
+
+    async def test_coinbase_malformed_success_does_not_become_unavailable_503(self):
+        with patch.object(api, "_fetch_binance", side_effect=urllib.error.URLError("Binance unavailable")), \
+             patch.object(api, "_fetch_kraken", side_effect=urllib.error.HTTPError("https://kraken.test", 500, "error", {}, None)), \
+             patch.object(api, "_fetch_coinbase", side_effect=api._MalformedProviderResponse("bad Coinbase payload")):
+            with self.assertRaises(HTTPException) as ctx:
+                await api._load("BTCUSD", "1h", 5)
+        self.assertEqual(ctx.exception.status_code, 502)
+        self.assertIn("Coinbase public market-data provider returned a malformed", ctx.exception.detail)
+
     async def test_kraken_keeps_forming_tail_but_freshness_uses_last_closed_candle(self):
         asset_pairs = {"error": [], "result": {
             "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "base": "XXBT", "quote": "USDT"}
