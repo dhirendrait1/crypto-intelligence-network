@@ -237,3 +237,40 @@ describe("Integrity diagnostics", () => {
     expect(coverageRow?.querySelector(".integrity-check-unavailable")).toBeTruthy();
     expect(screen.getByText("The provider response does not establish complete coverage of the requested time window.")).toBeTruthy();
   });
+
+  it("accepts candle opens exactly at either requested-window boundary", () => {
+    const atStart = { ...candle, open_time: 100, close_time: 159 };
+    const atEnd = { ...candle, open_time: 180, close_time: 239 };
+    const boundaryResult = {
+      ...result,
+      data: {
+        ...result.data!,
+        requested_start_utc: "1970-01-01T00:01:40Z",
+        requested_end_utc: "1970-01-01T00:03:00Z",
+        data: [atStart, atEnd],
+        count: 2,
+        provider_rows_received: 2,
+        provider_rows_invalid: 0,
+        provider_rows_duplicate: 0,
+        provider_rows_valid_before_deduplication: 2,
+        normalized_rows_count: 2,
+      },
+    };
+    render(<IntegrityDiagnostics result={boundaryResult} />);
+    const row = screen.getByText("Requested-window candle bounds").closest("li");
+    expect(row?.querySelector(".integrity-check-pass")).toBeTruthy();
+  });
+
+  it("does not claim requested-window bounds pass when the request range is reversed", () => {
+    const reversedWindow = {
+      ...result,
+      data: {
+        ...result.data!,
+        requested_start_utc: "1970-01-01T00:03:00Z",
+        requested_end_utc: "1970-01-01T00:01:40Z",
+      },
+    };
+    render(<IntegrityDiagnostics result={reversedWindow} />);
+    const row = screen.getByText("Requested-window candle bounds").closest("li");
+    expect(row?.querySelector(".integrity-check-unavailable")).toBeTruthy();
+  });
