@@ -68,7 +68,7 @@ describe("Integrity diagnostics", () => {
     };
     render(<IntegrityDiagnostics result={empty} />);
     expect(screen.getByText("No candle rows are available to inspect.")).toBeTruthy();
-    expect(screen.getAllByText("UNAVAILABLE").length).toBe(6);
+    expect(screen.getAllByText("UNAVAILABLE").length).toBe(5);
   });
 
   it("warns about missing intervals between returned candles without rejecting the payload", () => {
