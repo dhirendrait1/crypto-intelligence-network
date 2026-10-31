@@ -568,12 +568,17 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
                 ):
                     continue
                 timestamp_seconds_int = int(timestamp_seconds)
-                # Coinbase may include buckets preceding the declared start.
-                # Keep only opens inside CIN's requested UTC history window.
-                if start <= timestamp_seconds_int <= latest_open:
-                    rows_by_time[timestamp_seconds_int] = row
             except (TypeError, ValueError, OverflowError):
                 continue
+            # Coinbase may include buckets preceding the declared start.
+            # Keep only opens inside CIN's requested UTC history window.
+            if start <= timestamp_seconds_int <= latest_open:
+                previous_row = rows_by_time.get(timestamp_seconds_int)
+                if previous_row is not None and previous_row != row:
+                    raise ValueError(
+                        "Coinbase returned conflicting candle rows for the same open timestamp"
+                    )
+                rows_by_time[timestamp_seconds_int] = row
         cursor = chunk_end
     candles = []
     # Validate every collected row before selecting the requested latest
