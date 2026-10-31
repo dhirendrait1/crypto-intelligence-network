@@ -69,7 +69,7 @@ describe("Integrity diagnostics", () => {
   it("does not infer integrity when no validated payload exists", () => {
     render(<IntegrityDiagnostics result={{ ...result, data: null, state: "unknown" }} />);
     expect(screen.getByText("No validated candle payload is available.")).toBeTruthy();
-    expect(screen.getAllByText("UNAVAILABLE").length).toBe(12);
+    expect(screen.getAllByText("UNAVAILABLE").length).toBe(14);
     expect(screen.queryByText("PASS")).toBeNull();
   });
 
@@ -80,7 +80,39 @@ describe("Integrity diagnostics", () => {
     };
     render(<IntegrityDiagnostics result={empty} />);
     expect(screen.getByText("No candle rows are available to inspect.")).toBeTruthy();
-    expect(screen.getAllByText("UNAVAILABLE").length).toBe(8);
+    expect(screen.getAllByText("UNAVAILABLE").length).toBe(10);
+  });
+
+  it("passes requested-window bounds when every candle open is inside the requested range", () => {
+    render(<IntegrityDiagnostics result={result} />);
+    const row = screen.getByText("Requested-window candle bounds").closest("li");
+    expect(row?.querySelector(".integrity-check-pass")).toBeTruthy();
+  });
+
+  it("warns when a returned candle open falls outside the requested window", () => {
+    const outsideWindow = {
+      ...result,
+      data: { ...result.data!, data: [{ ...candle, open_time: 99 }] },
+    };
+    render(<IntegrityDiagnostics result={outsideWindow} />);
+    const row = screen.getByText("Requested-window candle bounds").closest("li");
+    expect(row?.querySelector(".integrity-check-warn")).toBeTruthy();
+  });
+
+  it("passes candle interval range when close time matches the interval boundary", () => {
+    render(<IntegrityDiagnostics result={result} />);
+    const row = screen.getByText("Candle interval range").closest("li");
+    expect(row?.querySelector(".integrity-check-pass")).toBeTruthy();
+  });
+
+  it("warns when candle close time does not match the expected interval boundary", () => {
+    const incorrectRange = {
+      ...result,
+      data: { ...result.data!, data: [{ ...candle, close_time: 158 }] },
+    };
+    render(<IntegrityDiagnostics result={incorrectRange} />);
+    const row = screen.getByText("Candle interval range").closest("li");
+    expect(row?.querySelector(".integrity-check-warn")).toBeTruthy();
   });
 
   it("warns about missing intervals between returned candles without rejecting the payload", () => {

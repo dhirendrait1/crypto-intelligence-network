@@ -65,6 +65,16 @@ export function IntegrityDiagnostics({ result }: IntegrityDiagnosticsProps) {
     payload.normalized_rows_count === payload.count;
   const intervalSeconds: Record<string, number> = { "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "6h": 21600, "1d": 86400 };
   const interval = payload ? intervalSeconds[payload.granularity] : undefined;
+  const requestedStartSeconds = payload ? Date.parse(payload.requested_start_utc) / 1000 : Number.NaN;
+  const requestedEndSeconds = payload ? Date.parse(payload.requested_end_utc) / 1000 : Number.NaN;
+  const requestedWindowAvailable = Number.isFinite(requestedStartSeconds) &&
+    Number.isFinite(requestedEndSeconds) && requestedStartSeconds <= requestedEndSeconds;
+  const requestedWindowBoundsConsistent = requestedWindowAvailable && candles.every((candle) =>
+    candle.open_time >= requestedStartSeconds && candle.open_time <= requestedEndSeconds
+  );
+  const candleRangeConsistent = interval !== undefined && candles.every((candle) =>
+    candle.close_time === candle.open_time + interval - 1
+  );
   const intervalAligned = interval !== undefined && candles.every((candle) => candle.open_time % interval === 0);
   const intervalDeltas = interval && candles.length > 1
     ? candles.slice(1).map((candle, index) => candle.open_time - candles[index].open_time)
@@ -81,6 +91,8 @@ export function IntegrityDiagnostics({ result }: IntegrityDiagnosticsProps) {
     { label: "Declared candle count", state: hasPayload ? countMatches ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasPayload ? `${candles.length} returned / ${payload.count} declared` : "Cannot compare counts without a payload." },
     { label: "Provider row accounting", state: !hasPayload || !providerAccountingAvailable ? "UNAVAILABLE" : !providerAccountingConsistent || payload.provider_rows_invalid! > 0 || payload.provider_rows_duplicate! > 0 ? "WARN" : "PASS", detail: !hasPayload || !providerAccountingAvailable ? "Provider row accounting metadata is not available." : `Received ${payload.provider_rows_received}; invalid ${payload.provider_rows_invalid}; duplicate ${payload.provider_rows_duplicate}; normalized ${payload.normalized_rows_count}.` },
     { label: "Requested-window coverage", state: "UNAVAILABLE", detail: "The provider response does not establish complete coverage of the requested time window." },
+    { label: "Requested-window candle bounds", state: !hasCandles || !requestedWindowAvailable ? "UNAVAILABLE" : requestedWindowBoundsConsistent ? "PASS" : "WARN", detail: !hasCandles ? "No candle rows are available to compare with the requested window." : !requestedWindowAvailable ? "Valid ordered requested-window timestamps are unavailable." : requestedWindowBoundsConsistent ? "Every returned candle open time falls within the requested UTC window." : "One or more returned candle open times fall outside the requested UTC window." },
+    { label: "Candle interval range", state: !hasCandles ? "UNAVAILABLE" : interval === undefined ? "WARN" : candleRangeConsistent ? "PASS" : "WARN", detail: !hasCandles ? "No candle rows are available to validate interval close boundaries." : interval === undefined ? "The interval is unsupported; candle close boundaries cannot be checked." : candleRangeConsistent ? "Every candle close time equals open time plus the interval duration minus one second." : "One or more candle close times do not match the expected interval boundary." },
     { label: "Chronological ordering", state: hasCandles ? chronological ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasCandles ? chronological ? "Open times are strictly increasing; duplicate timestamps are not accepted." : "One or more candle timestamps are duplicated or out of chronological order." : "No candle rows are available to inspect." },
     { label: "OHLC and volume bounds", state: hasCandles ? ohlcValid ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasCandles ? ohlcValid ? "OHLCV values are finite and price/volume bounds are consistent." : "One or more candles contain non-finite values or violate OHLC/volume bounds." : "No candle values are available to inspect." },
     { label: "Candle timestamps", state: hasCandles ? timestampsValid ? "PASS" : "WARN" : "UNAVAILABLE", detail: hasCandles ? timestampsValid ? "Candle timestamps are parseable." : "One or more candle timestamps are invalid." : "No candle timestamps are available to inspect." },
