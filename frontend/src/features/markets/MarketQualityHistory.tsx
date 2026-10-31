@@ -17,7 +17,7 @@ export function MarketQualityHistory({ observations }: MarketQualityHistoryProps
   return (
     <section className="market-quality-history" aria-label="Market data quality history">
       <div className="market-quality-history-heading">
-        <div><span className="eyebrow">SESSION OBSERVATIONS</span><strong>Data quality history</strong></div>
+        <div><span className="eyebrow">SESSION OBSERVATIONS</span><strong>Session quality history</strong></div>
         <span>{observations.length} / 12</span>
       </div>
       {observations.length === 0 ? (
