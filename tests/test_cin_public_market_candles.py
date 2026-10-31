@@ -829,6 +829,14 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, "invalid OHLCV candle"):
             api._provider_data_quality_metadata(rows, "1h", 1_700_000_000_000)
 
+    def test_provider_data_quality_rejects_out_of_order_rows_instead_of_sorting_them(self):
+        now_ms = 1_700_000_000_000
+        rows = [dict(SAMPLE[1]), dict(SAMPLE[0])]
+        rows[0]["close_time"] = now_ms - 30_000
+        rows[1]["close_time"] = now_ms - 30_000
+        with self.assertRaisesRegex(ValueError, "not chronological"):
+            api._provider_data_quality_metadata(rows, "1h", now_ms)
+
     def test_provider_data_quality_rejects_duplicate_open_times(self):
         rows = [dict(SAMPLE[0]), dict(SAMPLE[0])]
         with self.assertRaisesRegex(ValueError, "duplicate candle open timestamps"):

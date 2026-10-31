@@ -135,9 +135,12 @@ def _provider_data_quality_metadata(rows: list[dict[str, Any]], interval: str, n
         if open_time in seen_open_times:
             raise ValueError("Provider returned duplicate candle open timestamps")
         seen_open_times.add(open_time)
-    ordered = sorted(rows, key=lambda row: row["open_time"])
-    if any(current["open_time"] < previous["open_time"] for previous, current in zip(ordered, ordered[1:])):
+    if any(
+        current["open_time"] < previous["open_time"]
+        for previous, current in zip(rows, rows[1:])
+    ):
         raise ValueError("Provider candle timestamps are not chronological")
+    ordered = list(rows)
     freshness = _freshness_metadata(ordered, interval, now_ms)
     forming = [row for row in ordered if row["close_time"] >= now_ms]
     zero_volume_count = sum(1 for row in ordered if float(row["volume"]) == 0)
