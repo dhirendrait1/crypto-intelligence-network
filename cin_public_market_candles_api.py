@@ -30,6 +30,10 @@ MAX_BINANCE_KLINE_LIMIT = 1000
 MAX_PROVIDER_RESPONSE_BYTES = 2 * 1024 * 1024
 # Largest millisecond Unix timestamp representable by Python datetime (year 9999).
 MAX_TIMESTAMP_MS = 253402300799999
+
+
+class _MalformedProviderResponse(ValueError):
+    """A successful provider payload contains a malformed candle row."""
 TIMEFRAMES = {"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M"}
 KRAKEN_INTERVALS = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440, "1w": 10080}
 KRAKEN_SYMBOLS = {"BTC": "XBT"}
@@ -345,24 +349,26 @@ def _fetch_binance(symbol: str, interval: str, limit: int) -> list[dict[str, Any
     candles = []
     for row in payload:
         if not isinstance(row, list) or len(row) < 7:
-            continue
+            raise _MalformedProviderResponse("Binance returned a malformed candle row")
         try:
-            # Binance timestamps are integer milliseconds. Do not silently truncate
-            # fractional values or accept booleans as numeric timestamps.
+            # Do not silently discard malformed source rows or truncate timestamps.
             if isinstance(row[0], bool) or isinstance(row[6], bool):
-                continue
+                raise _MalformedProviderResponse("Binance returned a boolean candle timestamp")
             open_time_value, close_time_value = float(row[0]), float(row[6])
             if not open_time_value.is_integer() or not close_time_value.is_integer():
-                continue
+                raise _MalformedProviderResponse("Binance returned a fractional candle timestamp")
             candle = {
                 "open_time": int(open_time_value), "open": float(row[1]), "high": float(row[2]),
                 "low": float(row[3]), "close": float(row[4]), "volume": float(row[5]),
                 "close_time": int(close_time_value),
             }
-            if _is_valid_candle(candle):
-                candles.append(candle)
+            if not _is_valid_candle(candle):
+                raise _MalformedProviderResponse("Binance returned invalid OHLCV values")
+            candles.append(candle)
+        except _MalformedProviderResponse:
+            raise
         except (TypeError, ValueError, OverflowError):
-            continue
+            raise _MalformedProviderResponse("Binance returned a malformed candle row") from None
     if not candles:
         raise ValueError("Binance returned no valid candles")
     return candles
@@ -429,28 +435,29 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     # do not unnecessarily reduce the number of usable recent candles.
     for row in rows:
         if not isinstance(row, list) or len(row) < 7:
-            continue
+            raise _MalformedProviderResponse("Kraken returned a malformed candle row")
         try:
-            # Kraken timestamps are seconds. Reject booleans, non-finite values,
-            # and fractional seconds rather than silently truncating source data.
+            # Reject malformed timestamps and values; do not silently understate
+            # provider row counts by dropping invalid source rows.
             if isinstance(row[0], bool):
-                continue
+                raise _MalformedProviderResponse("Kraken returned a boolean candle timestamp")
             start_seconds = float(row[0])
             if not math.isfinite(start_seconds) or not start_seconds.is_integer():
-                continue
+                raise _MalformedProviderResponse("Kraken returned a fractional or non-finite candle timestamp")
             start = int(start_seconds * 1000)
-            # Kraken returns OHLC, VWAP, volume, trade count; derive candle end
-            # from the selected timeframe so the output schema matches Binance.
             duration_ms = KRAKEN_INTERVALS[interval] * 60_000
             candle = {
                 "open_time": start, "open": float(row[1]), "high": float(row[2]),
                 "low": float(row[3]), "close": float(row[4]), "volume": float(row[6]),
                 "close_time": start + duration_ms - 1,
             }
-            if _is_valid_candle(candle):
-                candles.append(candle)
+            if not _is_valid_candle(candle):
+                raise _MalformedProviderResponse("Kraken returned invalid OHLCV values")
+            candles.append(candle)
+        except _MalformedProviderResponse:
+            raise
         except (TypeError, ValueError, OverflowError):
-            continue
+            raise _MalformedProviderResponse("Kraken returned a malformed candle row") from None
     if not candles:
         raise ValueError("Kraken returned no valid candles")
     return candles[-limit:]
@@ -727,12 +734,11 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
             raise ValueError("Coinbase response exceeded the 300-candle per-request limit")
         for row in payload:
             if not isinstance(row, list) or len(row) < 6:
-                continue
+                raise _MalformedProviderResponse("Coinbase returned a malformed candle row")
             try:
-                # Coinbase timestamps are integer Unix seconds. Reject booleans,
-                # fractional values, non-finite values, and unrepresentable dates.
+                # Malformed timestamps must not disappear from the returned snapshot.
                 if isinstance(row[0], bool):
-                    continue
+                    raise _MalformedProviderResponse("Coinbase returned a boolean candle timestamp")
                 timestamp_seconds = float(row[0])
                 if (
                     not math.isfinite(timestamp_seconds)
@@ -740,10 +746,12 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
                     or timestamp_seconds < 0
                     or timestamp_seconds * 1000 > MAX_TIMESTAMP_MS
                 ):
-                    continue
+                    raise _MalformedProviderResponse("Coinbase returned an invalid candle timestamp")
                 timestamp_seconds_int = int(timestamp_seconds)
+            except _MalformedProviderResponse:
+                raise
             except (TypeError, ValueError, OverflowError):
-                continue
+                raise _MalformedProviderResponse("Coinbase returned a malformed candle row") from None
             # Coinbase may include buckets preceding the declared start.
             # Keep only opens inside CIN's requested UTC history window.
             if start <= timestamp_seconds_int <= latest_open:
@@ -768,10 +776,13 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
                 "low": float(row[1]), "close": float(row[4]), "volume": float(row[5]),
                 "close_time": start_ms + duration_ms - 1,
             }
-            if _is_valid_candle(candle):
-                candles.append(candle)
+            if not _is_valid_candle(candle):
+                raise _MalformedProviderResponse("Coinbase returned invalid OHLCV values")
+            candles.append(candle)
+        except _MalformedProviderResponse:
+            raise
         except (TypeError, ValueError, OverflowError):
-            continue
+            raise _MalformedProviderResponse("Coinbase returned a malformed candle row") from None
     if not candles:
         raise ValueError("Coinbase returned no valid candles")
     return candles[-limit:]
@@ -839,6 +850,8 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
             provider = "kraken"
             source = f"Kraken public OHLC API (fallback after {fallback_reason})"
             endpoint = KRAKEN_OHLC_URL
+        except _MalformedProviderResponse:
+            raise HTTPException(status_code=502, detail="Kraken public market-data provider returned a malformed candle row.") from None
         except urllib.error.HTTPError as exc:
             if exc.code in (418, 429):
                 raise HTTPException(status_code=503, detail="Kraken public market-data rate limit reached; retry later.") from None
@@ -847,11 +860,17 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
                 provider = "coinbase"
                 source = f"Coinbase Exchange public candles API (fallback after {fallback_reason})"
                 endpoint = COINBASE_CANDLES_URL
+            except _MalformedProviderResponse:
+                raise HTTPException(status_code=502, detail="Coinbase public market-data provider returned a malformed candle row.") from None
+            except _MalformedProviderResponse:
+                raise HTTPException(status_code=502, detail="Coinbase public market-data provider returned a malformed candle row.") from None
             except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as coinbase_exc:
                 reason = "Kraken and Coinbase fallbacks unavailable or pair/timeframe unsupported"
                 if isinstance(coinbase_exc, urllib.error.HTTPError):
                     reason += f" (Coinbase HTTP {coinbase_exc.code})"
                 raise HTTPException(status_code=503, detail=reason + f"; {fallback_reason}.") from None
+        except _MalformedProviderResponse:
+            raise HTTPException(status_code=502, detail="Kraken public market-data provider returned a malformed candle row.") from None
         except (urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
             try:
                 rows = await asyncio.to_thread(_fetch_coinbase, symbol, interval, limit)
