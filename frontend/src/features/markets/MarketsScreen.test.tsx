@@ -52,17 +52,17 @@ describe("Markets screen", () => {
     render(<MarketsScreen />);
     fireEvent.click(screen.getByRole("button", { name: "Load candles" }));
 
-    expect(screen.getByRole("combobox", { name: "Market" })).toBeDisabled();
-    expect(screen.getByRole("combobox", { name: "Interval" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Load candles" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Load comparison" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /Bitcoin/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /Ethereum/ })).toBeDisabled();
+    expect((screen.getByRole("combobox", { name: "Market" }) as HTMLSelectElement).disabled).toBe(true);
+    expect((screen.getByRole("combobox", { name: "Interval" }) as HTMLSelectElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Load candles" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Load comparison" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: /Bitcoin/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: /Ethereum/ }) as HTMLButtonElement).disabled).toBe(true);
 
     resolveRequest(response);
-    await waitFor(() => expect(screen.getByRole("button", { name: "Load candles" })).toBeEnabled());
-    expect(screen.getByRole("combobox", { name: "Market" })).toBeEnabled();
-    expect(screen.getByRole("combobox", { name: "Interval" })).toBeEnabled();
+    await waitFor(() => expect((screen.getByRole("button", { name: "Load candles" }) as HTMLButtonElement).disabled).toBe(false));
+    expect((screen.getByRole("combobox", { name: "Market" }) as HTMLSelectElement).disabled).toBe(false);
+    expect((screen.getByRole("combobox", { name: "Interval" }) as HTMLSelectElement).disabled).toBe(false);
   });
 
 });
