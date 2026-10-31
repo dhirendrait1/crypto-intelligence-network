@@ -262,3 +262,10 @@ Malformed successful responses, rate limits, access denials, and ambiguous
 provider data retain their existing stop/fail-closed behavior and are not
 reclassified as fallback-eligible outages. This is source attribution for
 read-only research data, not provider quality certification.
+
+
+### Explicit fallback eligibility matrix
+
+Fallback eligibility is an allow-list, not a generic retry-on-error rule. Binance HTTP 451 and classified transport failures may advance to Kraken. Binance HTTP 418/429 (rate limiting), other HTTP statuses including access denial and server errors, and malformed successful responses stop the chain. If Kraken is reached, HTTP 418/429 stops with a rate-limit response; HTTP 401/403 stops with an access-denial response; other HTTP errors and classified transport/data failures may advance to Coinbase. A malformed successful Kraken response always stops. Coinbase is terminal: its rate limits, HTTP errors, transport failures, unsupported products/timeframes, and malformed responses do not initiate another provider request.
+
+This policy deliberately does not infer that every 5xx, 4xx, parse, or integrity error is transient. Only the explicitly classified branches above are fallback-eligible. Regression tests exercise the Binance and Kraken HTTP-status decision matrices and verify that malformed successful responses do not fan out to the next venue. Tests use mocked responses and make no live exchange requests. Fallback eligibility is solely a read-only data-retrieval policy; it does not retry orders, place trades, or select a venue for execution.
