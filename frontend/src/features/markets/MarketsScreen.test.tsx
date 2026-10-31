@@ -58,6 +58,8 @@ describe("Markets screen", () => {
     expect((screen.getByRole("button", { name: "Load comparison" }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: /Bitcoin/ }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: /Ethereum/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Remove BTC-USD from watchlist" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Remove ETH-USD from watchlist" }) as HTMLButtonElement).disabled).toBe(true);
 
     resolveRequest(response);
     await waitFor(() => expect((screen.getByRole("button", { name: "Load candles" }) as HTMLButtonElement).disabled).toBe(false));
@@ -81,6 +83,8 @@ describe("Markets screen", () => {
     expect((screen.getByRole("button", { name: "Comparing…" }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: /Bitcoin/ }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: /Ethereum/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Remove BTC-USD from watchlist" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Remove ETH-USD from watchlist" }) as HTMLButtonElement).disabled).toBe(true);
 
     resolveRequests.forEach((resolve) => resolve(response));
     await waitFor(() => expect((screen.getByRole("button", { name: "Load comparison" }) as HTMLButtonElement).disabled).toBe(false));
