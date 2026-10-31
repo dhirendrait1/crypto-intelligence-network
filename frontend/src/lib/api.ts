@@ -40,8 +40,44 @@ function classifyError(error: unknown): string {
   return error instanceof Error ? error.message : "Unexpected API error.";
 }
 
+function isIsoTimestamp(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && Number.isFinite(Date.parse(value));
+}
+
+export function validateCoinbaseCandlesPayload(
+  payload: unknown,
+  expectedProductId: string,
+  expectedGranularity: string,
+): { valid: boolean; message: string } {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return { valid: false, message: "Response must be a JSON object." };
+  const body = payload as Record<string, unknown>;
+  if (body.service !== "cin" || body.mode !== "read_only") return { valid: false, message: "Response is not identified as CIN read-only data." };
+  if (body.product_id !== expectedProductId || body.quote_currency !== "USD") return { valid: false, message: "Product or USD quote does not match the requested market." };
+  if (body.granularity !== expectedGranularity) return { valid: false, message: "Candle interval does not match the requested interval." };
+  if (typeof body.source !== "string" || !body.source.trim() || !isIsoTimestamp(body.retrieved_at)) return { valid: false, message: "Source provenance or retrieval timestamp is missing." };
+  if (!Array.isArray(body.data) || !Number.isInteger(body.count) || body.count !== body.data.length) return { valid: false, message: "Candle count does not match the returned data collection." };
+  if (typeof body.stale_data_warning !== "string" && body.stale_data_warning !== null) return { valid: false, message: "Staleness metadata has an unsupported shape." };
+  let previousOpenTime = -Infinity;
+  for (const [index, item] of body.data.entries()) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return { valid: false, message: `Candle ${index + 1} is not an object.` };
+    const candle = item as Record<string, unknown>;
+    const numeric = ["open_time", "close_time", "open", "high", "low", "close", "volume"] as const;
+    if (numeric.some((key) => typeof candle[key] !== "number" || !Number.isFinite(candle[key]))) return { valid: false, message: `Candle ${index + 1} contains a non-finite numeric field.` };
+    const openTime = candle.open_time as number, closeTime = candle.close_time as number;
+    const open = candle.open as number, high = candle.high as number, low = candle.low as number, close = candle.close as number, volume = candle.volume as number;
+    if (closeTime < openTime || openTime < previousOpenTime || volume < 0 || low > high || low > open || open > high || low > close || close > high) {
+      return { valid: false, message: `Candle ${index + 1} failed OHLC, volume, or chronological validation.` };
+    }
+    if (!isIsoTimestamp(candle.open_time_utc) || !isIsoTimestamp(candle.close_time_utc) || typeof candle.is_closed !== "boolean") {
+      return { valid: false, message: `Candle ${index + 1} has invalid timestamps or close-state metadata.` };
+    }
+    previousOpenTime = openTime;
+  }
+  return { valid: true, message: "Coinbase public USD candles passed the frontend response contract." };
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<ApiResult<T>> {
-  if (!API_BASE) return { state: "unavailable", data: null, retrievedAt: null, source: null, message: "API base URL is not configured.", };
+  if (!API_BASE) return { state: "unavailable", data: null, retrievedAt: null, source: null, message: "API base URL is not configured." };
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
@@ -52,7 +88,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<ApiResult<T
     });
     if (!response.ok) return { state: "error", data: null, retrievedAt: null, source: null, message: `CIN API returned HTTP ${response.status}.` };
     const payload: unknown = await response.json();
-    if (!payload || typeof payload !== "object") return { state: "unknown", data: null, retrievedAt: null, source: null, message: "API response did not match the expected object shape." };
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return { state: "unknown", data: null, retrievedAt: null, source: null, message: "API response did not match the expected object shape." };
     const body = payload as Record<string, unknown>;
     const retrievedAt = typeof body.retrieved_at === "string" ? body.retrieved_at : null;
     const source = typeof body.source === "string" ? body.source : null;
@@ -61,11 +97,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<ApiResult<T
       return { state: healthy ? "fresh" : "unavailable", data: payload as T, retrievedAt, source, message: healthy ? "CIN service endpoint responded successfully." : "CIN service did not report a healthy state." };
     }
     if (path.startsWith("/coinbase/market-candles")) {
-      if (body.mode !== "read_only" || body.quote_currency !== "USD" || !Array.isArray(body.data)) {
-        return { state: "unknown", data: payload as T, retrievedAt, source, message: "Coinbase response failed the expected read-only USD contract." };
-      }
+      const params = new URLSearchParams(path.split("?")[1] ?? "");
+      const contract = validateCoinbaseCandlesPayload(payload, params.get("product_id") ?? "", params.get("granularity") ?? "");
+      if (!contract.valid) return { state: "unknown", data: null, retrievedAt, source, message: contract.message };
       const stale = typeof body.stale_data_warning === "string" && body.stale_data_warning.length > 0;
-      return { state: stale ? "stale" : "fresh", data: payload as T, retrievedAt, source, message: stale ? body.stale_data_warning as string : "Coinbase public USD candle response received; latest completed candle is within the API freshness threshold." };
+      return { state: stale ? "stale" : "fresh", data: payload as T, retrievedAt, source, message: stale ? body.stale_data_warning as string : contract.message };
     }
     if (!Array.isArray(body.data)) return { state: "unknown", data: payload as T, retrievedAt, source, message: "Response received, but its data collection is missing or has an unsupported shape." };
     const rows = body.data as unknown[];
