@@ -690,6 +690,37 @@ def _fetch_klines(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     return _fetch_binance(symbol, interval, limit)
 
 
+def _validate_provider_snapshot_provenance(
+    rows: list[dict[str, Any]], provider: str, source: str, endpoint: str,
+    fallback_reason: str | None,
+) -> None:
+    """Fail closed unless every returned candle carries one coherent provider identity."""
+    expected = {
+        "binance": ("Binance public market-data API", BINANCE_KLINES_URL),
+        "kraken": ("Kraken public OHLC API", KRAKEN_OHLC_URL),
+        "coinbase": ("Coinbase Exchange public candles API", COINBASE_CANDLES_URL),
+    }
+    if provider not in expected or not isinstance(rows, list) or not rows:
+        raise ValueError("Provider snapshot provenance is incomplete")
+    expected_source, expected_endpoint = expected[provider]
+    if endpoint != expected_endpoint or not isinstance(source, str) or not source.startswith(expected_source):
+        raise ValueError("Provider snapshot source does not match its selected provider")
+    if fallback_reason is None:
+        if source != expected_source or provider != "binance":
+            raise ValueError("Unexpected provider fallback metadata")
+    elif fallback_reason not in {"Binance HTTP 451", "Binance transport failure"} or fallback_reason not in source:
+        raise ValueError("Provider fallback reason does not match its source label")
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("Provider snapshot contains a non-object candle")
+        if (
+            row.get("_provider") != provider
+            or row.get("_source") != source
+            or row.get("_source_endpoint") != endpoint
+        ):
+            raise ValueError("Provider snapshot contains mixed or mismatched provenance metadata")
+
+
 async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
     """Load one provider snapshot; only transport failures and HTTP 451 fail over."""
     fallback_reason = None
@@ -749,6 +780,10 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
         row["_source"] = source
         row["_source_endpoint"] = endpoint
         row["_provider"] = provider
+    try:
+        _validate_provider_snapshot_provenance(rows, provider, source, endpoint, fallback_reason)
+    except (AttributeError, TypeError, ValueError):
+        raise HTTPException(status_code=502, detail="Public market-data provider returned inconsistent source provenance.") from None
     return rows
 
 
