@@ -610,6 +610,9 @@ async def get_market_candles(
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     try:
         freshness = _freshness_metadata(rows, interval, now_ms)
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(status_code=502, detail="Public market-data provider returned invalid candle freshness timestamps.") from None
+    try:
         timeline_integrity = _timeline_integrity_metadata(rows, interval)
     except (KeyError, TypeError, ValueError):
         raise HTTPException(status_code=502, detail="Public market-data provider returned inconsistent candle timeline metadata.") from None
