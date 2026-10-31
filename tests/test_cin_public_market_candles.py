@@ -772,7 +772,7 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
 
     def test_historical_continuity_rejects_duplicate_or_misaligned_source_candles(self):
         duplicate_rows = [dict(row) for row in SAMPLE[:3]]
-        duplicate_rows[1]["open_time"] = duplicate_rows[0]["open_time"]
+        duplicate_rows[1] = dict(duplicate_rows[0])
         with self.assertRaisesRegex(ValueError, "duplicate"):
             api._historical_continuity_metadata(duplicate_rows, "1h")
         misaligned_rows = [dict(row) for row in SAMPLE[:3]]
