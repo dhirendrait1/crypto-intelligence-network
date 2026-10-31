@@ -62,7 +62,6 @@ export function IntegrityDiagnostics({ result }: IntegrityDiagnosticsProps) {
   const missingIntervals = intervalDeltas.reduce((total, delta) =>
     delta > interval! && delta % interval! === 0 ? total + delta / interval! - 1 : total, 0);
   const gapCount = intervalDeltas.filter((delta) => delta > interval!).length;
-    : 0;
 
 
   const checks: Diagnostic[] = [
