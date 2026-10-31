@@ -1758,3 +1758,56 @@ class KrakenAssetPairsIdentityIntegrityTests(unittest.TestCase):
                 with self.assertRaisesRegex(api._MalformedProviderResponse, "spot asset class"):
                     api._fetch_kraken("BTCUSD", "1h", 5)
                 request.assert_called_once()
+
+
+class KrakenAssetPairsMarketStatusIntegrityTests(unittest.TestCase):
+    """Require an explicitly online Kraken market before requesting OHLC."""
+
+    def _payload(self, status="online"):
+        pair = {
+            "altname": "XBTUSD", "wsname": "XBT/USD",
+            "aclass_base": "currency", "aclass_quote": "currency",
+            "base": "XXBT", "quote": "ZUSD",
+        }
+        if status is not ...:
+            pair["status"] = status
+        return {"error": [], "result": {"XXBTZUSD": pair}}
+
+    def test_accepts_online_market_and_requests_ohlc(self):
+        rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
+        with patch.object(api, "_request_json", side_effect=[
+            self._payload(), {"error": [], "result": {"XXBTZUSD": rows, "last": 1700000000}}
+        ]) as request:
+            candles = api._fetch_kraken("BTCUSD", "1h", 5)
+        self.assertEqual(len(candles), 1)
+        self.assertEqual(request.call_count, 2)
+
+    def test_rejects_missing_or_invalid_status_before_ohlc(self):
+        for status in (..., None, "", 1, []):
+            payload = self._payload(status)
+            with self.subTest(status=status), patch.object(api, "_request_json", return_value=payload) as request:
+                with self.assertRaisesRegex(api._MalformedProviderResponse, "market status is missing or invalid"):
+                    api._fetch_kraken("BTCUSD", "1h", 5)
+                request.assert_called_once()
+
+    def test_rejects_known_non_online_statuses_before_ohlc(self):
+        statuses = (
+            "cancel_only", "post_only", "limit_only", "reduce_only",
+            "maintenance", "delisted", "suspended", "hidden",
+        )
+        for status in statuses:
+            with self.subTest(status=status), patch.object(
+                api, "_request_json", return_value=self._payload(status)
+            ) as request:
+                with self.assertRaisesRegex(ValueError, "market is unavailable"):
+                    api._fetch_kraken("BTCUSD", "1h", 5)
+                request.assert_called_once()
+
+    def test_rejects_unknown_status_before_ohlc(self):
+        for status in ("paused", "halted", "ONLINE", "online_future"):
+            with self.subTest(status=status), patch.object(
+                api, "_request_json", return_value=self._payload(status)
+            ) as request:
+                with self.assertRaisesRegex(api._MalformedProviderResponse, "market status is unknown"):
+                    api._fetch_kraken("BTCUSD", "1h", 5)
+                request.assert_called_once()
