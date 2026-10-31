@@ -392,6 +392,8 @@ def _provider_data_quality_metadata(rows: list[dict[str, Any]], interval: str, n
     warnings = []
     if freshness["is_stale"]:
         warnings.append("latest_completed_candle_is_stale")
+    if freshness["freshness_status"] == "no_completed_candle":
+        warnings.append("no_completed_candle_available")
     if forming:
         warnings.append("latest_candle_may_be_forming")
     if zero_volume_count:
@@ -406,7 +408,11 @@ def _provider_data_quality_metadata(rows: list[dict[str, Any]], interval: str, n
         "volume_quality": volume_quality,
         "invalid_candle_count": 0,
         "freshness_status": freshness["freshness_status"],
+        "is_stale": freshness["is_stale"],
+        "latest_completed_candle_close_time_utc": freshness["latest_closed_candle_close_time_utc"],
         "latest_completed_candle_age_seconds": freshness["latest_closed_candle_age_seconds"],
+        "stale_threshold_seconds": freshness["stale_threshold_seconds"],
+        "stale_data_warning": freshness["stale_data_warning"],
         "warnings": warnings,
         "data_repaired_or_synthesized": False,
     }
