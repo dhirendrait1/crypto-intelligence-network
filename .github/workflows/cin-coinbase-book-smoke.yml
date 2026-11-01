@@ -1,0 +1,41 @@
+name: CIN Coinbase Public Book Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "cin_coinbase_public_book_smoke.py"
+      - "cin_coinbase_public_orderbook.py"
+      - "cin_shortlist_orderbook_liquidity.py"
+      - "tests/test_cin_coinbase_public_book_smoke.py"
+      - ".github/workflows/cin-coinbase-book-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  coinbase-public-book:
+    name: Coinbase public book network probe (nonblocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout exact proposed code
+        uses: actions/checkout@v4
+      - name: Install Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Verify offline smoke contract before external access
+        run: python -m unittest tests.test_cin_coinbase_public_book_smoke -v
+      - name: Try exactly one Coinbase public GET, log redacted result
+        continue-on-error: true
+        run: |
+          python cin_coinbase_public_book_smoke.py --product BTC-USD
+      - name: State safety boundary
+        if: always()
+        run: |
+          echo "Public read-only Coinbase GET only; no credentials or orders."
+          echo "Smoke failure is NOT evidence of provider unavailability globally."
+          echo "A successful GitHub job does not mean the nonblocking live probe succeeded."
+          echo "No deployment or production activation."
