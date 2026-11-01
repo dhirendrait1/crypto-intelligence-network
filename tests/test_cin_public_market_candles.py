@@ -3004,3 +3004,37 @@ class CoinbaseHTTPStatusClassificationTests(unittest.TestCase):
             api._coinbase_http_status_failure(True),
             (502, "Coinbase public market-data provider returned an invalid HTTP status."),
         )
+
+
+class CoinbaseTransportFailureClassificationTests(unittest.TestCase):
+    def test_timeout_is_distinguished(self):
+        for exc in (TimeoutError("timed out"), api.socket.timeout("timed out"),
+                    urllib.error.URLError(api.socket.timeout("timed out"))):
+            with self.subTest(exc=type(exc).__name__):
+                self.assertEqual(api._coinbase_transport_failure_category(exc), "timeout")
+                self.assertIn("timed out", api._coinbase_transport_failure_detail(exc))
+
+    def test_dns_resolution_failure_is_distinguished(self):
+        exc = urllib.error.URLError(api.socket.gaierror(-2, "name or service not known"))
+        self.assertEqual(api._coinbase_transport_failure_category(exc), "dns")
+        self.assertIn("DNS", api._coinbase_transport_failure_detail(exc))
+
+    def test_tls_failure_is_distinguished(self):
+        exc = urllib.error.URLError(api.ssl.SSLError("handshake failed"))
+        self.assertEqual(api._coinbase_transport_failure_category(exc), "tls")
+        self.assertIn("TLS", api._coinbase_transport_failure_detail(exc))
+
+    def test_connection_refusal_reset_and_interruption_are_distinguished(self):
+        for exc in (ConnectionRefusedError("refused"), ConnectionResetError("reset"),
+                    BrokenPipeError("interrupted")):
+            with self.subTest(exc=type(exc).__name__):
+                wrapped = urllib.error.URLError(exc)
+                self.assertEqual(api._coinbase_transport_failure_category(wrapped), "connection")
+
+    def test_other_os_errors_are_network_failures(self):
+        self.assertEqual(api._coinbase_transport_failure_category(OSError("network down")), "network")
+
+    def test_transport_detail_does_not_expose_provider_response_body(self):
+        detail = api._coinbase_transport_failure_detail(TimeoutError("sensitive response payload"))
+        self.assertNotIn("sensitive response payload", detail)
+        self.assertIn("no further provider fallback", detail)
