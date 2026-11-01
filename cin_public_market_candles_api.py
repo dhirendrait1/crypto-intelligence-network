@@ -1352,8 +1352,21 @@ def _coinbase_page_rows_in_chronological_order(payload: Any) -> list[list[Any]]:
                 "Coinbase returned a candle row with an unexpected field count"
             )
         try:
-            if isinstance(row[0], bool):
-                raise _MalformedProviderResponse("Coinbase returned a boolean candle timestamp")
+            # Coinbase Exchange documents candle time as an integer Unix
+            # timestamp in seconds. Do not accept float or string coercions.
+            if isinstance(row[0], bool) or not isinstance(row[0], int):
+                raise _MalformedProviderResponse(
+                    "Coinbase returned a candle timestamp with an invalid field type"
+                )
+            # OHLCV values may be JSON numbers or numeric strings, but booleans
+            # and structured values are never valid numeric market fields.
+            if any(
+                isinstance(value, bool) or not isinstance(value, (str, int, float))
+                for value in row[1:]
+            ):
+                raise _MalformedProviderResponse(
+                    "Coinbase returned an OHLCV field with an invalid scalar type"
+                )
             timestamp_ms = _parse_provider_timestamp(row[0], "seconds")
             timestamps.append(timestamp_ms // 1000)
         except _MalformedProviderResponse:
