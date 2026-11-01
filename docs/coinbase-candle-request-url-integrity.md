@@ -32,3 +32,17 @@ Coinbase HTTP error responses are classified separately from transport failures 
 - URL/network failures remain transport failures; malformed HTTP 200 bodies remain malformed-provider failures.
 
 These classifications affect the API response only. They do not broaden the existing Binance-to-Kraken-to-Coinbase fallback policy: once Coinbase is reached, no further provider fan-out is possible or attempted. No HTTP status is treated as permission to substitute a different data source. Offline tests cover representative status classes; they do not establish live Coinbase behavior.
+
+## Coinbase transport failure classification
+
+Coinbase transport failures are separated from HTTP status responses and successful-response data failures:
+
+- Socket/request timeouts are classified as timeouts.
+- DNS lookup failures are classified separately from connection failures.
+- TLS handshake/transport failures are identified independently.
+- Connection refusal, reset, and interrupted writes are grouped as connection failures.
+- Other operating-system transport errors are reported as generic network failures.
+- These failures return a temporary-unavailability response (503); after Coinbase is reached, no further provider fallback is attempted.
+- Invalid, empty, unsupported, or malformed provider data is not re-labelled as a transport outage; it fails closed as a provider/data response error (502).
+
+The HTTP client retains its bounded 15-second request timeout. Offline exception-classification tests do not measure real network latency, DNS behavior, TLS trust, or Coinbase uptime.
