@@ -294,3 +294,8 @@ Offline regression tests cover the current forming interval, the preceding reque
 Kraken's OHLC `last` pagination cursor is treated as a provider timestamp, not as an arbitrary numeric marker. CIN validates it with the same strict Unix-seconds parser used for provider timestamps: booleans, fractional values, negative values, non-finite values, and timestamps outside the supported range are rejected. The cursor must also be at or after the latest returned candle open. An invalid cursor makes the successful provider response malformed; it does not trigger silent truncation or a fallback to another venue.
 
 Regression coverage includes missing, null, boolean, fractional, negative, out-of-range, and stale-before-latest cursor values. Tests are offline and use mocked AssetPairs/OHLC payloads.
+
+
+### Coinbase multi-page boundary consistency
+
+Coinbase candle pages are requested as adjacent granularity-aligned windows. The collector permits the immediately preceding boundary candle when it is returned by a page, but a timestamp repeated at a page boundary is deduplicated only when the complete raw candle row is identical. A conflicting duplicate across pages invalidates the successful provider response; CIN does not choose one page's values or merge fields. The page budget remains fixed at two requests for the public route's maximum 500-candle window, and missing intervals remain partial evidence rather than being filled. Offline tests verify contiguous page boundaries, identical cross-page deduplication, and rejection of conflicting cross-page rows without contacting Coinbase.
