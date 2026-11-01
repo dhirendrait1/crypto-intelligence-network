@@ -70,7 +70,8 @@ class PublicEvidenceHttpTests(unittest.TestCase):
             response = client.post("/public-evidence-ingestion", json={})
 
         self.assertEqual(response.status_code, 502)
-        self.assertIn("Public GitHub metadata retrieval failed", response.json()["detail"])
+        self.assertEqual(response.json()["detail"], "Public evidence provider is temporarily unavailable")
+        self.assertNotIn("TimeoutError", response.text)
 
     def test_unexpected_value_error_returns_sanitized_http_502(self):
         with patch.object(
@@ -83,7 +84,7 @@ class PublicEvidenceHttpTests(unittest.TestCase):
         self.assertEqual(response.status_code, 502)
         self.assertEqual(
             response.json()["detail"],
-            "Public evidence provider returned an unexpected response",
+            "Public evidence provider is temporarily unavailable",
         )
         self.assertNotIn("internal validation details", response.text)
 
@@ -103,9 +104,10 @@ class PublicEvidenceHttpTests(unittest.TestCase):
         self.assertEqual(response.status_code, 502)
         self.assertEqual(
             response.json()["detail"],
-            "Public evidence provider returned an unexpected response",
+            "Public evidence provider is temporarily unavailable",
         )
         self.assertNotIn("sensitive provider internals", response.text)
 
 if __name__ == "__main__":
     unittest.main()
+

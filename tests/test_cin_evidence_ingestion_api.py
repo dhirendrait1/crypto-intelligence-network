@@ -55,7 +55,8 @@ class PublicEvidenceIngestionApiTests(unittest.TestCase):
                 api.public_evidence_ingestion(request)
 
         self.assertEqual(raised.exception.status_code, 502)
-        self.assertIn("Public GitHub metadata retrieval failed", raised.exception.detail)
+        self.assertEqual(raised.exception.detail, "Public evidence provider is temporarily unavailable")
+        self.assertNotIn("TimeoutError", raised.exception.detail)
 
     def test_unexpected_value_error_maps_to_sanitized_bad_gateway(self):
         request = api.PublicEvidenceRequest()
@@ -69,7 +70,7 @@ class PublicEvidenceIngestionApiTests(unittest.TestCase):
         self.assertEqual(raised.exception.status_code, 502)
         self.assertEqual(
             raised.exception.detail,
-            "Public evidence provider returned an unexpected response",
+            "Public evidence provider is temporarily unavailable",
         )
         self.assertNotIn("internal validation details", raised.exception.detail)
 
@@ -86,9 +87,10 @@ class PublicEvidenceIngestionApiTests(unittest.TestCase):
         self.assertEqual(raised.exception.status_code, 502)
         self.assertEqual(
             raised.exception.detail,
-            "Public evidence provider returned an unexpected response",
+            "Public evidence provider is temporarily unavailable",
         )
         self.assertNotIn("sensitive provider internals", raised.exception.detail)
 
 if __name__ == "__main__":
     unittest.main()
+

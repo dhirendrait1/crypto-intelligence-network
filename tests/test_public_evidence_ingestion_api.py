@@ -82,7 +82,7 @@ class PublicEvidenceIngestionApiTests(unittest.TestCase):
         self.assertEqual(raised.exception.status_code, 502)
         self.assertEqual(
             raised.exception.detail,
-            "Public evidence provider returned an unexpected response",
+            "Public evidence provider is temporarily unavailable",
         )
         fetch.assert_called_once_with("ethereum/go-ethereum")
 
@@ -99,7 +99,7 @@ class PublicEvidenceIngestionApiTests(unittest.TestCase):
         self.assertEqual(raised.exception.status_code, 502)
         self.assertEqual(
             raised.exception.detail,
-            "Public evidence provider returned an unexpected response",
+            "Public evidence provider is temporarily unavailable",
         )
         self.assertNotIn("sensitive provider internals", raised.exception.detail)
         fetch.assert_called_once_with("ethereum/go-ethereum")
@@ -137,4 +137,5 @@ class PublicEvidenceIngestionApiTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
 
