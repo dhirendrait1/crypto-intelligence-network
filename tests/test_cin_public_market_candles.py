@@ -3550,3 +3550,43 @@ class CoinbaseCanonicalFloatConsistencyTests(CoinbaseDecimalNormalizationIntegri
             1: "0.9", 2: "1.1", 3: first, 4: second, 5: "0",
         })
         self.assertEqual(rows[0]["open"], rows[0]["close"])
+
+
+
+class CoinbaseCrossFieldPrecisionIntegrityTests(CoinbaseCanonicalFloatConsistencyTests):
+    def test_rejects_source_ohlc_violation_hidden_by_float_rounding(self):
+        with self.assertRaisesRegex(
+            api._MalformedProviderResponse, "invalid OHLC relationship at source decimal precision"
+        ):
+            self._fetch_with_values({
+                1: "99.9", 2: "100.00000000000000001",
+                3: "100.00000000000000002", 4: "100", 5: "1",
+            })
+
+    def test_rejects_distinct_ohlc_values_that_collapse_to_the_same_float(self):
+        with self.assertRaisesRegex(
+            api._MalformedProviderResponse, "OHLC distinction was lost"
+        ):
+            self._fetch_with_values({
+                1: "0.9", 2: "1.1",
+                3: "1.00000000000000001",
+                4: "1.00000000000000002", 5: "0",
+            })
+
+    def test_accepts_source_equal_ohlc_fields_that_remain_equal_after_normalization(self):
+        rows = self._fetch_with_values({
+            1: "100", 2: "100", 3: "100", 4: "100", 5: "0",
+        })
+        self.assertEqual(rows[0]["open"], rows[0]["high"])
+        self.assertEqual(rows[0]["open"], rows[0]["low"])
+        self.assertEqual(rows[0]["open"], rows[0]["close"])
+
+    def test_prior_precision_collapse_case_is_rejected_at_adapter_boundary(self):
+        with self.assertRaisesRegex(
+            api._MalformedProviderResponse, "OHLC distinction was lost"
+        ):
+            self._fetch_with_values({
+                1: "0.9", 2: "1.1",
+                3: "1.00000000000000001",
+                4: "1.00000000000000002", 5: "0",
+            })
