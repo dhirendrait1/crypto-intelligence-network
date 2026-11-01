@@ -6,14 +6,14 @@ No order execution, wallet access, accounts, or private keys.
 """
 from __future__ import annotations
 
-import os
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, ConfigDict, Field
 
 from cin_coinbase_status_shortlist_pipeline import research_liquidity_with_market_status
 from cin_coinbase_public_orderbook import PublicBookError
+from cin_coinbase_staging_guard import require_staging_access, reserve_research_budget
 
 router = APIRouter(tags=["coinbase-shortlist-research-staging"])
 ALLOWED_PRODUCTS = frozenset(("BTC-USD", "ETH-USD"))
@@ -36,14 +36,13 @@ class ResearchRequest(BaseModel):
     market: MarketEvidence
 
 
-@router.post("/research/coinbase/market-eligibility")
+@router.post("/research/coinbase/market-eligibility", dependencies=[Depends(require_staging_access)])
 def evaluate_coinbase_market(request: ResearchRequest) -> dict[str, Any]:
     """Return dashboard-safe evidence; never expose provider internals or books."""
-    if os.environ.get("CIN_COINBASE_RESEARCH_ENABLED") != "1":
-        raise HTTPException(status_code=404, detail="Research route unavailable")
     product = f"{request.market.symbol}-{request.market.currency}"
     if product not in ALLOWED_PRODUCTS:
         raise HTTPException(status_code=400, detail="Unsupported research market")
+    reserve_research_budget()
     try:
         result = research_liquidity_with_market_status(request.market.model_dump())
     except (PublicBookError, OSError, TimeoutError):
