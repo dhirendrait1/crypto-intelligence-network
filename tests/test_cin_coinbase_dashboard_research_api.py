@@ -115,7 +115,7 @@ class CoinbaseDashboardResearchTests(unittest.TestCase):
     @patch.dict("os.environ", {"CIN_COINBASE_RESEARCH_ENABLED": "1"})
     @patch("cin_coinbase_dashboard_research_api.research_liquidity_with_market_status")
     def test_malformed_input_is_422_before_network(self, worker):
-        row = dict(market(), price=float("nan"))
+        row = dict(market(), price=-1.0)
         response = self.client.post("/research/coinbase/market-eligibility",
                                     json={"market": row})
         self.assertEqual(response.status_code, 422)
