@@ -3464,3 +3464,59 @@ class CoinbaseCandleFieldTypeIntegrityTests(unittest.TestCase):
                     api._MalformedProviderResponse, "OHLCV field with an invalid scalar type"
                 ):
                     self._fetch_with_row(row)
+
+
+
+class CoinbaseDecimalNormalizationIntegrityTests(unittest.TestCase):
+    def _fetch_with_values(self, values):
+        class FrozenDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return cls(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
+
+        timestamp = int(datetime(2025, 1, 1, 11, 0, tzinfo=timezone.utc).timestamp())
+        row = [timestamp, "99", "103", "100", "102", "10"]
+        for index, value in values.items():
+            row[index] = value
+        catalogue = [{
+            "id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
+            "status": "online", "trading_disabled": False,
+        }]
+        with patch.object(api, "datetime", FrozenDateTime), patch.object(
+            api, "_coinbase_request_json", side_effect=[catalogue, [row]]
+        ):
+            return api._fetch_coinbase("BTCUSD", "1h", 5)
+
+    def test_rejects_nonzero_decimal_that_underflows_to_zero(self):
+        for index in range(1, 6):
+            with self.subTest(field=index):
+                with self.assertRaisesRegex(
+                    api._MalformedProviderResponse, "underflowed during normalization"
+                ):
+                    self._fetch_with_values({index: "1e-10000"})
+
+    def test_rejects_decimal_values_outside_finite_float_range(self):
+        for index in range(1, 6):
+            with self.subTest(field=index):
+                with self.assertRaisesRegex(
+                    api._MalformedProviderResponse, "outside the supported float range"
+                ):
+                    self._fetch_with_values({index: "1e10000"})
+
+    def test_rejects_non_finite_decimal_strings(self):
+        for value in ("NaN", "Infinity", "-Infinity"):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(
+                    api._MalformedProviderResponse, "non-finite decimal value"
+                ):
+                    self._fetch_with_values({3: value})
+
+    def test_preserves_supported_small_nonzero_values(self):
+        rows = self._fetch_with_values({1: "1e-300", 2: "103", 3: "100", 4: "102", 5: "1e-300"})
+        self.assertGreater(rows[0]["low"], 0.0)
+        self.assertGreater(rows[0]["volume"], 0.0)
+
+    def test_preserves_supported_large_finite_values(self):
+        rows = self._fetch_with_values({1: "9e307", 2: "9e307", 3: "9e307", 4: "9e307", 5: "9e307"})
+        self.assertTrue(math.isfinite(rows[0]["open"]))
+        self.assertEqual(rows[0]["open"], 9e307)
