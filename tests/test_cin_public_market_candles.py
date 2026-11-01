@@ -3362,3 +3362,45 @@ class CoinbaseIntervalContinuityTests(unittest.TestCase):
         self.assertEqual(report["missing_interval_count"], 1)
         self.assertEqual(len(candles), 2)
         self.assertFalse(report["missing_candles_synthesized"])
+
+
+
+class CoinbaseCandleRowSchemaCardinalityTests(unittest.TestCase):
+    def test_accepts_exactly_six_fields_in_documented_coinbase_order(self):
+        newest = [1735722000, "99", "103", "100", "102", "10"]
+        older = [1735718400, "98", "102", "99", "101", "9"]
+
+        rows = api._coinbase_page_rows_in_chronological_order([newest, older])
+
+        self.assertEqual(rows, [older, newest])
+
+    def test_rejects_rows_with_missing_fields(self):
+        valid = [1735722000, "99", "103", "100", "102", "10"]
+        for field_count in range(6):
+            with self.subTest(field_count=field_count):
+                with self.assertRaisesRegex(
+                    api._MalformedProviderResponse, "unexpected field count"
+                ):
+                    api._coinbase_page_rows_in_chronological_order(
+                        [valid[:field_count]]
+                    )
+
+    def test_rejects_rows_with_unexpected_extra_fields(self):
+        row_with_extra_field = [
+            1735722000, "99", "103", "100", "102", "10", "unexpected"
+        ]
+
+        with self.assertRaisesRegex(
+            api._MalformedProviderResponse, "unexpected field count"
+        ):
+            api._coinbase_page_rows_in_chronological_order(
+                [row_with_extra_field]
+            )
+
+    def test_rejects_non_list_rows_even_when_they_have_six_values(self):
+        row = (1735722000, "99", "103", "100", "102", "10")
+
+        with self.assertRaisesRegex(
+            api._MalformedProviderResponse, "unexpected field count"
+        ):
+            api._coinbase_page_rows_in_chronological_order([row])
