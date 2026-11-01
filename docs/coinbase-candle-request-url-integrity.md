@@ -166,3 +166,12 @@ The existing public candle contract stores OHLCV values as floating-point number
 Regression tests verify deterministic Decimal-to-float normalization for a high-precision decimal, finite JSON serialization and deserialization of the canonical candle, and the case where two distinct decimal inputs collapse to the same float. The range guards from Step 192 remain responsible for rejecting non-finite conversions and nonzero underflow. No arbitrary-precision guarantee, rounding mode, or public schema change is introduced.
 
 This is a consistency and transparency check, not a claim that binary floats preserve all source decimal digits. CIN remains read-only; no merge, deployment, synthetic data, or production activation is introduced.
+
+
+## Step 194 — Coinbase OHLCV cross-field precision integrity
+
+The Coinbase adapter now checks positive OHLC values, non-negative volume, and the high/low relationships using parsed source Decimal values before converting them to the canonical float schema. This prevents float rounding from masking a source-level OHLC relationship violation.
+
+It also fails closed when two distinct source OHLC values become equal after float normalization. Equal source decimal values remain valid when they normalize equally. This avoids presenting a candle whose distinct open/high/low/close values have become indistinguishable in CIN's public float representation. The existing public schema is unchanged; this is a deliberate strictness boundary for precision-sensitive provider rows.
+
+Regression coverage includes a source OHLC violation that float rounding would otherwise hide, distinct OHLC values collapsing to the same float, and genuinely equal OHLC values. Step 192 range guards and Step 193 canonical float behavior documentation remain in place. CIN remains read-only; no merge, deployment, synthetic data, or production activation is introduced.
