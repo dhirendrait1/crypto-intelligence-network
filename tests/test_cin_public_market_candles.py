@@ -1983,7 +1983,7 @@ if __name__ == "__main__":
 
 class CoinbaseProductCatalogueTests(unittest.TestCase):
     def test_coinbase_verifies_exact_product_id_and_base_quote_before_candles(self):
-        catalogue = [{"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD"}]
+        catalogue = [{"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD", "status": "online", "trading_disabled": False}]
         candle_rows = [[1700000000, "99", "103", "100", "102", "10"]]
         with patch.object(api, "_coinbase_request_json", side_effect=[catalogue, candle_rows]) as request:
             rows = api._fetch_coinbase("BTCUSD", "1h", 5)
@@ -2000,7 +2000,7 @@ class CoinbaseProductCatalogueTests(unittest.TestCase):
         self.assertEqual(request.call_count, 1)
 
     def test_coinbase_rejects_duplicate_product_ids_in_catalogue(self):
-        record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD"}
+        record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD", "status": "online", "trading_disabled": False}
         with patch.object(api, "_coinbase_request_json", return_value=[record, dict(record)]):
             with self.assertRaisesRegex(api._MalformedProviderResponse, "duplicate product identifiers"):
                 api._fetch_coinbase("BTCUSD", "1h", 5)
