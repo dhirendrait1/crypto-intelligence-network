@@ -1,5 +1,6 @@
 """Offline safety and contract tests for public market candle endpoints."""
 import json
+import math
 import unittest
 import urllib.error
 import urllib.parse
