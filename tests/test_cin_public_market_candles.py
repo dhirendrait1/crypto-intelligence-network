@@ -797,6 +797,71 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             1,
         )
 
+    def test_coinbase_allows_but_excludes_one_pre_window_candle_on_first_page(self):
+        requested = {}
+        def response(url):
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+            page_start = int(datetime.fromisoformat(query["start"][0]).timestamp())
+            page_end = int(datetime.fromisoformat(query["end"][0]).timestamp())
+            requested["start"] = page_start
+            requested["end"] = page_end
+            return [
+                [page_start + 60, "99", "103", "100", "102", "10"],
+                [page_start, "98", "102", "99", "101", "9"],
+                [page_start - 60, "97", "101", "98", "100", "8"],
+            ]
+        with patch.object(api, "_verify_coinbase_product"), patch.object(
+            api, "_request_json", side_effect=response
+        ):
+            rows = api._fetch_coinbase("BTCUSD", "1m", 5)
+        opens = [row["open_time"] // 1000 for row in rows]
+        self.assertNotIn(requested["start"] - 60, opens)
+        self.assertIn(requested["start"], opens)
+        self.assertTrue(all(requested["start"] <= opened <= requested["end"] for opened in opens))
+
+    def test_coinbase_rejects_prior_page_candle_on_second_page(self):
+        calls = []
+        def response(url):
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+            page_start = int(datetime.fromisoformat(query["start"][0]).timestamp())
+            page_end = int(datetime.fromisoformat(query["end"][0]).timestamp())
+            calls.append((page_start, page_end))
+            if len(calls) == 1:
+                return []
+            return [[page_start - 60, "99", "103", "100", "102", "10"]]
+        with patch.object(api, "_verify_coinbase_product"), patch.object(
+            api, "_request_json", side_effect=response
+        ):
+            with self.assertRaisesRegex(ValueError, "outside the requested pagination page"):
+                api._fetch_coinbase("BTCUSD", "1m", 500)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[0][1], calls[1][0])
+
+    def test_coinbase_accepts_inclusive_page_end_and_reconciles_exact_next_start(self):
+        calls = []
+        boundary_row = None
+        def response(url):
+            nonlocal boundary_row
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+            page_start = int(datetime.fromisoformat(query["start"][0]).timestamp())
+            page_end = int(datetime.fromisoformat(query["end"][0]).timestamp())
+            calls.append((page_start, page_end))
+            if len(calls) == 1:
+                boundary_row = [page_end, "99", "103", "100", "102", "10"]
+                return [boundary_row]
+            if len(calls) == 2:
+                return [list(boundary_row)]
+            return []
+        with patch.object(api, "_verify_coinbase_product"), patch.object(
+            api, "_request_json", side_effect=response
+        ):
+            rows = api._fetch_coinbase("BTCUSD", "1m", 500)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[0][1], calls[1][0])
+        self.assertEqual(
+            sum(1 for row in rows if row["open_time"] == calls[0][1] * 1000), 1
+        )
+
     def test_coinbase_rejects_rows_from_an_older_pagination_page(self):
         requests = []
         def response(url):
