@@ -100,3 +100,20 @@ Offline tests validate representative malformed and high-precision inputs. They 
 Coinbase request-window starts and page boundaries are constructed on the requested granularity grid, but request bounds alone do not prove that each returned candle open belongs to that grid. The adapter now independently requires every returned candle timestamp (including any provider-supplied pre-window context row) to be divisible by the requested granularity in Unix UTC seconds. A misaligned row fails the entire snapshot as a malformed provider response; CIN does not round, shift, or silently discard it.
 
 The check is epoch-based and applies to the fixed-duration Coinbase granularities supported by this adapter. It is distinct from timestamp-unit validation, page ordering, duplicate-boundary reconciliation, and current-candle exclusion. Regression tests cover a timestamp that is valid and inside the page window but off the interval grid, plus valid minute/hour-aligned opens. Calendar-based intervals are not represented by this fixed-second Coinbase granularity mapping.
+
+
+## Step 189 — Coinbase interval continuity and missing buckets
+
+The Coinbase adapter may return fewer candle rows than the number of interval buckets in the requested time span. This audit distinguishes **internal continuity** (missing expected opens between two returned candles) from leading/trailing request-window shortfalls. The existing `timeline_integrity` metadata reports internal gaps using the requested interval duration and records each gap's previous open, next observed open, expected next open, and missing-interval count.
+
+For Coinbase, a gap is an observation about absent candle rows, not proof of provider feed loss. Coinbase historical candle data may omit intervals with no trades; the response therefore labels this interpretation as `missing_intervals_may_indicate_no_trades` when a Coinbase gap is present. A consumer must not treat an absent row as a zero-volume candle or infer a price for it.
+
+The audit adds Coinbase-focused offline regression coverage for:
+- fully contiguous returned hourly candles (zero internal gaps);
+- one missing interval between observed candles;
+- multiple missing intervals across more than one discontinuity;
+- sparse raw Coinbase adapter output remaining sparse while the timeline report identifies the missing bucket.
+
+**No synthetic data is created.** The adapter preserves provider-returned candles; the timeline report is metadata only. It does not create rows, interpolate OHLC values, set volume to zero, or repair the provider response. The scope is limited to gaps between returned candles; leading/trailing window coverage remains separately described by `historical_window_integrity` and is not re-audited here.
+
+The shared timeline helper is already used by the market-candles endpoint, so this step adds Coinbase-specific regression evidence and documentation rather than introducing a second competing gap detector or changing the canonical candle schema. These offline tests do not establish why Coinbase omitted a particular interval or prove live feed completeness.
