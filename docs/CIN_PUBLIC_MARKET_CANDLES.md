@@ -358,3 +358,10 @@ Coinbase pages are accumulated only inside the adapter's local request scope. A 
 An actually empty but valid page remains distinct from a failed or malformed page: an empty second page may preserve valid first-page history as a legitimate partial result, while a page request failure or malformed response fails the whole fetch. The adapter does not retry, silently skip a failed page, or expose incomplete accumulated rows as a successful result.
 
 Offline regression tests cover first-page and second-page timeouts, malformed first- and second-page payloads, and invalid successful response-body classification. All requests are mocked; no live provider call is made.
+
+
+### Coinbase response resource bounds
+
+Coinbase response bodies use the shared bounded JSON transport reader. The reader requests at most the configured 2 MiB limit plus one byte, allowing deterministic oversized-body detection without reading an unbounded response into memory. It does not trust Content-Length as the enforcement mechanism; the actual bytes read determine acceptance. Incomplete HTTP bodies, invalid UTF-8, invalid JSON, and bodies above the cap are classified as malformed successful provider responses and do not become transport-failure fallback signals.
+
+After JSON decoding, the Coinbase adapter separately enforces the 300-row per-page ceiling and validates the candle schema before normalization. These controls bound both raw response bytes and accepted page row count. Tests use mocked HTTP responses only and verify the bounded read call and Coinbase-specific malformed-response classification.
