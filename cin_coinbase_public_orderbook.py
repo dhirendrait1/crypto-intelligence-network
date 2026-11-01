@@ -76,8 +76,16 @@ def fetch_coinbase_public_book(
         payload = json.loads(raw.decode("utf-8"))
     except (UnicodeError, ValueError) as exc:
         raise PublicBookError("Coinbase public book invalid JSON") from exc
-    if not isinstance(payload, dict) or set(payload) != {"pricebook"}:
+    if not isinstance(payload, dict) or "pricebook" not in payload:
         raise PublicBookError("Coinbase public book malformed envelope")
+    # Coinbase documents optional top-level quote metrics in addition to pricebook.
+    # They are not substitutes for independently checking bid/ask levels.
+    optional = {"last", "mid_market", "spread_bps", "spread_absolute"}
+    if set(payload) - ({"pricebook"} | optional):
+        raise PublicBookError("Coinbase public book unexpected envelope fields")
+    for name in optional & set(payload):
+        if not isinstance(payload[name], str) or not payload[name] or len(payload[name]) > 128:
+            raise PublicBookError(f"Coinbase public book invalid {name} field")
     pricebook = payload["pricebook"]
     if not isinstance(pricebook, dict) or set(pricebook) != {"product_id", "bids", "asks", "time"}:
         raise PublicBookError("Coinbase pricebook malformed fields")
