@@ -150,6 +150,23 @@ def _expected_window_opens(interval: str, requested_limit: int, provider: str, n
     return list(reversed(opens))
 
 
+def _validate_requested_candle_window(
+    rows: list[dict[str, Any]], interval: str, requested_limit: int,
+    provider: str, now_ms: int,
+) -> None:
+    """Reject candles outside the original rolling request window, including future opens."""
+    expected = _expected_window_opens(interval, requested_limit, provider, now_ms)
+    expected_set = set(expected)
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("Requested candle window contains a malformed row")
+        open_time = row.get("open_time")
+        if isinstance(open_time, bool) or not isinstance(open_time, int):
+            raise ValueError("Requested candle window contains an invalid open timestamp")
+        if open_time not in expected_set:
+            raise ValueError("Provider returned a candle outside the requested historical window")
+
+
 def _historical_window_integrity_metadata(
     rows: list[dict[str, Any]], interval: str, requested_limit: int,
     provider: str, now_ms: int,
@@ -1522,8 +1539,11 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
 
     try:
         rows = _normalize_candle_sequence(rows, interval, provider)
+        _validate_requested_candle_window(
+            rows, interval, limit, provider, int(datetime.now(timezone.utc).timestamp() * 1000)
+        )
     except (KeyError, TypeError, ValueError):
-        raise HTTPException(status_code=502, detail="Public market-data provider returned an ambiguous candle sequence.") from None
+        raise HTTPException(status_code=502, detail="Public market-data provider returned an ambiguous or out-of-window candle sequence.") from None
     for row in rows:
         row["_source"] = source
         row["_source_endpoint"] = endpoint
