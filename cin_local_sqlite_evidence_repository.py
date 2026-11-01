@@ -59,6 +59,8 @@ def _validate_claim_value(value: Any) -> None:
             if any(pattern.search(item) for pattern in _SECRET_PATTERNS):
                 raise ValueError("claim value contains a prohibited credential or secret marker")
 
+    walk(value)
+
 MAX_METADATA_BYTES = 64 * 1024
 MAX_METADATA_DEPTH = 8
 MAX_METADATA_NODES = 2048
@@ -398,3 +400,4 @@ class LocalSQLiteEvidenceRepository:
             "persisted": "true",
             "storage_mode": "local_sqlite_development_only",
         }
+
