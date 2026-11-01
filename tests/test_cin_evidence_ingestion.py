@@ -144,11 +144,13 @@ class EvidenceIngestionTests(unittest.TestCase):
 
     @patch("cin_evidence_ingestion.urlopen")
     def test_recent_repository_timestamp_is_fresh(self, mocked):
+        # Use a relative timestamp: static fixtures eventually exceed the freshness window.
+        recently_pushed = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
         mocked.return_value = FakeResponse({
             "full_name": "ethereum/go-ethereum",
             "default_branch": "master",
-            "pushed_at": "2026-10-23T10:00:00Z",
-            "updated_at": "2026-10-23T10:00:00Z",
+            "pushed_at": recently_pushed,
+            "updated_at": recently_pushed,
             "stargazers_count": 50000,
             "forks_count": 20000,
             "open_issues_count": 1000,
