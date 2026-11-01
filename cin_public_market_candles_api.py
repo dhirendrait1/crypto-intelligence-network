@@ -1382,10 +1382,14 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
             # Keep only opens inside CIN's overall requested UTC history window.
             if start <= timestamp_seconds_int <= latest_open:
                 previous_row = rows_by_time.get(timestamp_seconds_int)
-                if previous_row is not None and previous_row != row:
-                    raise _MalformedProviderResponse(
-                        "Coinbase returned conflicting candle rows for the same open timestamp"
-                    )
+                if previous_row is not None:
+                    if previous_row != row:
+                        raise _MalformedProviderResponse(
+                            "Coinbase returned conflicting candle rows for the same open timestamp"
+                        )
+                    # The documented one-candle page-boundary overlap is
+                    # accepted only when the complete raw row is identical.
+                    continue
                 rows_by_time[timestamp_seconds_int] = row
                 if ordered_raw_rows and timestamp_seconds_int <= int(ordered_raw_rows[-1][0]):
                     raise _MalformedProviderResponse(
