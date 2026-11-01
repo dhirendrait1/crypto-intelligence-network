@@ -3102,3 +3102,52 @@ class CoinbaseSnapshotAnchorConsistencyTests(unittest.TestCase):
         self.assertEqual(first["end"], second["start"])
         self.assertEqual(first["granularity"], ["3600"])
         self.assertEqual(second["granularity"], ["3600"])
+
+
+class CoinbaseCurrentCandleFinalizationTests(unittest.TestCase):
+    def test_excludes_current_in_progress_bucket_and_returns_only_completed_candles(self):
+        class FrozenDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return cls(2025, 1, 1, 12, 30, tzinfo=timezone.utc)
+
+        catalogue = [{
+            "id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
+            "status": "online", "trading_disabled": False,
+        }]
+        completed = [int(datetime(2025, 1, 1, 11, 0, tzinfo=timezone.utc).timestamp()),
+                     "99", "103", "100", "102", "10"]
+        in_progress = [int(datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc).timestamp()),
+                       "101", "105", "102", "104", "4"]
+        with patch.object(api, "datetime", FrozenDateTime), patch.object(
+            api, "_coinbase_request_json", side_effect=[catalogue, [in_progress, completed]]
+        ):
+            rows = api._fetch_coinbase("BTCUSD", "1h", 5)
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["open_time"], int(datetime(
+            2025, 1, 1, 11, 0, tzinfo=timezone.utc
+        ).timestamp() * 1000))
+        self.assertEqual(rows[0]["close_time"], int(datetime(
+            2025, 1, 1, 12, 0, tzinfo=timezone.utc
+        ).timestamp() * 1000) - 1)
+
+    def test_does_not_query_a_current_bucket_when_clock_is_exactly_on_boundary(self):
+        class FrozenDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return cls(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
+
+        catalogue = [{
+            "id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
+            "status": "online", "trading_disabled": False,
+        }]
+        completed = [int(datetime(2025, 1, 1, 11, 0, tzinfo=timezone.utc).timestamp()),
+                     "99", "103", "100", "102", "10"]
+        with patch.object(api, "datetime", FrozenDateTime), patch.object(
+            api, "_coinbase_request_json", side_effect=[catalogue, [completed]]
+        ) as request:
+            rows = api._fetch_coinbase("BTCUSD", "1h", 5)
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(request.call_count, 2)
