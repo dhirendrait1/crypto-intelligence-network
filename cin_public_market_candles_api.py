@@ -1393,8 +1393,8 @@ def _coinbase_canonical_product_identity(symbol: str) -> tuple[str, str, str]:
     return f"{base}-{quote}", base, quote
 
 
-def _coinbase_decimal_to_float(value: Any, field_name: str) -> float:
-    """Convert a validated Coinbase numeric scalar without silent range loss."""
+def _coinbase_decimal_value(value: Any, field_name: str) -> Decimal:
+    """Parse a finite Coinbase decimal scalar without losing source precision."""
     try:
         decimal_value = Decimal(str(value))
     except (InvalidOperation, TypeError, ValueError):
@@ -1405,6 +1405,12 @@ def _coinbase_decimal_to_float(value: Any, field_name: str) -> float:
         raise _MalformedProviderResponse(
             f"Coinbase returned a non-finite decimal value for {field_name}"
         )
+    return decimal_value
+
+
+def _coinbase_decimal_to_float(value: Any, field_name: str) -> float:
+    """Convert a Coinbase decimal while rejecting silent float range loss."""
+    decimal_value = _coinbase_decimal_value(value, field_name)
     try:
         normalized = float(decimal_value)
     except (OverflowError, ValueError):
@@ -1521,12 +1527,46 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
             start_ms = int(row[0]) * 1000
             duration_ms = duration * 1000
             # Coinbase rows are [time, low, high, open, close, volume].
+            # Check OHLC semantics at source decimal precision before float
+            # normalization can collapse distinct values or mask violations.
+            decimal_ohlc = {
+                "low": _coinbase_decimal_value(row[1], "low"),
+                "high": _coinbase_decimal_value(row[2], "high"),
+                "open": _coinbase_decimal_value(row[3], "open"),
+                "close": _coinbase_decimal_value(row[4], "close"),
+            }
+            decimal_volume = _coinbase_decimal_value(row[5], "volume")
+            if any(value <= 0 for value in decimal_ohlc.values()):
+                raise _MalformedProviderResponse("Coinbase returned a non-positive OHLC decimal value")
+            if decimal_volume < 0:
+                raise _MalformedProviderResponse("Coinbase returned a negative volume decimal value")
+            if (
+                decimal_ohlc["high"] < max(decimal_ohlc["open"], decimal_ohlc["close"])
+                or decimal_ohlc["low"] > min(decimal_ohlc["open"], decimal_ohlc["close"])
+                or decimal_ohlc["high"] < decimal_ohlc["low"]
+            ):
+                raise _MalformedProviderResponse(
+                    "Coinbase returned an invalid OHLC relationship at source decimal precision"
+                )
+            normalized_ohlc = {
+                name: _coinbase_decimal_to_float(row[index], name)
+                for name, index in (("low", 1), ("high", 2), ("open", 3), ("close", 4))
+            }
+            for left_index, left_name in enumerate(("open", "high", "low", "close")):
+                for right_name in ("open", "high", "low", "close")[left_index + 1:]:
+                    if (
+                        decimal_ohlc[left_name] != decimal_ohlc[right_name]
+                        and normalized_ohlc[left_name] == normalized_ohlc[right_name]
+                    ):
+                        raise _MalformedProviderResponse(
+                            "Coinbase OHLC distinction was lost during float normalization"
+                        )
             candle = {
                 "open_time": start_ms,
-                "open": _coinbase_decimal_to_float(row[3], "open"),
-                "high": _coinbase_decimal_to_float(row[2], "high"),
-                "low": _coinbase_decimal_to_float(row[1], "low"),
-                "close": _coinbase_decimal_to_float(row[4], "close"),
+                "open": normalized_ohlc["open"],
+                "high": normalized_ohlc["high"],
+                "low": normalized_ohlc["low"],
+                "close": normalized_ohlc["close"],
                 "volume": _coinbase_decimal_to_float(row[5], "volume"),
                 "close_time": start_ms + duration_ms - 1,
             }
