@@ -2050,6 +2050,37 @@ class CoinbaseProductCatalogueTests(unittest.TestCase):
                     api._fetch_coinbase("BTCUSD", "1h", 5)
                 request.assert_called_once_with(api.COINBASE_PRODUCTS_URL)
 
+    def test_coinbase_page_accepts_strict_newest_first_and_explicitly_reverses(self):
+        newest = [1700003600, "99", "103", "100", "102", "10"]
+        middle = [1700000000, "98", "102", "99", "101", "11"]
+        oldest = [1699996400, "97", "101", "98", "100", "12"]
+        original = [newest, middle, oldest]
+        normalized = api._coinbase_page_rows_in_chronological_order(original)
+        self.assertEqual(normalized, [oldest, middle, newest])
+        self.assertEqual(original, [newest, middle, oldest])
+
+    def test_coinbase_page_rejects_duplicate_timestamps_without_deduplication(self):
+        row = [1700000000, "99", "103", "100", "102", "10"]
+        with self.assertRaisesRegex(api._MalformedProviderResponse, "duplicate candle timestamps"):
+            api._coinbase_page_rows_in_chronological_order([row, list(row)])
+
+    def test_coinbase_page_rejects_ascending_or_non_monotonic_rows_without_sorting(self):
+        first = [1700000000, "99", "103", "100", "102", "10"]
+        newer = [1700003600, "99", "104", "100", "103", "12"]
+        older = [1699996400, "98", "102", "99", "101", "9"]
+        for sequence in ([first, newer], [newer, older, first]):
+            with self.subTest(sequence=sequence):
+                with self.assertRaisesRegex(api._MalformedProviderResponse, "newest-first chronological"):
+                    api._coinbase_page_rows_in_chronological_order(sequence)
+
+    def test_coinbase_page_rejects_malformed_rows_and_timestamps(self):
+        valid = [1700000000, "99", "103", "100", "102", "10"]
+        invalid_rows = ([valid, [1700000000]], [valid, [True, "99", "103", "100", "102", "10"]])
+        for sequence in invalid_rows:
+            with self.subTest(sequence=sequence):
+                with self.assertRaises(api._MalformedProviderResponse):
+                    api._coinbase_page_rows_in_chronological_order(sequence)
+
     def test_coinbase_rejects_malformed_catalogue_envelope(self):
         with patch.object(api, "_coinbase_request_json", return_value={"products": []}):
             with self.assertRaisesRegex(api._MalformedProviderResponse, "catalogue response was not a list"):
