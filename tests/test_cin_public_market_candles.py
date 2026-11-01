@@ -2902,3 +2902,30 @@ class CoinbaseProductCatalogueAmbiguityRegressionTests(unittest.TestCase):
         ]
         with patch.object(api, "_coinbase_request_json", return_value=catalogue):
             api._verify_coinbase_product("BTC-USD", "BTC", "USD")
+
+
+class CoinbaseCanonicalProductSymbolMappingTests(unittest.TestCase):
+    def test_maps_supported_concatenated_symbols_to_exact_product_identity(self):
+        cases = (
+            ("BTCUSD", ("BTC-USD", "BTC", "USD")),
+            ("ETHUSD", ("ETH-USD", "ETH", "USD")),
+            ("1INCHUSD", ("1INCH-USD", "1INCH", "USD")),
+            ("TUSDUSD", ("TUSD-USD", "TUSD", "USD")),
+        )
+        for symbol, expected in cases:
+            with self.subTest(symbol=symbol):
+                self.assertEqual(api._coinbase_canonical_product_identity(symbol), expected)
+
+    def test_never_maps_usdt_or_other_quote_assets_to_a_usd_product(self):
+        for symbol in ("BTCUSDT", "ETHUSDT"):
+            with self.subTest(symbol=symbol), patch.object(api, "_request_json") as request:
+                with self.assertRaisesRegex(ValueError, "USDT requests are not mapped to USD"):
+                    api._fetch_coinbase(symbol, "1h", 5)
+                request.assert_not_called()
+
+    def test_rejects_noncanonical_separators_case_and_whitespace(self):
+        for symbol in ("btcUSD", " BTCUSD", "BTCUSD ", "BTC-USD", "BTC/USD", "BTC_USD", "BTCUSDC"):
+            with self.subTest(symbol=symbol), patch.object(api, "_request_json") as request:
+                with self.assertRaises(ValueError):
+                    api._coinbase_canonical_product_identity(symbol)
+                request.assert_not_called()
