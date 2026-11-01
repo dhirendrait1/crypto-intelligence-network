@@ -805,6 +805,51 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(requests[0][1], requests[1][0])
         self.assertEqual([row["open_time"] for row in rows], [1700000000000, 1700000060000])
 
+    def test_coinbase_rejects_identical_duplicate_outside_exact_page_boundary(self):
+        requests = []
+        repeated_timestamp = {}
+        def response(url):
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+            page_start = int(datetime.fromisoformat(query["start"][0]).timestamp())
+            requests.append(page_start)
+            if len(requests) == 1:
+                repeated_timestamp["value"] = page_start + 60
+            return [[repeated_timestamp["value"], "99", "103", "100", "102", "10"]]
+
+        with patch.object(api, "_request_json", side_effect=response):
+            with self.assertRaisesRegex(
+                ValueError, "repeated a candle timestamp outside the exact pagination boundary"
+            ):
+                api._fetch_coinbase("BTCUSD", "1m", 500)
+        self.assertEqual(len(requests), 2)
+
+    def test_coinbase_preserves_missing_intervals_without_synthesizing_candles(self):
+        requests = []
+        returned = {}
+        def response(url):
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+            page_start = int(datetime.fromisoformat(query["start"][0]).timestamp())
+            page_end = int(datetime.fromisoformat(query["end"][0]).timestamp())
+            requests.append((page_start, page_end))
+            if len(requests) == 1:
+                # A valid newest-first page with a deliberate interval gap.
+                returned["first"] = page_start + 120
+                returned["second"] = page_start
+                return [
+                    [returned["first"], "99", "103", "100", "102", "10"],
+                    [returned["second"], "98", "102", "99", "101", "9"],
+                ]
+            return []
+
+        with patch.object(api, "_request_json", side_effect=response):
+            rows = api._fetch_coinbase("BTCUSD", "1m", 500)
+
+        self.assertEqual(
+            [row["open_time"] for row in rows],
+            [returned["second"] * 1000, returned["first"] * 1000],
+        )
+        self.assertEqual(len(rows), 2)
+
     def test_coinbase_rejects_conflicting_boundary_row_across_pages(self):
         requests = []
         def response(url):
