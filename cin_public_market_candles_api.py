@@ -1246,7 +1246,7 @@ COINBASE_PRODUCTS_URL = "https://api.exchange.coinbase.com/products"
 
 
 def _coinbase_product_catalogue_records(payload: Any) -> list[dict[str, Any]]:
-    """Validate the product-catalogue array separately from candle-page arrays."""
+    """Validate required field types and identity uniqueness for catalogue records."""
     if not isinstance(payload, list):
         raise _MalformedProviderResponse("Coinbase product catalogue response was not a list")
     identifiers = set()
@@ -1264,6 +1264,23 @@ def _coinbase_product_catalogue_records(payload: Any) -> list[dict[str, Any]]:
         if product_identifier in identifiers:
             raise _MalformedProviderResponse(
                 "Coinbase product catalogue contained duplicate product identifiers"
+            )
+        for field_name in ("base_currency", "quote_currency"):
+            field_value = item.get(field_name)
+            if not isinstance(field_value, str) or not field_value.strip():
+                raise _MalformedProviderResponse(
+                    f"Coinbase product catalogue field {field_name} was missing or invalid"
+                )
+        product_status = item.get("status")
+        if not isinstance(product_status, str) or product_status not in {
+            "online", "offline", "delisted"
+        }:
+            raise _MalformedProviderResponse(
+                "Coinbase product catalogue field status was missing or invalid"
+            )
+        if not isinstance(item.get("trading_disabled"), bool):
+            raise _MalformedProviderResponse(
+                "Coinbase product catalogue field trading_disabled was missing or invalid"
             )
         identifiers.add(product_identifier)
         records.append(item)
