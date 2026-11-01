@@ -64,7 +64,7 @@ jobs:
               "open": 100.0, "high": 103.0, "low": 99.0,
               "close": 102.0, "volume": 12.5,
           }]
-          with patch.object(api, "fetch_candles", return_value=fixture) as fetch:
+          with patch.object(api, "fetch_candles_with_diagnostics", return_value=(fixture, {})) as fetch:
               body = asyncio.run(api.get_coinbase_market_candles(
                   product_id="BTC-USD", granularity="1h",
                   start=1700000000, end=1700003600,
@@ -77,7 +77,7 @@ jobs:
           assert body["data"][0]["open_time_utc"].endswith("+00:00")
           fetch.assert_called_once()
 
-          with patch.object(api, "fetch_candles", side_effect=RuntimeError("private provider detail")):
+          with patch.object(api, "fetch_candles_with_diagnostics", side_effect=RuntimeError("private provider detail")):
               try:
                   asyncio.run(api.get_coinbase_market_candles(
                       product_id="BTC-USD", granularity="1h",

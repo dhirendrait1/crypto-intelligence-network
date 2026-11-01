@@ -2257,7 +2257,7 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(api._is_aligned_candle_open(monday, "1M", "kraken"))
         self.assertFalse(api._is_aligned_candle_open(monday, "3d", "kraken"))
 
-    def test_coinbase_fallback_uses_explicit_provider_identity(self):
+    async def test_coinbase_fallback_uses_explicit_provider_identity(self):
         with patch.object(api, "_fetch_binance", side_effect=urllib.error.URLError("network down")), patch.object(
             api, "_fetch_kraken", side_effect=TimeoutError("kraken timed out")
         ), patch.object(api, "_fetch_coinbase", return_value=[dict(SAMPLE[0])]):
