@@ -349,3 +349,12 @@ The first page may return one candle immediately before CIN's requested history 
 Adjacent page windows are generated with the prior page end equal to the next page start. The end timestamp is treated as inclusive for boundary reconciliation: if both pages return the exact shared timestamp, only byte-for-byte identical candle rows are accepted and retained once. Conflicting duplicates, timestamps older than the next page start, and timestamps beyond the page end fail closed. The final result remains limited to the overall requested history window.
 
 Regression tests cover first-page pre-window exclusion, rejection of a prior-page candle on a later page, and exact inclusive end/next-start duplicate reconciliation. No gap filling, timestamp sorting, or live provider request is used.
+
+
+### Coinbase pagination failure and recovery semantics
+
+Coinbase pages are accumulated only inside the adapter's local request scope. A request timeout or transport exception on either page aborts the complete fetch; records accumulated from an earlier page are not returned as a successful partial snapshot. A successful HTTP response with a non-list body or malformed candle rows is classified as malformed provider data and also aborts the fetch. Invalid successful response-body decoding is classified separately from a provider outage.
+
+An actually empty but valid page remains distinct from a failed or malformed page: an empty second page may preserve valid first-page history as a legitimate partial result, while a page request failure or malformed response fails the whole fetch. The adapter does not retry, silently skip a failed page, or expose incomplete accumulated rows as a successful result.
+
+Offline regression tests cover first-page and second-page timeouts, malformed first- and second-page payloads, and invalid successful response-body classification. All requests are mocked; no live provider call is made.
