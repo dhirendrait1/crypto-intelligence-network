@@ -313,3 +313,10 @@ Coinbase Exchange candle pages are expected newest-first (strictly descending by
 Pages are requested in increasing time windows. After each page passes its native-order check and is explicitly reversed, the combined pagination sequence must remain strictly oldest-first. An identical row repeated at an allowed page boundary is retained once; a conflicting duplicate is rejected. Any other cross-page chronology regression is rejected. This preserves the distinction between a documented provider-order conversion and silent normalization of invalid input.
 
 Offline regression tests cover valid newest-first input, preservation of the original payload, duplicate timestamps, ascending rows, non-monotonic sequences, and malformed rows/timestamps. The adapter additionally enforces page-to-page chronological integrity during pagination. Tests use mocked responses and do not contact Coinbase. This is a read-only data-integrity check; no order or trade functionality is involved.
+
+
+### Coinbase pagination boundary integrity and sparse intervals
+
+Coinbase pages are requested in adjacent granularity-aligned windows. CIN permits an identical repeated candle only when its open timestamp is exactly the current page's start boundary and the complete raw row matches the previously received row. An identical duplicate elsewhere across pages is malformed; a conflicting duplicate is always rejected. This prevents timestamp-keyed collection from silently masking repeated provider records outside the documented boundary overlap.
+
+CIN preserves gaps in provider candle timestamps. It does not infer that a missing interval is a malformed response, create synthetic zero-volume candles, interpolate OHLCV values, or silently fill gaps. The returned sequence remains strictly increasing, but need not be interval-contiguous because the provider may omit intervals without candle data. Regression tests verify rejection of non-boundary cross-page duplicates and preservation of sparse intervals without synthetic rows.
