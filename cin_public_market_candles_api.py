@@ -1288,6 +1288,40 @@ def _coinbase_request_json(url: str) -> Any:
         raise _MalformedProviderResponse("Coinbase returned an invalid successful response body") from None
 
 
+def _coinbase_page_rows_in_chronological_order(payload: Any) -> list[list[Any]]:
+    """Validate Coinbase's newest-first page order, then explicitly reverse it.
+
+    Coinbase Exchange returns candle rows newest-first. Only a strictly
+    descending timestamp sequence is accepted; duplicates and any ascending
+    or non-monotonic sequence are malformed provider data, not repair targets.
+    """
+    if not isinstance(payload, list):
+        raise _MalformedProviderResponse("Coinbase response was not a list")
+    if len(payload) > MAX_COINBASE_CANDLE_PAGE_SIZE:
+        raise _MalformedProviderResponse("Coinbase response exceeded the 300-candle per-request limit")
+    timestamps: list[int] = []
+    for row in payload:
+        if not isinstance(row, list) or len(row) < 6:
+            raise _MalformedProviderResponse("Coinbase returned a malformed candle row")
+        try:
+            if isinstance(row[0], bool):
+                raise _MalformedProviderResponse("Coinbase returned a boolean candle timestamp")
+            timestamp_ms = _parse_provider_timestamp(row[0], "seconds")
+            timestamps.append(timestamp_ms // 1000)
+        except _MalformedProviderResponse:
+            raise
+        except (TypeError, ValueError, OverflowError):
+            raise _MalformedProviderResponse("Coinbase returned a malformed candle row") from None
+    for previous, current in zip(timestamps, timestamps[1:]):
+        if current == previous:
+            raise _MalformedProviderResponse("Coinbase returned duplicate candle timestamps within a page")
+        if current > previous:
+            raise _MalformedProviderResponse("Coinbase candle page was not strictly newest-first chronological")
+    # This is an explicit conversion from Coinbase's documented newest-first
+    # response contract to CIN's oldest-first internal sequence, after validation.
+    return list(reversed(payload))
+
+
 def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
     """Fetch public Coinbase Exchange candles when primary providers are blocked."""
     if interval not in COINBASE_GRANULARITY:
@@ -1308,9 +1342,10 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
     latest_open = (now // duration) * duration
     start = latest_open - limit * duration
     rows_by_time: dict[int, list[Any]] = {}
+    ordered_raw_rows: list[list[Any]] = []
     # Coinbase caps each response at 300 candles; fetch non-overlapping,
-    # granularity-aligned windows. Timestamp-keyed collection deduplicates any
-    # boundary row repeated by the upstream API.
+    # granularity-aligned windows. Validate each original newest-first page
+    # before explicitly converting it to oldest-first order.
     cursor = start
     page_count = 0
     while cursor < now:
@@ -1327,17 +1362,9 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
         })
         url = COINBASE_CANDLES_URL.format(product_id=urllib.parse.quote(product_id, safe="")) + "?" + query
         payload = _coinbase_request_json(url)
-        if not isinstance(payload, list):
-            raise _MalformedProviderResponse("Coinbase response was not a list")
-        if len(payload) > MAX_COINBASE_CANDLE_PAGE_SIZE:
-            raise _MalformedProviderResponse("Coinbase response exceeded the 300-candle per-request limit")
-        for row in payload:
-            if not isinstance(row, list) or len(row) < 6:
-                raise _MalformedProviderResponse("Coinbase returned a malformed candle row")
+        page_rows = _coinbase_page_rows_in_chronological_order(payload)
+        for row in page_rows:
             try:
-                # Malformed timestamps must not disappear from the returned snapshot.
-                if isinstance(row[0], bool):
-                    raise _MalformedProviderResponse("Coinbase returned a boolean candle timestamp")
                 timestamp_ms = _parse_provider_timestamp(row[0], "seconds")
                 timestamp_seconds_int = timestamp_ms // 1000
             except _MalformedProviderResponse:
@@ -1360,12 +1387,17 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
                         "Coinbase returned conflicting candle rows for the same open timestamp"
                     )
                 rows_by_time[timestamp_seconds_int] = row
+                if ordered_raw_rows and timestamp_seconds_int <= int(ordered_raw_rows[-1][0]):
+                    raise _MalformedProviderResponse(
+                        "Coinbase pagination produced a malformed chronological sequence"
+                    )
+                ordered_raw_rows.append(row)
         cursor = chunk_end
     candles = []
     # Validate every collected row before selecting the requested latest
     # window. Otherwise an invalid newest row can consume one of the limit
     # slots and unnecessarily discard an older valid candle.
-    for row in sorted(rows_by_time.values(), key=lambda item: int(item[0])):
+    for row in ordered_raw_rows:
         try:
             start_ms = int(row[0]) * 1000
             duration_ms = duration * 1000
