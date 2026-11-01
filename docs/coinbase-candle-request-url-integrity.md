@@ -59,3 +59,12 @@ The Coinbase adapter intentionally performs **zero automatic retries**:
 - No retry loop, exponential backoff, or automatic repeat of a Coinbase catalogue/candle request is introduced. This avoids rate-limit amplification and avoids combining pages fetched at different times after a retry.
 
 Offline regression tests verify one HTTP attempt for a transport failure, one attempt for HTTP 429, and abort-on-failure without replay of a later pagination page. These tests do not establish live provider consistency or guarantee that a subsequent client-initiated request will observe the same exchange snapshot.
+
+
+## Coinbase retrieval-window consistency
+
+CIN captures its UTC request-window anchor once, after local symbol/interval validation and **before** the product-catalogue request. The catalogue check and all candle-page requests therefore belong to one fixed, granularity-aligned requested time window; time spent waiting for catalogue or page responses cannot move the end boundary or cause later pages to use a newly calculated window.
+
+This is a **best-effort retrieval window, not an atomic exchange snapshot**. Coinbase's public catalogue and candle endpoints do not provide a shared snapshot token in this adapter. Product status or candle values may change while separate HTTP requests are in flight, and the adapter cannot prove all returned pages represent one exchange-state instant. CIN therefore keeps the fixed window, validates page bounds and duplicate boundaries, performs no automatic retries, and fails the whole result on a failed or malformed page. Consumers must not interpret the output as a transactionally consistent exchange snapshot.
+
+An offline regression test verifies that the time anchor is captured before catalogue I/O and that both pages use contiguous boundaries derived from that single anchor. It does not simulate or prove atomicity at Coinbase.
