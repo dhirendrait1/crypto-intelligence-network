@@ -3,7 +3,7 @@ import json
 import unittest
 import urllib.error
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
@@ -2929,3 +2929,48 @@ class CoinbaseCanonicalProductSymbolMappingTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     api._coinbase_canonical_product_identity(symbol)
                 request.assert_not_called()
+
+
+class CoinbaseCandleRequestUrlIntegrityTests(unittest.TestCase):
+    def test_request_uses_encoded_product_path_and_exact_utc_query_contract(self):
+        class FrozenDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return cls(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+
+        catalogue = [{
+            "id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
+            "status": "online", "trading_disabled": False,
+        }]
+        candle = [[
+            int(datetime(2025, 1, 1, 11, 0, 0, tzinfo=timezone.utc).timestamp()),
+            "99", "103", "100", "102", "10",
+        ]]
+        with patch.object(api, "datetime", FrozenDateTime), patch.object(
+            api, "_coinbase_request_json", side_effect=[catalogue, candle]
+        ) as request:
+            rows = api._fetch_coinbase("BTCUSD", "1h", 5)
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(request.call_count, 2)
+        request.assert_any_call(api.COINBASE_PRODUCTS_URL)
+        candle_url = request.call_args_list[1].args[0]
+        parsed = urllib.parse.urlsplit(candle_url)
+        self.assertEqual(parsed.scheme, "https")
+        self.assertEqual(parsed.netloc, "api.exchange.coinbase.com")
+        self.assertEqual(parsed.path, "/products/BTC-USD/candles")
+        self.assertEqual(parsed.fragment, "")
+        query = urllib.parse.parse_qs(parsed.query, strict_parsing=True)
+        self.assertEqual(set(query), {"granularity", "start", "end"})
+        self.assertEqual(query["granularity"], ["3600"])
+        self.assertEqual(query["start"], ["2025-01-01T07:00:00+00:00"])
+        self.assertEqual(query["end"], ["2025-01-01T12:00:00+00:00"])
+
+    def test_product_path_encoding_is_not_treated_as_query_or_fragment_data(self):
+        product_id = "BTC-USD"
+        encoded = urllib.parse.quote(product_id, safe="")
+        url = api.COINBASE_CANDLES_URL.format(product_id=encoded)
+        parsed = urllib.parse.urlsplit(url)
+        self.assertEqual(parsed.path, "/products/BTC-USD/candles")
+        self.assertEqual(parsed.query, "")
+        self.assertEqual(parsed.fragment, "")
