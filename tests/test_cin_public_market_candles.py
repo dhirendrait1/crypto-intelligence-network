@@ -788,14 +788,13 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
 
     def test_coinbase_identical_boundary_row_is_deduplicated_across_pages(self):
         requests = []
-        boundary = [1700000000, "99", "103", "100", "102", "10"]
-        later = [1700000060, "100", "104", "101", "103", "11"]
-
         def response(url):
             query = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
             page_start = int(datetime.fromisoformat(query["start"][0]).timestamp())
             page_end = int(datetime.fromisoformat(query["end"][0]).timestamp())
             requests.append((page_start, page_end))
+            boundary = [page_end, "99", "103", "100", "102", "10"]
+            later = [page_start + 60, "100", "104", "101", "103", "11"]
             return [boundary] if len(requests) == 1 else [boundary, later]
 
         with patch.object(api, "_request_json", side_effect=response):
@@ -807,11 +806,12 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
 
     def test_coinbase_rejects_conflicting_boundary_row_across_pages(self):
         requests = []
-        boundary = [1700000000, "99", "103", "100", "102", "10"]
-        conflicting = [1700000000, "99", "103", "100", "101", "10"]
-
         def response(url):
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+            page_end = int(datetime.fromisoformat(query["end"][0]).timestamp())
             requests.append(url)
+            boundary = [page_end, "99", "103", "100", "102", "10"]
+            conflicting = [page_end, "99", "103", "100", "101", "10"]
             return [boundary] if len(requests) == 1 else [conflicting]
 
         with patch.object(api, "_request_json", side_effect=response):
