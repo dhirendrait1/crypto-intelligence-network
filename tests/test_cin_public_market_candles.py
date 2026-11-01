@@ -3069,3 +3069,34 @@ class CoinbaseRetryAndRequestConsistencyTests(unittest.TestCase):
                 api._fetch_coinbase("BTCUSD", "1h", 301)
 
         self.assertEqual(request.call_count, 2)
+
+
+class CoinbaseSnapshotAnchorConsistencyTests(unittest.TestCase):
+    def test_snapshot_anchor_is_captured_before_catalogue_and_shared_by_pages(self):
+        events = []
+        class FrozenDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                events.append("anchor")
+                return cls(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
+
+        def verify_catalogue(*args):
+            events.append("catalogue")
+
+        def fetch_page(url):
+            events.append("page")
+            return []
+
+        with patch.object(api, "datetime", FrozenDateTime), patch.object(
+            api, "_verify_coinbase_product", side_effect=verify_catalogue
+        ), patch.object(api, "_coinbase_request_json", side_effect=fetch_page) as request:
+            rows = api._fetch_coinbase("BTCUSD", "1h", 301)
+
+        self.assertEqual(rows, [])
+        self.assertEqual(events, ["anchor", "catalogue", "page", "page"])
+        self.assertEqual(request.call_count, 2)
+        first = urllib.parse.parse_qs(urllib.parse.urlsplit(request.call_args_list[0].args[0]).query)
+        second = urllib.parse.parse_qs(urllib.parse.urlsplit(request.call_args_list[1].args[0]).query)
+        self.assertEqual(first["end"], second["start"])
+        self.assertEqual(first["granularity"], ["3600"])
+        self.assertEqual(second["granularity"], ["3600"])
