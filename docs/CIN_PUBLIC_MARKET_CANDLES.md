@@ -304,3 +304,12 @@ Coinbase candle pages are requested as adjacent granularity-aligned windows. The
 ### Coinbase product availability and status integrity
 
 Before requesting Coinbase candles, CIN requires exactly one catalogue record with the requested product ID and exact base/quote identity, an explicit recognized `status` of `online`, and an explicit boolean `trading_disabled` value of `false`. Recognized non-online states (`offline` and `delisted`) are unavailable and are not queried for candles. Missing, null, malformed, or unrecognized status values and a missing/non-boolean `trading_disabled` flag are treated as malformed catalogue metadata and fail closed. A disabled product is unavailable. Other product flags that restrict order types are not interpreted as market-data availability; CIN does not place or route orders. Offline regression tests cover online/enabled acceptance through the existing adapter test, non-online states, disabled trading, and missing/unknown/malformed metadata.
+
+
+### Coinbase candle response ordering and chronology integrity
+
+Coinbase Exchange candle pages are expected newest-first (strictly descending by the raw candle-open timestamp). CIN validates the original row order before converting a valid page to its internal oldest-first sequence. Duplicate timestamps within a page, ascending rows, and any non-monotonic or malformed timestamp sequence invalidate the successful provider response. CIN does not sort, deduplicate, select a winner, or otherwise repair malformed provider rows.
+
+Pages are requested in increasing time windows. After each page passes its native-order check and is explicitly reversed, the combined pagination sequence must remain strictly oldest-first. An identical row repeated at an allowed page boundary is retained once; a conflicting duplicate is rejected. Any other cross-page chronology regression is rejected. This preserves the distinction between a documented provider-order conversion and silent normalization of invalid input.
+
+Offline regression tests cover valid newest-first input, preservation of the original payload, duplicate timestamps, ascending rows, non-monotonic sequences, malformed rows/timestamps, and page-to-page chronological integrity. Tests use mocked responses and do not contact Coinbase. This is a read-only data-integrity check; no order or trade functionality is involved.
