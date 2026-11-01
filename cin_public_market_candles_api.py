@@ -1245,12 +1245,36 @@ COINBASE_CANDLES_URL = "https://api.exchange.coinbase.com/products/{product_id}/
 COINBASE_PRODUCTS_URL = "https://api.exchange.coinbase.com/products"
 
 
+def _coinbase_product_catalogue_records(payload: Any) -> list[dict[str, Any]]:
+    """Validate the product-catalogue array separately from candle-page arrays."""
+    if not isinstance(payload, list):
+        raise _MalformedProviderResponse("Coinbase product catalogue response was not a list")
+    identifiers = set()
+    records = []
+    for item in payload:
+        if not isinstance(item, dict):
+            raise _MalformedProviderResponse(
+                "Coinbase product catalogue contained a non-object record"
+            )
+        product_identifier = item.get("id")
+        if not isinstance(product_identifier, str) or not product_identifier.strip():
+            raise _MalformedProviderResponse(
+                "Coinbase product catalogue record had a missing or invalid product identifier"
+            )
+        if product_identifier in identifiers:
+            raise _MalformedProviderResponse(
+                "Coinbase product catalogue contained duplicate product identifiers"
+            )
+        identifiers.add(product_identifier)
+        records.append(item)
+    return records
+
+
 def _verify_coinbase_product(product_id: str, base: str, quote: str) -> None:
     """Require one exact public product-catalogue record before requesting candles."""
     payload = _coinbase_request_json(COINBASE_PRODUCTS_URL)
-    if not isinstance(payload, list):
-        raise _MalformedProviderResponse("Coinbase product catalogue response was not a list")
-    matches = [item for item in payload if isinstance(item, dict) and item.get("id") == product_id]
+    records = _coinbase_product_catalogue_records(payload)
+    matches = [item for item in records if item["id"] == product_id]
     if len(matches) > 1:
         raise _MalformedProviderResponse("Coinbase product catalogue contained duplicate product identifiers")
     if not matches:
