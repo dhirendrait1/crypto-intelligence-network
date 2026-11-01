@@ -329,3 +329,14 @@ The candle response reports returned row count and count shortfall against the r
 For Coinbase, requested-window integrity counts missing leading and trailing expected opens. This is an edge-coverage diagnostic, not a claim that every interval inside the window must contain a candle. Coinbase may omit intervals with no trades; internal gaps remain represented by timeline-integrity metadata and are never filled. A response with both requested edges present can therefore have complete edge coverage while still containing internal gaps. Conversely, a missing first or last requested candle is reported as partial edge coverage, with the warning explicitly noting that provider no-trade semantics may explain the absence.
 
 Regression tests cover missing first/last requested opens, interior gaps despite complete edges, zero-row responses, and count shortfall metadata. Tests use deterministic timestamps and mocked provider responses; no live Coinbase request is required.
+
+
+### Coinbase pagination page completeness and response-size integrity
+
+CIN requests each granularity-aligned page in sequence and does not stop early merely because a page is empty or contains fewer rows than its requested interval capacity. A short or empty page is not, by itself, proof of provider failure: Coinbase may omit intervals without trades. CIN proceeds to the next bounded page and combines only the actual validated records.
+
+The 300-row provider response ceiling is enforced independently for every page, including the second page. Variable page sizes below that ceiling are accepted; CIN does not assume that each page must contain exactly its maximum theoretical row count. The total public-route request remains capped at 500 requested candles and two pages. Page windows must advance contiguously by granularity, and the validated combined rows must retain strict chronological order and existing duplicate-boundary rules.
+
+A short first page does not suppress the second request, and an empty second page does not erase valid records from the first. If all pages are empty, the adapter fails closed rather than returning an apparently successful empty snapshot. Returned-count and requested-window coverage metadata remain the consumer-facing indicators of partial history; missing intervals are never filled or synthesized.
+
+Offline tests cover empty/short first pages, short variable page sizes, empty second pages, and enforcement of the per-page row ceiling on page two. These tests use mocked responses and deterministic page boundaries; no live Coinbase request is required.
