@@ -340,3 +340,12 @@ The 300-row provider response ceiling is enforced independently for every page, 
 A short first page does not suppress the second request, and an empty second page does not erase valid records from the first. If all pages are empty, the adapter fails closed rather than returning an apparently successful empty snapshot. Returned-count and requested-window coverage metadata remain the consumer-facing indicators of partial history; missing intervals are never filled or synthesized.
 
 Offline tests cover empty/short first pages, short variable page sizes, empty second pages, and enforcement of the per-page row ceiling on page two. These tests use mocked responses and deterministic page boundaries; no live Coinbase request is required.
+
+
+### Coinbase page-window boundary reconciliation
+
+The first page may return one candle immediately before CIN's requested history start; that record is treated as provider boundary context and excluded from the requested output window. Subsequent pages are stricter: returned candle opens must fall between that page's inclusive start and end. A candle older than a later page's start is rejected rather than treated as a replayable prior-page row.
+
+Adjacent page windows are generated with the prior page end equal to the next page start. The end timestamp is treated as inclusive for boundary reconciliation: if both pages return the exact shared timestamp, only byte-for-byte identical candle rows are accepted and retained once. Conflicting duplicates, timestamps older than the next page start, and timestamps beyond the page end fail closed. The final result remains limited to the overall requested history window.
+
+Regression tests cover first-page pre-window exclusion, rejection of a prior-page candle on a later page, and exact inclusive end/next-start duplicate reconciliation. No gap filling, timestamp sorting, or live provider request is used.
