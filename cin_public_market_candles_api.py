@@ -1293,6 +1293,29 @@ def _coinbase_product_catalogue_records(payload: Any) -> list[dict[str, Any]]:
                 raise _MalformedProviderResponse(
                     f"Coinbase product catalogue field {field_name} must be positive"
                 )
+        size_bounds = {}
+        for field_name in (
+            "base_min_size", "base_max_size", "quote_min_size", "quote_max_size"
+        ):
+            raw_size = item.get(field_name)
+            if not isinstance(raw_size, str) or not raw_size.strip():
+                raise _MalformedProviderResponse(
+                    f"Coinbase product catalogue field {field_name} was missing or invalid"
+                )
+            size_value = _coinbase_decimal_value(raw_size, field_name)
+            if size_value <= 0:
+                raise _MalformedProviderResponse(
+                    f"Coinbase product catalogue field {field_name} must be positive"
+                )
+            size_bounds[field_name] = size_value
+        for minimum_field, maximum_field in (
+            ("base_min_size", "base_max_size"),
+            ("quote_min_size", "quote_max_size"),
+        ):
+            if size_bounds[minimum_field] > size_bounds[maximum_field]:
+                raise _MalformedProviderResponse(
+                    f"Coinbase product catalogue {minimum_field} exceeded {maximum_field}"
+                )
         identifiers.add(product_identifier)
         records.append(item)
     return records
