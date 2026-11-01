@@ -162,7 +162,7 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreater(timeline["missing_interval_count"], 0)
 
     def test_coinbase_empty_provider_result_fails_closed_and_coverage_reports_zero_rows(self):
-        with patch.object(api, "_request_json", return_value=[]):
+        with patch.object(api, "_verify_coinbase_product"), patch.object(api, "_request_json", return_value=[]):
             with self.assertRaisesRegex(ValueError, "no valid candles"):
                 api._fetch_coinbase("BTCUSD", "1h", 5)
         coverage = api._coverage_metadata([], 5)
