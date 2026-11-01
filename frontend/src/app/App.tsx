@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { cinApi, type ApiResult } from "../lib/api";
 import { marketsFeatureEnabled } from "../lib/featureFlags";
 import { MarketsScreen } from "../features/markets/MarketsScreen";
-import { DataStatePanel } from "../components/DataState";
+import { OverviewTerminal } from "../features/overview/OverviewTerminal";
 
 const sections = ["Overview", "Markets", "Screening", "Analysis", "Research", "News", "Alerts", "System Health"] as const;
 type Section = typeof sections[number];
@@ -46,26 +46,7 @@ function App() {
         </header>
 
         {active === "Markets" && marketsFeatureEnabled ? <MarketsScreen /> : active === "Overview" ? (
-          <>
-            <section className="notice" role="status">
-              <span className="notice-icon">i</span>
-              <div><strong>Preview interface — demo mode</strong><p>These overview cards are layout fixtures, not live market data. Markets requests are separately gated and user-initiated.</p></div>
-              <span className="demo-tag">DEMO DATA</span>
-            </section>
-            <div className="section-heading"><div><span className="eyebrow">MARKET SNAPSHOT</span><h2>Market intelligence overview</h2></div><span className="timestamp">Fixture snapshot · no live feed</span></div>
-            <div className="metric-grid">
-              <article className="metric-card"><span>BTC / USD</span><strong>—</strong><small>Live feed not connected</small></article>
-              <article className="metric-card"><span>ETH / USD</span><strong>—</strong><small>Live feed not connected</small></article>
-              <article className="metric-card"><span>DATA SOURCES</span><strong>0 <em>/ 0</em></strong><small>Provider health unavailable</small></article>
-              <article className="metric-card"><span>ACTIVE ALERTS</span><strong>—</strong><small>Alert service not implemented</small></article>
-            </div>
-            {cinApi.configured && <div className="content-grid"><article className="panel"><DataStatePanel state={health?.state ?? "unknown"} message={health?.message ?? "Checking CIN service health…"} /></article><article className="panel"><DataStatePanel state={readiness?.state ?? "unknown"} message={readiness?.message ?? "Checking CIN service readiness…"} /></article></div>}
-            <div className="content-grid">
-              <article className="panel"><div className="panel-head"><div><span className="eyebrow">SYSTEM STATUS</span><h3>Data availability</h3></div><span className="state-pill neutral">NOT CONNECTED</span></div><div className="empty-state"><span className="empty-symbol">⌁</span><strong>Waiting for verified API connection</strong><p>Provider status, freshness and coverage will appear here after contract validation.</p></div></article>
-              <article className="panel"><div className="panel-head"><div><span className="eyebrow">RESEARCH FEED</span><h3>Latest intelligence</h3></div><span className="state-pill neutral">NOT AVAILABLE</span></div><div className="empty-state"><span className="empty-symbol">◷</span><strong>No assessments loaded</strong><p>Assessment history is not connected in this preview.</p></div></article>
-            </div>
-            <div className="footer-note">CIN provides research and monitoring only. No trading, order execution, wallet control or fund movement.</div>
-          </>
+          <OverviewTerminal health={health} readiness={readiness} />
         ) : (
           <section className="panel page-placeholder"><span className="eyebrow">MODULE STATUS</span><h2>{active} integration pending</h2><p>This module is not connected to a verified API contract. No sample values are presented as live information.</p><span className="state-pill neutral">NOT IMPLEMENTED</span></section>
         )}
