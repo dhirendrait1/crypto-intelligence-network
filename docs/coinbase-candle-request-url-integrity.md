@@ -77,3 +77,19 @@ The Coinbase candle request may cover the current granularity bucket when the re
 At an exact interval boundary, the newly opening bucket is not requested as part of the completed history. This policy is intentionally limited to Coinbase normalization in this audit; it does not claim that every provider exposes or finalizes candles identically. CIN's canonical candle response remains unchanged and does not add a provider-specific completion flag. Consumers receive completed Coinbase candles only, avoiding a schema change that could mislead existing technical-analysis consumers.
 
 Offline regression tests cover a mid-interval response containing both a completed candle and the current in-progress candle, and an exact-boundary request. They do not verify Coinbase's live publication timing or guarantee that the exchange never revises a previously closed candle.
+
+
+## Coinbase OHLCV numeric integrity and precision
+
+The Coinbase adapter accepts provider JSON scalar fields and normalizes OHLCV values to the existing canonical Python float schema. Before a row is returned, the shared candle validator requires:
+
+- finite, strictly positive open/high/low/close prices;
+- finite, non-negative volume (zero-volume candles are permitted);
+- high at least as large as both open and close, low no greater than either, and high not below low;
+- valid integer open/close timestamps within the supported timestamp range.
+
+Booleans, nulls, arrays, objects, malformed numeric strings, NaN, positive/negative infinity, float-overflow values, non-positive prices, negative volume, and impossible OHLC relationships fail closed. A malformed row aborts the Coinbase snapshot; CIN does not silently drop it and return a partial result.
+
+**Precision limitation:** the canonical API currently represents prices and volume as binary floating-point values. Coinbase decimal strings with more significant digits than the float representation can preserve may be rounded during normalization. The audit adds regression coverage for this conversion and does not claim arbitrary-precision decimal fidelity. Changing the public numeric schema to decimal strings or scaled integers would require a separate compatibility audit of downstream analytics and API consumers; no such schema change is included here.
+
+Offline tests validate representative malformed and high-precision inputs. They do not establish exchange-side decimal semantics or market-specific tick/lot increments, which require authoritative instrument metadata and a separate audit.
