@@ -3520,3 +3520,33 @@ class CoinbaseDecimalNormalizationIntegrityTests(unittest.TestCase):
         rows = self._fetch_with_values({1: "9e307", 2: "9e307", 3: "9e307", 4: "9e307", 5: "9e307"})
         self.assertTrue(math.isfinite(rows[0]["open"]))
         self.assertEqual(rows[0]["open"], 9e307)
+
+
+class CoinbaseCanonicalFloatConsistencyTests(CoinbaseDecimalNormalizationIntegrityTests):
+    def test_supported_decimal_rounding_is_deterministic_in_canonical_float_schema(self):
+        from decimal import Decimal
+
+        source = "100.1234567890123456789"
+        rows = self._fetch_with_values({
+            1: "99.9", 2: "103.2", 3: source,
+            4: "102.1234567890123456789", 5: "0.1234567890123456789",
+        })
+        candle = rows[0]
+        self.assertIsInstance(candle["open"], float)
+        self.assertEqual(candle["open"], float(Decimal(source)))
+        decoded = json.loads(json.dumps(candle, allow_nan=False))
+        for field in ("open", "high", "low", "close", "volume"):
+            self.assertEqual(decoded[field], candle[field])
+            self.assertIsInstance(decoded[field], float)
+
+    def test_distinct_decimal_inputs_that_collapse_to_one_float_are_explicitly_observed(self):
+        from decimal import Decimal
+
+        first = "1.00000000000000001"
+        second = "1.00000000000000002"
+        self.assertNotEqual(Decimal(first), Decimal(second))
+        self.assertEqual(float(Decimal(first)), float(Decimal(second)))
+        rows = self._fetch_with_values({
+            1: "0.9", 2: "1.1", 3: first, 4: second, 5: "0",
+        })
+        self.assertEqual(rows[0]["open"], rows[0]["close"])
