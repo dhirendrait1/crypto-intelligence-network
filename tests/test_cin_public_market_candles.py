@@ -339,7 +339,8 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
         }}
         for result in ({"XBTUSDT": rows}, {"XBTUSDT": rows, "last": None},
-                       {"XBTUSDT": rows, "last": True}, {"XBTUSDT": rows, "last": 1700000000.5}):
+                       {"XBTUSDT": rows, "last": True}, {"XBTUSDT": rows, "last": 1700000000.5},
+                       {"XBTUSDT": rows, "last": -1}, {"XBTUSDT": rows, "last": 10**12}):
             with patch.object(api, "_request_json", side_effect=[asset_pairs, {"error": [], "result": result}]):
                 with self.assertRaisesRegex(ValueError, "pagination cursor"):
                     api._fetch_kraken("BTCUSDT", "1h", 5)
