@@ -3404,3 +3404,63 @@ class CoinbaseCandleRowSchemaCardinalityTests(unittest.TestCase):
             api._MalformedProviderResponse, "unexpected field count"
         ):
             api._coinbase_page_rows_in_chronological_order([row])
+
+
+
+class CoinbaseCandleFieldTypeIntegrityTests(unittest.TestCase):
+    def _fetch_with_row(self, row):
+        class FrozenDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return cls(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
+
+        catalogue = [{
+            "id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
+            "status": "online", "trading_disabled": False,
+        }]
+        with patch.object(api, "datetime", FrozenDateTime), patch.object(
+            api, "_coinbase_request_json", side_effect=[catalogue, [row]]
+        ):
+            return api._fetch_coinbase("BTCUSD", "1h", 5)
+
+    def test_rejects_string_and_float_timestamps_instead_of_coercing_them(self):
+        valid = [int(datetime(2025, 1, 1, 11, 0, tzinfo=timezone.utc).timestamp()),
+                 "99", "103", "100", "102", "10"]
+        for timestamp in (str(valid[0]), float(valid[0]), float(valid[0]) + 0.0):
+            row = list(valid)
+            row[0] = timestamp
+            with self.subTest(timestamp=timestamp):
+                with self.assertRaisesRegex(
+                    api._MalformedProviderResponse, "timestamp with an invalid field type"
+                ):
+                    self._fetch_with_row(row)
+
+    def test_accepts_integer_timestamp_and_documented_numeric_ohlcv_scalars(self):
+        timestamp = int(datetime(2025, 1, 1, 11, 0, tzinfo=timezone.utc).timestamp())
+        rows = self._fetch_with_row([timestamp, 99, 103.0, "100", "102.0", 10])
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["open_time"], timestamp * 1000)
+
+    def test_rejects_boolean_ohlcv_values_including_volume(self):
+        timestamp = int(datetime(2025, 1, 1, 11, 0, tzinfo=timezone.utc).timestamp())
+        valid = [timestamp, "99", "103", "100", "102", "10"]
+        for index in range(1, 6):
+            row = list(valid)
+            row[index] = True
+            with self.subTest(index=index):
+                with self.assertRaisesRegex(
+                    api._MalformedProviderResponse, "OHLCV field with an invalid scalar type"
+                ):
+                    self._fetch_with_row(row)
+
+    def test_rejects_structured_ohlcv_values_before_numeric_coercion(self):
+        timestamp = int(datetime(2025, 1, 1, 11, 0, tzinfo=timezone.utc).timestamp())
+        valid = [timestamp, "99", "103", "100", "102", "10"]
+        for invalid in (None, [], {}, (100,)):
+            row = list(valid)
+            row[3] = invalid
+            with self.subTest(invalid=invalid):
+                with self.assertRaisesRegex(
+                    api._MalformedProviderResponse, "OHLCV field with an invalid scalar type"
+                ):
+                    self._fetch_with_row(row)
