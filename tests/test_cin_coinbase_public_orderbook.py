@@ -59,6 +59,34 @@ class CoinbasePublicBookTests(unittest.TestCase):
         self.assertEqual(result["snapshot"]["bids"], [["100", "200"]])
 
     @patch("cin_coinbase_public_orderbook.urllib.request.urlopen")
+    def test_documented_optional_quote_metrics_allowed(self, opener):
+        body = payload()
+        body.update({
+            "last": "100.5",
+            "mid_market": "100.5",
+            "spread_bps": "99.5",
+            "spread_absolute": "1",
+        })
+        opener.return_value = FakeResponse(body)
+        result = fetch_coinbase_public_book("BTC-USD", now=NOW)
+        self.assertEqual(result["product_id"], "BTC-USD")
+        self.assertEqual(result["snapshot"]["bids"], [["100", "200"]])
+
+    @patch("cin_coinbase_public_orderbook.urllib.request.urlopen")
+    def test_optional_metrics_cannot_replace_pricebook_or_hide_bad_fields(self, opener):
+        invalid = [
+            {"last": "100"},
+            dict(payload(), spread_bps={"unexpected": "object"}),
+            dict(payload(), unexpected_provider_field=1),
+            dict(payload(), last=""),
+        ]
+        for body in invalid:
+            with self.subTest(body=body):
+                opener.return_value = FakeResponse(body)
+                with self.assertRaises(PublicBookError):
+                    fetch_coinbase_public_book("BTC-USD", now=NOW)
+
+    @patch("cin_coinbase_public_orderbook.urllib.request.urlopen")
     def test_wrong_product_rejected(self, opener):
         opener.return_value = FakeResponse(payload(product_id="ETH-USD"))
         with self.assertRaisesRegex(PublicBookError, "identity mismatch"):
