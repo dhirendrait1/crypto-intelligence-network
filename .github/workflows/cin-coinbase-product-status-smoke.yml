@@ -1,0 +1,36 @@
+name: CIN Coinbase Public Product Status Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "cin_coinbase_public_product_status.py"
+      - "cin_coinbase_public_product_status_smoke.py"
+      - "tests/test_cin_coinbase_public_product_status_smoke.py"
+      - ".github/workflows/cin-coinbase-product-status-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-product-status:
+    name: Public Coinbase market status probe (nonblocking live step)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run offline status and smoke tests
+        run: python -m unittest tests.test_cin_coinbase_public_product_status tests.test_cin_coinbase_public_product_status_smoke -v
+      - name: One public GET with redacted result
+        continue-on-error: true
+        run: python cin_coinbase_public_product_status_smoke.py --product BTC-USD
+      - name: Explain evidence limit
+        if: always()
+        run: |
+          echo "The live GET step is nonblocking: overall job success does not prove provider status pass."
+          echo "Inspect redacted JSON status=pass or status=not_eligible/fail to distinguish outcomes."
+          echo "Read-only, no credentials, no orders, no production deployment."
