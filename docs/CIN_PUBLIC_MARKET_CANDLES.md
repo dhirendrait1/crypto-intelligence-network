@@ -287,3 +287,10 @@ Before a provider snapshot is returned, CIN now validates every candle open agai
 The current interval's candle is allowed to be forming: its open is within the requested window even when its close time is still in the future. The API continues to label that candle as not closed. A future interval open is never accepted. Provider-specific boundaries are retained, including Binance's Monday UTC weekly anchor and Kraken's Thursday UTC weekly anchor; unsupported provider/timeframe combinations fail closed. The check does not require a full row count because exchanges may omit intervals with no trades. Missing rows remain visible as partial coverage and are never synthesized.
 
 Offline regression tests cover the current forming interval, the preceding requested interval, future opens, older-than-requested opens, unaligned opens, and provider-specific weekly anchors. These tests use deterministic timestamps and make no network requests.
+
+
+### Kraken OHLC pagination cursor integrity
+
+Kraken's OHLC `last` pagination cursor is treated as a provider timestamp, not as an arbitrary numeric marker. CIN validates it with the same strict Unix-seconds parser used for provider timestamps: booleans, fractional values, negative values, non-finite values, and timestamps outside the supported range are rejected. The cursor must also be at or after the latest returned candle open. An invalid cursor makes the successful provider response malformed; it does not trigger silent truncation or a fallback to another venue.
+
+Regression coverage includes missing, null, boolean, fractional, negative, out-of-range, and stale-before-latest cursor values. Tests are offline and use mocked AssetPairs/OHLC payloads.
