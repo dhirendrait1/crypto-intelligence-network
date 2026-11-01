@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { cinApi, type ApiResult } from "../lib/api";
-import { marketsFeatureEnabled } from "../lib/featureFlags";
+import { marketsFeatureEnabled, coinbaseResearchUiEnabled } from "../lib/featureFlags";
 import { MarketsScreen } from "../features/markets/MarketsScreen";
 import { OverviewTerminal } from "../features/overview/OverviewTerminal";
+import { ResearchScreen } from "../features/research/ResearchScreen";
 
 const sections = ["Overview", "Markets", "Screening", "Analysis", "Research", "News", "Alerts", "System Health"] as const;
 type Section = typeof sections[number];
@@ -32,7 +33,7 @@ function App() {
           {visibleSections.map((section) => (
             <button key={section} className={active === section ? "nav-item active" : "nav-item"} onClick={() => setActive(section)} aria-current={active === section ? "page" : undefined}>
               <span className="nav-dot" aria-hidden="true" />{section}
-              {["Alerts", "Research", "News"].includes(section) && <span className="planned">PLANNED</span>}
+              {["Alerts", "News"].includes(section) && <span className="planned">PLANNED</span>}
             </button>
           ))}
         </nav>
@@ -47,6 +48,8 @@ function App() {
 
         {active === "Markets" && marketsFeatureEnabled ? <MarketsScreen /> : active === "Overview" ? (
           <OverviewTerminal health={health} readiness={readiness} />
+        ) : active === "Research" ? (
+          <ResearchScreen enabled={coinbaseResearchUiEnabled} />
         ) : (
           <section className="panel page-placeholder"><span className="eyebrow">MODULE STATUS</span><h2>{active} integration pending</h2><p>This module is not connected to a verified API contract. No sample values are presented as live information.</p><span className="state-pill neutral">NOT IMPLEMENTED</span></section>
         )}
