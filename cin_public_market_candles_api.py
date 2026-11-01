@@ -1322,17 +1322,22 @@ def _coinbase_page_rows_in_chronological_order(payload: Any) -> list[list[Any]]:
     return list(reversed(payload))
 
 
+def _coinbase_canonical_product_identity(symbol: str) -> tuple[str, str, str]:
+    """Map an exact supported concatenated symbol to Coinbase product/base/quote."""
+    base, quote = _parse_fallback_market_symbol(symbol, "Coinbase")
+    # Never substitute a USD market for a USDT request: quote assets are not interchangeable.
+    if quote != "USD":
+        raise ValueError("Coinbase fallback supports USD-quoted pairs only; USDT requests are not mapped to USD.")
+    return f"{base}-{quote}", base, quote
+
+
 def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
     """Fetch public Coinbase Exchange candles when primary providers are blocked."""
     if interval not in COINBASE_GRANULARITY:
         raise ValueError(f"Coinbase fallback does not support interval {interval}")
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= MAX_COINBASE_CANDLE_REQUEST_LIMIT:
         raise ValueError("Coinbase candle request limit must be an integer from 1 to 500")
-    base, quote = _parse_fallback_market_symbol(symbol, "Coinbase")
-    # Never substitute a USD market for a USDT request: quote assets are not interchangeable.
-    if quote != "USD":
-        raise ValueError("Coinbase fallback supports USD-quoted pairs only; USDT requests are not mapped to USD.")
-    product_id = f"{base}-USD"
+    product_id, base, quote = _coinbase_canonical_product_identity(symbol)
     _verify_coinbase_product(product_id, base, quote)
     duration = COINBASE_GRANULARITY[interval]
     now = int(datetime.now(timezone.utc).timestamp())
