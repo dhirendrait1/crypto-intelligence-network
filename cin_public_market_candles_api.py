@@ -1383,12 +1383,16 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
             if start <= timestamp_seconds_int <= latest_open:
                 previous_row = rows_by_time.get(timestamp_seconds_int)
                 if previous_row is not None:
+                    if timestamp_seconds_int != cursor:
+                        raise _MalformedProviderResponse(
+                            "Coinbase repeated a candle timestamp outside the exact pagination boundary"
+                        )
                     if previous_row != row:
                         raise _MalformedProviderResponse(
                             "Coinbase returned conflicting candle rows for the same open timestamp"
                         )
-                    # The documented one-candle page-boundary overlap is
-                    # accepted only when the complete raw row is identical.
+                    # Only an identical row at this page's exact start may
+                    # represent the documented shared pagination boundary.
                     continue
                 rows_by_time[timestamp_seconds_int] = row
                 if ordered_raw_rows and timestamp_seconds_int <= int(ordered_raw_rows[-1][0]):
