@@ -117,3 +117,15 @@ The audit adds Coinbase-focused offline regression coverage for:
 **No synthetic data is created.** The adapter preserves provider-returned candles; the timeline report is metadata only. It does not create rows, interpolate OHLC values, set volume to zero, or repair the provider response. The scope is limited to gaps between returned candles; leading/trailing window coverage remains separately described by `historical_window_integrity` and is not re-audited here.
 
 The shared timeline helper is already used by the market-candles endpoint, so this step adds Coinbase-specific regression evidence and documentation rather than introducing a second competing gap detector or changing the canonical candle schema. These offline tests do not establish why Coinbase omitted a particular interval or prove live feed completeness.
+
+
+
+## Step 190 — Coinbase candle row schema cardinality
+
+Coinbase Exchange candle rows use a six-element positional schema: `[time, low, high, open, close, volume]`. The adapter previously rejected rows with fewer than six values but accepted rows with additional values, silently ignoring the extras during OHLCV normalization. That permissive behavior could conceal an unexpected provider response shape or an upstream schema change.
+
+The adapter now requires every row to be a list containing **exactly six fields** before timestamp chronology validation or OHLCV normalization. Rows with missing or extra fields, and tuple/object alternatives, fail closed as malformed successful provider data. CIN does not guess at extra columns, shift positions, or ignore unknown fields.
+
+Offline regression coverage includes the exact six-field contract, every shorter row length, an extra seventh field, and a non-list row with six values. Existing newest-first chronology validation and explicit oldest-first conversion remain unchanged. This is a response-shape check only; it does not claim that the provider's field values are semantically correct beyond the separate timestamp and OHLCV validators.
+
+No canonical candle schema, provider fallback policy, synthetic data behavior, or read-only operating boundary is changed.
