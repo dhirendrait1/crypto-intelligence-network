@@ -93,3 +93,10 @@ Booleans, nulls, arrays, objects, malformed numeric strings, NaN, positive/negat
 **Precision limitation:** the canonical API currently represents prices and volume as binary floating-point values. Coinbase decimal strings with more significant digits than the float representation can preserve may be rounded during normalization. The audit adds regression coverage for this conversion and does not claim arbitrary-precision decimal fidelity. Changing the public numeric schema to decimal strings or scaled integers would require a separate compatibility audit of downstream analytics and API consumers; no such schema change is included here.
 
 Offline tests validate representative malformed and high-precision inputs. They do not establish exchange-side decimal semantics or market-specific tick/lot increments, which require authoritative instrument metadata and a separate audit.
+
+
+## Coinbase interval-grid integrity
+
+Coinbase request-window starts and page boundaries are constructed on the requested granularity grid, but request bounds alone do not prove that each returned candle open belongs to that grid. The adapter now independently requires every returned candle timestamp (including any provider-supplied pre-window context row) to be divisible by the requested granularity in Unix UTC seconds. A misaligned row fails the entire snapshot as a malformed provider response; CIN does not round, shift, or silently discard it.
+
+The check is epoch-based and applies to the fixed-duration Coinbase granularities supported by this adapter. It is distinct from timestamp-unit validation, page ordering, duplicate-boundary reconciliation, and current-candle exclusion. Regression tests cover a timestamp that is valid and inside the page window but off the interval grid, plus valid minute/hour-aligned opens. Calendar-based intervals are not represented by this fixed-second Coinbase granularity mapping.
