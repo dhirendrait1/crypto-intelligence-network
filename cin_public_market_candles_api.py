@@ -1438,7 +1438,7 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
                     "Coinbase returned a candle outside the requested pagination page"
                 )
             # Keep only opens inside CIN's overall requested UTC history window.
-            if start <= timestamp_seconds_int <= latest_open:
+            if start <= timestamp_seconds_int < latest_open:
                 previous_row = rows_by_time.get(timestamp_seconds_int)
                 if previous_row is not None:
                     if timestamp_seconds_int != cursor:
