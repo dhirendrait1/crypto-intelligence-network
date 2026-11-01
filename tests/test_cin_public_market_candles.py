@@ -3085,14 +3085,16 @@ class CoinbaseSnapshotAnchorConsistencyTests(unittest.TestCase):
 
         def fetch_page(url):
             events.append("page")
-            return []
+            query = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)
+            open_time = int(datetime.fromisoformat(query["start"][0]).timestamp())
+            return [[open_time, "99", "102", "100", "101", "10"]]
 
         with patch.object(api, "datetime", FrozenDateTime), patch.object(
             api, "_verify_coinbase_product", side_effect=verify_catalogue
         ), patch.object(api, "_coinbase_request_json", side_effect=fetch_page) as request:
             rows = api._fetch_coinbase("BTCUSD", "1h", 301)
 
-        self.assertEqual(rows, [])
+        self.assertEqual(len(rows), 2)
         self.assertEqual(events, ["anchor", "catalogue", "page", "page"])
         self.assertEqual(request.call_count, 2)
         first = urllib.parse.parse_qs(urllib.parse.urlsplit(request.call_args_list[0].args[0]).query)
