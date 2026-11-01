@@ -972,6 +972,48 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             ).timestamp()
         ) * 1000)
 
+    def test_coinbase_oversized_success_body_is_rejected_with_bounded_read(self):
+        response = MagicMock()
+        response.status = 200
+        response.__enter__.return_value = response
+        response.read.return_value = b"x" * (api.MAX_PROVIDER_RESPONSE_BYTES + 1)
+        with patch.object(api.urllib.request, "urlopen", return_value=response):
+            with self.assertRaisesRegex(api._MalformedProviderResponse, "size limit"):
+                api._coinbase_request_json("https://provider.test/coinbase")
+        response.read.assert_called_once_with(api.MAX_PROVIDER_RESPONSE_BYTES + 1)
+
+    def test_coinbase_incomplete_success_body_is_malformed_not_transport_fallback(self):
+        response = MagicMock()
+        response.status = 200
+        response.__enter__.return_value = response
+        response.read.side_effect = api.http.client.IncompleteRead(b'{"partial":', 12)
+        with patch.object(api.urllib.request, "urlopen", return_value=response):
+            with self.assertRaisesRegex(api._MalformedProviderResponse, "invalid successful response body"):
+                api._coinbase_request_json("https://provider.test/coinbase")
+
+    def test_coinbase_invalid_utf8_and_truncated_json_are_malformed(self):
+        for body in (b"\\xff", b'{"partial":'):
+            response = MagicMock()
+            response.status = 200
+            response.__enter__.return_value = response
+            response.read.return_value = body
+            with self.subTest(body=body), patch.object(
+                api.urllib.request, "urlopen", return_value=response
+            ):
+                with self.assertRaisesRegex(api._MalformedProviderResponse, "invalid successful response body"):
+                    api._coinbase_request_json("https://provider.test/coinbase")
+
+    def test_coinbase_size_guard_does_not_trust_content_length_header(self):
+        response = MagicMock()
+        response.status = 200
+        response.__enter__.return_value = response
+        response.headers = {"Content-Length": "1"}
+        response.read.return_value = b"x" * (api.MAX_PROVIDER_RESPONSE_BYTES + 1)
+        with patch.object(api.urllib.request, "urlopen", return_value=response):
+            with self.assertRaisesRegex(api._MalformedProviderResponse, "size limit"):
+                api._coinbase_request_json("https://provider.test/coinbase")
+        response.read.assert_called_once_with(api.MAX_PROVIDER_RESPONSE_BYTES + 1)
+
     def test_coinbase_first_page_timeout_fails_without_returning_partial_history(self):
         with patch.object(api, "_verify_coinbase_product"), patch.object(
             api, "_request_json", side_effect=TimeoutError("simulated page-one timeout")
