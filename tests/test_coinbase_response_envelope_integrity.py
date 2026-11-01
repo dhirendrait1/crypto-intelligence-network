@@ -55,7 +55,7 @@ class CoinbaseResponseEnvelopeIntegrityTests(unittest.TestCase):
         with self.assertRaisesRegex(
             api._MalformedProviderResponse, "non-object record"
         ):
-            api._coinbase_product_catalogue_records([{"id": "BTC-USD"}, None])
+            api._coinbase_product_catalogue_records([{"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD", "status": "online", "trading_disabled": False}, None])
 
     def test_product_catalogue_rejects_missing_or_blank_identifiers(self):
         for record in ({"id": None}, {"id": ""}, {"base_currency": "BTC"}):
@@ -70,11 +70,45 @@ class CoinbaseResponseEnvelopeIntegrityTests(unittest.TestCase):
             api._MalformedProviderResponse, "duplicate product identifiers"
         ):
             api._coinbase_product_catalogue_records([
-                {"id": "BTC-USD"}, {"id": "BTC-USD"}
+                {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD", "status": "online", "trading_disabled": False}, {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD", "status": "online", "trading_disabled": False}
             ])
 
     def test_empty_candle_page_is_valid_but_not_a_valid_final_snapshot(self):
         self.assertEqual(api._coinbase_page_rows_in_chronological_order([]), [])
+
+
+    def test_product_catalogue_accepts_required_fields_with_expected_types(self):
+        record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
+                  "status": "online", "trading_disabled": False}
+        self.assertEqual(api._coinbase_product_catalogue_records([record]), [record])
+
+    def test_product_catalogue_rejects_invalid_currency_field_types(self):
+        for field_name, invalid_value in (
+            ("base_currency", None), ("base_currency", 1), ("base_currency", ""),
+            ("quote_currency", None), ("quote_currency", False), ("quote_currency", " "),
+        ):
+            with self.subTest(field=field_name, value=invalid_value):
+                record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
+                          "status": "online", "trading_disabled": False}
+                record[field_name] = invalid_value
+                with self.assertRaises(api._MalformedProviderResponse):
+                    api._coinbase_product_catalogue_records([record])
+
+    def test_product_catalogue_rejects_missing_or_unknown_status(self):
+        for invalid_status in (None, "", "ONLINE", "suspended", 1):
+            with self.subTest(status=invalid_status):
+                record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
+                          "status": invalid_status, "trading_disabled": False}
+                with self.assertRaisesRegex(api._MalformedProviderResponse, "field status"):
+                    api._coinbase_product_catalogue_records([record])
+
+    def test_product_catalogue_requires_boolean_trading_disabled(self):
+        for invalid_flag in (None, 0, 1, "false", "true"):
+            with self.subTest(flag=invalid_flag):
+                record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
+                          "status": "online", "trading_disabled": invalid_flag}
+                with self.assertRaisesRegex(api._MalformedProviderResponse, "field trading_disabled"):
+                    api._coinbase_product_catalogue_records([record])
 
 
 if __name__ == "__main__":
