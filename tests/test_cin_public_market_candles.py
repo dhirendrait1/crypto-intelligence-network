@@ -3281,3 +3281,84 @@ class CoinbaseIntervalAlignmentIntegrityTests(unittest.TestCase):
                 api._MalformedProviderResponse, "misaligned to the requested interval"
             ):
                 api._fetch_coinbase("BTCUSD", "1h", 5)
+
+
+class CoinbaseIntervalContinuityTests(unittest.TestCase):
+    @staticmethod
+    def _candle(open_time):
+        return {
+            "open_time": open_time,
+            "open": 100.0, "high": 102.0, "low": 99.0,
+            "close": 101.0, "volume": 10.0,
+            "close_time": open_time + 3_599_999,
+        }
+
+    def test_contiguous_returned_coinbase_buckets_report_no_internal_gaps(self):
+        hour = 3_600_000
+        rows = [self._candle(1735718400000 + index * hour) for index in range(3)]
+        report = api._timeline_integrity_metadata(rows, "1h")
+        self.assertFalse(report["has_gaps"])
+        self.assertEqual(report["gap_count"], 0)
+        self.assertEqual(report["missing_interval_count"], 0)
+        self.assertEqual(report["gaps"], [])
+        self.assertFalse(report["missing_candles_synthesized"])
+
+    def test_one_missing_coinbase_bucket_is_reported_between_returned_rows(self):
+        hour = 3_600_000
+        first = 1735718400000
+        rows = [self._candle(first), self._candle(first + 2 * hour)]
+        report = api._timeline_integrity_metadata(rows, "1h")
+        self.assertTrue(report["has_gaps"])
+        self.assertEqual(report["gap_count"], 1)
+        self.assertEqual(report["missing_interval_count"], 1)
+        self.assertEqual(report["gaps"], [{
+            "after_open_time": first,
+            "before_open_time": first + 2 * hour,
+            "expected_next_open_time": first + hour,
+            "missing_interval_count": 1,
+        }])
+        self.assertFalse(report["missing_candles_synthesized"])
+
+    def test_multiple_missing_coinbase_buckets_and_separate_gaps_are_counted(self):
+        hour = 3_600_000
+        first = 1735718400000
+        rows = [
+            self._candle(first),
+            self._candle(first + 2 * hour),
+            self._candle(first + 6 * hour),
+        ]
+        report = api._timeline_integrity_metadata(rows, "1h")
+        self.assertEqual(report["gap_count"], 2)
+        self.assertEqual(report["missing_interval_count"], 4)
+        self.assertEqual(
+            [gap["missing_interval_count"] for gap in report["gaps"]],
+            [1, 3],
+        )
+        self.assertEqual(report["scope"], "between_returned_candles_only")
+        self.assertFalse(report["missing_candles_synthesized"])
+
+    def test_coinbase_adapter_preserves_sparse_provider_rows_without_filling_them(self):
+        class FrozenDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return cls(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
+
+        first = int(datetime(2025, 1, 1, 8, 0, tzinfo=timezone.utc).timestamp())
+        later = first + 2 * 3600
+        provider_rows = [
+            [later, "99", "103", "100", "102", "10"],
+            [first, "98", "102", "99", "101", "9"],
+        ]
+        with patch.object(api, "datetime", FrozenDateTime), patch.object(
+            api, "_verify_coinbase_product", return_value=None
+        ), patch.object(api, "_coinbase_request_json", return_value=provider_rows):
+            candles = api._fetch_coinbase("BTCUSD", "1h", 5)
+
+        self.assertEqual(
+            [row["open_time"] for row in candles],
+            [first * 1000, later * 1000],
+        )
+        report = api._timeline_integrity_metadata(candles, "1h")
+        self.assertEqual(report["missing_interval_count"], 1)
+        self.assertEqual(len(candles), 2)
+        self.assertFalse(report["missing_candles_synthesized"])
