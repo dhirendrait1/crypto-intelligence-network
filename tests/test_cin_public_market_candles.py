@@ -3240,16 +3240,26 @@ class CoinbaseIntervalAlignmentIntegrityTests(unittest.TestCase):
                 api._fetch_coinbase("BTCUSD", "1h", 5)
 
     def test_accepts_epoch_aligned_candle_opens_for_minute_and_hour_intervals(self):
-        minute_row = [1699999200, "99", "103", "100", "102", "10"]
-        hour_row = [1699999200, "99", "103", "100", "102", "10"]
-        with patch.object(api, "_request_json", return_value=[minute_row]):
+        class FrozenDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return cls(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
+
+        aligned_open = int(datetime(2025, 1, 1, 11, 0, tzinfo=timezone.utc).timestamp())
+        minute_row = [aligned_open, "99", "103", "100", "102", "10"]
+        hour_row = [aligned_open, "99", "103", "100", "102", "10"]
+        with patch.object(api, "datetime", FrozenDateTime), patch.object(
+            api, "_request_json", return_value=[minute_row]
+        ):
             minute_rows = api._fetch_coinbase("BTCUSD", "1m", 5)
-        with patch.object(api, "_request_json", return_value=[hour_row]):
+        with patch.object(api, "datetime", FrozenDateTime), patch.object(
+            api, "_request_json", return_value=[hour_row]
+        ):
             hour_rows = api._fetch_coinbase("BTCUSD", "1h", 5)
         self.assertEqual(len(minute_rows), 1)
         self.assertEqual(len(hour_rows), 1)
-        self.assertEqual(minute_rows[0]["open_time"], 1699999200000)
-        self.assertEqual(hour_rows[0]["open_time"], 1699999200000)
+        self.assertEqual(minute_rows[0]["open_time"], aligned_open * 1000)
+        self.assertEqual(hour_rows[0]["open_time"], aligned_open * 1000)
 
     def test_rejects_candle_misaligned_even_when_timestamp_is_inside_page_bounds(self):
         class FrozenDateTime(datetime):
