@@ -13,3 +13,9 @@ It passes price/quantity rows to CIN's existing depth/spread validator and retur
 **Release gates:** The module is NOT mounted in the live API, and no scheduled polling is enabled. Confirm actual live payload schema and availability in staging, provider quotas, requested instrument status and market/quote identity, bounded failure modes, and source/factor confidence before using it to authorize any positive shortlist liquidity gate. No trading/order calls, wallets, keys, funds or paid infrastructure.
 
 Offline tests: `python -m unittest tests.test_cin_coinbase_public_orderbook -v`.
+
+## Documented response-envelope compatibility
+
+Coinbase's public product-book schema also permits the optional top-level string fields `last`, `mid_market`, `spread_bps` and `spread_absolute` alongside the required `pricebook`. CIN now accepts these documented fields with bounded string validation, but derives spread and depth solely from validated order-book levels, not from optional provider claims. Unknown top-level fields and missing `pricebook` still fail closed.
+
+A direct live request from the current development execution environment could not be completed because external DNS resolution was unavailable. Documentation-backed contract validation and mocked CI tests **are not** evidence of a successful live Coinbase ingestion. Validate actual responses in an authorized network-enabled staging environment before mounting the adapter in a live API.
