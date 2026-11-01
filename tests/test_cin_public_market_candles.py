@@ -2346,3 +2346,58 @@ class ProviderSnapshotContractIntegrityTests(unittest.IsolatedAsyncioTestCase):
                 coinbase.assert_not_called()
                 if provider == "binance":
                     kraken.assert_not_called()
+
+
+class RequestedCandleWindowBoundaryTests(unittest.TestCase):
+    def _row(self, open_time, interval_ms=3_600_000):
+        return {
+            "open_time": open_time, "open": 100.0, "high": 102.0,
+            "low": 99.0, "close": 101.0, "volume": 10.0,
+            "close_time": open_time + interval_ms - 1,
+        }
+
+    def test_requested_window_accepts_current_forming_hour_and_prior_requested_hour(self):
+        hour = 3_600_000
+        now_ms = 20 * hour + 30 * 60_000
+        rows = [self._row(19 * hour), self._row(20 * hour)]
+        api._validate_requested_candle_window(rows, "1h", 2, "binance", now_ms)
+
+    def test_requested_window_rejects_future_candle_open(self):
+        hour = 3_600_000
+        now_ms = 20 * hour + 30 * 60_000
+        with self.assertRaisesRegex(ValueError, "outside the requested historical window"):
+            api._validate_requested_candle_window(
+                [self._row(21 * hour)], "1h", 2, "binance", now_ms
+            )
+
+    def test_requested_window_rejects_older_than_requested_history(self):
+        hour = 3_600_000
+        now_ms = 20 * hour + 30 * 60_000
+        with self.assertRaisesRegex(ValueError, "outside the requested historical window"):
+            api._validate_requested_candle_window(
+                [self._row(17 * hour)], "1h", 2, "binance", now_ms
+            )
+
+    def test_requested_window_rejects_unaligned_edge_timestamp(self):
+        hour = 3_600_000
+        now_ms = 20 * hour + 30 * 60_000
+        with self.assertRaisesRegex(ValueError, "outside the requested historical window"):
+            api._validate_requested_candle_window(
+                [self._row(20 * hour + 1)], "1h", 2, "binance", now_ms
+            )
+
+    def test_requested_window_uses_provider_specific_weekly_anchor(self):
+        # Binance weekly candles open Monday 00:00 UTC; the current week is
+        # accepted, while a Kraken-anchored Thursday timestamp is not.
+        monday = 4 * 86_400_000
+        now_ms = monday + 2 * 86_400_000 + 12 * 3_600_000
+        api._validate_requested_candle_window(
+            [self._row(monday, 7 * 86_400_000)], "1w", 1, "binance", now_ms
+        )
+        with self.assertRaises(ValueError):
+            api._validate_requested_candle_window(
+                [self._row(monday + 3 * 86_400_000, 7 * 86_400_000)],
+                "1w", 1, "binance", now_ms
+            )
+
+
