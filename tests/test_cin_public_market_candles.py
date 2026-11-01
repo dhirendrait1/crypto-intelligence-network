@@ -2011,6 +2011,45 @@ class CoinbaseProductCatalogueTests(unittest.TestCase):
                 api._fetch_coinbase("BTCUSD", "1h", 5)
         request.assert_called_once_with(api.COINBASE_PRODUCTS_URL)
 
+    def test_coinbase_requires_explicit_online_product_status_and_enabled_trading(self):
+        for status in ("offline", "delisted"):
+            product = {
+                "id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
+                "status": status, "trading_disabled": False,
+            }
+            with self.subTest(status=status), patch.object(
+                api, "_coinbase_request_json", return_value=[product]
+            ) as request:
+                with self.assertRaisesRegex(ValueError, "unavailable for candle eligibility"):
+                    api._fetch_coinbase("BTCUSD", "1h", 5)
+                request.assert_called_once_with(api.COINBASE_PRODUCTS_URL)
+
+        product = {
+            "id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
+            "status": "online", "trading_disabled": True,
+        }
+        with patch.object(api, "_coinbase_request_json", return_value=[product]) as request:
+            with self.assertRaisesRegex(ValueError, "trading disabled"):
+                api._fetch_coinbase("BTCUSD", "1h", 5)
+            request.assert_called_once_with(api.COINBASE_PRODUCTS_URL)
+
+    def test_coinbase_rejects_missing_unknown_or_invalid_product_status_metadata(self):
+        base = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD"}
+        invalid_products = [
+            dict(base),
+            {**base, "status": "paused", "trading_disabled": False},
+            {**base, "status": None, "trading_disabled": False},
+            {**base, "status": "online"},
+            {**base, "status": "online", "trading_disabled": "false"},
+        ]
+        for product in invalid_products:
+            with self.subTest(product=product), patch.object(
+                api, "_coinbase_request_json", return_value=[product]
+            ) as request:
+                with self.assertRaises(api._MalformedProviderResponse):
+                    api._fetch_coinbase("BTCUSD", "1h", 5)
+                request.assert_called_once_with(api.COINBASE_PRODUCTS_URL)
+
     def test_coinbase_rejects_malformed_catalogue_envelope(self):
         with patch.object(api, "_coinbase_request_json", return_value={"products": []}):
             with self.assertRaisesRegex(api._MalformedProviderResponse, "catalogue response was not a list"):
