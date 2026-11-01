@@ -2942,6 +2942,9 @@ class CoinbaseCandleRequestUrlIntegrityTests(unittest.TestCase):
         catalogue = [{
             "id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
             "status": "online", "trading_disabled": False,
+            "base_increment": "0.00000001", "quote_increment": "0.01",
+            "base_min_size": "0.00000001", "base_max_size": "1000000",
+            "quote_min_size": "0.01", "quote_max_size": "1000000000",
         }]
         candle = [[
             int(datetime(2025, 1, 1, 11, 0, 0, tzinfo=timezone.utc).timestamp()),
@@ -3115,6 +3118,9 @@ class CoinbaseCurrentCandleFinalizationTests(unittest.TestCase):
         catalogue = [{
             "id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
             "status": "online", "trading_disabled": False,
+            "base_increment": "0.00000001", "quote_increment": "0.01",
+            "base_min_size": "0.00000001", "base_max_size": "1000000",
+            "quote_min_size": "0.01", "quote_max_size": "1000000000",
         }]
         completed = [int(datetime(2025, 1, 1, 11, 0, tzinfo=timezone.utc).timestamp()),
                      "99", "103", "100", "102", "10"]
@@ -3142,6 +3148,9 @@ class CoinbaseCurrentCandleFinalizationTests(unittest.TestCase):
         catalogue = [{
             "id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
             "status": "online", "trading_disabled": False,
+            "base_increment": "0.00000001", "quote_increment": "0.01",
+            "base_min_size": "0.00000001", "base_max_size": "1000000",
+            "quote_min_size": "0.01", "quote_max_size": "1000000000",
         }]
         completed = [int(datetime(2025, 1, 1, 11, 0, tzinfo=timezone.utc).timestamp()),
                      "99", "103", "100", "102", "10"]
@@ -3164,6 +3173,9 @@ class CoinbaseOHLCVNumericIntegrityTests(unittest.TestCase):
         catalogue = [{
             "id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
             "status": "online", "trading_disabled": False,
+            "base_increment": "0.00000001", "quote_increment": "0.01",
+            "base_min_size": "0.00000001", "base_max_size": "1000000",
+            "quote_min_size": "0.01", "quote_max_size": "1000000000",
         }]
         with patch.object(api, "datetime", FrozenDateTime), patch.object(
             api, "_coinbase_request_json", side_effect=[catalogue, [row]]
@@ -3270,6 +3282,9 @@ class CoinbaseIntervalAlignmentIntegrityTests(unittest.TestCase):
         catalogue = [{
             "id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
             "status": "online", "trading_disabled": False,
+            "base_increment": "0.00000001", "quote_increment": "0.01",
+            "base_min_size": "0.00000001", "base_max_size": "1000000",
+            "quote_min_size": "0.01", "quote_max_size": "1000000000",
         }]
         # 11:00:01 UTC is inside the requested hour but not a candle open.
         misaligned = [int(datetime(2025, 1, 1, 11, 0, 1, tzinfo=timezone.utc).timestamp()),
@@ -3417,6 +3432,9 @@ class CoinbaseCandleFieldTypeIntegrityTests(unittest.TestCase):
         catalogue = [{
             "id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
             "status": "online", "trading_disabled": False,
+            "base_increment": "0.00000001", "quote_increment": "0.01",
+            "base_min_size": "0.00000001", "base_max_size": "1000000",
+            "quote_min_size": "0.01", "quote_max_size": "1000000000",
         }]
         with patch.object(api, "datetime", FrozenDateTime), patch.object(
             api, "_coinbase_request_json", side_effect=[catalogue, [row]]
@@ -3481,6 +3499,9 @@ class CoinbaseDecimalNormalizationIntegrityTests(unittest.TestCase):
         catalogue = [{
             "id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
             "status": "online", "trading_disabled": False,
+            "base_increment": "0.00000001", "quote_increment": "0.01",
+            "base_min_size": "0.00000001", "base_max_size": "1000000",
+            "quote_min_size": "0.01", "quote_max_size": "1000000000",
         }]
         with patch.object(api, "datetime", FrozenDateTime), patch.object(
             api, "_coinbase_request_json", side_effect=[catalogue, [row]]
