@@ -5,6 +5,7 @@ import asyncio
 import http.client
 import json
 import math
+from decimal import Decimal, InvalidOperation
 import re
 import socket
 import ssl
@@ -1392,6 +1393,35 @@ def _coinbase_canonical_product_identity(symbol: str) -> tuple[str, str, str]:
     return f"{base}-{quote}", base, quote
 
 
+def _coinbase_decimal_to_float(value: Any, field_name: str) -> float:
+    """Convert a validated Coinbase numeric scalar without silent range loss."""
+    try:
+        decimal_value = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        raise _MalformedProviderResponse(
+            f"Coinbase returned an invalid decimal value for {field_name}"
+        ) from None
+    if not decimal_value.is_finite():
+        raise _MalformedProviderResponse(
+            f"Coinbase returned a non-finite decimal value for {field_name}"
+        )
+    try:
+        normalized = float(decimal_value)
+    except (OverflowError, ValueError):
+        raise _MalformedProviderResponse(
+            f"Coinbase decimal value is outside the supported float range for {field_name}"
+        ) from None
+    if not math.isfinite(normalized):
+        raise _MalformedProviderResponse(
+            f"Coinbase decimal value is outside the supported float range for {field_name}"
+        )
+    if decimal_value != 0 and normalized == 0.0:
+        raise _MalformedProviderResponse(
+            f"Coinbase decimal value underflowed during normalization for {field_name}"
+        )
+    return normalized
+
+
 def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
     """Fetch public Coinbase Exchange candles when primary providers are blocked."""
     if interval not in COINBASE_GRANULARITY:
@@ -1492,8 +1522,12 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
             duration_ms = duration * 1000
             # Coinbase rows are [time, low, high, open, close, volume].
             candle = {
-                "open_time": start_ms, "open": float(row[3]), "high": float(row[2]),
-                "low": float(row[1]), "close": float(row[4]), "volume": float(row[5]),
+                "open_time": start_ms,
+                "open": _coinbase_decimal_to_float(row[3], "open"),
+                "high": _coinbase_decimal_to_float(row[2], "high"),
+                "low": _coinbase_decimal_to_float(row[1], "low"),
+                "close": _coinbase_decimal_to_float(row[4], "close"),
+                "volume": _coinbase_decimal_to_float(row[5], "volume"),
                 "close_time": start_ms + duration_ms - 1,
             }
             if not _is_valid_candle(candle):
