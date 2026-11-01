@@ -156,7 +156,7 @@ class CoinbaseResponseEnvelopeIntegrityTests(unittest.TestCase):
     def test_product_catalogue_accepts_positive_order_size_bounds(self):
         record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
                   "status": "online", "trading_disabled": False,
-                  "base_increment": "0.00000001", "quote_increment": "0.01",
+                  "base_increment": "0.00000001", "quote_increment": "0.01", "base_min_size": "0.0001", "base_max_size": "1000000", "quote_min_size": "1", "quote_max_size": "10000000",
                   "base_min_size": "0.0001", "base_max_size": "1000000",
                   "quote_min_size": "1", "quote_max_size": "10000000"}
         self.assertEqual(api._coinbase_product_catalogue_records([record]), [record])
@@ -170,7 +170,7 @@ class CoinbaseResponseEnvelopeIntegrityTests(unittest.TestCase):
             with self.subTest(field=field_name, value=invalid_value):
                 record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
                           "status": "online", "trading_disabled": False,
-                          "base_increment": "0.00000001", "quote_increment": "0.01",
+                          "base_increment": "0.00000001", "quote_increment": "0.01", "base_min_size": "0.0001", "base_max_size": "1000000", "quote_min_size": "1", "quote_max_size": "10000000",
                           "base_min_size": "0.0001", "base_max_size": "1000000",
                           "quote_min_size": "1", "quote_max_size": "10000000"}
                 record[field_name] = invalid_value
@@ -184,7 +184,7 @@ class CoinbaseResponseEnvelopeIntegrityTests(unittest.TestCase):
                 with self.subTest(field=field_name, value=invalid_value):
                     record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
                               "status": "online", "trading_disabled": False,
-                              "base_increment": "0.00000001", "quote_increment": "0.01",
+                              "base_increment": "0.00000001", "quote_increment": "0.01", "base_min_size": "0.0001", "base_max_size": "1000000", "quote_min_size": "1", "quote_max_size": "10000000",
                               "base_min_size": "0.0001", "base_max_size": "1000000",
                               "quote_min_size": "1", "quote_max_size": "10000000"}
                     record[field_name] = invalid_value
@@ -199,7 +199,7 @@ class CoinbaseResponseEnvelopeIntegrityTests(unittest.TestCase):
             with self.subTest(minimum=minimum_field, maximum=maximum_field):
                 record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
                           "status": "online", "trading_disabled": False,
-                          "base_increment": "0.00000001", "quote_increment": "0.01",
+                          "base_increment": "0.00000001", "quote_increment": "0.01", "base_min_size": "0.0001", "base_max_size": "1000000", "quote_min_size": "1", "quote_max_size": "10000000",
                           "base_min_size": "0.0001", "base_max_size": "1000000",
                           "quote_min_size": "1", "quote_max_size": "10000000"}
                 record[minimum_field] = "100"
