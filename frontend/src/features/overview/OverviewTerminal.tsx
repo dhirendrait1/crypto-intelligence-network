@@ -37,7 +37,7 @@ export function OverviewTerminal({ health, readiness }: Props) {
       <div className="cin-terminal">
         <div className="cin-command-bar">
           <div className="cin-command-brand"><span className="cin-io-dot" />CIN // NEURAL INTELLIGENCE COMMAND CENTER</div>
-          <div className="cin-command-right"><span>PUBLIC DATA · RESEARCH</span><span className="cin-tiny-tag">READ ONLY</span></div>
+          <div className="cin-command-right"><span>PUBLIC DATA · RESEARCH</span><span className="cin-tiny-tag">NO EXECUTION</span></div>
         </div>
 
         <section className="cin-tile-row" aria-label="Market status overview">
@@ -60,7 +60,7 @@ export function OverviewTerminal({ health, readiness }: Props) {
             <div className="cin-card-bottom"><span>FRESHNESS · UNKNOWN</span><span>NO TIMESTAMP</span></div>
           </article>
           <article className="cin-terminal-card cin-summary">
-            <div className="cin-kicker">INTELLIGENCE ALERTS <span>READ ONLY</span></div>
+            <div className="cin-kicker">INTELLIGENCE ALERTS <span>OBSERVE ONLY</span></div>
             <div className="cin-big-value">— <small>ALERTS</small></div>
             <div className="cin-muted">Alert integration not connected</div>
             <div className="cin-card-bottom"><span>DELIVERY · UNKNOWN</span><span>NOT ACTIVE</span></div>
