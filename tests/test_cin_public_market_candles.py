@@ -786,6 +786,42 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["open_time"], 1700000000000)
 
+    def test_coinbase_identical_boundary_row_is_deduplicated_across_pages(self):
+        requests = []
+        boundary = [1700000000, "99", "103", "100", "102", "10"]
+        later = [1700000060, "100", "104", "101", "103", "11"]
+
+        def response(url):
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+            page_start = int(datetime.fromisoformat(query["start"][0]).timestamp())
+            page_end = int(datetime.fromisoformat(query["end"][0]).timestamp())
+            requests.append((page_start, page_end))
+            return [boundary] if len(requests) == 1 else [boundary, later]
+
+        with patch.object(api, "_request_json", side_effect=response):
+            rows = api._fetch_coinbase("BTCUSD", "1m", 500)
+
+        self.assertEqual(len(requests), 2)
+        self.assertEqual(requests[0][1], requests[1][0])
+        self.assertEqual([row["open_time"] for row in rows], [1700000000000, 1700000060000])
+
+    def test_coinbase_rejects_conflicting_boundary_row_across_pages(self):
+        requests = []
+        boundary = [1700000000, "99", "103", "100", "102", "10"]
+        conflicting = [1700000000, "99", "103", "100", "101", "10"]
+
+        def response(url):
+            requests.append(url)
+            return [boundary] if len(requests) == 1 else [conflicting]
+
+        with patch.object(api, "_request_json", side_effect=response):
+            with self.assertRaisesRegex(
+                ValueError, "conflicting candle rows for the same open timestamp"
+            ):
+                api._fetch_coinbase("BTCUSD", "1m", 500)
+
+        self.assertEqual(len(requests), 2)
+
     def test_coinbase_candle_rows_are_normalized_and_sorted(self):
         payload = [
             [1700003600, "99", "103", "101", "102", "12.5"],
