@@ -972,6 +972,59 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             ).timestamp()
         ) * 1000)
 
+    def test_coinbase_first_page_timeout_fails_without_returning_partial_history(self):
+        with patch.object(api, "_verify_coinbase_product"), patch.object(
+            api, "_request_json", side_effect=TimeoutError("simulated page-one timeout")
+        ) as request:
+            with self.assertRaisesRegex(TimeoutError, "page-one timeout"):
+                api._fetch_coinbase("BTCUSD", "1m", 500)
+        self.assertEqual(request.call_count, 1)
+
+    def test_coinbase_second_page_timeout_discards_first_page_partial_history(self):
+        calls = []
+        def response(url):
+            calls.append(url)
+            if len(calls) == 1:
+                query = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+                page_start = int(datetime.fromisoformat(query["start"][0]).timestamp())
+                return [[page_start + 60, "99", "103", "100", "102", "10"]]
+            raise TimeoutError("simulated page-two timeout")
+        with patch.object(api, "_verify_coinbase_product"), patch.object(
+            api, "_request_json", side_effect=response
+        ):
+            with self.assertRaisesRegex(TimeoutError, "page-two timeout"):
+                api._fetch_coinbase("BTCUSD", "1m", 500)
+        self.assertEqual(len(calls), 2)
+
+    def test_coinbase_malformed_first_page_fails_closed(self):
+        with patch.object(api, "_verify_coinbase_product"), patch.object(
+            api, "_request_json", return_value={"candles": []}
+        ) as request:
+            with self.assertRaisesRegex(ValueError, "response was not a list"):
+                api._fetch_coinbase("BTCUSD", "1m", 500)
+        self.assertEqual(request.call_count, 1)
+
+    def test_coinbase_malformed_second_page_discards_first_page_partial_history(self):
+        calls = []
+        def response(url):
+            calls.append(url)
+            if len(calls) == 1:
+                query = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+                page_start = int(datetime.fromisoformat(query["start"][0]).timestamp())
+                return [[page_start + 60, "99", "103", "100", "102", "10"]]
+            return {"candles": []}
+        with patch.object(api, "_verify_coinbase_product"), patch.object(
+            api, "_request_json", side_effect=response
+        ):
+            with self.assertRaisesRegex(ValueError, "response was not a list"):
+                api._fetch_coinbase("BTCUSD", "1m", 500)
+        self.assertEqual(len(calls), 2)
+
+    def test_coinbase_invalid_success_body_is_classified_as_malformed_provider_data(self):
+        with patch.object(api, "_request_json", side_effect=ValueError("invalid JSON")):
+            with self.assertRaisesRegex(ValueError, "invalid successful response body"):
+                api._coinbase_request_json("https://example.invalid/coinbase-test")
+
     def test_coinbase_page_budget_is_exactly_two_for_maximum_route_window(self):
         self.assertEqual(api.MAX_COINBASE_CANDLE_PAGE_SIZE, 300)
         self.assertEqual(api.MAX_COINBASE_CANDLE_REQUEST_LIMIT, 500)
