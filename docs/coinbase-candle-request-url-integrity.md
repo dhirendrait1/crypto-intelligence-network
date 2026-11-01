@@ -46,3 +46,16 @@ Coinbase transport failures are separated from HTTP status responses and success
 - Invalid, empty, unsupported, or malformed provider data is not re-labelled as a transport outage; it fails closed as a provider/data response error (502).
 
 The HTTP client retains its bounded 15-second request timeout. Offline exception-classification tests do not measure real network latency, DNS behavior, TLS trust, or Coinbase uptime.
+
+
+## Coinbase retry and repeated-request policy
+
+The Coinbase adapter intentionally performs **zero automatic retries**:
+
+- The shared HTTP request helper makes one urlopen call per request, with a 15-second timeout.
+- The product catalogue is fetched once per Coinbase snapshot, followed by each required candle page exactly once.
+- HTTP 418/429, HTTP 5xx, and transport failures are surfaced as failures; a retry-later API classification is guidance to the caller, not an internal retry instruction.
+- A failed or malformed candle page aborts the complete Coinbase snapshot. Previously received page rows are not returned as a partial snapshot, and the failed page is not replayed.
+- No retry loop, exponential backoff, or automatic repeat of a Coinbase catalogue/candle request is introduced. This avoids rate-limit amplification and avoids combining pages fetched at different times after a retry.
+
+Offline regression tests verify one HTTP attempt for a transport failure, one attempt for HTTP 429, and abort-on-failure without replay of a later pagination page. These tests do not establish live provider consistency or guarantee that a subsequent client-initiated request will observe the same exchange snapshot.
