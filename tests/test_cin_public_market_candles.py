@@ -2851,3 +2851,54 @@ class RequestedCandleWindowBoundaryTests(unittest.TestCase):
             )
 
 
+
+
+class CoinbaseProductCatalogueAmbiguityRegressionTests(unittest.TestCase):
+    """Ensure only one exact, structurally valid Coinbase product can authorize candles."""
+
+    def _valid_product(self):
+        return {
+            "id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
+            "status": "online", "trading_disabled": False,
+        }
+
+    def test_rejects_matching_product_with_non_string_or_empty_asset_identity(self):
+        invalid_records = (
+            {**self._valid_product(), "base_currency": None},
+            {**self._valid_product(), "base_currency": ["BTC"]},
+            {**self._valid_product(), "base_currency": ""},
+            {**self._valid_product(), "quote_currency": 0},
+            {**self._valid_product(), "quote_currency": ""},
+        )
+        for record in invalid_records:
+            with self.subTest(record=record), patch.object(
+                api, "_coinbase_request_json", return_value=[record]
+            ) as request:
+                with self.assertRaisesRegex(
+                    api._MalformedProviderResponse, "base/quote identity"
+                ):
+                    api._verify_coinbase_product("BTC-USD", "BTC", "USD")
+                request.assert_called_once_with(api.COINBASE_PRODUCTS_URL)
+
+    def test_rejects_conflicting_duplicate_product_records_even_if_one_is_valid(self):
+        valid = self._valid_product()
+        conflicting = {**valid, "base_currency": "WBTC"}
+        for records in ([valid, conflicting], [conflicting, valid]):
+            with self.subTest(records=records), patch.object(
+                api, "_coinbase_request_json", return_value=records
+            ) as request:
+                with self.assertRaisesRegex(
+                    api._MalformedProviderResponse, "duplicate product identifiers"
+                ):
+                    api._verify_coinbase_product("BTC-USD", "BTC", "USD")
+                request.assert_called_once_with(api.COINBASE_PRODUCTS_URL)
+
+    def test_unrelated_malformed_catalogue_entries_do_not_create_a_false_match(self):
+        catalogue = [
+            None,
+            "not-a-product-record",
+            {"id": "ETH-USD", "base_currency": ["malformed"], "quote_currency": None},
+            self._valid_product(),
+        ]
+        with patch.object(api, "_coinbase_request_json", return_value=catalogue):
+            api._verify_coinbase_product("BTC-USD", "BTC", "USD")
