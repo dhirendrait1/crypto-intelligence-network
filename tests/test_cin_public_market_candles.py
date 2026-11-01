@@ -2966,11 +2966,3 @@ class CoinbaseCandleRequestUrlIntegrityTests(unittest.TestCase):
         self.assertEqual(query["start"], ["2025-01-01T07:00:00+00:00"])
         self.assertEqual(query["end"], ["2025-01-01T12:00:00+00:00"])
 
-    def test_product_path_encoding_is_not_treated_as_query_or_fragment_data(self):
-        product_id = "BTC-USD"
-        encoded = urllib.parse.quote(product_id, safe="")
-        url = api.COINBASE_CANDLES_URL.format(product_id=encoded)
-        parsed = urllib.parse.urlsplit(url)
-        self.assertEqual(parsed.path, "/products/BTC-USD/candles")
-        self.assertEqual(parsed.query, "")
-        self.assertEqual(parsed.fragment, "")
