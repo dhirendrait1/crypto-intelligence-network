@@ -19,3 +19,16 @@ A deterministic clock fixture verifies the exact product path, HTTPS host, absen
 ## Scope and limitations
 
 This is an offline request-construction contract test. It does not verify Coinbase's live server behavior, network availability, authentication requirements, or production readiness. The adapter remains read-only public market-data retrieval; no order, wallet, or funds operations are introduced.
+
+## Coinbase HTTP status classification
+
+Coinbase HTTP error responses are classified separately from transport failures and malformed successful bodies. Status handling is fail-closed and does not initiate another provider attempt:
+
+- HTTP 418 and 429 are reported as rate limiting with a retry-later response (503).
+- HTTP 401 and 403 are terminal access-denied responses (502).
+- HTTP 404 and 410 are terminal endpoint/market-unavailable responses (502).
+- HTTP 5xx responses are reported as temporary provider unavailability (503).
+- Other HTTP 4xx responses and unexpected non-error statuses are rejected as provider/request failures (502).
+- URL/network failures remain transport failures; malformed HTTP 200 bodies remain malformed-provider failures.
+
+These classifications affect the API response only. They do not broaden the existing Binance-to-Kraken-to-Coinbase fallback policy: once Coinbase is reached, no further provider fan-out is possible or attempted. No HTTP status is treated as permission to substitute a different data source. Offline tests cover representative status classes; they do not establish live Coinbase behavior.
