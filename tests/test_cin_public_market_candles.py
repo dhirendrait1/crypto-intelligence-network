@@ -822,6 +822,89 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             ):
                 api._fetch_coinbase("BTCUSD", "1m", 500)
 
+    def test_coinbase_does_not_stop_after_empty_or_short_first_page(self):
+        for first_page in ([], [[1700000000, "99", "103", "100", "102", "10"]]):
+            requests = []
+            def response(url):
+                query = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+                page_start = int(datetime.fromisoformat(query["start"][0]).timestamp())
+                requests.append(page_start)
+                if len(requests) == 1:
+                    return first_page
+                return [[page_start + 60, "99", "103", "100", "102", "10"]]
+            with self.subTest(first_page_size=len(first_page)), patch.object(
+                api, "_verify_coinbase_product"
+            ), patch.object(api, "_request_json", side_effect=response):
+                rows = api._fetch_coinbase("BTCUSD", "1m", 500)
+            self.assertEqual(len(requests), 2)
+            self.assertEqual(len(rows), 1 if not first_page else 2)
+
+    def test_coinbase_accepts_variable_short_page_sizes_without_filling_missing_rows(self):
+        requests = []
+        def response(url):
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+            page_start = int(datetime.fromisoformat(query["start"][0]).timestamp())
+            page_end = int(datetime.fromisoformat(query["end"][0]).timestamp())
+            requests.append((page_start, page_end))
+            if len(requests) == 1:
+                return [
+                    [page_start + 60, "99", "103", "100", "102", "10"],
+                    [page_start, "98", "102", "99", "101", "9"],
+                ]
+            return [[page_start + 60, "100", "104", "101", "103", "11"]]
+        with patch.object(api, "_verify_coinbase_product"), patch.object(
+            api, "_request_json", side_effect=response
+        ):
+            rows = api._fetch_coinbase("BTCUSD", "1m", 500)
+        self.assertEqual(len(requests), 2)
+        self.assertEqual([row["open_time"] for row in rows], [
+            requests[0][0] * 1000,
+            (requests[0][0] + 60) * 1000,
+            (requests[1][0] + 60) * 1000,
+        ])
+        self.assertEqual(len(rows), 3)
+
+    def test_coinbase_enforces_300_row_limit_on_second_page_too(self):
+        calls = []
+        def response(url):
+            calls.append(url)
+            if len(calls) == 1:
+                return []
+            return [
+                [1700000000 + index * 60, "99", "103", "100", "102", "10"]
+                for index in range(301)
+            ]
+        with patch.object(api, "_verify_coinbase_product"), patch.object(
+            api, "_request_json", side_effect=response
+        ):
+            with self.assertRaisesRegex(ValueError, "exceeded the 300-candle per-request limit"):
+                api._fetch_coinbase("BTCUSD", "1m", 500)
+        self.assertEqual(len(calls), 2)
+
+    def test_coinbase_empty_second_page_preserves_first_page_partial_result(self):
+        calls = []
+        def response(url):
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+            page_start = int(datetime.fromisoformat(query["start"][0]).timestamp())
+            calls.append(url)
+            if len(calls) == 1:
+                return [
+                    [page_start + 60, "99", "103", "100", "102", "10"],
+                    [page_start, "98", "102", "99", "101", "9"],
+                ]
+            return []
+        with patch.object(api, "_verify_coinbase_product"), patch.object(
+            api, "_request_json", side_effect=response
+        ):
+            rows = api._fetch_coinbase("BTCUSD", "1m", 500)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]["open_time"], int(
+            datetime.fromisoformat(
+                urllib.parse.parse_qs(urllib.parse.urlparse(calls[0]).query)["start"][0]
+            ).timestamp()
+        ) * 1000)
+
     def test_coinbase_page_budget_is_exactly_two_for_maximum_route_window(self):
         self.assertEqual(api.MAX_COINBASE_CANDLE_PAGE_SIZE, 300)
         self.assertEqual(api.MAX_COINBASE_CANDLE_REQUEST_LIMIT, 500)
