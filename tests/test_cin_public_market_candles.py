@@ -3590,3 +3590,14 @@ class CoinbaseCrossFieldPrecisionIntegrityTests(CoinbaseCanonicalFloatConsistenc
                 3: "1.00000000000000001",
                 4: "1.00000000000000002", 5: "0",
             })
+
+
+    def test_distinct_decimal_inputs_that_collapse_to_one_float_are_explicitly_observed(self):
+        with self.assertRaisesRegex(
+            api._MalformedProviderResponse, "OHLC distinction was lost"
+        ):
+            self._fetch_with_values({
+                1: "0.9", 2: "1.1",
+                3: "1.00000000000000001",
+                4: "1.00000000000000002", 5: "0",
+            })
