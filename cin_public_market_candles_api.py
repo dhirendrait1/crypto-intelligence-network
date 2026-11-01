@@ -1374,7 +1374,12 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
             # Coinbase may include the single candle immediately preceding
             # the page start. A response containing older rows or rows beyond
             # this page's end is not trusted as belonging to the requested page.
-            page_floor = max(start - duration, cursor - duration)
+            # The first page may include one pre-window candle; it is
+            # excluded below. Subsequent pages may overlap only at their
+            # exact inclusive start/end boundary. A row older than cursor on
+            # later pages would replay data from an earlier page and is not
+            # accepted as a boundary duplicate.
+            page_floor = start - duration if page_count == 1 else cursor
             if timestamp_seconds_int < page_floor or timestamp_seconds_int > chunk_end:
                 raise _MalformedProviderResponse(
                     "Coinbase returned a candle outside the requested pagination page"
