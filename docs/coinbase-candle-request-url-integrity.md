@@ -68,3 +68,12 @@ CIN captures its UTC request-window anchor once, after local symbol/interval val
 This is a **best-effort retrieval window, not an atomic exchange snapshot**. Coinbase's public catalogue and candle endpoints do not provide a shared snapshot token in this adapter. Product status or candle values may change while separate HTTP requests are in flight, and the adapter cannot prove all returned pages represent one exchange-state instant. CIN therefore keeps the fixed window, validates page bounds and duplicate boundaries, performs no automatic retries, and fails the whole result on a failed or malformed page. Consumers must not interpret the output as a transactionally consistent exchange snapshot.
 
 An offline regression test verifies that the time anchor is captured before catalogue I/O and that both pages use contiguous boundaries derived from that single anchor. It does not simulate or prove atomicity at Coinbase.
+
+
+## Coinbase in-progress candle handling
+
+The Coinbase candle request may cover the current granularity bucket when the request is made between bucket boundaries. The adapter now treats the bucket whose open time equals the request-window's current aligned boundary as **in progress**, not finalized: it validates the provider row and page placement as usual, but excludes that current bucket from the canonical completed-candle result. The most recent returned Coinbase candle therefore has a close time that represents an elapsed interval, rather than assigning a completed close boundary to a still-forming candle.
+
+At an exact interval boundary, the newly opening bucket is not requested as part of the completed history. This policy is intentionally limited to Coinbase normalization in this audit; it does not claim that every provider exposes or finalizes candles identically. CIN's canonical candle response remains unchanged and does not add a provider-specific completion flag. Consumers receive completed Coinbase candles only, avoiding a schema change that could mislead existing technical-analysis consumers.
+
+Offline regression tests cover a mid-interval response containing both a completed candle and the current in-progress candle, and an exact-boundary request. They do not verify Coinbase's live publication timing or guarantee that the exchange never revises a previously closed candle.
