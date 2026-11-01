@@ -3151,3 +3151,77 @@ class CoinbaseCurrentCandleFinalizationTests(unittest.TestCase):
 
         self.assertEqual(len(rows), 1)
         self.assertEqual(request.call_count, 2)
+
+
+class CoinbaseOHLCVNumericIntegrityTests(unittest.TestCase):
+    def _fetch_with_row(self, row):
+        class FrozenDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return cls(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
+
+        catalogue = [{
+            "id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
+            "status": "online", "trading_disabled": False,
+        }]
+        with patch.object(api, "datetime", FrozenDateTime), patch.object(
+            api, "_coinbase_request_json", side_effect=[catalogue, [row]]
+        ):
+            return api._fetch_coinbase("BTCUSD", "1h", 5)
+
+    def test_rejects_non_finite_and_overflowing_price_or_volume_strings(self):
+        valid = [int(datetime(2025, 1, 1, 11, 0, tzinfo=timezone.utc).timestamp()),
+                 "99", "103", "100", "102", "10"]
+        invalid_values = ("NaN", "Infinity", "-Infinity", "1e9999")
+        for field_index in (1, 2, 3, 4, 5):
+            for value in invalid_values:
+                row = list(valid)
+                row[field_index] = value
+                with self.subTest(field_index=field_index, value=value):
+                    with self.assertRaisesRegex(ValueError, "invalid OHLCV"):
+                        self._fetch_with_row(row)
+
+    def test_rejects_zero_or_negative_prices_and_negative_volume(self):
+        valid = [int(datetime(2025, 1, 1, 11, 0, tzinfo=timezone.utc).timestamp()),
+                 "99", "103", "100", "102", "10"]
+        cases = ((1, "0"), (2, "-1"), (3, "0"), (4, "-0.01"), (5, "-0.01"))
+        for index, value in cases:
+            row = list(valid)
+            row[index] = value
+            with self.subTest(index=index, value=value):
+                with self.assertRaisesRegex(ValueError, "invalid OHLCV"):
+                    self._fetch_with_row(row)
+
+    def test_rejects_impossible_high_low_and_open_close_relationships(self):
+        valid = [int(datetime(2025, 1, 1, 11, 0, tzinfo=timezone.utc).timestamp()),
+                 "99", "103", "100", "102", "10"]
+        cases = ((1, "101"), (2, "98"), (3, "104"), (4, "105"))
+        for index, value in cases:
+            row = list(valid)
+            row[index] = value
+            with self.subTest(index=index, value=value):
+                with self.assertRaisesRegex(ValueError, "invalid OHLCV"):
+                    self._fetch_with_row(row)
+
+    def test_rejects_non_scalar_ohlcv_values_and_boolean_values(self):
+        valid = [int(datetime(2025, 1, 1, 11, 0, tzinfo=timezone.utc).timestamp()),
+                 "99", "103", "100", "102", "10"]
+        invalid_values = (True, None, [], {}, "not-a-number")
+        for index in range(1, 6):
+            for value in invalid_values:
+                row = list(valid)
+                row[index] = value
+                with self.subTest(index=index, value=value):
+                    with self.assertRaises(ValueError):
+                        self._fetch_with_row(row)
+
+    def test_finite_decimal_strings_are_normalized_to_existing_float_schema(self):
+        row = [int(datetime(2025, 1, 1, 11, 0, tzinfo=timezone.utc).timestamp()),
+               "100.00000000000000001", "103.00000000000000001",
+               "100.00000000000000001", "102.00000000000000001",
+               "0.00000000000000001"]
+        rows = self._fetch_with_row(row)
+        self.assertIsInstance(rows[0]["open"], float)
+        self.assertIsInstance(rows[0]["volume"], float)
+        self.assertTrue(math.isfinite(rows[0]["open"]))
+        self.assertTrue(math.isfinite(rows[0]["volume"]))
