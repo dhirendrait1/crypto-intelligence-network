@@ -1384,9 +1384,11 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= MAX_COINBASE_CANDLE_REQUEST_LIMIT:
         raise ValueError("Coinbase candle request limit must be an integer from 1 to 500")
     product_id, base, quote = _coinbase_canonical_product_identity(symbol)
-    _verify_coinbase_product(product_id, base, quote)
     duration = COINBASE_GRANULARITY[interval]
+    # Capture one request-window anchor before any provider I/O. The catalogue
+    # check and every candle page then use a fixed window even if I/O is slow.
     now = int(datetime.now(timezone.utc).timestamp())
+    _verify_coinbase_product(product_id, base, quote)
     # Anchor the requested history window to the provider's UTC granularity.
     # This prevents fractional first/last buckets and keeps adjacent page
     # boundaries on exact candle-open timestamps.
