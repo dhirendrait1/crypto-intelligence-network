@@ -124,6 +124,55 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, "weekly candle boundary"):
             api._historical_window_integrity_metadata([dict(SAMPLE[0])], "1w", 1, "coinbase", 1_800_000_000_000)
 
+    def test_coinbase_window_coverage_reports_missing_first_and_last_requested_candles(self):
+        hour = 3_600_000
+        # With now at 12h and a five-candle window, expected opens are 8h..12h.
+        rows = [
+            dict(SAMPLE[0], open_time=9 * hour, close_time=10 * hour - 1),
+            dict(SAMPLE[0], open_time=10 * hour, close_time=11 * hour - 1),
+            dict(SAMPLE[0], open_time=11 * hour, close_time=12 * hour - 1),
+        ]
+        result = api._historical_window_integrity_metadata(
+            rows, "1h", 5, "coinbase", 12 * hour
+        )
+        self.assertEqual(result["window_status"], "partial")
+        self.assertEqual(result["leading_missing_interval_count"], 1)
+        self.assertEqual(result["trailing_missing_interval_count"], 1)
+        self.assertEqual(result["observed_in_window_candle_count"], 3)
+        self.assertFalse(result["missing_candles_synthesized"])
+        self.assertIn("no-trade omissions", result["window_warning"])
+
+    def test_coinbase_window_edge_completeness_does_not_claim_internal_continuity(self):
+        hour = 3_600_000
+        # Both requested edges are present, but an interior interval is absent.
+        rows = [
+            dict(SAMPLE[0], open_time=8 * hour, close_time=9 * hour - 1),
+            dict(SAMPLE[0], open_time=10 * hour, close_time=11 * hour - 1),
+            dict(SAMPLE[0], open_time=12 * hour, close_time=13 * hour - 1),
+        ]
+        result = api._historical_window_integrity_metadata(
+            rows, "1h", 5, "coinbase", 12 * hour
+        )
+        self.assertEqual(result["window_status"], "complete")
+        self.assertEqual(result["leading_missing_interval_count"], 0)
+        self.assertEqual(result["trailing_missing_interval_count"], 0)
+        self.assertEqual(result["interpretation_scope"], "requested_rolling_window_edges_only; not_proof_of_provider_feed_loss")
+        timeline = api._timeline_integrity_metadata(rows, "1h")
+        self.assertTrue(timeline["has_gaps"])
+        self.assertGreater(timeline["missing_interval_count"], 0)
+
+    def test_coinbase_empty_provider_result_fails_closed_and_coverage_reports_zero_rows(self):
+        with patch.object(api, "_request_json", return_value=[]):
+            with self.assertRaisesRegex(ValueError, "no valid candles"):
+                api._fetch_coinbase("BTCUSD", "1h", 5)
+        coverage = api._coverage_metadata([], 5)
+        self.assertEqual(coverage["coverage_status"], "partial")
+        self.assertEqual(coverage["returned_candle_count"], 0)
+        self.assertEqual(coverage["candle_count_shortfall"], 5)
+        self.assertEqual(coverage["returned_row_ratio"], 0.0)
+        self.assertIsNone(coverage["first_returned_candle_open_time_utc"])
+        self.assertIsNone(coverage["last_returned_candle_open_time_utc"])
+
     def test_coverage_metadata_reports_partial_row_ratio_without_claiming_feed_loss(self):
         rows = [dict(row) for row in SAMPLE[:3]]
         result = api._coverage_metadata(rows, 5)
