@@ -232,8 +232,8 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
         }}
         malformed_ohlc = {"error": [], "result": {"XBTUSDT": [], "last": "not-a-cursor"}}
-        with patch.object(api, "_fetch_binance", side_effect=urllib.error.URLError("Binance unavailable")), \\
-             patch.object(api, "_request_json", side_effect=[asset_pairs, malformed_ohlc]), \\
+        with patch.object(api, "_fetch_binance", side_effect=urllib.error.URLError("Binance unavailable")), \
+             patch.object(api, "_request_json", side_effect=[asset_pairs, malformed_ohlc]), \
              patch.object(api, "_fetch_coinbase") as coinbase:
             with self.assertRaises(HTTPException) as ctx:
                 await api._load("BTCUSDT", "1h", 5)
@@ -242,8 +242,8 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         coinbase.assert_not_called()
 
     async def test_malformed_kraken_success_body_does_not_fall_through_to_coinbase(self):
-        with patch.object(api, "_fetch_binance", side_effect=urllib.error.URLError("Binance unavailable")), \\
-             patch.object(api, "_request_json", side_effect=[json.JSONDecodeError("bad json", "{", 0)]), \\
+        with patch.object(api, "_fetch_binance", side_effect=urllib.error.URLError("Binance unavailable")), \
+             patch.object(api, "_request_json", side_effect=[json.JSONDecodeError("bad json", "{", 0)]), \
              patch.object(api, "_fetch_coinbase") as coinbase:
             with self.assertRaises(HTTPException) as ctx:
                 await api._load("BTCUSDT", "1h", 5)
@@ -251,8 +251,8 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         coinbase.assert_not_called()
 
     async def test_ordinary_kraken_transport_failure_still_allows_coinbase_fallback(self):
-        with patch.object(api, "_fetch_binance", side_effect=urllib.error.URLError("Binance unavailable")), \\
-             patch.object(api, "_request_json", side_effect=urllib.error.URLError("Kraken unavailable")), \\
+        with patch.object(api, "_fetch_binance", side_effect=urllib.error.URLError("Binance unavailable")), \
+             patch.object(api, "_request_json", side_effect=urllib.error.URLError("Kraken unavailable")), \
              patch.object(api, "_fetch_coinbase", return_value=[dict(SAMPLE[0])]):
             rows = await api._load("BTCUSD", "1h", 5)
         self.assertEqual(rows[0]["_provider"], "coinbase")
