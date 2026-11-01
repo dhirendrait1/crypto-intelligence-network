@@ -320,3 +320,12 @@ Offline regression tests cover valid newest-first input, preservation of the ori
 Coinbase pages are requested in adjacent granularity-aligned windows. CIN permits an identical repeated candle only when its open timestamp is exactly the current page's start boundary and the complete raw row matches the previously received row. An identical duplicate elsewhere across pages is malformed; a conflicting duplicate is always rejected. This prevents timestamp-keyed collection from silently masking repeated provider records outside the documented boundary overlap.
 
 CIN preserves gaps in provider candle timestamps. It does not infer that a missing interval is a malformed response, create synthetic zero-volume candles, interpolate OHLCV values, or silently fill gaps. The returned sequence remains strictly increasing, but need not be interval-contiguous because the provider may omit intervals without candle data. Regression tests verify rejection of non-boundary cross-page duplicates and preservation of sparse intervals without synthetic rows.
+
+
+### Coinbase requested-window coverage and partial history
+
+The candle response reports returned row count and count shortfall against the requested limit separately from historical-window edge integrity. A short response is labelled partial; zero returned rows are a provider failure and are not emitted as a successful empty candle snapshot. The first and last returned open timestamps remain explicit so consumers can inspect observed coverage.
+
+For Coinbase, requested-window integrity counts missing leading and trailing expected opens. This is an edge-coverage diagnostic, not a claim that every interval inside the window must contain a candle. Coinbase may omit intervals with no trades; internal gaps remain represented by timeline-integrity metadata and are never filled. A response with both requested edges present can therefore have complete edge coverage while still containing internal gaps. Conversely, a missing first or last requested candle is reported as partial edge coverage, with the warning explicitly noting that provider no-trade semantics may explain the absence.
+
+Regression tests cover missing first/last requested opens, interior gaps despite complete edges, zero-row responses, and count shortfall metadata. Tests use deterministic timestamps and mocked provider responses; no live Coinbase request is required.
