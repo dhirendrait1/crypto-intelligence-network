@@ -145,3 +145,15 @@ This is deliberately provider-specific. It does not change timestamp-unit bounds
 Offline regression tests cover rejected string/float timestamps, accepted integer timestamps with mixed documented numeric OHLCV scalar forms, booleans in every OHLCV position (including volume), and structured OHLCV values. These tests establish local adapter behavior, not live-provider behavior or future API compatibility.
 
 No data is repaired or synthesized. Malformed successful provider rows fail closed. CIN remains read-only; no order execution, wallet access, merge, deployment, or production activation is introduced.
+
+
+
+## Step 192 — Coinbase OHLCV decimal precision and normalization range
+
+Coinbase numeric OHLCV scalars are now parsed through Python's decimal representation before conversion to the existing canonical floating-point candle fields. The adapter rejects non-finite decimal values, values outside the finite IEEE-754 float range, and nonzero decimal values that underflow to zero during conversion. This prevents silent range loss at normalization boundaries.
+
+The public canonical candle schema remains floating-point; this change does not claim arbitrary-precision preservation after normalization. Ordinary decimal values can still be rounded to the nearest representable binary float, as required by the existing schema. No rounding policy or decimal-place truncation is introduced. Existing OHLC relationships, positive-price, non-negative-volume, and finite-value checks remain in force.
+
+Offline tests cover underflow and overflow across each OHLCV field, non-finite decimal strings, and supported very small and large finite values. The tests exercise adapter normalization without live-provider calls. No timestamp, pagination, row-order, field-count, or raw-field-type rules are changed.
+
+CIN remains read-only. No synthetic candles, order execution, wallet access, merge, Render deployment, or production activation is introduced.
