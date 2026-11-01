@@ -129,3 +129,19 @@ The adapter now requires every row to be a list containing **exactly six fields*
 Offline regression coverage includes the exact six-field contract, every shorter row length, an extra seventh field, and a non-list row with six values. Existing newest-first chronology validation and explicit oldest-first conversion remain unchanged. This is a response-shape check only; it does not claim that the provider's field values are semantically correct beyond the separate timestamp and OHLCV validators.
 
 No canonical candle schema, provider fallback policy, synthetic data behavior, or read-only operating boundary is changed.
+
+
+
+## Step 191 — Coinbase candle field types and timestamp representation
+
+The Coinbase candle adapter now enforces the documented raw field types before numeric normalization:
+
+- The timestamp field must be a JSON integer representing Unix seconds. Boolean, floating-point, and string timestamps are rejected rather than coerced, even when their textual or numeric value looks integral.
+- Each OHLCV field must be a scalar string, integer, or floating-point number. Boolean values and structured values such as null, arrays, objects, and tuples are rejected before conversion.
+- Existing finite-number, positive-price, non-negative-volume, and OHLC relationship validation remains responsible for semantic numeric validity after scalar type checks.
+
+This is deliberately provider-specific. It does not change timestamp-unit bounds, interval alignment, row cardinality, page chronology, canonical timestamp units, or the public candle schema. Numeric OHLCV strings remain accepted because Coinbase returns decimal values in string form in its documented candle response.
+
+Offline regression tests cover rejected string/float timestamps, accepted integer timestamps with mixed documented numeric OHLCV scalar forms, booleans in every OHLCV position (including volume), and structured OHLCV values. These tests establish local adapter behavior, not live-provider behavior or future API compatibility.
+
+No data is repaired or synthesized. Malformed successful provider rows fail closed. CIN remains read-only; no order execution, wallet access, merge, deployment, or production activation is introduced.
