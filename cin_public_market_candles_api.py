@@ -1347,8 +1347,10 @@ def _coinbase_page_rows_in_chronological_order(payload: Any) -> list[list[Any]]:
         raise _MalformedProviderResponse("Coinbase response exceeded the 300-candle per-request limit")
     timestamps: list[int] = []
     for row in payload:
-        if not isinstance(row, list) or len(row) < 6:
-            raise _MalformedProviderResponse("Coinbase returned a malformed candle row")
+        if not isinstance(row, list) or len(row) != 6:
+            raise _MalformedProviderResponse(
+                "Coinbase returned a candle row with an unexpected field count"
+            )
         try:
             if isinstance(row[0], bool):
                 raise _MalformedProviderResponse("Coinbase returned a boolean candle timestamp")
