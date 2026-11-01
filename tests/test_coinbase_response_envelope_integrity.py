@@ -55,7 +55,7 @@ class CoinbaseResponseEnvelopeIntegrityTests(unittest.TestCase):
         with self.assertRaisesRegex(
             api._MalformedProviderResponse, "non-object record"
         ):
-            api._coinbase_product_catalogue_records([{"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD", "status": "online", "trading_disabled": False, "base_increment": "0.00000001", "quote_increment": "0.01"}, None])
+            api._coinbase_product_catalogue_records([{"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD", "status": "online", "trading_disabled": False, "base_increment": "0.00000001", "quote_increment": "0.01", "base_min_size": "0.0001", "base_max_size": "1000000", "quote_min_size": "1", "quote_max_size": "10000000"}, None])
 
     def test_product_catalogue_rejects_missing_or_blank_identifiers(self):
         for record in ({"id": None}, {"id": ""}, {"base_currency": "BTC"}):
@@ -70,7 +70,7 @@ class CoinbaseResponseEnvelopeIntegrityTests(unittest.TestCase):
             api._MalformedProviderResponse, "duplicate product identifiers"
         ):
             api._coinbase_product_catalogue_records([
-                {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD", "status": "online", "trading_disabled": False, "base_increment": "0.00000001", "quote_increment": "0.01"}, {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD", "status": "online", "trading_disabled": False, "base_increment": "0.00000001", "quote_increment": "0.01"}
+                {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD", "status": "online", "trading_disabled": False, "base_increment": "0.00000001", "quote_increment": "0.01", "base_min_size": "0.0001", "base_max_size": "1000000", "quote_min_size": "1", "quote_max_size": "10000000"}, {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD", "status": "online", "trading_disabled": False, "base_increment": "0.00000001", "quote_increment": "0.01", "base_min_size": "0.0001", "base_max_size": "1000000", "quote_min_size": "1", "quote_max_size": "10000000"}
             ])
 
     def test_empty_candle_page_is_valid_but_not_a_valid_final_snapshot(self):
@@ -79,7 +79,7 @@ class CoinbaseResponseEnvelopeIntegrityTests(unittest.TestCase):
 
     def test_product_catalogue_accepts_required_fields_with_expected_types(self):
         record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
-                  "status": "online", "trading_disabled": False, "base_increment": "0.00000001", "quote_increment": "0.01"}
+                  "status": "online", "trading_disabled": False, "base_increment": "0.00000001", "quote_increment": "0.01", "base_min_size": "0.0001", "base_max_size": "1000000", "quote_min_size": "1", "quote_max_size": "10000000"}
         self.assertEqual(api._coinbase_product_catalogue_records([record]), [record])
 
     def test_product_catalogue_rejects_invalid_currency_field_types(self):
@@ -89,7 +89,7 @@ class CoinbaseResponseEnvelopeIntegrityTests(unittest.TestCase):
         ):
             with self.subTest(field=field_name, value=invalid_value):
                 record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
-                          "status": "online", "trading_disabled": False, "base_increment": "0.00000001", "quote_increment": "0.01"}
+                          "status": "online", "trading_disabled": False, "base_increment": "0.00000001", "quote_increment": "0.01", "base_min_size": "0.0001", "base_max_size": "1000000", "quote_min_size": "1", "quote_max_size": "10000000"}
                 record[field_name] = invalid_value
                 with self.assertRaises(api._MalformedProviderResponse):
                     api._coinbase_product_catalogue_records([record])
@@ -98,7 +98,7 @@ class CoinbaseResponseEnvelopeIntegrityTests(unittest.TestCase):
         for invalid_status in (None, "", "ONLINE", "suspended", 1):
             with self.subTest(status=invalid_status):
                 record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
-                          "status": invalid_status, "trading_disabled": False, "base_increment": "0.00000001", "quote_increment": "0.01"}
+                          "status": invalid_status, "trading_disabled": False, "base_increment": "0.00000001", "quote_increment": "0.01", "base_min_size": "0.0001", "base_max_size": "1000000", "quote_min_size": "1", "quote_max_size": "10000000"}
                 with self.assertRaisesRegex(api._MalformedProviderResponse, "field status"):
                     api._coinbase_product_catalogue_records([record])
 
@@ -106,7 +106,7 @@ class CoinbaseResponseEnvelopeIntegrityTests(unittest.TestCase):
         for invalid_flag in (None, 0, 1, "false", "true"):
             with self.subTest(flag=invalid_flag):
                 record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
-                          "status": "online", "trading_disabled": invalid_flag, "base_increment": "0.00000001", "quote_increment": "0.01"}
+                          "status": "online", "trading_disabled": invalid_flag, "base_increment": "0.00000001", "quote_increment": "0.01", "base_min_size": "0.0001", "base_max_size": "1000000", "quote_min_size": "1", "quote_max_size": "10000000"}
                 with self.assertRaisesRegex(api._MalformedProviderResponse, "field trading_disabled"):
                     api._coinbase_product_catalogue_records([record])
 
@@ -114,7 +114,7 @@ class CoinbaseResponseEnvelopeIntegrityTests(unittest.TestCase):
     def test_product_catalogue_accepts_positive_decimal_increment_strings(self):
         record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
                   "status": "online", "trading_disabled": False,
-                  "base_increment": "0.00000001", "quote_increment": "0.01"}
+                  "base_increment": "0.00000001", "quote_increment": "0.01", "base_min_size": "0.0001", "base_max_size": "1000000", "quote_min_size": "1", "quote_max_size": "10000000"}
         self.assertEqual(api._coinbase_product_catalogue_records([record]), [record])
 
     def test_product_catalogue_rejects_missing_or_non_string_increments(self):
@@ -127,7 +127,7 @@ class CoinbaseResponseEnvelopeIntegrityTests(unittest.TestCase):
             with self.subTest(field=field_name, value=invalid_value):
                 record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
                           "status": "online", "trading_disabled": False,
-                          "base_increment": "0.00000001", "quote_increment": "0.01"}
+                          "base_increment": "0.00000001", "quote_increment": "0.01", "base_min_size": "0.0001", "base_max_size": "1000000", "quote_min_size": "1", "quote_max_size": "10000000"}
                 record[field_name] = invalid_value
                 with self.assertRaisesRegex(api._MalformedProviderResponse, field_name):
                     api._coinbase_product_catalogue_records([record])
@@ -138,7 +138,7 @@ class CoinbaseResponseEnvelopeIntegrityTests(unittest.TestCase):
                 with self.subTest(field=field_name, value=invalid_value):
                     record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
                               "status": "online", "trading_disabled": False,
-                              "base_increment": "0.00000001", "quote_increment": "0.01"}
+                              "base_increment": "0.00000001", "quote_increment": "0.01", "base_min_size": "0.0001", "base_max_size": "1000000", "quote_min_size": "1", "quote_max_size": "10000000"}
                     record[field_name] = invalid_value
                     with self.assertRaises(api._MalformedProviderResponse):
                         api._coinbase_product_catalogue_records([record])
@@ -148,8 +148,63 @@ class CoinbaseResponseEnvelopeIntegrityTests(unittest.TestCase):
             with self.subTest(value=invalid_value):
                 record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
                           "status": "online", "trading_disabled": False,
-                          "base_increment": invalid_value, "quote_increment": "0.01"}
+                          "base_increment": invalid_value, "quote_increment": "0.01", "base_min_size": "0.0001", "base_max_size": "1000000", "quote_min_size": "1", "quote_max_size": "10000000"}
                 with self.assertRaisesRegex(api._MalformedProviderResponse, "increment"):
+                    api._coinbase_product_catalogue_records([record])
+
+
+    def test_product_catalogue_accepts_positive_order_size_bounds(self):
+        record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
+                  "status": "online", "trading_disabled": False,
+                  "base_increment": "0.00000001", "quote_increment": "0.01",
+                  "base_min_size": "0.0001", "base_max_size": "1000000",
+                  "quote_min_size": "1", "quote_max_size": "10000000"}
+        self.assertEqual(api._coinbase_product_catalogue_records([record]), [record])
+
+    def test_product_catalogue_rejects_missing_or_non_string_size_bounds(self):
+        for field_name, invalid_value in (
+            ("base_min_size", None), ("base_min_size", 0.0001),
+            ("base_max_size", True), ("quote_min_size", ""),
+            ("quote_max_size", None),
+        ):
+            with self.subTest(field=field_name, value=invalid_value):
+                record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
+                          "status": "online", "trading_disabled": False,
+                          "base_increment": "0.00000001", "quote_increment": "0.01",
+                          "base_min_size": "0.0001", "base_max_size": "1000000",
+                          "quote_min_size": "1", "quote_max_size": "10000000"}
+                record[field_name] = invalid_value
+                with self.assertRaisesRegex(api._MalformedProviderResponse, field_name):
+                    api._coinbase_product_catalogue_records([record])
+
+    def test_product_catalogue_rejects_non_finite_or_non_positive_size_bounds(self):
+        for invalid_value in ("NaN", "Infinity", "-Infinity", "0", "-0.1"):
+            for field_name in ("base_min_size", "base_max_size",
+                               "quote_min_size", "quote_max_size"):
+                with self.subTest(field=field_name, value=invalid_value):
+                    record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
+                              "status": "online", "trading_disabled": False,
+                              "base_increment": "0.00000001", "quote_increment": "0.01",
+                              "base_min_size": "0.0001", "base_max_size": "1000000",
+                              "quote_min_size": "1", "quote_max_size": "10000000"}
+                    record[field_name] = invalid_value
+                    with self.assertRaises(api._MalformedProviderResponse):
+                        api._coinbase_product_catalogue_records([record])
+
+    def test_product_catalogue_rejects_inverted_size_bounds(self):
+        for minimum_field, maximum_field in (
+            ("base_min_size", "base_max_size"),
+            ("quote_min_size", "quote_max_size"),
+        ):
+            with self.subTest(minimum=minimum_field, maximum=maximum_field):
+                record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
+                          "status": "online", "trading_disabled": False,
+                          "base_increment": "0.00000001", "quote_increment": "0.01",
+                          "base_min_size": "0.0001", "base_max_size": "1000000",
+                          "quote_min_size": "1", "quote_max_size": "10000000"}
+                record[minimum_field] = "100"
+                record[maximum_field] = "10"
+                with self.assertRaisesRegex(api._MalformedProviderResponse, "exceeded"):
                     api._coinbase_product_catalogue_records([record])
 
 
