@@ -3038,3 +3038,34 @@ class CoinbaseTransportFailureClassificationTests(unittest.TestCase):
         detail = api._coinbase_transport_failure_detail(TimeoutError("sensitive response payload"))
         self.assertNotIn("sensitive response payload", detail)
         self.assertIn("no further provider fallback", detail)
+
+
+class CoinbaseRetryAndRequestConsistencyTests(unittest.TestCase):
+    def test_coinbase_transport_failure_makes_exactly_one_http_attempt(self):
+        with patch.object(api.urllib.request, "urlopen", side_effect=TimeoutError("timed out")) as urlopen:
+            with self.assertRaises(TimeoutError):
+                api._coinbase_request_json("https://api.exchange.coinbase.com/products")
+        urlopen.assert_called_once()
+
+    def test_coinbase_rate_limit_response_is_not_retried(self):
+        error = urllib.error.HTTPError(
+            "https://api.exchange.coinbase.com/products", 429, "rate limited", {}, None
+        )
+        with patch.object(api.urllib.request, "urlopen", side_effect=error) as urlopen:
+            with self.assertRaises(urllib.error.HTTPError):
+                api._coinbase_request_json("https://api.exchange.coinbase.com/products")
+        urlopen.assert_called_once()
+
+    def test_failed_second_page_aborts_snapshot_without_page_retry(self):
+        class FrozenDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return cls(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
+
+        with patch.object(api, "_verify_coinbase_product", return_value=None), patch.object(
+            api, "datetime", FrozenDateTime
+        ), patch.object(api, "_coinbase_request_json", side_effect=[[], TimeoutError("page two timed out")]) as request:
+            with self.assertRaises(TimeoutError):
+                api._fetch_coinbase("BTCUSD", "1h", 301)
+
+        self.assertEqual(request.call_count, 2)
