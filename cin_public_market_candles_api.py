@@ -1258,6 +1258,19 @@ def _verify_coinbase_product(product_id: str, base: str, quote: str) -> None:
         or product.get("quote_currency") != quote
     ):
         raise _MalformedProviderResponse("Coinbase product catalogue base/quote identity did not match the requested market")
+    # Candle access is permitted only for an explicitly online, enabled product.
+    # Unknown/missing status metadata is not interpreted as availability.
+    product_status = product.get("status")
+    known_statuses = {"online", "offline", "delisted"}
+    if not isinstance(product_status, str) or product_status not in known_statuses:
+        raise _MalformedProviderResponse("Coinbase product catalogue status is missing or unknown")
+    if product_status != "online":
+        raise ValueError(f"Coinbase product is unavailable for candle eligibility (status: {product_status})")
+    trading_disabled = product.get("trading_disabled")
+    if not isinstance(trading_disabled, bool):
+        raise _MalformedProviderResponse("Coinbase product catalogue trading_disabled flag is missing or invalid")
+    if trading_disabled:
+        raise ValueError("Coinbase product is unavailable for candle eligibility (trading disabled)")
 
 MAX_COINBASE_CANDLE_PAGE_SIZE = 300
 # The public candle route accepts at most 500 rows, so no request may need >2 pages.
