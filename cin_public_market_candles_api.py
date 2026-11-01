@@ -1437,6 +1437,14 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
                 raise _MalformedProviderResponse(
                     "Coinbase returned a candle outside the requested pagination page"
                 )
+            # Coinbase candle opens must land exactly on the requested
+            # granularity grid (Unix UTC epoch alignment). A valid page range
+            # alone does not prove that an individual candle belongs to this
+            # interval.
+            if timestamp_seconds_int % duration != 0:
+                raise _MalformedProviderResponse(
+                    "Coinbase returned a candle timestamp misaligned to the requested interval"
+                )
             # Keep only opens inside CIN's overall requested UTC history window.
             if start <= timestamp_seconds_int < latest_open:
                 previous_row = rows_by_time.get(timestamp_seconds_int)
