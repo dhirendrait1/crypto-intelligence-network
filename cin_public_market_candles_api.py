@@ -1327,12 +1327,17 @@ def _coinbase_http_status_failure(status_code: int) -> tuple[int, str]:
     return 502, f"Coinbase public market-data provider returned unexpected HTTP status {status_code}."
 
 
-def _coinbase_request_json(url: str) -> Any:
-    """Classify invalid successful Coinbase response bodies as malformed, not outages."""
+def _coinbase_request_json(url: str) -> list[Any]:
+    """Require Coinbase's successful JSON envelope to be a top-level array."""
     try:
-        return _request_json(url)
+        payload = _request_json(url)
     except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
         raise _MalformedProviderResponse("Coinbase returned an invalid successful response body") from None
+    if not isinstance(payload, list):
+        raise _MalformedProviderResponse(
+            "Coinbase successful response envelope was not a top-level array"
+        )
+    return payload
 
 
 def _coinbase_page_rows_in_chronological_order(payload: Any) -> list[list[Any]]:
