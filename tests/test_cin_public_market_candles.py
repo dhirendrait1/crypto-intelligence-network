@@ -823,21 +823,23 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
                 api._fetch_coinbase("BTCUSD", "1m", 500)
 
     def test_coinbase_does_not_stop_after_empty_or_short_first_page(self):
-        for first_page in ([], [[1700000000, "99", "103", "100", "102", "10"]]):
+        for first_page_size in (0, 1):
             requests = []
             def response(url):
                 query = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
                 page_start = int(datetime.fromisoformat(query["start"][0]).timestamp())
                 requests.append(page_start)
                 if len(requests) == 1:
-                    return first_page
+                    return [] if first_page_size == 0 else [
+                        [page_start + 60, "99", "103", "100", "102", "10"]
+                    ]
                 return [[page_start + 60, "99", "103", "100", "102", "10"]]
-            with self.subTest(first_page_size=len(first_page)), patch.object(
+            with self.subTest(first_page_size=first_page_size), patch.object(
                 api, "_verify_coinbase_product"
             ), patch.object(api, "_request_json", side_effect=response):
                 rows = api._fetch_coinbase("BTCUSD", "1m", 500)
             self.assertEqual(len(requests), 2)
-            self.assertEqual(len(rows), 1 if not first_page else 2)
+            self.assertEqual(len(rows), 1 if first_page_size == 0 else 2)
 
     def test_coinbase_accepts_variable_short_page_sizes_without_filling_missing_rows(self):
         requests = []
