@@ -992,7 +992,7 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
                 api._coinbase_request_json("https://provider.test/coinbase")
 
     def test_coinbase_invalid_utf8_and_truncated_json_are_malformed(self):
-        for body in (b"\\xff", b'{"partial":'):
+        for body in (b"\xff", b'{"partial":'):
             response = MagicMock()
             response.status = 200
             response.__enter__.return_value = response
