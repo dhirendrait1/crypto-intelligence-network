@@ -709,15 +709,13 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     if not isinstance(result, dict) or "last" not in result:
         raise _MalformedProviderResponse("Kraken OHLC response had no result or pagination cursor")
     cursor = result.get("last")
-    if isinstance(cursor, bool):
-        raise _MalformedProviderResponse("Kraken OHLC pagination cursor was not an integer Unix timestamp")
     try:
-        cursor_value = float(cursor)
+        # Apply the same strict seconds-unit, finite-integer, and supported
+        # timestamp-range checks used for candle timestamps.
+        cursor_ms = _parse_provider_timestamp(cursor, "seconds")
     except (TypeError, ValueError, OverflowError):
-        raise _MalformedProviderResponse("Kraken OHLC pagination cursor was not an integer Unix timestamp") from None
-    if not math.isfinite(cursor_value) or not cursor_value.is_integer() or cursor_value < 0:
-        raise _MalformedProviderResponse("Kraken OHLC pagination cursor was not an integer Unix timestamp")
-    cursor_seconds = int(cursor_value)
+        raise _MalformedProviderResponse("Kraken OHLC pagination cursor was not a valid in-range integer Unix timestamp") from None
+    cursor_seconds = cursor_ms // 1000
     pair_keys = [key for key in result if key != "last"]
     accepted_keys = {canonical_key, altname, wsname.replace("/", "")}
     if len(pair_keys) != 1 or pair_keys[0] not in accepted_keys:
