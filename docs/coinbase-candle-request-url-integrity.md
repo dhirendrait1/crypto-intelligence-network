@@ -157,3 +157,12 @@ The public canonical candle schema remains floating-point; this change does not 
 Offline tests cover underflow and overflow across each OHLCV field, non-finite decimal strings, and supported very small and large finite values. The tests exercise adapter normalization without live-provider calls. No timestamp, pagination, row-order, field-count, or raw-field-type rules are changed.
 
 CIN remains read-only. No synthetic candles, order execution, wallet access, merge, Render deployment, or production activation is introduced.
+
+
+## Step 193 — Coinbase precision and canonical-value consistency
+
+The existing public candle contract stores OHLCV values as floating-point numbers. Decimal inputs with more precision than binary floating-point can represent are rounded during normalization; distinct decimal strings can therefore map to the same canonical float. CIN does not label those values as exact decimal representations.
+
+Regression tests verify deterministic Decimal-to-float normalization for a high-precision decimal, finite JSON serialization and deserialization of the canonical candle, and the case where two distinct decimal inputs collapse to the same float. The range guards from Step 192 remain responsible for rejecting non-finite conversions and nonzero underflow. No arbitrary-precision guarantee, rounding mode, or public schema change is introduced.
+
+This is a consistency and transparency check, not a claim that binary floats preserve all source decimal digits. CIN remains read-only; no merge, deployment, synthetic data, or production activation is introduced.
