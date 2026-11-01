@@ -106,7 +106,7 @@ class CoinbaseResponseEnvelopeIntegrityTests(unittest.TestCase):
         for invalid_flag in (None, 0, 1, "false", "true"):
             with self.subTest(flag=invalid_flag):
                 record = {"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
-                          "status": "online", "trading_disabled": invalid_flag}
+                          "status": "online", "trading_disabled": invalid_flag, "base_increment": "0.00000001", "quote_increment": "0.01"}
                 with self.assertRaisesRegex(api._MalformedProviderResponse, "field trading_disabled"):
                     api._coinbase_product_catalogue_records([record])
 
