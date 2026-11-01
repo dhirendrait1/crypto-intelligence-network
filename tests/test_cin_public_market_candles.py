@@ -2966,3 +2966,41 @@ class CoinbaseCandleRequestUrlIntegrityTests(unittest.TestCase):
         self.assertEqual(query["start"], ["2025-01-01T07:00:00+00:00"])
         self.assertEqual(query["end"], ["2025-01-01T12:00:00+00:00"])
 
+
+
+class CoinbaseHTTPStatusClassificationTests(unittest.TestCase):
+    def test_rate_limits_are_reported_as_retryable(self):
+        for status in (418, 429):
+            with self.subTest(status=status):
+                code, detail = api._coinbase_http_status_failure(status)
+                self.assertEqual(code, 503)
+                self.assertIn("rate limit", detail.lower())
+                self.assertIn(str(status), detail)
+
+    def test_access_denied_and_missing_resources_are_terminal(self):
+        for status in (401, 403, 404, 410):
+            with self.subTest(status=status):
+                code, detail = api._coinbase_http_status_failure(status)
+                self.assertEqual(code, 502)
+                self.assertIn(str(status), detail)
+                self.assertIn("fallback stopped", detail)
+
+    def test_server_errors_are_temporary_provider_failures(self):
+        for status in (500, 502, 503, 504, 599):
+            with self.subTest(status=status):
+                code, detail = api._coinbase_http_status_failure(status)
+                self.assertEqual(code, 503)
+                self.assertIn("temporarily unavailable", detail)
+
+    def test_other_client_errors_and_unexpected_statuses_fail_closed(self):
+        for status in (400, 405, 422, 499, 302):
+            with self.subTest(status=status):
+                code, detail = api._coinbase_http_status_failure(status)
+                self.assertEqual(code, 502)
+                self.assertIn(str(status), detail)
+
+    def test_invalid_status_type_fails_closed(self):
+        self.assertEqual(
+            api._coinbase_http_status_failure(True),
+            (502, "Coinbase public market-data provider returned an invalid HTTP status."),
+        )
