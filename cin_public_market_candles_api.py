@@ -1282,6 +1282,17 @@ def _coinbase_product_catalogue_records(payload: Any) -> list[dict[str, Any]]:
             raise _MalformedProviderResponse(
                 "Coinbase product catalogue field trading_disabled was missing or invalid"
             )
+        for field_name in ("base_increment", "quote_increment"):
+            increment = item.get(field_name)
+            if not isinstance(increment, str) or not increment.strip():
+                raise _MalformedProviderResponse(
+                    f"Coinbase product catalogue field {field_name} was missing or invalid"
+                )
+            increment_value = _coinbase_decimal_value(increment, field_name)
+            if increment_value <= 0:
+                raise _MalformedProviderResponse(
+                    f"Coinbase product catalogue field {field_name} must be positive"
+                )
         identifiers.add(product_identifier)
         records.append(item)
     return records
