@@ -733,7 +733,7 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         request.assert_not_called()
 
     def test_coinbase_rejects_response_over_provider_page_limit(self):
-        payload = [[1700000000 + index * 3600, "99", "103", "100", "102", "10"] for index in range(301)]
+        payload = [[1699999200 + index * 3600, "99", "103", "100", "102", "10"] for index in range(301)]
         with patch.object(api, "_request_json", return_value=payload):
             with self.assertRaisesRegex(ValueError, "exceeded the 300-candle per-request limit"):
                 api._fetch_coinbase("BTCUSD", "1h", 5)
@@ -880,8 +880,8 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(requests), 2)
 
     def test_coinbase_rejects_conflicting_rows_with_same_open_timestamp(self):
-        first = [1700000000, "99", "103", "100", "102", "10"]
-        conflicting = [1700000000, "99", "103", "100", "101", "10"]
+        first = [1699999200, "99", "103", "100", "102", "10"]
+        conflicting = [1699999200, "99", "103", "100", "101", "10"]
         with patch.object(api, "_request_json", return_value=[first, conflicting]):
             with self.assertRaisesRegex(
                 ValueError, "conflicting candle rows for the same open timestamp"
@@ -939,7 +939,7 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             if len(calls) == 1:
                 return []
             return [
-                [1700000000 + index * 60, "99", "103", "100", "102", "10"]
+                [1699999200 + index * 60, "99", "103", "100", "102", "10"]
                 for index in range(301)
             ]
         with patch.object(api, "_verify_coinbase_product"), patch.object(
@@ -1074,12 +1074,12 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(api.MAX_COINBASE_CANDLE_PAGES, 2)
 
     def test_coinbase_paginates_requested_history_in_bounded_chunks(self):
-        payload = [[1700000000, "99", "103", "100", "102", "10"]]
+        payload = [[1699999200, "99", "103", "100", "102", "10"]]
         with patch.object(api, "_request_json", return_value=payload) as request:
             rows = api._fetch_coinbase("BTCUSD", "1m", 500)
         self.assertEqual(request.call_count, 2)
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["open_time"], 1700000000000)
+        self.assertEqual(rows[0]["open_time"], 1699999200000)
 
     def test_coinbase_identical_boundary_row_is_deduplicated_across_pages(self):
         requests = []
@@ -1098,7 +1098,7 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(requests), 2)
         self.assertEqual(requests[0][1], requests[1][0])
-        self.assertEqual([row["open_time"] for row in rows], [1700000000000, 1700000060000])
+        self.assertEqual([row["open_time"] for row in rows], [1699999200000, 1699999260000])
 
     def test_coinbase_rejects_identical_duplicate_outside_exact_page_boundary(self):
         requests = []
@@ -1168,8 +1168,8 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
 
     def test_coinbase_candle_rows_are_normalized_and_sorted(self):
         payload = [
-            [1700003600, "99", "103", "101", "102", "12.5"],
-            [1700000000, "98", "102", "100", "101", "10.5"],
+            [1700002800, "99", "103", "101", "102", "12.5"],
+            [1699999200, "98", "102", "100", "101", "10.5"],
         ]
         with patch.object(api, "_request_json", return_value=payload):
             rows = api._fetch_coinbase("BTCUSD", "1h", 5)
@@ -1183,15 +1183,15 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
 
     def test_coinbase_rejects_snapshot_with_any_invalid_ohlcv_row(self):
         payload = [
-            [1700000000, "99", "103", "100", "102", "10"],
-            [1700003600, "99", "98", "100", "102", "10"],
+            [1699999200, "99", "103", "100", "102", "10"],
+            [1700002800, "99", "98", "100", "102", "10"],
         ]
         with patch.object(api, "_request_json", return_value=payload):
             with self.assertRaisesRegex(ValueError, "invalid OHLCV"):
                 api._fetch_coinbase("BTCUSD", "1h", 5)
 
     def test_coinbase_rejects_fractional_boolean_and_out_of_range_timestamps(self):
-        for timestamp in (1700000000.5, True, 10**30):
+        for timestamp in (1699999200.5, True, 10**30):
             payload = [[timestamp, "99", "103", "100", "102", "10"]]
             with patch.object(api, "_request_json", return_value=payload):
                 with self.assertRaisesRegex(ValueError, "timestamp"):
@@ -1199,16 +1199,16 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
 
     def test_coinbase_rejects_malformed_tail_instead_of_returning_partial_snapshot(self):
         payload = [
-            [1700000000 + i * 3600, "99", "103", "100", "102", "10"]
+            [1699999200 + i * 3600, "99", "103", "100", "102", "10"]
             for i in range(6)
         ]
-        payload[-1] = [1700018000, "99", "98", "100", "102", "10"]
+        payload[-1] = [1700017200, "99", "98", "100", "102", "10"]
         with patch.object(api, "_request_json", return_value=payload):
             with self.assertRaisesRegex(ValueError, "invalid OHLCV"):
                 api._fetch_coinbase("BTCUSD", "1h", 5)
 
     def test_coinbase_fails_when_all_provider_candles_are_invalid(self):
-        payload = [[1700000000, "99", "98", "100", "102", "10"]]
+        payload = [[1699999200, "99", "98", "100", "102", "10"]]
         with patch.object(api, "_request_json", return_value=payload):
             with self.assertRaisesRegex(ValueError, "Coinbase returned no valid candles"):
                 api._fetch_coinbase("BTCUSD", "1h", 5)
@@ -2324,7 +2324,7 @@ if __name__ == "__main__":
 class CoinbaseProductCatalogueTests(unittest.TestCase):
     def test_coinbase_verifies_exact_product_id_and_base_quote_before_candles(self):
         catalogue = [{"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD", "status": "online", "trading_disabled": False}]
-        candle_rows = [[1700000000, "99", "103", "100", "102", "10"]]
+        candle_rows = [[1699999200, "99", "103", "100", "102", "10"]]
         with patch.object(api, "_coinbase_request_json", side_effect=[catalogue, candle_rows]) as request:
             rows = api._fetch_coinbase("BTCUSD", "1h", 5)
         self.assertEqual(len(rows), 1)
@@ -2391,31 +2391,31 @@ class CoinbaseProductCatalogueTests(unittest.TestCase):
                 request.assert_called_once_with(api.COINBASE_PRODUCTS_URL)
 
     def test_coinbase_page_accepts_strict_newest_first_and_explicitly_reverses(self):
-        newest = [1700003600, "99", "103", "100", "102", "10"]
-        middle = [1700000000, "98", "102", "99", "101", "11"]
-        oldest = [1699996400, "97", "101", "98", "100", "12"]
+        newest = [1700002800, "99", "103", "100", "102", "10"]
+        middle = [1699999200, "98", "102", "99", "101", "11"]
+        oldest = [1699995600, "97", "101", "98", "100", "12"]
         original = [newest, middle, oldest]
         normalized = api._coinbase_page_rows_in_chronological_order(original)
         self.assertEqual(normalized, [oldest, middle, newest])
         self.assertEqual(original, [newest, middle, oldest])
 
     def test_coinbase_page_rejects_duplicate_timestamps_without_deduplication(self):
-        row = [1700000000, "99", "103", "100", "102", "10"]
+        row = [1699999200, "99", "103", "100", "102", "10"]
         with self.assertRaisesRegex(api._MalformedProviderResponse, "duplicate candle timestamps"):
             api._coinbase_page_rows_in_chronological_order([row, list(row)])
 
     def test_coinbase_page_rejects_ascending_or_non_monotonic_rows_without_sorting(self):
-        first = [1700000000, "99", "103", "100", "102", "10"]
-        newer = [1700003600, "99", "104", "100", "103", "12"]
-        older = [1699996400, "98", "102", "99", "101", "9"]
+        first = [1699999200, "99", "103", "100", "102", "10"]
+        newer = [1700002800, "99", "104", "100", "103", "12"]
+        older = [1699995600, "98", "102", "99", "101", "9"]
         for sequence in ([first, newer], [newer, older, first]):
             with self.subTest(sequence=sequence):
                 with self.assertRaisesRegex(api._MalformedProviderResponse, "newest-first chronological"):
                     api._coinbase_page_rows_in_chronological_order(sequence)
 
     def test_coinbase_page_rejects_malformed_rows_and_timestamps(self):
-        valid = [1700000000, "99", "103", "100", "102", "10"]
-        invalid_rows = ([valid, [1700000000]], [valid, [True, "99", "103", "100", "102", "10"]])
+        valid = [1699999200, "99", "103", "100", "102", "10"]
+        invalid_rows = ([valid, [1699999200]], [valid, [True, "99", "103", "100", "102", "10"]])
         for sequence in invalid_rows:
             with self.subTest(sequence=sequence):
                 with self.assertRaises(api._MalformedProviderResponse):
@@ -2439,9 +2439,9 @@ class KrakenAssetPairsIdentityIntegrityTests(unittest.TestCase):
         }}
 
     def test_accepts_reviewed_internal_asset_ids_and_requests_ohlc(self):
-        rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
+        rows = [[1699999200, "100", "102", "99", "101", "100.5", "10", 4]]
         with patch.object(api, "_request_json", side_effect=[
-            self._payload(), {"error": [], "result": {"XXBTZUSD": rows, "last": 1700000000}}
+            self._payload(), {"error": [], "result": {"XXBTZUSD": rows, "last": 1699999200}}
         ]) as request:
             candles = api._fetch_kraken("BTCUSD", "1h", 5)
         self.assertEqual(len(candles), 1)
@@ -2518,9 +2518,9 @@ class KrakenAssetPairsMarketStatusIntegrityTests(unittest.TestCase):
         return {"error": [], "result": {"XXBTZUSD": pair}}
 
     def test_accepts_online_market_and_requests_ohlc(self):
-        rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
+        rows = [[1699999200, "100", "102", "99", "101", "100.5", "10", 4]]
         with patch.object(api, "_request_json", side_effect=[
-            self._payload(), {"error": [], "result": {"XXBTZUSD": rows, "last": 1700000000}}
+            self._payload(), {"error": [], "result": {"XXBTZUSD": rows, "last": 1699999200}}
         ]) as request:
             candles = api._fetch_kraken("BTCUSD", "1h", 5)
         self.assertEqual(len(candles), 1)
@@ -3226,3 +3226,48 @@ class CoinbaseOHLCVNumericIntegrityTests(unittest.TestCase):
         self.assertIsInstance(rows[0]["volume"], float)
         self.assertTrue(math.isfinite(rows[0]["open"]))
         self.assertTrue(math.isfinite(rows[0]["volume"]))
+
+
+class CoinbaseIntervalAlignmentIntegrityTests(unittest.TestCase):
+    def test_rejects_misaligned_candle_open_timestamp_for_requested_interval(self):
+        # This timestamp is valid Unix seconds and falls inside the request
+        # window, but is not aligned to a 1-hour candle boundary.
+        misaligned = [1699999300, "99", "103", "100", "102", "10"]
+        with patch.object(api, "_request_json", return_value=[misaligned]):
+            with self.assertRaisesRegex(
+                api._MalformedProviderResponse, "misaligned to the requested interval"
+            ):
+                api._fetch_coinbase("BTCUSD", "1h", 5)
+
+    def test_accepts_epoch_aligned_candle_opens_for_minute_and_hour_intervals(self):
+        minute_row = [1699999200, "99", "103", "100", "102", "10"]
+        hour_row = [1699999200, "99", "103", "100", "102", "10"]
+        with patch.object(api, "_request_json", return_value=[minute_row]):
+            minute_rows = api._fetch_coinbase("BTCUSD", "1m", 5)
+        with patch.object(api, "_request_json", return_value=[hour_row]):
+            hour_rows = api._fetch_coinbase("BTCUSD", "1h", 5)
+        self.assertEqual(len(minute_rows), 1)
+        self.assertEqual(len(hour_rows), 1)
+        self.assertEqual(minute_rows[0]["open_time"], 1699999200000)
+        self.assertEqual(hour_rows[0]["open_time"], 1699999200000)
+
+    def test_rejects_candle_misaligned_even_when_timestamp_is_inside_page_bounds(self):
+        class FrozenDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return cls(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
+
+        catalogue = [{
+            "id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
+            "status": "online", "trading_disabled": False,
+        }]
+        # 11:00:01 UTC is inside the requested hour but not a candle open.
+        misaligned = [int(datetime(2025, 1, 1, 11, 0, 1, tzinfo=timezone.utc).timestamp()),
+                      "99", "103", "100", "102", "10"]
+        with patch.object(api, "datetime", FrozenDateTime), patch.object(
+            api, "_coinbase_request_json", side_effect=[catalogue, [misaligned]]
+        ):
+            with self.assertRaisesRegex(
+                api._MalformedProviderResponse, "misaligned to the requested interval"
+            ):
+                api._fetch_coinbase("BTCUSD", "1h", 5)
