@@ -55,9 +55,9 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_kraken_rejects_non_string_error_envelope_entries(self):
         asset_pairs = {"error": [], "result": {
-            "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
+            "XXBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
         }}
-        ohlc = {"error": [7], "result": {"XBTUSDT": [], "last": 1700000000}}
+        ohlc = {"error": [7], "result": {"XXBTUSDT": [], "last": 1700000000}}
         with patch.object(api, "_request_json", side_effect=[asset_pairs, ohlc]):
             with self.assertRaisesRegex(ValueError, "invalid error envelope"):
                 api._fetch_kraken("BTCUSDT", "1m", 5)
@@ -218,10 +218,10 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_kraken_rejects_ohlc_payload_over_documented_720_row_cap(self):
         asset_pairs = {"error": [], "result": {
-            "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
+            "XXBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
         }}
         rows = [[1700000000 + i * 60, "100", "102", "99", "101", "100.5", "10", 4] for i in range(721)]
-        ohlc = {"error": [], "result": {"XBTUSDT": rows, "last": 1700043260}}
+        ohlc = {"error": [], "result": {"XXBTUSDT": rows, "last": 1700043260}}
         with patch.object(api, "_request_json", side_effect=[asset_pairs, ohlc]):
             with self.assertRaisesRegex(ValueError, "documented 720-row cap"):
                 api._fetch_kraken("BTCUSDT", "1m", 500)
@@ -229,9 +229,9 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_malformed_successful_kraken_envelope_does_not_fall_through_to_coinbase(self):
         asset_pairs = {"error": [], "result": {
-            "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
+            "XXBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
         }}
-        malformed_ohlc = {"error": [], "result": {"XBTUSDT": [], "last": "not-a-cursor"}}
+        malformed_ohlc = {"error": [], "result": {"XXBTUSDT": [], "last": "not-a-cursor"}}
         with patch.object(api, "_fetch_binance", side_effect=urllib.error.URLError("Binance unavailable")), \
              patch.object(api, "_request_json", side_effect=[asset_pairs, malformed_ohlc]), \
              patch.object(api, "_fetch_coinbase") as coinbase:
@@ -279,14 +279,14 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_kraken_keeps_forming_tail_but_freshness_uses_last_closed_candle(self):
         asset_pairs = {"error": [], "result": {
-            "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
+            "XXBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
         }}
         current_open = 1700002800  # UTC hour boundary
         rows = [
             [current_open - 3600, "100", "102", "99", "101", "100.5", "10", 4],
             [current_open, "101", "103", "100", "102", "101.5", "5", 2],
         ]
-        ohlc = {"error": [], "result": {"XBTUSDT": rows, "last": current_open + 30}}
+        ohlc = {"error": [], "result": {"XXBTUSDT": rows, "last": current_open + 30}}
         with patch.object(api, "_request_json", side_effect=[asset_pairs, ohlc]):
             candles = api._fetch_kraken("BTCUSDT", "1h", 5)
         self.assertEqual(len(candles), 2)
@@ -337,25 +337,25 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_kraken_rejects_misaligned_utc_candle_open_at_adapter_boundary(self):
         asset_pairs = {"error": [], "result": {
-            "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
+            "XXBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
         }}
         for interval, timestamp in (("1h", 1700000060), ("1w", 1736121600)):
             rows = [[timestamp, "100", "102", "99", "101", "100.5", "10", 4]]
-            payload = {"error": [], "result": {"XBTUSDT": rows, "last": timestamp}}
+            payload = {"error": [], "result": {"XXBTUSDT": rows, "last": timestamp}}
             with patch.object(api, "_request_json", side_effect=[asset_pairs, payload]):
                 with self.assertRaisesRegex(api._MalformedProviderResponse, "UTC timeframe boundary"):
                     api._fetch_kraken("BTCUSDT", interval, 5)
 
     async def test_kraken_preserves_exact_interval_close_time_for_daily_and_four_hour_rows(self):
         asset_pairs = {"error": [], "result": {
-            "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
+            "XXBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
         }}
         for interval, timestamp, duration_ms in (
             ("4h", 1700006400, 14_400_000),
             ("1d", 1700006400, 86_400_000),
         ):
             rows = [[timestamp, "100", "102", "99", "101", "100.5", "10", 4]]
-            payload = {"error": [], "result": {"XBTUSDT": rows, "last": timestamp}}
+            payload = {"error": [], "result": {"XXBTUSDT": rows, "last": timestamp}}
             with patch.object(api, "_request_json", side_effect=[asset_pairs, payload]):
                 candles = api._fetch_kraken("BTCUSDT", interval, 5)
             self.assertEqual(candles[0]["close_time"], timestamp * 1000 + duration_ms - 1)
@@ -364,9 +364,9 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         row = [1700000000, "100", "102", "99", "101", "100.5", "10", 4]
         rows = [row, list(row)]
         asset_pairs = {"error": [], "result": {
-            "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
+            "XXBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
         }}
-        payload = {"error": [], "result": {"XBTUSDT": rows, "last": 1700000000}}
+        payload = {"error": [], "result": {"XXBTUSDT": rows, "last": 1700000000}}
         with patch.object(api, "_request_json", side_effect=[asset_pairs, payload]):
             with self.assertRaisesRegex(api._MalformedProviderResponse, "duplicate or out-of-order"):
                 api._fetch_kraken("BTCUSDT", "1h", 5)
@@ -376,9 +376,9 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         later = [1700003600, "101", "103", "100", "102", "101.5", "8", 4]
         rows = [later, first]
         asset_pairs = {"error": [], "result": {
-            "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
+            "XXBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
         }}
-        payload = {"error": [], "result": {"XBTUSDT": rows, "last": 1700003600}}
+        payload = {"error": [], "result": {"XXBTUSDT": rows, "last": 1700003600}}
         with patch.object(api, "_request_json", side_effect=[asset_pairs, payload]):
             with self.assertRaisesRegex(api._MalformedProviderResponse, "duplicate or out-of-order"):
                 api._fetch_kraken("BTCUSDT", "1h", 5)
@@ -386,11 +386,11 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
     async def test_kraken_rejects_missing_or_invalid_ohlc_pagination_cursor(self):
         rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
         asset_pairs = {"error": [], "result": {
-            "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
+            "XXBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
         }}
-        for result in ({"XBTUSDT": rows}, {"XBTUSDT": rows, "last": None},
-                       {"XBTUSDT": rows, "last": True}, {"XBTUSDT": rows, "last": 1700000000.5},
-                       {"XBTUSDT": rows, "last": -1}, {"XBTUSDT": rows, "last": 10**12}):
+        for result in ({"XXBTUSDT": rows}, {"XXBTUSDT": rows, "last": None},
+                       {"XXBTUSDT": rows, "last": True}, {"XXBTUSDT": rows, "last": 1700000000.5},
+                       {"XXBTUSDT": rows, "last": -1}, {"XXBTUSDT": rows, "last": 10**12}):
             with patch.object(api, "_request_json", side_effect=[asset_pairs, {"error": [], "result": result}]):
                 with self.assertRaisesRegex(ValueError, "pagination cursor"):
                     api._fetch_kraken("BTCUSDT", "1h", 5)
@@ -398,9 +398,9 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
     async def test_kraken_rejects_cursor_older_than_latest_returned_candle(self):
         rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
         asset_pairs = {"error": [], "result": {
-            "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
+            "XXBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
         }}
-        payload = {"error": [], "result": {"XBTUSDT": rows, "last": 1699999999}}
+        payload = {"error": [], "result": {"XXBTUSDT": rows, "last": 1699999999}}
         with patch.object(api, "_request_json", side_effect=[asset_pairs, payload]):
             with self.assertRaisesRegex(ValueError, "cursor precedes the latest"):
                 api._fetch_kraken("BTCUSDT", "1h", 5)
@@ -408,10 +408,10 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
     async def test_kraken_rejects_non_list_error_envelope(self):
         rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
         asset_pairs = {"error": [], "result": {
-            "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
+            "XXBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
         }}
         for errors in (None, "error", {"message": "bad"}):
-            payload = {"error": errors, "result": {"XBTUSDT": rows, "last": 1700000000}}
+            payload = {"error": errors, "result": {"XXBTUSDT": rows, "last": 1700000000}}
             with patch.object(api, "_request_json", side_effect=[asset_pairs, payload]):
                 with self.assertRaisesRegex(ValueError, "error envelope"):
                     api._fetch_kraken("BTCUSDT", "1h", 5)
@@ -437,9 +437,9 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
     async def test_kraken_rejects_fractional_or_boolean_source_timestamps(self):
         for timestamp in (1700000000.5, True):
             rows = [[timestamp, "100", "102", "99", "101", "100.5", "10", 4]]
-            payload = {"error": [], "result": {"XBTUSDT": rows, "last": 1700000000}}
+            payload = {"error": [], "result": {"XXBTUSDT": rows, "last": 1700000000}}
             asset_pairs = {"error": [], "result": {
-                "XBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
+                "XXBTUSDT": {"altname": "XBTUSDT", "wsname": "XBT/USDT", "aclass_base": "currency", "aclass_quote": "currency", "status": "online", "base": "XXBT", "quote": "USDT"}
             }}
             with patch.object(api, "_request_json", side_effect=[asset_pairs, payload]):
                 with self.assertRaisesRegex(ValueError, "timestamp"):
