@@ -110,6 +110,18 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         self.assertIn("market_data_older_than_15_minutes", result["data_quality_warnings"])
 
     @patch("market_data_step1.urllib.request.urlopen")
+    def test_fractionally_over_15_minutes_is_stale(self, mocked):
+        # More than 15 minutes old by a fraction of a second must not become
+        # fresh merely because the reported integer age is truncated to 900.
+        old = (datetime.now(timezone.utc) - timedelta(minutes=15, milliseconds=500)).isoformat()
+        mocked.return_value = FakeResponse([row(last_updated=old)])
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertEqual(result["freshness_status"], "stale")
+        self.assertEqual(result["freshness_age_seconds"], 900)
+        self.assertFalse(result["analysis_eligible"])
+        self.assertIn("market_data_older_than_15_minutes", result["data_quality_warnings"])
+
+    @patch("market_data_step1.urllib.request.urlopen")
     def test_missing_or_timezone_naive_timestamp_is_unknown(self, mocked):
         mocked.return_value = FakeResponse([row(last_updated="2026-10-24T00:00:00")])
         result = _fetch_market_data(["bitcoin"], "usd")[0]
@@ -124,6 +136,26 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         self.assertEqual(result["freshness_status"], "unknown")
         self.assertIn("future_last_updated_timestamp", result["data_quality_warnings"])
 
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_future_timestamp_within_tolerance_remains_fresh(self, mocked):
+        future = (datetime.now(timezone.utc) + timedelta(minutes=4)).isoformat()
+        mocked.return_value = FakeResponse([row(last_updated=future)])
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertEqual(result["freshness_status"], "fresh")
+        self.assertEqual(result["freshness_age_seconds"], 0)
+        self.assertTrue(result["analysis_eligible"])
+        self.assertNotIn("future_last_updated_timestamp", result["data_quality_warnings"])
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_future_timestamp_beyond_tolerance_is_unknown(self, mocked):
+        future = (datetime.now(timezone.utc) + timedelta(minutes=6)).isoformat()
+        mocked.return_value = FakeResponse([row(last_updated=future)])
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertEqual(result["freshness_status"], "unknown")
+        self.assertIsNone(result["freshness_age_seconds"])
+        self.assertFalse(result["analysis_eligible"])
+        self.assertIn("future_last_updated_timestamp", result["data_quality_warnings"])
 
     @patch("market_data_step1.urllib.request.urlopen")
     def test_unexpected_provider_status_is_controlled_error(self, mocked):
@@ -290,6 +322,59 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         self.assertNotIn("sensitive provider internals", raised.exception.detail)
         mocked.assert_called_once_with(["bitcoin"], "usd")
 
+
+
+    def test_freshness_threshold_boundary_is_deterministic(self):
+        fixed_now = datetime(2026, 10, 30, 12, 0, tzinfo=timezone.utc)
+
+        class FixedDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return fixed_now if tz is not None else fixed_now.replace(tzinfo=None)
+
+        with patch("market_data_step1.datetime", FixedDateTime):
+            from market_data_step1 import _timestamp_status
+            self.assertEqual(
+                _timestamp_status((fixed_now - timedelta(minutes=15)).isoformat()),
+                ("fresh", 900, None),
+            )
+            status, age, warning = _timestamp_status(
+                (fixed_now - timedelta(minutes=15, seconds=1)).isoformat()
+            )
+            self.assertEqual((status, age), ("stale", 901))
+            self.assertIsNone(warning)
+
+    def test_future_timestamp_tolerance_boundary_is_explicit(self):
+        from market_data_step1 import _timestamp_status
+        fixed_now = datetime(2026, 10, 30, 12, 0, tzinfo=timezone.utc)
+
+        class FixedDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return fixed_now if tz is not None else fixed_now.replace(tzinfo=None)
+
+        with patch("market_data_step1.datetime", FixedDateTime):
+            within_tolerance = _timestamp_status(
+                (fixed_now + timedelta(minutes=5)).isoformat()
+            )
+            beyond_tolerance = _timestamp_status(
+                (fixed_now + timedelta(minutes=5, seconds=1)).isoformat()
+            )
+        self.assertEqual(within_tolerance, ("fresh", 0, None))
+        self.assertEqual(beyond_tolerance, ("unknown", None, "future_last_updated_timestamp"))
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_boolean_optional_metrics_are_omitted_with_warnings(self, mocked):
+        mocked.return_value = FakeResponse([row(
+            market_cap=True, total_volume=False, price_change_percentage_24h=True,
+        )])
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertIsNone(result["market_cap"])
+        self.assertIsNone(result["total_volume_24h"])
+        self.assertIsNone(result["price_change_percentage_24h"])
+        self.assertIn("invalid_market_cap_omitted", result["data_quality_warnings"])
+        self.assertIn("invalid_total_volume_omitted", result["data_quality_warnings"])
+        self.assertIn("invalid_price_change_percentage_omitted", result["data_quality_warnings"])
 
 if __name__ == "__main__":
     unittest.main()
