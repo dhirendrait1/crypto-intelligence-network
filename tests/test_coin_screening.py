@@ -747,3 +747,72 @@ class MarketProviderResponseSizeTests(unittest.TestCase):
         self.assertEqual(fallback.requested_size, MODULE._MAX_MARKET_PROVIDER_RESPONSE_BYTES + 1)
         self.assertEqual(caught.exception.primary_kind, "invalid_response")
         self.assertEqual(caught.exception.fallback_kind, "invalid_response")
+
+
+class ScreeningCacheAgeBoundaryTests(unittest.TestCase):
+    def setUp(self):
+        MODULE._CACHE.clear()
+
+    def tearDown(self):
+        MODULE._CACHE.clear()
+
+    @staticmethod
+    def _cached_row(retrieved_at):
+        return [{
+            "id": "cached-boundary", "symbol": "CACH", "name": "Cached Boundary",
+            "_cin_provider": "CoinGecko", "_cin_retrieved_at": retrieved_at,
+            "current_price": 1.0,
+        }]
+
+    @staticmethod
+    def _provider_failure():
+        return MODULE.MarketDataProviderFailure(
+            primary_kind="network_error", primary_status=None,
+            fallback_kind="network_error", fallback_status=None,
+        )
+
+    def test_fresh_cache_ttl_includes_exact_90_second_boundary(self):
+        now = 1_800_000_000.0
+        rows = self._cached_row(now - MODULE._CACHE_TTL_SECONDS)
+        MODULE._CACHE[("usd", 1)] = (now - MODULE._CACHE_TTL_SECONDS, rows)
+        with patch.object(MODULE.time, "time", return_value=now), patch.object(
+            MODULE, "_request_markets", side_effect=AssertionError("fresh cache should be used")
+        ):
+            cached, mode, _, _ = MODULE._fetch_markets("usd", 1)
+        self.assertEqual(mode, "cache")
+        self.assertEqual(cached[0]["_cin_retrieved_at"], now - 90)
+
+    def test_cache_one_second_beyond_fresh_ttl_attempts_provider_refresh(self):
+        now = 1_800_000_000.0
+        rows = self._cached_row(now - MODULE._CACHE_TTL_SECONDS - 1)
+        MODULE._CACHE[("usd", 1)] = (now - MODULE._CACHE_TTL_SECONDS - 1, rows)
+        fresh_rows = [{"id": "refreshed", "symbol": "NEW", "name": "Refreshed"}]
+        with patch.object(MODULE.time, "time", return_value=now), patch.object(
+            MODULE, "_request_markets", return_value=fresh_rows
+        ) as request:
+            result, mode, _, _ = MODULE._fetch_markets("usd", 1)
+        request.assert_called_once_with("usd", 1)
+        self.assertEqual(mode, "live")
+        self.assertEqual(result[0]["id"], "refreshed")
+
+    def test_stale_cache_accepts_exact_900_second_limit(self):
+        now = 1_800_000_000.0
+        retrieved_at = now - MODULE._STALE_CACHE_MAX_SECONDS
+        rows = self._cached_row(retrieved_at)
+        MODULE._CACHE[("usd", 1)] = (retrieved_at, rows)
+        with patch.object(MODULE.time, "time", return_value=now), patch.object(
+            MODULE, "_request_markets", side_effect=self._provider_failure()
+        ):
+            result, mode, _, _ = MODULE._fetch_markets("usd", 1)
+        self.assertEqual(mode, "stale_cache")
+        self.assertEqual(result[0]["_cin_retrieved_at"], retrieved_at)
+
+    def test_stale_cache_one_second_over_limit_is_rejected(self):
+        now = 1_800_000_000.0
+        retrieved_at = now - MODULE._STALE_CACHE_MAX_SECONDS - 1
+        MODULE._CACHE[("usd", 1)] = (retrieved_at, self._cached_row(retrieved_at))
+        with patch.object(MODULE.time, "time", return_value=now), patch.object(
+            MODULE, "_request_markets", side_effect=self._provider_failure()
+        ):
+            with self.assertRaises(MODULE.MarketDataProviderFailure):
+                MODULE._fetch_markets("usd", 1)
