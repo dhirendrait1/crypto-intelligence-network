@@ -126,6 +126,26 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
 
 
     @patch("market_data_step1.urllib.request.urlopen")
+    def test_future_timestamp_within_tolerance_remains_fresh(self, mocked):
+        future = (datetime.now(timezone.utc) + timedelta(minutes=4)).isoformat()
+        mocked.return_value = FakeResponse([row(last_updated=future)])
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertEqual(result["freshness_status"], "fresh")
+        self.assertEqual(result["freshness_age_seconds"], 0)
+        self.assertTrue(result["analysis_eligible"])
+        self.assertNotIn("future_last_updated_timestamp", result["data_quality_warnings"])
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_future_timestamp_beyond_tolerance_is_unknown(self, mocked):
+        future = (datetime.now(timezone.utc) + timedelta(minutes=6)).isoformat()
+        mocked.return_value = FakeResponse([row(last_updated=future)])
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertEqual(result["freshness_status"], "unknown")
+        self.assertIsNone(result["freshness_age_seconds"])
+        self.assertFalse(result["analysis_eligible"])
+        self.assertIn("future_last_updated_timestamp", result["data_quality_warnings"])
+
+    @patch("market_data_step1.urllib.request.urlopen")
     def test_unexpected_provider_status_is_controlled_error(self, mocked):
         from market_data_step1 import _fetch_market_data
         mocked.return_value = FakeResponse([], status=503)
