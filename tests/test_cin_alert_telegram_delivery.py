@@ -170,7 +170,6 @@ class TelegramDeliveryTests(unittest.TestCase):
         with __import__("sqlite3").connect(path) as db:
             self.assertEqual(db.execute("SELECT status FROM alert_delivery_outbox").fetchone()[0], "pending")
 
-
 def test_crash_after_provider_acceptance_retries_after_lease_and_is_at_least_once(tmp_path):
     """Provider acceptance before local commit can cause a duplicate after recovery."""
     from datetime import timedelta
