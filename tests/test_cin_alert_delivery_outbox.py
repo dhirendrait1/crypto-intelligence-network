@@ -467,3 +467,49 @@ def test_operator_authorized_uncertain_retry_can_override_retry_cap_once(tmp_pat
     assert len(retry) == 1
     assert retry[0]["attempts"] == 2
     assert retry[0]["status"] == "sending"
+
+def test_concurrent_claimers_only_claim_each_due_item_once(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    item = enqueue_alert_delivery(
+        path, rule_id="r1", observation_id="concurrent-claim",
+        payload={"value": 1}, now=NOW,
+    )
+
+    def claim(_):
+        return claim_due_alerts(path, now=NOW, limit=10)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        batches = list(pool.map(claim, range(8)))
+
+    claimed_keys = [
+        row["idempotency_key"]
+        for batch in batches
+        for row in batch
+    ]
+    assert claimed_keys == [item["idempotency_key"]]
+    assert sum(len(batch) for batch in batches) == 1
+
+def test_concurrent_workers_claim_each_due_item_at_most_once(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    for index in range(12):
+        enqueue_alert_delivery(
+            path,
+            rule_id="r1",
+            observation_id=f"e{index}",
+            payload={"index": index},
+            now=NOW,
+        )
+
+    barrier = __import__("threading").Barrier(4)
+
+    def claim(_):
+        barrier.wait()
+        return claim_due_alerts(path, now=NOW, limit=4)
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        batches = list(pool.map(claim, range(4)))
+
+    keys = [item["idempotency_key"] for batch in batches for item in batch]
+    assert len(keys) == 12
+    assert len(set(keys)) == 12
+    assert all(item["status"] == "sending" for batch in batches for item in batch)
