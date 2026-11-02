@@ -283,3 +283,61 @@ def test_shared_aggregator_preserves_unknown_when_evidence_is_incomplete():
     result = monitoring_status(MonitoringSnapshot(health="healthy", readiness="ready", provider_status="unknown", freshness="fresh"))
     assert result["status"] == "unknown"
     assert result["checks_performed"] is False
+
+
+
+def test_source_freshness_endpoint_rejects_caller_supplied_age_limit():
+    app = FastAPI()
+    from cin_monitoring_status_api import router
+    app.include_router(router)
+    response = TestClient(app).post("/monitoring/source-freshness", json={
+        "observation": {"subject": "BTC-USD"},
+        "max_age_seconds": 1,
+    })
+    assert response.status_code == 422
+
+
+def test_source_freshness_endpoint_uses_exact_configured_policy(monkeypatch):
+    from cin_source_freshness_policy import FreshnessPolicy
+    import cin_source_freshness_policy
+
+    monkeypatch.setattr(
+        cin_source_freshness_policy,
+        "resolve_freshness_policy",
+        lambda source_id, data_type: (
+            FreshnessPolicy(
+                source_id="coinbase_public",
+                data_type="market_candles",
+                max_age_seconds=10,
+                future_tolerance_seconds=0,
+            )
+            if (source_id, data_type) == ("coinbase_public", "market_candles")
+            else None
+        ),
+    )
+    now = datetime.now(timezone.utc)
+    observation = {
+        "source_id": "coinbase_public",
+        "data_type": "market_candles",
+        "subject": "BTC-USD",
+        "observed_at": (now - timedelta(seconds=20)).isoformat(),
+        "retrieved_at": now.isoformat(),
+        "timestamp_semantics": "snapshot_time",
+        "provenance": "test-fixture",
+    }
+    app = FastAPI()
+    from cin_monitoring_status_api import router
+    app.include_router(router)
+    response = TestClient(app).post(
+        "/monitoring/source-freshness", json={"observation": observation}
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "stale"
+    assert body["freshness"]["reason"] == "age_exceeds_limit"
+    assert body["freshness_policy"]["configured"] is True
+    assert body["freshness_policy"]["max_age_seconds"] == 10
+    assert body["freshness_policy"]["source_id"] == "coinbase_public"
+    assert body["freshness_policy"]["data_type"] == "market_candles"
+    assert body["checks_performed"] is False
+    assert body["read_only"] is True
