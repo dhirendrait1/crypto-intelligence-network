@@ -49,6 +49,17 @@ class EvidenceGateTests(unittest.TestCase):
         )
         self.assertEqual(len(evaluate([candidate], "7d", NOW)["eligible"]), 1)
 
+    def test_shorter_windows_are_not_confused_with_24_hours(self):
+        for horizon, start in (
+            ("1h", "2026-11-02T11:00:00+00:00"),
+            ("6h", "2026-11-02T06:00:00+00:00"),
+            ("12h", "2026-11-02T00:00:00+00:00"),
+        ):
+            candidate = good()
+            candidate["evidence"]["chart"].update(horizon=horizon, window_start=start)
+            with self.subTest(horizon=horizon):
+                self.assertEqual(len(evaluate([candidate], horizon, NOW)["eligible"]), 1)
+
     def test_duplicate_does_not_fill_shortlist(self):
         candidate = good()
         result = evaluate([candidate, deepcopy(candidate)], "24h", NOW)

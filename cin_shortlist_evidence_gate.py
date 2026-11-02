@@ -6,7 +6,17 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import urlsplit
 
-HORIZONS = ("24h", "7d")
+HORIZONS = ("1h", "6h", "12h", "24h", "7d")
+CHART_INTERVALS = {
+    "1h": timedelta(minutes=5), "6h": timedelta(minutes=15),
+    "12h": timedelta(minutes=30), "24h": timedelta(hours=1),
+    "7d": timedelta(hours=4),
+}
+WINDOWS = {
+    "1h": timedelta(hours=1), "6h": timedelta(hours=6),
+    "12h": timedelta(hours=12), "24h": timedelta(hours=24),
+    "7d": timedelta(days=7),
+}
 REQUIRED = ("market", "chart", "news", "social", "market_sentiment")
 
 
@@ -17,7 +27,7 @@ def evaluate(candidates: list[dict[str, Any]], horizon: str, now: datetime) -> d
     if not isinstance(candidates, list) or len(candidates) > 100:
         raise ValueError("candidates must be a list of at most 100 items")
     now = now.astimezone(timezone.utc)
-    max_ages = {"market": timedelta(minutes=15), "chart": timedelta(hours=4),
+    max_ages = {"market": timedelta(minutes=15), "chart": CHART_INTERVALS[horizon],
                 "news": timedelta(hours=48), "social": timedelta(hours=48),
                 "market_sentiment": timedelta(hours=24)}
     accepted, excluded, seen = [], [], set()
@@ -65,7 +75,7 @@ def evaluate(candidates: list[dict[str, Any]], horizon: str, now: datetime) -> d
             try:
                 start = datetime.fromisoformat(chart["window_start"].replace("Z", "+00:00"))
                 end = datetime.fromisoformat(chart["window_end"].replace("Z", "+00:00"))
-                minimum = timedelta(hours=24) if horizon == "24h" else timedelta(days=7)
+                minimum = WINDOWS[horizon]
                 if start.tzinfo is None or end.tzinfo is None or end > now or end - start < minimum or now - end > max_ages["chart"]:
                     raise ValueError("invalid chart window")
             except (KeyError, TypeError, ValueError, OverflowError, AttributeError):

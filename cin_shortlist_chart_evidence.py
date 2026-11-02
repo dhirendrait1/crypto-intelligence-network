@@ -8,7 +8,13 @@ import math
 from datetime import datetime, timezone
 from typing import Any
 
-_RULES = {"24h": ("1h", 24, 3_600_000), "7d": ("4h", 42, 14_400_000)}
+_RULES = {
+    "1h": ("5m", 12, 300_000),
+    "6h": ("15m", 24, 900_000),
+    "12h": ("30m", 24, 1_800_000),
+    "24h": ("1h", 24, 3_600_000),
+    "7d": ("4h", 42, 14_400_000),
+}
 
 
 def chart_evidence(payload: Any, *, asset_id: str, market_id: str, horizon: str, now: datetime) -> dict[str, Any]:

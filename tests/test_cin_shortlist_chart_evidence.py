@@ -25,6 +25,19 @@ class ChartTests(unittest.TestCase):
         self.assertEqual(self.call(payload())["candle_count"], 24)
         self.assertEqual(self.call(payload(42, 14_400_000, "4h"), "7d")["candle_count"], 42)
 
+    def test_shorter_horizons_use_their_explicit_intervals(self):
+        for horizon, count, duration, interval in (
+            ("1h", 12, 300_000, "5m"),
+            ("6h", 24, 900_000, "15m"),
+            ("12h", 24, 1_800_000, "30m"),
+        ):
+            with self.subTest(horizon=horizon):
+                self.assertEqual(self.call(payload(count, duration, interval), horizon)["candle_count"], count)
+
+    def test_wrong_interval_is_not_silently_reused(self):
+        with self.assertRaisesRegex(ValueError, "interval"):
+            self.call(payload(), "1h")
+
     def test_realistic_response_maps_to_gate_without_inventing_other_sources(self):
         candidate = {"asset_id": "bitcoin", "market_id": "BTCUSD",
                      "evidence": {"chart": self.call(payload())}}
