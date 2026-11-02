@@ -80,7 +80,7 @@ class DashboardPreviewTests(unittest.TestCase):
 
 
     def test_verified_endpoint_states_update_visible_dashboard_panels(self):
-        for panel in ("market", "technical", "screening", "evidence", "news", "monitoring"):
+        for panel in ("market", "technical", "screening", "evidence", "news", "social-btc", "social-eth", "monitoring"):
             self.assertIn('data-cin-panel="' + panel + '"', self.html)
         self.assertIn("function updateDashboardPanel(name,state,detail,data,meta)", self.html)
         self.assertIn("updateDashboardPanel(name,state,detail,data,meta);", self.html)
@@ -195,4 +195,5 @@ class DashboardPreviewTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
 

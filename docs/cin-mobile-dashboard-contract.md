@@ -51,3 +51,8 @@ Never infer `fresh` from a successful HTTP response alone. Never convert missing
 ## Security boundaries
 No order placement or execution, order management, wallet control, private keys, seed phrases or fund movement. The dashboard is an informational interface only.
 
+
+
+## Optional social preview
+
+The dashboard can request Bitcoin and Ethereum social preview endpoints separately. These are optional and their failures do not count as failures of the five existing required endpoints. The server returns 404 while the preview is disabled. A successful response reports a limited, low-confidence English keyword signal for a single public Mastodon instance and must not be interpreted as a broad market or price forecast. The preview is not an accepted input to the mandatory shortlist gate.
