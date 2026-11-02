@@ -104,7 +104,8 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
 <article class="card" data-cin-panel="technical"><h2>Technical analysis</h2><div class="state">Awaiting API</div><p class="muted small">Trend structure and indicators must include timeframe and closed-candle status.</p></article>
 <article class="card" data-cin-panel="screening"><h2>Coin screening</h2><div class="state">Awaiting API</div><p class="muted small">Scores should expose methodology, inputs and data limitations.</p></article>
 <article class="card" data-cin-panel="evidence"><h2>Evidence & provenance</h2><div class="state">Not verified</div><p class="muted small">Source identity, retrieval time, observed time and evidence completeness.</p></article>
-<article class="card" data-cin-panel="news"><h2>News & derivatives</h2><div class="state">Awaiting API</div><p class="muted small">Sentiment and derivatives metrics remain unavailable until returned by the service.</p></article>
+<article class="card" data-cin-panel="news"><h2>News & sentiment</h2><div class="state">Awaiting API</div><p class="muted small">News sentiment remains unavailable until returned by the service.</p></article>
+<article class="card" data-cin-panel="derivatives"><h2>Derivatives</h2><div class="state">Awaiting API</div><p class="muted small">Derivatives metrics remain unavailable until returned by the service.</p></article>
 <article class="card" data-cin-panel="monitoring"><h2>Monitoring</h2><div class="state">Policy not configured</div><p class="muted small">Unknown freshness stays unknown; no universal thresholds are assumed.</p></article>
 <article class="card full"><h2>Data quality rules</h2><ul><li>Show unavailable and unknown states explicitly; never substitute fabricated values.</li><li>Display source and timestamps beside each dataset.</li><li>Separate heuristic research outputs from verified facts.</li><li>All controls are informational only: no orders, wallets or fund movement.</li></ul><div class="actions"><button id="refresh" type="button">Recheck preview state</button><span id="refresh-state" class="muted small" role="status" aria-live="polite">No API request has been made.</span></div></article>
 </section>
@@ -152,7 +153,7 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
     "Technical analysis":"technical",
     "Coin screening":"screening",
     "Public news sentiment":"news",
-    "Derivatives snapshot":"news"
+    "Derivatives snapshot":"derivatives"
   };
   function metricLine(container,label,value){
     const line=document.createElement("div");

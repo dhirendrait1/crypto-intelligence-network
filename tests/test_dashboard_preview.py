@@ -24,7 +24,7 @@ class DashboardPreviewTests(unittest.TestCase):
     def test_required_research_panels_are_present(self):
         for panel in (
             "Market data", "Technical analysis", "Coin screening",
-            "Evidence & provenance", "News & derivatives",
+            "Evidence & provenance", "News & sentiment", "Derivatives",
             "Monitoring", "Data quality rules",
         ):
             with self.subTest(panel=panel):
@@ -80,7 +80,7 @@ class DashboardPreviewTests(unittest.TestCase):
 
 
     def test_verified_endpoint_states_update_visible_dashboard_panels(self):
-        for panel in ("market", "technical", "screening", "evidence", "news", "monitoring"):
+        for panel in ("market", "technical", "screening", "evidence", "news", "derivatives", "monitoring"):
             self.assertIn('data-cin-panel="' + panel + '"', self.html)
         self.assertIn("function updateDashboardPanel(name,state,detail,data,meta)", self.html)
         self.assertIn("updateDashboardPanel(name,state,detail,data,meta);", self.html)
