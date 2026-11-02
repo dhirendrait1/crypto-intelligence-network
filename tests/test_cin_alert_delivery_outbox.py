@@ -119,3 +119,25 @@ def test_stale_worker_cannot_mark_reclaimed_attempt_sent_or_failed(tmp_path):
         mark_alert_failed(path, item["idempotency_key"], now=NOW + timedelta(seconds=301), error_code="stale_worker", claim_attempt=old_claim["attempts"])
     current = mark_alert_sent(path, item["idempotency_key"], now=NOW + timedelta(seconds=302), claim_attempt=new_claim["attempts"])
     assert current["status"] == "sent"
+
+
+def test_concurrent_claimers_only_claim_each_due_item_once(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    item = enqueue_alert_delivery(
+        path, rule_id="r1", observation_id="concurrent-claim",
+        payload={"value": 1}, now=NOW,
+    )
+
+    def claim(_):
+        return claim_due_alerts(path, now=NOW, limit=10)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        batches = list(pool.map(claim, range(8)))
+
+    claimed_keys = [
+        row["idempotency_key"]
+        for batch in batches
+        for row in batch
+    ]
+    assert claimed_keys == [item["idempotency_key"]]
+    assert sum(len(batch) for batch in batches) == 1
