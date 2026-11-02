@@ -165,14 +165,27 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     payload = _request_json(f"{KRAKEN_OHLC_URL}?{query}")
     if not isinstance(payload, dict):
         raise ValueError("Kraken response was not an object")
-    errors = payload.get("error") or []
+    errors = payload.get("error")
+    if not isinstance(errors, list) or any(not isinstance(error, str) or not error.strip() for error in errors):
+        raise ValueError("Kraken response error field was malformed")
     if errors:
         raise ValueError("Kraken rejected pair/timeframe: " + "; ".join(str(e) for e in errors))
     result = payload.get("result")
     if not isinstance(result, dict):
         raise ValueError("Kraken response had no result")
-    pair_key = next((key for key in result if key != "last"), None)
-    rows = result.get(pair_key) if pair_key else None
+    # Kraken can use canonical aliases. Only accept explicitly
+    # recognised aliases for these common pairs; other pairs must be exact.
+    aliases = {
+        ("XBT", "USD"): {"XBTUSD", "XXBTZUSD"},
+        ("ETH", "USD"): {"ETHUSD", "XETHZUSD"},
+        ("XBT", "USDT"): {"XBTUSDT"},
+        ("ETH", "USDT"): {"ETHUSDT"},
+    }
+    accepted = aliases.get((base, quote), {kraken_pair})
+    result_keys = [key for key in result if key != "last"]
+    if len(result_keys) != 1 or result_keys[0] not in accepted:
+        raise ValueError("Kraken response market key did not uniquely match requested pair")
+    rows = result.get(result_keys[0])
     if not isinstance(rows, list):
         raise ValueError("Kraken returned no candle rows")
     candles = []
@@ -454,3 +467,4 @@ async def analyze_public_market(
         "Technical outputs and ATR scenarios are descriptive research, not investment advice or trade instructions.",
     ])
     return analysis
+
