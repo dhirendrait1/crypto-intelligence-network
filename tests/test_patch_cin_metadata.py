@@ -86,6 +86,46 @@ class DeploymentPatchTests(unittest.TestCase):
             with self.subTest(router=router):
                 self.assertEqual(second_text.count(f"app.include_router({router})"), 1)
 
+    def test_dashboard_cors_allows_only_the_published_origin(self):
+        import asyncio
+        from fastapi import FastAPI
+
+        result = self.run_patch()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        text = (self.app_dir / "main.py").read_text(encoding="utf-8")
+        block = text.split("# CIN dashboard CORS begin", 1)[1].split("# CIN dashboard CORS end", 1)[0]
+        app = FastAPI()
+        exec(block, {"app": app})
+
+        @app.get("/health")
+        def health():
+            return {"status": "ok"}
+
+        middleware = app.user_middleware[0]
+        self.assertEqual(middleware.kwargs["allow_origins"], ["https://crypto-net.pages.dev"])
+        self.assertFalse(middleware.kwargs["allow_credentials"])
+        self.assertEqual(middleware.kwargs["allow_methods"], ["GET"])
+
+        async def inner(scope, receive, send):
+            await send({"type": "http.response.start", "status": 200, "headers": []})
+            await send({"type": "http.response.body", "body": b"ok"})
+
+        async def request(origin):
+            messages = []
+            async def send(message):
+                messages.append(message)
+            async def receive():
+                return {"type": "http.request", "body": b"", "more_body": False}
+            cors = middleware.cls(inner, **middleware.kwargs)
+            await cors({"type": "http", "method": "GET", "headers": [(b"origin", origin.encode())]}, receive, send)
+            return dict(messages[0]["headers"])
+
+        allowed = asyncio.run(request("https://crypto-net.pages.dev"))
+        self.assertEqual(allowed.get(b"access-control-allow-origin"), b"https://crypto-net.pages.dev")
+        self.assertNotIn(b"access-control-allow-credentials", allowed)
+        denied = asyncio.run(request("https://other.example"))
+        self.assertNotIn(b"access-control-allow-origin", denied)
+
     def test_monitoring_api_module_is_copied_into_deployment_app(self):
         result = self.run_patch()
         self.assertEqual(result.returncode, 0, result.stderr)

@@ -130,6 +130,31 @@ for marker, registration in registrations:
         main_text = main_text.rstrip() + registration
     registrations_added += 1
 
+# Permit the published dashboard origin to read public API responses.
+# Credentials are omitted by the dashboard. CORS is a browser policy, not authentication.
+cors_block = (
+    '\n# CIN dashboard CORS begin\n'
+    'from fastapi.middleware.cors import CORSMiddleware\n'
+    'app.add_middleware(\n'
+    '    CORSMiddleware,\n'
+    '    allow_origins=["https://crypto-net.pages.dev"],\n'
+    '    allow_credentials=False,\n'
+    '    allow_methods=["GET"],\n'
+    '    allow_headers=["Accept"],\n'
+    ')\n'
+    '# CIN dashboard CORS end\n'
+)
+cors_start = "# CIN dashboard CORS begin"
+cors_end = "# CIN dashboard CORS end"
+if cors_start in main_text or cors_end in main_text:
+    if cors_block.strip() not in main_text:
+        raise SystemExit("Partial or unexpected CIN dashboard CORS configuration")
+else:
+    if main_guard in main_text:
+        main_text = main_text.replace(main_guard, cors_block + "\n" + main_guard, 1)
+    else:
+        main_text = main_text.rstrip() + cors_block
+
 # Preflight branding metadata across the full app before writing any scaffold file.
 branding_files = list(APP_DIR.rglob("*.py"))
 branding_text = {path: path.read_text(encoding="utf-8") for path in branding_files}
