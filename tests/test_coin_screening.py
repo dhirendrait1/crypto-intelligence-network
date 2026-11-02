@@ -423,14 +423,14 @@ class ProviderFailureClassificationTests(unittest.TestCase):
         MODULE._CACHE[("usd", 5)] = (now - 120, cached_rows)
         failure = MODULE.MarketDataProviderFailure(
             primary_kind="http_error", primary_status=429,
-            fallback_kind="http_error", fallback_status=503,
+            fallback_kind="not_attempted", fallback_status=None,
         )
         with patch.object(MODULE.time, "time", return_value=now), patch.object(
             MODULE, "_request_markets", side_effect=failure
         ):
             rows, mode, error_code, error_details = MODULE._fetch_markets("usd", 5)
         self.assertEqual(mode, "stale_cache")
-        self.assertEqual(error_code, 503)
+        self.assertEqual(error_code, 429)
         self.assertEqual(error_details["primary_http_status"], 429)
         self.assertIsNone(error_details["fallback_http_status"])
         self.assertEqual(error_details["primary_error"], "http_error")
