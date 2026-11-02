@@ -4,6 +4,7 @@ from __future__ import annotations
 import math
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from urllib.parse import urlsplit
 
 HORIZONS = ("24h", "7d")
 REQUIRED = ("market", "chart", "news", "social", "market_sentiment")
@@ -11,7 +12,7 @@ REQUIRED = ("market", "chart", "news", "social", "market_sentiment")
 
 def evaluate(candidates: list[dict[str, Any]], horizon: str, now: datetime) -> dict[str, Any]:
     """Gate caller-supplied evidence. Source authenticity must be verified upstream."""
-    if horizon not in HORIZONS or now.tzinfo is None:
+    if horizon not in HORIZONS or not isinstance(now, datetime) or now.tzinfo is None:
         raise ValueError("unsupported horizon or naive clock")
     if not isinstance(candidates, list) or len(candidates) > 100:
         raise ValueError("candidates must be a list of at most 100 items")
@@ -29,10 +30,8 @@ def evaluate(candidates: list[dict[str, Any]], horizon: str, now: datetime) -> d
         market = item.get("market_id")
         if not isinstance(asset, str) or not asset.strip() or not isinstance(market, str) or not market.strip():
             reasons.append("Asset and market identity are required.")
-        elif (asset, market) in seen:
-            reasons.append("Duplicate asset and market.")
-        else:
-            seen.add((asset, market))
+        elif asset.strip().casefold() in seen:
+            reasons.append("Duplicate asset.")
         evidence = item.get("evidence")
         if not isinstance(evidence, dict):
             evidence = {}
@@ -45,8 +44,12 @@ def evaluate(candidates: list[dict[str, Any]], horizon: str, now: datetime) -> d
                 reasons.append(key + ": asset mismatch")
             if not isinstance(entry.get("source"), str) or not entry["source"].strip():
                 reasons.append(key + ": missing source")
-            if not isinstance(entry.get("source_url"), str) or not entry["source_url"].startswith("https://"):
-                reasons.append(key + ": missing source URL")
+            try:
+                url = urlsplit(entry["source_url"])
+                if url.scheme != "https" or not url.hostname or url.username or url.password or url.port is not None:
+                    raise ValueError("invalid source URL")
+            except (KeyError, TypeError, ValueError, AttributeError):
+                reasons.append(key + ": invalid source URL")
             try:
                 stamp = datetime.fromisoformat(entry["observed_at"].replace("Z", "+00:00"))
                 if stamp.tzinfo is None or stamp > now or now - stamp > max_ages[key]:
@@ -56,13 +59,31 @@ def evaluate(candidates: list[dict[str, Any]], horizon: str, now: datetime) -> d
         chart = evidence.get("chart")
         if not isinstance(chart, dict) or chart.get("horizon") != horizon or chart.get("closed_candles") is not True or chart.get("coverage") != "complete":
             reasons.append("chart: horizon and completed coverage not established")
+        if isinstance(chart, dict):
+            if chart.get("market_id") != market:
+                reasons.append("chart: market mismatch")
+            try:
+                start = datetime.fromisoformat(chart["window_start"].replace("Z", "+00:00"))
+                end = datetime.fromisoformat(chart["window_end"].replace("Z", "+00:00"))
+                minimum = timedelta(hours=24) if horizon == "24h" else timedelta(days=7)
+                if start.tzinfo is None or end.tzinfo is None or end > now or end - start < minimum or now - end > max_ages["chart"]:
+                    raise ValueError("invalid chart window")
+            except (KeyError, TypeError, ValueError, OverflowError, AttributeError):
+                reasons.append("chart: invalid or incomplete time window")
         market_evidence = evidence.get("market")
+        if not isinstance(market_evidence, dict) or market_evidence.get("market_id") != market:
+            reasons.append("market: identity mismatch")
         price = market_evidence.get("price") if isinstance(market_evidence, dict) else None
-        if isinstance(price, bool) or not isinstance(price, (int, float)) or not math.isfinite(price) or price <= 0:
+        try:
+            valid_price = not isinstance(price, bool) and isinstance(price, (int, float)) and math.isfinite(price) and price > 0
+        except OverflowError:
+            valid_price = False
+        if not valid_price:
             reasons.append("market: valid price unavailable")
         if reasons:
             excluded.append({"asset_id": asset, "reasons": reasons})
         else:
+            seen.add(asset.strip().casefold())
             accepted.append({"asset_id": asset, "market_id": market, "price": price,
                              "scenario": "not_assessed", "probability": None,
                              "invalidation": None, "evidence": evidence})
@@ -70,5 +91,6 @@ def evaluate(candidates: list[dict[str, Any]], horizon: str, now: datetime) -> d
     return {"horizon": horizon, "as_of": now.isoformat(), "eligible": accepted[:5],
             "excluded": excluded, "ranking_status": "not_assessed",
             "limitations": ["Evidence is caller supplied; authenticity must be verified upstream.",
+                            "Market identity and chart coverage fields are assertions and require independent provider verification.",
                             "No forecast or probability is produced by this gate."]}
 
