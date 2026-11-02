@@ -11,6 +11,9 @@ class ChartPreviewTests(unittest.TestCase):
     def setUp(self):
         api._cache.clear()
         api._failures.clear()
+        self.news_patcher = patch.object(api, "news_sentiment", new_callable=AsyncMock, side_effect=ValueError("unavailable"))
+        self.news_patcher.start()
+        self.addCleanup(self.news_patcher.stop)
 
     @patch.dict(os.environ, {}, clear=True)
     def test_disabled_never_fetches(self):
@@ -58,6 +61,23 @@ class ChartPreviewTests(unittest.TestCase):
         for stamp in ("bad", None, (now + timedelta(seconds=1)).isoformat()):
             with self.subTest(stamp=stamp):
                 self.assertFalse(api._chart_is_fresh({"chart": {"window_end": stamp}}, "1h", now))
+
+    @patch.dict(os.environ, {"CIN_SHORTLIST_PREVIEW_ENABLED": "1"}, clear=True)
+    def test_preliminary_news_does_not_pass_news_gate(self):
+        async def run():
+            now = datetime.now(timezone.utc).isoformat()
+            payload = {"query": "bitcoin", "source": "GDELT DOC 2.0 public article search", "count": 1,
+                       "articles": [{"title": "Bitcoin network update", "url": "https://example.test/news",
+                                     "provider_seen_at_utc": now, "provider_seen_at_validation_status": "valid"}]}
+            with patch.object(api, "get_market_candles", new_callable=AsyncMock, return_value={}):
+                with patch.object(api, "chart_evidence", return_value={"status": "available", "window_end": now}):
+                    with patch.object(api, "news_sentiment", new_callable=AsyncMock, return_value=payload) as fetch:
+                        result = await api.shortlist_chart_preview("bitcoin", "24h")
+            fetch.assert_awaited_once_with(query="bitcoin", max_records=10)
+            self.assertEqual(result["news"]["status"], "preliminary")
+            self.assertIn("news", result["missing_required_evidence"])
+            self.assertEqual(result["shortlist_status"], "not_eligible")
+        asyncio.run(run())
 
     @patch.dict(os.environ, {"CIN_SHORTLIST_PREVIEW_ENABLED": "1"}, clear=True)
     def test_invalid_input_never_fetches(self):

@@ -30,6 +30,7 @@ MODULES = (
     "cin_public_social_preview_api.py",
     "cin_shortlist_chart_evidence.py",
     "cin_shortlist_market_evidence.py",
+    "cin_shortlist_news_evidence.py",
     "cin_shortlist_chart_preview_api.py",
 )
 

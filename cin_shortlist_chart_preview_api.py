@@ -14,13 +14,17 @@ try:
     from app.cin_shortlist_chart_evidence import chart_evidence
     from app.market_data_step1 import get_public_market_data
     from app.cin_shortlist_market_evidence import coinbase_market_evidence
+    from app.cin_public_news_sentiment_api import news_sentiment
+    from app.cin_shortlist_news_evidence import news_evidence
 except ModuleNotFoundError as exc:
-    if exc.name not in {"app", "app.cin_public_market_candles_api", "app.cin_shortlist_chart_evidence", "app.market_data_step1", "app.cin_shortlist_market_evidence"}:
+    if exc.name not in {"app", "app.cin_public_market_candles_api", "app.cin_shortlist_chart_evidence", "app.market_data_step1", "app.cin_shortlist_market_evidence", "app.cin_public_news_sentiment_api", "app.cin_shortlist_news_evidence"}:
         raise
     from cin_public_market_candles_api import get_market_candles
     from cin_shortlist_chart_evidence import chart_evidence
     from market_data_step1 import get_public_market_data
     from cin_shortlist_market_evidence import coinbase_market_evidence
+    from cin_public_news_sentiment_api import news_sentiment
+    from cin_shortlist_news_evidence import news_evidence
 
 router = APIRouter(tags=["experimental-shortlist-preview"])
 _BASES = {"bitcoin": "BTC", "ethereum": "ETH"}
@@ -61,6 +65,14 @@ async def shortlist_chart_preview(asset_id: str, horizon: str = "24h", quote: st
         if (cached and 0 <= tick - cached[0] < _CACHE_SECONDS
                 and _chart_is_fresh(cached[1], horizon, datetime.now(timezone.utc))):
             response = copy.deepcopy(cached[1])
+            news = response.get("news")
+            if news:
+                try:
+                    stamp = datetime.fromisoformat(news["observed_at"].replace("Z", "+00:00"))
+                    if stamp.tzinfo is None or not timedelta(0) <= datetime.now(timezone.utc) - stamp <= timedelta(hours=48):
+                        raise ValueError("stale news")
+                except (KeyError, AttributeError, TypeError, ValueError, OverflowError):
+                    response["news"] = None
             market = response.get("market")
             if market:
                 try:
@@ -105,17 +117,25 @@ async def shortlist_chart_preview(asset_id: str, horizon: str = "24h", quote: st
             except Exception:
                 # A failed ticker does not invalidate a separately validated chart.
                 market = None
+        news = None
+        try:
+            news_payload = await asyncio.wait_for(news_sentiment(query=asset_id, max_records=10), timeout=20)
+            news = news_evidence(news_payload, asset_id=asset_id, now=datetime.now(timezone.utc))
+        except Exception:
+            # An unavailable or unverified source is never treated as evidence.
+            pass
         missing = ["news", "social", "market_sentiment"]
         if market is None:
             missing.insert(0, "market")
         response = {
             "service": "cin", "mode": "read_only", "asset_id": asset_id, "horizon": horizon,
-            "chart": evidence, "market": market, "shortlist_status": "not_eligible",
+            "chart": evidence, "market": market, "news": news, "shortlist_status": "not_eligible",
             "missing_required_evidence": missing,
             "scenario": "not_assessed", "probability": None,
             "limitations": [
                 "Chart and ticker may come from different exchanges and are not an atomic snapshot.",
                 "Chart source authenticity and cross-provider identity have not been independently established.",
+                "News title matching is preliminary and does not meet the required news relevance gate.",
                 "This is not a ranked shortlist, forecast or investment recommendation.",
             ],
             "cache_age_seconds": 0,
