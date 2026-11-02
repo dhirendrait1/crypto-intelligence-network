@@ -274,3 +274,24 @@ describe("Integrity diagnostics", () => {
     const row = screen.getByText("Requested-window candle bounds").closest("li");
     expect(row?.querySelector(".integrity-check-unavailable")).toBeTruthy();
   });
+
+
+it("keeps requested-window bounds unavailable when the start timestamp is invalid", () => {
+  const invalidStart = {
+    ...result,
+    data: { ...result.data!, requested_start_utc: "not-a-date" },
+  };
+  render(<IntegrityDiagnostics result={invalidStart} />);
+  const row = screen.getByText("Requested-window candle bounds").closest("li");
+  expect(row?.querySelector(".integrity-check-unavailable")).toBeTruthy();
+});
+
+it("keeps requested-window bounds unavailable when the end timestamp is invalid", () => {
+  const invalidEnd = {
+    ...result,
+    data: { ...result.data!, requested_end_utc: "not-a-date" },
+  };
+  render(<IntegrityDiagnostics result={invalidEnd} />);
+  const row = screen.getByText("Requested-window candle bounds").closest("li");
+  expect(row?.querySelector(".integrity-check-unavailable")).toBeTruthy();
+});
