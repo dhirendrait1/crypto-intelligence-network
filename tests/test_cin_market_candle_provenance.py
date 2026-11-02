@@ -74,3 +74,30 @@ def test_coinbase_usdt_mismatch_is_not_reported_as_usd_quote():
     assert result["quote_currency"] is None
     assert result["pair_metadata_status"] == "quote_mismatch"
     assert result["data"][0]["observation_metadata"]["quote_currency"] is None
+
+def test_market_candle_endpoint_includes_provenance_observation_metadata():
+    import asyncio
+    from unittest.mock import patch
+    import cin_public_market_candles_api as market_api
+
+    now_ms = int(market_api.datetime.now(market_api.timezone.utc).timestamp() * 1000)
+    rows = [{
+        "open_time": now_ms - 120000, "open": 100.0, "high": 102.0,
+        "low": 99.0, "close": 101.0, "volume": 5.0,
+        "close_time": now_ms - 60001,
+        "_source": "Coinbase Exchange public candles API",
+        "_source_endpoint": market_api.COINBASE_CANDLES_URL,
+    }]
+    async def load(*args):
+        return rows
+    with patch.object(market_api, "_load", side_effect=load):
+        result = asyncio.run(market_api.get_market_candles("BTCUSDT", "1m", 5))
+    assert result["source_id"] == "coinbase_public"
+    assert result["requested_quote_currency"] == "USDT"
+    assert result["quote_currency"] is None
+    assert result["pair_metadata_status"] == "quote_mismatch"
+    observation = result["data"][0]["observation_metadata"]
+    assert observation["quote_currency"] is None
+    assert observation["timestamp_semantics"] == "candle_close_time"
+    assert observation["freshness_assessed"] is False
+    assert observation["source_authenticity_verified"] is False
