@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, milestone-3-technical-analysis, cin-public-candles-pipeline]
   pull_request:
-    branches: [main]
+    branches: [main, feat/cin-market-candle-provenance]
   workflow_dispatch:
 
 permissions:
