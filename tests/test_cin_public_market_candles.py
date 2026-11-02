@@ -51,6 +51,62 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(candles), 5)
         self.assertEqual(candles[-1]["open_time"], 1700014400000)
 
+    async def test_kraken_rejects_missing_or_malformed_error_field(self):
+        rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
+        malformed_payloads = [
+            {"result": {"XBTUSDT": rows, "last": 1700000000}},
+            {"error": None, "result": {"XBTUSDT": rows, "last": 1700000000}},
+            {"error": "not-a-list", "result": {"XBTUSDT": rows, "last": 1700000000}},
+            {"error": [7], "result": {"XBTUSDT": rows, "last": 1700000000}},
+        ]
+        for payload in malformed_payloads:
+            with self.subTest(payload=payload):
+                with patch.object(api, "_request_json", return_value=payload):
+                    with self.assertRaisesRegex(ValueError, "error field was malformed"):
+                        api._fetch_kraken("BTCUSDT", "1h", 5)
+
+    async def test_kraken_rejects_provider_error_list(self):
+        payload = {"error": ["EQuery:Unknown asset pair"], "result": {}}
+        with patch.object(api, "_request_json", return_value=payload):
+            with self.assertRaisesRegex(ValueError, "Kraken rejected pair/timeframe"):
+                api._fetch_kraken("BTCUSDT", "1h", 5)
+
+    async def test_kraken_rejects_unexpected_returned_market_key(self):
+        rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
+        payload = {"error": [], "result": {"ETHUSDT": rows, "last": 1700000000}}
+        with patch.object(api, "_request_json", return_value=payload):
+            with self.assertRaisesRegex(ValueError, "market key did not match"):
+                api._fetch_kraken("BTCUSDT", "1h", 5)
+
+    async def test_kraken_rejects_ambiguous_matching_market_keys(self):
+        rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
+        payload = {"error": [], "result": {"XBTUSDT": rows, "XXBTUSDT": rows, "last": 1700000000}}
+        with patch.object(api, "_request_json", return_value=payload):
+            with self.assertRaisesRegex(ValueError, "ambiguous market keys"):
+                api._fetch_kraken("BTCUSDT", "1h", 5)
+
+    async def test_kraken_rejects_response_with_only_last_cursor(self):
+        payload = {"error": [], "result": {"last": 1700000000}}
+        with patch.object(api, "_request_json", return_value=payload):
+            with self.assertRaisesRegex(ValueError, "market key did not match"):
+                api._fetch_kraken("BTCUSDT", "1h", 5)
+
+    async def test_kraken_accepts_canonical_non_btc_usd_alias(self):
+        rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
+        payload = {"error": [], "result": {"XETHZUSD": rows, "last": 1700000000}}
+        with patch.object(api, "_request_json", return_value=payload):
+            candles = api._fetch_kraken("ETHUSD", "1h", 5)
+        self.assertEqual(len(candles), 1)
+        self.assertEqual(candles[0]["close"], 101.0)
+
+    async def test_kraken_accepts_explicit_canonical_usd_alias(self):
+        rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
+        payload = {"error": [], "result": {"XXBTZUSD": rows, "last": 1700000000}}
+        with patch.object(api, "_request_json", return_value=payload):
+            candles = api._fetch_kraken("BTCUSD", "1h", 5)
+        self.assertEqual(len(candles), 1)
+        self.assertEqual(candles[0]["close"], 101.0)
+
     async def test_kraken_skips_fractional_and_boolean_timestamps(self):
         rows = [
             [1700000000.5, "100", "102", "99", "101", "100.5", "10", 4],
