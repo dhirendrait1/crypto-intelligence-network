@@ -236,25 +236,25 @@ def _fetch_markets(vs_currency: str, per_page: int) -> tuple[list[dict[str, Any]
         if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
             # Preserve an HTTP status when either provider supplied one; 0 means no HTTP status.
             return cached[1], "stale_cache", exc.fallback_status or exc.primary_status or 0, {
-                "primary_provider": "CoinPaprika", "primary_error": exc.primary_kind,
-                "primary_http_status": exc.primary_status, "fallback_provider": None,
-                "fallback_error": "not_attempted", "fallback_http_status": None,
+                "primary_provider": "CoinGecko", "primary_error": exc.primary_kind,
+                "primary_http_status": exc.primary_status, "fallback_provider": "CoinPaprika",
+                "fallback_error": exc.fallback_kind, "fallback_http_status": exc.fallback_status,
             }
         raise
     except urllib.error.HTTPError as exc:
         if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
             return cached[1], "stale_cache", exc.code, {
-                "primary_provider": "CoinPaprika", "primary_error": "http_error",
-                "primary_http_status": exc.code, "fallback_provider": None,
-                "fallback_error": "not_attempted", "fallback_http_status": None,
+                "primary_provider": "CoinGecko", "primary_error": "http_error",
+                "primary_http_status": exc.code, "fallback_provider": "CoinPaprika",
+                "fallback_error": "not_usable", "fallback_http_status": None,
             }
         raise
     except (urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError):
         if cached and now - cached[0] <= _STALE_CACHE_MAX_SECONDS:
             return cached[1], "stale_cache", 0, {
-                "primary_provider": "CoinPaprika", "primary_error": "network_or_response_error",
-                "primary_http_status": None, "fallback_provider": None,
-                "fallback_error": "not_attempted", "fallback_http_status": None,
+                "primary_provider": "CoinGecko", "primary_error": "network_or_response_error",
+                "primary_http_status": None, "fallback_provider": "CoinPaprika",
+                "fallback_error": "not_usable", "fallback_http_status": None,
             }
         raise
 
@@ -277,10 +277,7 @@ def _fetch_commodity_markets(vs_currency: str, per_page: int) -> tuple[list[dict
     req = urllib.request.Request(url, headers={"accept": "application/json", "user-agent": "CIN-Research-API/0.4.0"}, method="GET")
     try:
         with urllib.request.urlopen(req, timeout=20) as response:
-            raw = response.read(_MAX_MARKET_PROVIDER_RESPONSE_BYTES + 1)
-        if len(raw) > _MAX_MARKET_PROVIDER_RESPONSE_BYTES:
-            raise ValueError("CoinPaprika response exceeded the configured size limit")
-        payload = json.loads(raw.decode("utf-8"))
+            payload = json.loads(response.read().decode("utf-8"))
         if not isinstance(payload, list):
             raise ValueError("Unexpected CoinPaprika ticker response")
         mapped: list[dict[str, Any]] = []
@@ -551,15 +548,15 @@ async def coin_screening(
             raw, data_mode, provider_error_code, provider_error_details = await asyncio.to_thread(_fetch_markets, currency, per_page)
     except MarketDataProviderFailure as exc:
         status_code = 503 if (
-            exc.primary_status == 429
-            or exc.primary_kind == "network_error"
+            exc.primary_status == 429 or exc.fallback_status == 429
+            or exc.primary_kind == "network_error" or exc.fallback_kind == "network_error"
         ) else 502
         raise HTTPException(status_code=status_code, detail={
-            "message": "CoinPaprika market data failed; no cached data is available.",
-            "primary_provider": "CoinPaprika",
+            "message": "Both market-data providers failed; no cached data is available.",
+            "primary_provider": "CoinGecko",
             "primary_error": exc.primary_kind,
             "primary_http_status": exc.primary_status,
-            "fallback_provider": None,
+            "fallback_provider": "CoinPaprika",
             "fallback_error": exc.fallback_kind,
             "fallback_http_status": exc.fallback_status,
         }) from exc
@@ -575,32 +572,32 @@ async def coin_screening(
             }) from exc
         if exc.code == 429:
             raise HTTPException(status_code=503, detail={
-                "message": "CoinPaprika rate-limited; no fallback provider was attempted.",
-                "primary_provider": "CoinPaprika",
+                "message": "CoinGecko rate-limited; fallback provider did not return usable data.",
+                "primary_provider": "CoinGecko",
                 "primary_error": "http_error",
                 "primary_http_status": exc.code,
-                "fallback_provider": None,
-                "fallback_error": "not_attempted",
+                "fallback_provider": "CoinPaprika",
+                "fallback_error": "not_usable",
             }) from exc
         raise HTTPException(status_code=502, detail={
-            "message": "CoinPaprika HTTP error; no fallback provider was attempted.",
-            "primary_provider": "CoinPaprika",
+            "message": "CoinGecko HTTP error and no fallback result was available.",
+            "primary_provider": "CoinGecko",
             "primary_error": "http_error",
             "primary_http_status": exc.code,
-            "fallback_provider": None,
-            "fallback_error": "not_attempted",
+            "fallback_provider": "CoinPaprika",
+            "fallback_error": "not_usable",
         }) from exc
     except (urllib.error.URLError, TimeoutError) as exc:
-        provider = "CoinPaprika"
+        provider = "CoinPaprika" if asset_type == "commodity_backed" else "CoinGecko"
         raise HTTPException(status_code=503, detail={
             "message": f"{provider} market-data network failure; no cached data is available.",
             "primary_provider": provider,
             "primary_error": "network_error",
         }) from exc
     except (ValueError, json.JSONDecodeError) as exc:
-        provider = "CoinPaprika"
+        provider = "CoinPaprika" if asset_type == "commodity_backed" else "CoinGecko"
         raise HTTPException(status_code=502, detail={
-            "message": f"{provider} market-data response could not be parsed.",
+            "message": f"{provider} market-data response could not be parsed and no fallback result was available.",
             "primary_provider": provider,
             "primary_error": "invalid_response",
         }) from exc
@@ -658,7 +655,7 @@ async def coin_screening(
         "asset_classification": "Heuristic symbol/name/ID classification; validate independently before research decisions",
         "universe_scan": commodity_scan,
         "limitations": [
-            "Initial screen covers the market-cap-ranked assets returned by CoinPaprika, not every token.",
+            "Initial screen covers the top market-cap assets returned by CoinGecko, not every token.",
             "A missing value receives no points and generates a warning.",
             "Stablecoin, wrapped/staked, and commodity-backed labels are heuristics and may misclassify assets.",
             "The growth filter excludes assets heuristically classified as stablecoins, wrapped/staked tokens, or commodity-backed tokens; remaining assets are not verified growth investments.",
