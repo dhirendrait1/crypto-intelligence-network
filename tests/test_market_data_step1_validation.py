@@ -26,10 +26,10 @@ class FakeResponse:
 
 class MarketDataStep1ValidationTests(unittest.TestCase):
     def _responses(self, mocked, stats=None, ticker=None):
-        mocked.side_effect = [
-            FakeResponse(stats if stats is not None else {"last": "100", "open": "90", "volume": "12"}),
-            FakeResponse(ticker if ticker is not None else {"time": datetime.now(timezone.utc).isoformat()}),
-        ]
+        stats_data = stats if stats is not None else {"last": "100", "open": "90", "volume": "12"}
+        ticker_data = {"price": stats_data.get("last")}
+        ticker_data.update(ticker if ticker is not None else {"time": datetime.now(timezone.utc).isoformat()})
+        mocked.side_effect = [FakeResponse(stats_data), FakeResponse(ticker_data)]
 
     @patch("market_data_step1.urllib.request.urlopen")
     def test_coinbase_usd_product_and_normalized_read_only_row(self, mocked):
@@ -45,6 +45,21 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
         self.assertIn("/products/BTC-USD/stats", mocked.call_args_list[0].args[0].full_url)
         self.assertIn("/products/BTC-USD/ticker", mocked.call_args_list[1].args[0].full_url)
         self.assertEqual(mocked.call_args_list[0].kwargs["timeout"], 12)
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_price_and_timestamp_come_from_the_same_ticker(self, mocked):
+        timestamp = datetime.now(timezone.utc).isoformat()
+        self._responses(mocked, stats={"last": "80", "open": "90", "volume": "12"},
+                        ticker={"price": "100", "time": timestamp})
+        result = _fetch_market_data(["bitcoin"], "usd")[0]
+        self.assertEqual(result["price"], 100)
+        self.assertEqual(result["last_updated"], timestamp)
+        self.assertAlmostEqual(result["price_change_percentage_24h"], 100 / 90 * 100 - 100)
+
+    @patch("market_data_step1.urllib.request.urlopen")
+    def test_missing_ticker_price_does_not_reuse_stats_price(self, mocked):
+        self._responses(mocked, ticker={"price": None, "time": datetime.now(timezone.utc).isoformat()})
+        self.assertEqual(_fetch_market_data(["bitcoin"], "usd"), [])
 
     @patch("market_data_step1.urllib.request.urlopen")
     def test_ethereum_maps_to_coinbase_eth_usd(self, mocked):
@@ -278,3 +293,4 @@ class MarketDataStep1ValidationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
