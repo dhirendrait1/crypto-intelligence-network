@@ -100,7 +100,8 @@ def _fetch_market_data(ids: list[str], vs_currency: str) -> list[dict[str, Any]]
         product_id = f"{symbol}-USD"
         stats = _coinbase_json(f"/products/{product_id}/stats")
         ticker = _coinbase_json(f"/products/{product_id}/ticker")
-        price = stats.get("last")
+        # Pair the displayed price with the timestamp from the same ticker response.
+        price = ticker.get("price")
         volume = stats.get("volume")
         open_price = stats.get("open")
         price_value = _provider_number(price, minimum=0)
@@ -206,6 +207,8 @@ async def get_public_market_data(
             "Coinbase Exchange does not provide market capitalization through these endpoints.",
             "Only explicitly mapped Coinbase USD products are supported.",
             "Coinbase 24-hour stats volume is denominated in the base asset, not USD quote turnover.",
+            "The ticker and 24-hour statistics are separate requests, not an atomic snapshot.",
         ],
         "data": rows,
     }
+

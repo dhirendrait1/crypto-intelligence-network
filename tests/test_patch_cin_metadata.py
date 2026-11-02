@@ -19,12 +19,19 @@ MODULES = (
     "cin_technical_analysis.py",
     "cin_technical_analysis_api.py",
     "cin_public_market_candles_api.py",
+    "cin_market_candle_provenance.py",
     "cin_derivatives_market_data_api.py",
     "cin_public_news_sentiment_api.py",
     "cin_monitoring_status.py",
     "cin_monitoring_status_api.py",
     "cin_source_observation_contract.py",
     "cin_source_freshness_policy.py",
+    "cin_public_social_mastodon.py",
+    "cin_public_social_preview_api.py",
+    "cin_shortlist_chart_evidence.py",
+    "cin_shortlist_market_evidence.py",
+    "cin_shortlist_news_evidence.py",
+    "cin_shortlist_chart_preview_api.py",
 )
 
 
@@ -82,9 +89,51 @@ class DeploymentPatchTests(unittest.TestCase):
             "cin_derivatives_market_data_router",
             "cin_public_news_sentiment_router",
             "cin_monitoring_status_router",
+            "cin_social_preview_router",
+            "cin_shortlist_chart_preview_router",
         ):
             with self.subTest(router=router):
                 self.assertEqual(second_text.count(f"app.include_router({router})"), 1)
+
+    def test_dashboard_cors_allows_only_the_published_origin(self):
+        import asyncio
+        from fastapi import FastAPI
+
+        result = self.run_patch()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        text = (self.app_dir / "main.py").read_text(encoding="utf-8")
+        block = text.split("# CIN dashboard CORS begin", 1)[1].split("# CIN dashboard CORS end", 1)[0]
+        app = FastAPI()
+        exec(block, {"app": app})
+
+        @app.get("/health")
+        def health():
+            return {"status": "ok"}
+
+        middleware = app.user_middleware[0]
+        self.assertEqual(middleware.kwargs["allow_origins"], ["https://crypto-net.pages.dev"])
+        self.assertFalse(middleware.kwargs["allow_credentials"])
+        self.assertEqual(middleware.kwargs["allow_methods"], ["GET"])
+
+        async def inner(scope, receive, send):
+            await send({"type": "http.response.start", "status": 200, "headers": []})
+            await send({"type": "http.response.body", "body": b"ok"})
+
+        async def request(origin):
+            messages = []
+            async def send(message):
+                messages.append(message)
+            async def receive():
+                return {"type": "http.request", "body": b"", "more_body": False}
+            cors = middleware.cls(inner, **middleware.kwargs)
+            await cors({"type": "http", "method": "GET", "headers": [(b"origin", origin.encode())]}, receive, send)
+            return dict(messages[0]["headers"])
+
+        allowed = asyncio.run(request("https://crypto-net.pages.dev"))
+        self.assertEqual(allowed.get(b"access-control-allow-origin"), b"https://crypto-net.pages.dev")
+        self.assertNotIn(b"access-control-allow-credentials", allowed)
+        denied = asyncio.run(request("https://other.example"))
+        self.assertNotIn(b"access-control-allow-origin", denied)
 
     def test_monitoring_api_module_is_copied_into_deployment_app(self):
         result = self.run_patch()
@@ -193,3 +242,6 @@ class DeploymentPatchTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+

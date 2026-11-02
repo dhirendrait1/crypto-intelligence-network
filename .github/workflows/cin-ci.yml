@@ -91,3 +91,8 @@ jobs:
           if missing:
               raise SystemExit(f"Missing required routes: {missing}")
           PY
+
+      - name: Verify packaged app imports outside repository root
+        run: |
+          cd /tmp
+          PYTHONPATH="$GITHUB_WORKSPACE/cin" python -c "from app.main import app; assert any(route.path == '/market-candles' for route in app.routes)"

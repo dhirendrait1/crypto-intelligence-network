@@ -22,12 +22,19 @@ MODULES = (
     "cin_technical_analysis.py",
     "cin_technical_analysis_api.py",
     "cin_public_market_candles_api.py",
+    "cin_market_candle_provenance.py",
     "cin_derivatives_market_data_api.py",
     "cin_public_news_sentiment_api.py",
     "cin_monitoring_status.py",
     "cin_monitoring_status_api.py",
     "cin_source_observation_contract.py",
     "cin_source_freshness_policy.py",
+    "cin_public_social_mastodon.py",
+    "cin_public_social_preview_api.py",
+    "cin_shortlist_chart_evidence.py",
+    "cin_shortlist_market_evidence.py",
+    "cin_shortlist_news_evidence.py",
+    "cin_shortlist_chart_preview_api.py",
 )
 main_path = APP_DIR / "main.py"
 if not main_path.is_file():
@@ -103,6 +110,18 @@ registrations = [
         "from app.cin_monitoring_status_api import router as cin_monitoring_status_router\n"
         "app.include_router(cin_monitoring_status_router)\n",
     ),
+    (
+        "cin_social_preview_router",
+        "\n# CIN: opt-in social research preview; disabled by default\n"
+        "from app.cin_public_social_preview_api import router as cin_social_preview_router\n"
+        "app.include_router(cin_social_preview_router)\n",
+    ),
+    (
+        "cin_shortlist_chart_preview_router",
+        "\n# CIN: opt-in chart evidence preview; disabled by default\n"
+        "from app.cin_shortlist_chart_preview_api import router as cin_shortlist_chart_preview_router\n"
+        "app.include_router(cin_shortlist_chart_preview_router)\n",
+    ),
 ]
 # Insert registrations before a direct-execution guard so routes are ready
 # even when the module is run as a script, not only imported by Uvicorn.
@@ -129,6 +148,31 @@ for marker, registration in registrations:
     else:
         main_text = main_text.rstrip() + registration
     registrations_added += 1
+
+# Permit the published dashboard origin to read public API responses.
+# Credentials are omitted by the dashboard. CORS is a browser policy, not authentication.
+cors_block = (
+    '\n# CIN dashboard CORS begin\n'
+    'from fastapi.middleware.cors import CORSMiddleware\n'
+    'app.add_middleware(\n'
+    '    CORSMiddleware,\n'
+    '    allow_origins=["https://crypto-net.pages.dev"],\n'
+    '    allow_credentials=False,\n'
+    '    allow_methods=["GET"],\n'
+    '    allow_headers=["Accept"],\n'
+    ')\n'
+    '# CIN dashboard CORS end\n'
+)
+cors_start = "# CIN dashboard CORS begin"
+cors_end = "# CIN dashboard CORS end"
+if cors_start in main_text or cors_end in main_text:
+    if cors_block.strip() not in main_text:
+        raise SystemExit("Partial or unexpected CIN dashboard CORS configuration")
+else:
+    if main_guard in main_text:
+        main_text = main_text.replace(main_guard, cors_block + "\n" + main_guard, 1)
+    else:
+        main_text = main_text.rstrip() + cors_block
 
 # Preflight branding metadata across the full app before writing any scaffold file.
 branding_files = list(APP_DIR.rglob("*.py"))
@@ -160,3 +204,6 @@ for module_name in MODULES:
 
 
 print(f"CIN metadata verified; read-only market data, screening, assessment, evidence, and technical-analysis and public market-candle routers installed; files updated: {changed}")
+
+
+

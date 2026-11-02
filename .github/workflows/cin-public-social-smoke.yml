@@ -1,0 +1,36 @@
+name: CIN public social source smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - cin_public_social_mastodon.py
+      - tests/test_cin_public_social_mastodon.py
+      - .github/workflows/cin-public-social-smoke.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Check public hashtag timeline
+        run: |
+          python - <<'PY'
+          from cin_public_social_mastodon import fetch_public_observations
+
+          result = fetch_public_observations("bitcoin")
+          print("Public Mastodon endpoint responded.")
+          print("Observation status:", result["status"])
+          print("Post count:", result["recent_public_post_count"])
+          print("Source:", result["source"])
+          print("Sentiment:", result["sentiment"])
+          print("This does not establish source rights or Render reachability.")
+          PY

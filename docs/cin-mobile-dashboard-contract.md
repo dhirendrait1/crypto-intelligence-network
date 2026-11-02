@@ -24,7 +24,7 @@ All configured requests use GET and are issued only after explicit user action:
 | Technical analysis | `/technical-analysis/market?symbol=BTCUSDT&interval=1h&limit=100` | `input.symbol`, `input.timeframe`, `input.source`, `input.retrieved_at`, analysis and indicator fields |
 | Coin screening | `/coin-screening?vs_currency=usd&per_page=5&min_score=0&asset_type=growth` | `count`, `source`, `data_mode`, `retrieved_at`, `methodology`, `data[]` |
 | Public news sentiment | `/news-sentiment?query=cryptocurrency&max_records=5` | `count`, `sentiment_summary`, `source`, `retrieved_at`, article timestamps |
-| Derivatives snapshot | `/derivatives/market-snapshot?symbol=BTCUSDT` | `symbol`, `source`, `retrieved_at`, `data_quality.freshness_status`, `timestamp_quality` |
+| BTC/USD perpetual derivatives | `/derivatives/kraken-market-snapshot` | `symbol`, `source`, `retrieved_at`, `data_quality.freshness_status`, `timestamp_quality` |
 
 These are configured client paths and expected fields, not a claim that every route is present in every deployed build. Verify the target application's OpenAPI document and route registration before treating a panel as integrated. Coin screening provider behavior must also be checked against the active provider-specific implementation; do not assume the preview's branch includes later provider changes.
 
@@ -50,3 +50,9 @@ Never infer `fresh` from a successful HTTP response alone. Never convert missing
 
 ## Security boundaries
 No order placement or execution, order management, wallet control, private keys, seed phrases or fund movement. The dashboard is an informational interface only.
+
+
+
+## Optional social preview
+
+The dashboard can request Bitcoin and Ethereum social preview endpoints separately. These are optional and their failures do not count as failures of the five existing required endpoints. The server returns 404 while the preview is disabled. A successful response reports a limited, low-confidence English keyword signal for a single public Mastodon instance and must not be interpreted as a broad market or price forecast. The preview is not an accepted input to the mandatory shortlist gate.
