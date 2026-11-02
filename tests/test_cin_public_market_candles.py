@@ -418,8 +418,8 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_kraken_accepts_single_market_result_with_cursor_metadata(self):
         rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
-        payload = {"error": [], "result": {"XBTUSDT": rows, "last": 1700000000}}
-        with patch.object(api, "_request_json", side_effect=[{"error":[],"result":{"XBTUSDT":{"altname":"XBTUSDT","wsname":"XBT/USDT","aclass_base":"currency","aclass_quote":"currency","base":"XXBT","quote":"USDT"}}}, payload]):
+        payload = {"error": [], "result": {"XXBTUSDT": rows, "last": 1700000000}}
+        with patch.object(api, "_request_json", side_effect=[{"error":[],"result":{"XXBTUSDT":{"altname":"XBTUSDT","wsname":"XBT/USDT","aclass_base":"currency","aclass_quote":"currency","status":"online","base":"XXBT","quote":"USDT"}}}, payload]):
             candles = api._fetch_kraken("BTCUSDT", "1h", 5)
         self.assertEqual(len(candles), 1)
 
@@ -429,8 +429,8 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             for i in range(6)
         ]
         rows[-1] = [1700018000, "100", "99", "101", "100", "100", "10", 4]
-        payload = {"error": [], "result": {"XBTUSDT": rows, "last": 1700018000}}
-        with patch.object(api, "_request_json", side_effect=[{"error":[],"result":{"XBTUSDT":{"altname":"XBTUSDT","wsname":"XBT/USDT","aclass_base":"currency","aclass_quote":"currency","base":"XXBT","quote":"USDT"}}}, payload]):
+        payload = {"error": [], "result": {"XXBTUSDT": rows, "last": 1700018000}}
+        with patch.object(api, "_request_json", side_effect=[{"error":[],"result":{"XXBTUSDT":{"altname":"XBTUSDT","wsname":"XBT/USDT","aclass_base":"currency","aclass_quote":"currency","status":"online","base":"XXBT","quote":"USDT"}}}, payload]):
             with self.assertRaisesRegex(ValueError, "invalid OHLCV"):
                 api._fetch_kraken("BTCUSDT", "1h", 5)
 
