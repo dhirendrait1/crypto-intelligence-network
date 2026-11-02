@@ -95,6 +95,30 @@ class DeploymentPatchTests(unittest.TestCase):
             with self.subTest(router=router):
                 self.assertEqual(second_text.count(f"app.include_router({router})"), 1)
 
+    def test_scaffold_capabilities_follow_registered_routes(self):
+        import ast
+        from fastapi import FastAPI
+
+        main = self.app_dir / "main.py"
+        text = main.read_text(encoding="utf-8")
+        text += '\ncapabilities = {"market_data": "not_implemented", "coin_screening": "not_implemented", "technical_analysis": "not_implemented"}\n'
+        main.write_text(text, encoding="utf-8")
+        result = self.run_patch()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        parsed = ast.parse(main.read_text(encoding="utf-8"))
+        assignment = next(node for node in parsed.body if isinstance(node, ast.Assign)
+                          and any(isinstance(t, ast.Name) and t.id == "capabilities" for t in node.targets))
+        expression = compile(ast.Expression(assignment.value), "<capabilities>", "eval")
+        application = FastAPI()
+        self.assertEqual(set(eval(expression, {"application": application}).values()), {"not_implemented"})
+        application.add_api_route("/market-data", lambda: None)
+        values = eval(expression, {"application": application})
+        self.assertEqual(values["market_data"], "partial")
+        self.assertEqual(values["technical_analysis"], "not_implemented")
+        application.add_api_route("/coin-screening", lambda: None)
+        application.add_api_route("/technical-analysis", lambda: None)
+        self.assertEqual(set(eval(expression, {"application": application}).values()), {"partial"})
+
     def test_dashboard_cors_allows_only_the_published_origin(self):
         import asyncio
         from fastapi import FastAPI

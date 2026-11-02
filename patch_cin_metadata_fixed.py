@@ -174,6 +174,21 @@ else:
     else:
         main_text = main_text.rstrip() + cors_block
 
+# The scaffold's overview predates these installed routers. Report partial
+# implementation only when the corresponding route is actually registered.
+# Provider availability and production readiness are not implied.
+for capability, endpoint in (
+    ("market_data", "/market-data"),
+    ("coin_screening", "/coin-screening"),
+    ("technical_analysis", "/technical-analysis"),
+):
+    old = f'"{capability}": "not_implemented"'
+    new = (f'"{capability}": "partial" if any('
+           f'getattr(route, "path", None) == "{endpoint}" '
+           f'for route in application.routes) else "not_implemented"')
+    if old in main_text:
+        main_text = main_text.replace(old, new, 1)
+
 # Preflight branding metadata across the full app before writing any scaffold file.
 branding_files = list(APP_DIR.rglob("*.py"))
 branding_text = {path: path.read_text(encoding="utf-8") for path in branding_files}
