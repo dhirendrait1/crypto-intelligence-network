@@ -209,8 +209,9 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
             [1700003600, "99", "103", "101", "102", "12.5"],
             [1700000000, "98", "102", "100", "101", "10.5"],
         ]
-        with patch.object(api, "_request_json", return_value=payload):
-            rows = api._fetch_coinbase("BTCUSDT", "1h", 5)
+        with patch.object(api, "_request_json", return_value=payload) as request_json:
+            rows = api._fetch_coinbase("BTCUSD", "1h", 5)
+        self.assertIn("/products/BTC-USD/candles?", request_json.call_args.args[0])
         self.assertEqual(len(rows), 2)
         self.assertLess(rows[0]["open_time"], rows[1]["open_time"])
         self.assertEqual(rows[0]["open"], 100.0)
@@ -218,6 +219,35 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rows[0]["low"], 98.0)
         self.assertEqual(rows[0]["close"], 101.0)
         self.assertEqual(rows[0]["volume"], 10.5)
+
+
+    def test_coinbase_rejects_usdt_without_requesting_usd_market(self):
+        with patch.object(api, "_request_json") as request_json:
+            with self.assertRaisesRegex(ValueError, "does not support quote currency USDT"):
+                api._fetch_coinbase("BTCUSDT", "1h", 5)
+        request_json.assert_not_called()
+
+    def test_coinbase_discards_malformed_ohlc_rows(self):
+        payload = [
+            [1700000000, "98", "102", "100", "101", "10"],
+            [1700003600, "99", "98", "101", "100", "10"],  # high below open/close
+            [1700007200, "99", "NaN", "98", "100", "10"],
+            [1700010800, "99", "103", "98", "100", "Infinity"],
+        ]
+        with patch.object(api, "_request_json", return_value=payload):
+            rows = api._fetch_coinbase("BTCUSD", "1h", 5)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["open_time"], 1700000000000)
+        self.assertTrue(api._is_valid_candle(rows[0]))
+
+    def test_coinbase_fails_when_all_rows_are_invalid(self):
+        payload = [
+            [1700000000, "98", "97", "99", "100", "10"],
+            [1700003600, "99", "103", "98", "100", "-1"],
+        ]
+        with patch.object(api, "_request_json", return_value=payload):
+            with self.assertRaisesRegex(ValueError, "no valid candles"):
+                api._fetch_coinbase("BTCUSD", "1h", 5)
 
     async def test_451_and_fallback_failure_returns_clear_503(self):
         with patch.object(api, "_fetch_binance", side_effect=urllib.error.HTTPError(
