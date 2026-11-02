@@ -12,7 +12,12 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
-from cin_market_candle_provenance import candle_observation_metadata, market_pair_metadata
+try:
+    from app.cin_market_candle_provenance import candle_observation_metadata, market_pair_metadata
+except ModuleNotFoundError as exc:
+    if exc.name not in {"app", "app.cin_market_candle_provenance"}:
+        raise
+    from cin_market_candle_provenance import candle_observation_metadata, market_pair_metadata
 
 try:
     from app.cin_technical_analysis import analyze_ohlc
