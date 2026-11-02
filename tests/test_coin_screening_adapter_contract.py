@@ -44,14 +44,9 @@ def _paprika_row(**overrides):
     return row
 
 
-def _force_primary_failure():
-    return urllib.error.HTTPError("https://api.coingecko.com", 429, "rate limited", {}, None)
 
-
-def test_coinpaprika_fallback_keeps_requested_quote_currency():
-    with patch.object(screening.urllib.request, "urlopen", side_effect=[
-        _force_primary_failure(), _response([_paprika_row()])
-    ]):
+def test_coinpaprika_primary_keeps_requested_quote_currency():
+    with patch.object(screening.urllib.request, "urlopen", return_value=_response([_paprika_row()])):
         rows = screening._request_markets("usd", 10)
 
     assert rows[0]["_cin_provider"] == "CoinPaprika"
@@ -60,9 +55,7 @@ def test_coinpaprika_fallback_keeps_requested_quote_currency():
 
 
 def test_coinpaprika_does_not_substitute_usd_for_usdt():
-    with patch.object(screening.urllib.request, "urlopen", side_effect=[
-        _force_primary_failure(), _response([_paprika_row()])
-    ]):
+    with patch.object(screening.urllib.request, "urlopen", return_value=_response([_paprika_row()])):
         with pytest.raises(screening.MarketDataProviderFailure):
             screening._request_markets("usdt", 10)
 
@@ -71,9 +64,7 @@ def test_coinpaprika_does_not_substitute_usd_for_usdt():
 def test_coinpaprika_invalid_price_is_missing_evidence(value):
     row = _paprika_row()
     row["quotes"]["USD"]["price"] = value
-    with patch.object(screening.urllib.request, "urlopen", side_effect=[
-        _force_primary_failure(), _response([row])
-    ]):
+    with patch.object(screening.urllib.request, "urlopen", return_value=_response([row])):
         rows = screening._request_markets("usd", 10)
 
     assert rows[0]["current_price"] is None
@@ -83,9 +74,7 @@ def test_coinpaprika_invalid_price_is_missing_evidence(value):
 def test_fdv_requires_positive_known_max_supply():
     row = _paprika_row()
     row["max_supply"] = None
-    with patch.object(screening.urllib.request, "urlopen", side_effect=[
-        _force_primary_failure(), _response([row])
-    ]):
+    with patch.object(screening.urllib.request, "urlopen", return_value=_response([row])):
         rows = screening._request_markets("usd", 10)
     assert rows[0]["fully_diluted_valuation"] is None
 
@@ -124,15 +113,12 @@ def test_market_freshness_requires_timezone_aware_timestamp(timestamp, expected)
         assert age is not None and age >= 0
 
 
-def test_provider_failure_is_sanitized_and_reports_both_provider_classes():
-    with patch.object(screening.urllib.request, "urlopen", side_effect=[
-        _force_primary_failure(),
-        urllib.error.URLError("secret endpoint detail"),
-    ]):
+def test_provider_failure_is_sanitized_without_disallowed_fallback():
+    with patch.object(screening.urllib.request, "urlopen", side_effect=urllib.error.HTTPError("https://api.coinpaprika.com", 429, "secret endpoint detail", {}, None)):
         with pytest.raises(screening.MarketDataProviderFailure) as exc:
             screening._request_markets("usd", 10)
 
     assert exc.value.primary_kind == "http_error"
     assert exc.value.primary_status == 429
-    assert exc.value.fallback_kind == "network_error"
+    assert exc.value.fallback_kind == "not_attempted"
     assert "secret endpoint detail" not in str(exc.value)
