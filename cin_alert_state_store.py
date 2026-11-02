@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
-from cin_alert_rules import evaluate_alert_rule
+from cin_alert_rules import evaluate_durable_alert_rule
 
 
 _SCHEMA = """
@@ -112,7 +112,7 @@ def evaluate_and_record(
                 "SELECT last_triggered_at FROM alert_rule_state WHERE rule_id = ?",
                 (rule_id,),
             ).fetchone()
-            result = evaluate_alert_rule(
+            result = evaluate_durable_alert_rule(
                 rule, observation, now=evaluated_at,
                 last_triggered_at=state[0] if state else None,
             )
