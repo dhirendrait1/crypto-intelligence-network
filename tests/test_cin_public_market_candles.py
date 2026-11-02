@@ -3245,7 +3245,14 @@ class CoinbaseIntervalAlignmentIntegrityTests(unittest.TestCase):
         # This timestamp is valid Unix seconds and falls inside the request
         # window, but is not aligned to a 1-hour candle boundary.
         misaligned = [1699999300, "99", "103", "100", "102", "10"]
-        with patch.object(api, "_request_json", return_value=[misaligned]):
+        catalogue = [{
+            "id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
+            "status": "online", "trading_disabled": False,
+            "base_increment": "0.00000001", "quote_increment": "0.01",
+            "base_min_size": "0.00000001", "base_max_size": "1000000",
+            "quote_min_size": "0.01", "quote_max_size": "1000000000",
+        }]
+        with patch.object(api, "_coinbase_request_json", side_effect=[catalogue, [misaligned]]):
             with self.assertRaisesRegex(
                 api._MalformedProviderResponse, "misaligned to the requested interval"
             ):
@@ -3260,12 +3267,19 @@ class CoinbaseIntervalAlignmentIntegrityTests(unittest.TestCase):
         aligned_open = int(datetime(2025, 1, 1, 11, 0, tzinfo=timezone.utc).timestamp())
         minute_row = [aligned_open, "99", "103", "100", "102", "10"]
         hour_row = [aligned_open, "99", "103", "100", "102", "10"]
+        catalogue = [{
+            "id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USD",
+            "status": "online", "trading_disabled": False,
+            "base_increment": "0.00000001", "quote_increment": "0.01",
+            "base_min_size": "0.00000001", "base_max_size": "1000000",
+            "quote_min_size": "0.01", "quote_max_size": "1000000000",
+        }]
         with patch.object(api, "datetime", FrozenDateTime), patch.object(
-            api, "_request_json", return_value=[minute_row]
+            api, "_coinbase_request_json", side_effect=[catalogue, [minute_row]]
         ):
             minute_rows = api._fetch_coinbase("BTCUSD", "1m", 5)
         with patch.object(api, "datetime", FrozenDateTime), patch.object(
-            api, "_request_json", return_value=[hour_row]
+            api, "_coinbase_request_json", side_effect=[catalogue, [hour_row]]
         ):
             hour_rows = api._fetch_coinbase("BTCUSD", "1h", 5)
         self.assertEqual(len(minute_rows), 1)
