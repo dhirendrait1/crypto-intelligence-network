@@ -7,6 +7,7 @@ import pytest
 
 from cin_alert_rules import evaluate_alert_rule
 from cin_alert_state_store import evaluate_and_record
+from cin_alert_delivery_outbox import claim_due_alerts
 
 
 NOW = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
@@ -189,3 +190,46 @@ def test_invalid_notification_payload_fails_before_state_is_changed(tmp_path):
 def test_durable_state_rejects_in_memory_database(tmp_path):
     with pytest.raises(ValueError, match="persistent SQLite file path"):
         evaluate_and_record(":memory:", RULE, OBS, now=NOW)
+
+
+
+def test_state_store_enqueues_on_legacy_outbox_then_worker_migrates_it(tmp_path):
+    path = tmp_path / "legacy-state-store.sqlite3"
+    legacy_schema = """
+    CREATE TABLE alert_delivery_outbox (
+        idempotency_key TEXT PRIMARY KEY,
+        rule_id TEXT NOT NULL,
+        observation_id TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('pending','sending','sent','failed','dead')),
+        attempts INTEGER NOT NULL DEFAULT 0,
+        next_attempt_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        last_error_code TEXT
+    );
+    CREATE INDEX idx_alert_delivery_outbox_due
+    ON alert_delivery_outbox(status, next_attempt_at);
+    """
+    with sqlite3.connect(path) as db:
+        db.executescript(legacy_schema)
+
+    result = evaluate_and_record(
+        path, RULE, OBS, now=NOW,
+        notification_payload={"message": "legacy migration regression"},
+    )
+    assert result["notification_enqueued"] is True
+
+    claimed = claim_due_alerts(path, now=NOW)
+    assert len(claimed) == 1
+    assert claimed[0]["idempotency_key"] == f'{RULE["id"]}:{OBS["id"]}'
+    assert claimed[0]["status"] == "sending"
+
+    with sqlite3.connect(path) as db:
+        schema = db.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='alert_delivery_outbox'"
+        ).fetchone()[0]
+        assert "uncertain" in schema
+        assert "CHECK (attempts >= 0)" in schema
+        assert db.execute("SELECT COUNT(*) FROM alert_evaluation_events").fetchone()[0] == 1
+        assert db.execute("SELECT COUNT(*) FROM alert_delivery_outbox").fetchone()[0] == 1

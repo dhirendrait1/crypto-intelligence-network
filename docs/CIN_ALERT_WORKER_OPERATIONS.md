@@ -14,6 +14,8 @@ Set these environment variables only in the authorized runtime that will execute
 
 Never commit credentials, print them, or pass the destination through alert payloads. The adapter intentionally uses only the configured destination. Do not use an ephemeral filesystem for durable production alert state: container restarts can erase it. The current SQLite design is single-host/single-writer oriented and is not a multi-instance shared queue.
 
+The evaluator commits the trigger decision, cooldown state, audit event, and pending outbox intent atomically in one SQLite transaction. Later worker claims, provider outcomes, lease recovery, and operator reconciliation are separate transactions; this does not make the external Telegram send part of the database transaction.
+
 ## Explicit one-shot invocation
 
 After the database and destination are deliberately configured, run:
@@ -34,8 +36,8 @@ The worker exits after one batch. It is not invoked by API import, startup, or C
 
 - Successful provider acceptance is recorded as `sent`; it is not an exactly-once delivery guarantee.
 - Transient or provider failures are recorded using sanitized error codes and bounded retry scheduling.
-- Exhausted attempts or expired leases at the configured attempt limit become dead-letter items.
-- A worker process crash may leave an item in `sending` until its lease expires.
+- Exhausted attempts or expired leases at the configured attempt limit become dead-letter items. Expired leases below the limit become `uncertain` and require operator reconciliation; retry authorization can produce a duplicate if Telegram accepted the original.
+- A worker process crash may leave an item in `sending` until its lease expires; then it becomes `uncertain` below the attempt limit or `dead` at the limit, without an automatic resend.
 - Missing configuration is rejected before queue items are claimed.
 - Do not paste bot tokens, chat IDs, or private provider responses into issue reports or logs.
 
