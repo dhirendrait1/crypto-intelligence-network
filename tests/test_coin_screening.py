@@ -816,3 +816,32 @@ class ScreeningCacheAgeBoundaryTests(unittest.TestCase):
         ):
             with self.assertRaises(MODULE.MarketDataProviderFailure):
                 MODULE._fetch_markets("usd", 1)
+
+
+class ProviderTimestampBoundaryRegressionTests(unittest.TestCase):
+    def test_freshness_and_future_tolerance_boundaries(self):
+        from datetime import datetime as ActualDatetime, timezone as tz
+        fixed = ActualDatetime(2026, 11, 2, 0, 0, 0, tzinfo=tz.utc)
+
+        class FrozenDatetime(ActualDatetime):
+            @classmethod
+            def now(cls, timezone=None):
+                return fixed if timezone is None else fixed.astimezone(timezone)
+
+        cases = (
+            (fixed.timestamp() - 900, "fresh"),
+            (fixed.timestamp() - 901, "stale"),
+            (fixed.timestamp() + 300, "fresh"),
+            (fixed.timestamp() + 301, "unknown"),
+        )
+        with patch.object(MODULE, "datetime", FrozenDatetime):
+            for timestamp, expected in cases:
+                with self.subTest(timestamp=timestamp, expected=expected):
+                    iso = ActualDatetime.fromtimestamp(timestamp, tz.utc).isoformat()
+                    status, age = MODULE._market_freshness(iso)
+                    self.assertEqual(status, expected)
+                    if expected == "unknown":
+                        self.assertIsNone(age)
+                    else:
+                        self.assertIsNotNone(age)
+                        self.assertGreaterEqual(age, 0)
