@@ -68,6 +68,84 @@ class ChartPreviewTests(unittest.TestCase):
         fetch.assert_not_called()
 
     @patch.dict(os.environ, {"CIN_SHORTLIST_PREVIEW_ENABLED": "1"}, clear=True)
+    def test_usd_joins_only_exact_coinbase_usd_and_keeps_other_requirements_missing(self):
+        async def run():
+            now = datetime.now(timezone.utc).isoformat()
+            market_payload = {
+                "source": "Coinbase Exchange public API", "currency": "USD", "count": 1,
+                "data": [{"id": "bitcoin", "symbol": "BTC", "currency": "USD",
+                          "product_id": "BTC-USD", "price": 70000, "last_updated": now,
+                          "freshness_status": "fresh", "analysis_eligible": True}],
+            }
+            chart = {"status": "available", "market_id": "BTCUSD", "window_end": now}
+            with patch.object(api, "get_market_candles", new_callable=AsyncMock, return_value={}) as fetch:
+                with patch.object(api, "chart_evidence", return_value=chart):
+                    with patch.object(api, "get_public_market_data", new_callable=AsyncMock, return_value=market_payload):
+                        result = await api.shortlist_chart_preview("bitcoin", "24h", "USD")
+            fetch.assert_awaited_once_with(symbol="BTCUSD", interval="1h", limit=26)
+            self.assertEqual(result["market"]["market_id"], "BTCUSD")
+            self.assertNotIn("market", result["missing_required_evidence"])
+            self.assertIn("social", result["missing_required_evidence"])
+            self.assertEqual(result["shortlist_status"], "not_eligible")
+            self.assertIsNone(result["probability"])
+        asyncio.run(run())
+
+    @patch.dict(os.environ, {"CIN_SHORTLIST_PREVIEW_ENABLED": "1"}, clear=True)
+    def test_usdt_does_not_fetch_or_substitute_usd_price(self):
+        async def run():
+            with patch.object(api, "get_market_candles", new_callable=AsyncMock, return_value={}):
+                with patch.object(api, "chart_evidence", return_value={"status": "available"}):
+                    with patch.object(api, "get_public_market_data", new_callable=AsyncMock) as market:
+                        result = await api.shortlist_chart_preview("bitcoin", "24h", "USDT")
+            market.assert_not_called()
+            self.assertIsNone(result["market"])
+            self.assertIn("market", result["missing_required_evidence"])
+        asyncio.run(run())
+
+    @patch.dict(os.environ, {"CIN_SHORTLIST_PREVIEW_ENABLED": "1"}, clear=True)
+    def test_price_provider_failure_keeps_chart_but_not_market(self):
+        async def run():
+            with patch.object(api, "get_market_candles", new_callable=AsyncMock, return_value={}):
+                with patch.object(api, "chart_evidence", return_value={"status": "available"}):
+                    with patch.object(api, "get_public_market_data", new_callable=AsyncMock, side_effect=ValueError("private")):
+                        result = await api.shortlist_chart_preview("bitcoin", "24h", "USD")
+            self.assertEqual(result["chart"]["status"], "available")
+            self.assertIsNone(result["market"])
+            self.assertIn("market", result["missing_required_evidence"])
+        asyncio.run(run())
+
+    @patch.dict(os.environ, {"CIN_SHORTLIST_PREVIEW_ENABLED": "1"}, clear=True)
+    def test_cached_usd_market_expires_independently_from_chart(self):
+        async def run():
+            now = datetime.now(timezone.utc)
+            key = ("bitcoin", "24h", "USD")
+            api._cache[key] = (api.time.monotonic(), {
+                "chart": {"window_end": now.isoformat()},
+                "market": {"observed_at": (now - timedelta(minutes=16)).isoformat()},
+                "missing_required_evidence": ["news", "social", "market_sentiment"],
+            })
+            with patch.object(api, "get_market_candles", new_callable=AsyncMock) as fetch:
+                result = await api.shortlist_chart_preview("bitcoin", "24h", "USD")
+            fetch.assert_not_called()
+            self.assertIsNone(result["market"])
+            self.assertIn("market", result["missing_required_evidence"])
+        asyncio.run(run())
+
+    @patch.dict(os.environ, {"CIN_SHORTLIST_PREVIEW_ENABLED": "1"}, clear=True)
+    def test_quote_is_part_of_cache_key(self):
+        async def run():
+            now = datetime.now(timezone.utc).isoformat()
+            with patch.object(api, "get_market_candles", new_callable=AsyncMock, return_value={}) as fetch:
+                with patch.object(api, "chart_evidence", return_value={"status": "available", "window_end": now}):
+                    with patch.object(api, "get_public_market_data", new_callable=AsyncMock, side_effect=ValueError("unavailable")):
+                        await api.shortlist_chart_preview("bitcoin", "24h", "USD")
+                        await api.shortlist_chart_preview("bitcoin", "24h", "USDT")
+            self.assertEqual(fetch.await_count, 2)
+            self.assertEqual(fetch.await_args_list[0].kwargs["symbol"], "BTCUSD")
+            self.assertEqual(fetch.await_args_list[1].kwargs["symbol"], "BTCUSDT")
+        asyncio.run(run())
+
+    @patch.dict(os.environ, {"CIN_SHORTLIST_PREVIEW_ENABLED": "1"}, clear=True)
     def test_real_validator_processes_provider_shaped_data(self):
         duration = 900_000
         now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
@@ -99,4 +177,5 @@ class ChartPreviewTests(unittest.TestCase):
                     self.assertNotIn("private", error.exception.detail)
                 fetch.assert_awaited_once()
         asyncio.run(run())
+
 

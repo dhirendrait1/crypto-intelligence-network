@@ -32,6 +32,7 @@ MODULES = (
     "cin_public_social_mastodon.py",
     "cin_public_social_preview_api.py",
     "cin_shortlist_chart_evidence.py",
+    "cin_shortlist_market_evidence.py",
     "cin_shortlist_chart_preview_api.py",
 )
 main_path = APP_DIR / "main.py"
@@ -202,5 +203,6 @@ for module_name in MODULES:
 
 
 print(f"CIN metadata verified; read-only market data, screening, assessment, evidence, and technical-analysis and public market-candle routers installed; files updated: {changed}")
+
 
 

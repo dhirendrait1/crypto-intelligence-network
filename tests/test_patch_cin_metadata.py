@@ -29,6 +29,7 @@ MODULES = (
     "cin_public_social_mastodon.py",
     "cin_public_social_preview_api.py",
     "cin_shortlist_chart_evidence.py",
+    "cin_shortlist_market_evidence.py",
     "cin_shortlist_chart_preview_api.py",
 )
 
@@ -240,5 +241,6 @@ class DeploymentPatchTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
 
 
