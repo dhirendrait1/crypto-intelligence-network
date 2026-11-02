@@ -270,7 +270,17 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
             if not isinstance(row, list) or len(row) < 6:
                 continue
             try:
-                rows_by_time[int(row[0])] = row
+                # Coinbase timestamps are integer Unix seconds. Reject booleans,
+                # fractional values, non-finite numbers, and out-of-range times.
+                if isinstance(row[0], bool):
+                    continue
+                timestamp_seconds = float(row[0])
+                if (not math.isfinite(timestamp_seconds)
+                        or not timestamp_seconds.is_integer()
+                        or timestamp_seconds < 0
+                        or timestamp_seconds * 1000 > MAX_TIMESTAMP_MS):
+                    continue
+                rows_by_time[int(timestamp_seconds)] = row
             except (TypeError, ValueError, OverflowError):
                 continue
         cursor = chunk_end
@@ -280,11 +290,13 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
             start_ms = int(row[0]) * 1000
             duration_ms = duration * 1000
             # Coinbase rows are [time, low, high, open, close, volume].
-            candles.append({
+            candle = {
                 "open_time": start_ms, "open": float(row[3]), "high": float(row[2]),
                 "low": float(row[1]), "close": float(row[4]), "volume": float(row[5]),
                 "close_time": start_ms + duration_ms - 1,
-            })
+            }
+            if _is_valid_candle(candle):
+                candles.append(candle)
         except (TypeError, ValueError, OverflowError):
             continue
     if not candles:
