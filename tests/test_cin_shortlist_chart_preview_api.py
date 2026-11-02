@@ -2,7 +2,7 @@ import asyncio
 import os
 import unittest
 from unittest.mock import AsyncMock, patch
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
 import cin_shortlist_chart_preview_api as api
@@ -24,7 +24,9 @@ class ChartPreviewTests(unittest.TestCase):
     def test_validated_chart_is_not_a_complete_shortlist(self):
         async def run():
             with patch.object(api, "get_market_candles", new_callable=AsyncMock, return_value={"data": []}) as fetch:
-                with patch.object(api, "chart_evidence", return_value={"status": "available"}) as validate:
+                with patch.object(api, "chart_evidence", return_value={
+                    "status": "available", "window_end": datetime.now(timezone.utc).isoformat()
+                }) as validate:
                     first = await api.shortlist_chart_preview("bitcoin", "6h")
                     second = await api.shortlist_chart_preview("bitcoin", "6h")
                     self.assertEqual(first["shortlist_status"], "not_eligible")
@@ -34,6 +36,28 @@ class ChartPreviewTests(unittest.TestCase):
                     fetch.assert_awaited_once_with(symbol="BTCUSDT", interval="15m", limit=26)
                     validate.assert_called_once()
         asyncio.run(run())
+
+    @patch.dict(os.environ, {"CIN_SHORTLIST_PREVIEW_ENABLED": "1"}, clear=True)
+    def test_stale_cached_chart_is_not_returned_as_available(self):
+        async def run():
+            stale = (datetime.now(timezone.utc) - timedelta(minutes=6)).isoformat()
+            current = datetime.now(timezone.utc).isoformat()
+            with patch.object(api, "get_market_candles", new_callable=AsyncMock, return_value={"data": []}) as fetch:
+                with patch.object(api, "chart_evidence", side_effect=[
+                    {"status": "available", "window_end": stale},
+                    {"status": "available", "window_end": current},
+                ]):
+                    await api.shortlist_chart_preview("bitcoin", "1h")
+                    result = await api.shortlist_chart_preview("bitcoin", "1h")
+            self.assertEqual(result["chart"]["window_end"], current)
+            self.assertEqual(fetch.await_count, 2)
+        asyncio.run(run())
+
+    def test_invalid_or_future_cached_timestamp_is_not_fresh(self):
+        now = datetime.now(timezone.utc)
+        for stamp in ("bad", None, (now + timedelta(seconds=1)).isoformat()):
+            with self.subTest(stamp=stamp):
+                self.assertFalse(api._chart_is_fresh({"chart": {"window_end": stamp}}, "1h", now))
 
     @patch.dict(os.environ, {"CIN_SHORTLIST_PREVIEW_ENABLED": "1"}, clear=True)
     def test_invalid_input_never_fetches(self):

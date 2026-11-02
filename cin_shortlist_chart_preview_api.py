@@ -5,7 +5,7 @@ import asyncio
 import copy
 import os
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException
 
@@ -22,10 +22,24 @@ router = APIRouter(tags=["experimental-shortlist-preview"])
 _MARKETS = {"bitcoin": "BTCUSDT", "ethereum": "ETHUSDT"}
 _WINDOWS = {"1h": ("5m", 12), "6h": ("15m", 24), "12h": ("30m", 24),
             "24h": ("1h", 24), "7d": ("4h", 42)}
+_MAX_CHART_AGE = {"1h": timedelta(minutes=5), "6h": timedelta(minutes=15),
+                  "12h": timedelta(minutes=30), "24h": timedelta(hours=1),
+                  "7d": timedelta(hours=4)}
 _CACHE_SECONDS = 300
 _cache = {}
 _failures = {}
 _lock = asyncio.Lock()
+
+
+def _chart_is_fresh(response: dict, horizon: str, now: datetime) -> bool:
+    try:
+        end = datetime.fromisoformat(response["chart"]["window_end"].replace("Z", "+00:00"))
+        if end.tzinfo is None:
+            return False
+        age = now - end.astimezone(timezone.utc)
+        return timedelta(0) <= age <= _MAX_CHART_AGE[horizon]
+    except (KeyError, TypeError, AttributeError, ValueError, OverflowError):
+        return False
 
 
 @router.get("/research/shortlist-chart-preview/{asset_id}")
@@ -39,7 +53,8 @@ async def shortlist_chart_preview(asset_id: str, horizon: str = "24h"):
     async with _lock:
         tick = time.monotonic()
         cached = _cache.get(key)
-        if cached and 0 <= tick - cached[0] < _CACHE_SECONDS:
+        if (cached and 0 <= tick - cached[0] < _CACHE_SECONDS
+                and _chart_is_fresh(cached[1], horizon, datetime.now(timezone.utc))):
             response = copy.deepcopy(cached[1])
             response["cache_age_seconds"] = round(tick - cached[0], 2)
             return response
