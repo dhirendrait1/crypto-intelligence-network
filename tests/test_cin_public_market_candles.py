@@ -2333,7 +2333,7 @@ class CoinbaseProductCatalogueTests(unittest.TestCase):
         self.assertIn("/products/BTC-USD/candles?", request.call_args_list[1].args[0])
 
     def test_coinbase_rejects_product_catalogue_base_quote_mismatch(self):
-        catalogue = [{"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USDT"}]
+        catalogue = [{"id": "BTC-USD", "base_currency": "BTC", "quote_currency": "USDT", "status": "online", "trading_disabled": False}]
         with patch.object(api, "_coinbase_request_json", return_value=catalogue) as request:
             with self.assertRaisesRegex(api._MalformedProviderResponse, "base/quote identity"):
                 api._fetch_coinbase("BTCUSD", "1h", 5)
