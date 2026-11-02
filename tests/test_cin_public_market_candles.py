@@ -2423,7 +2423,7 @@ class CoinbaseProductCatalogueTests(unittest.TestCase):
 
     def test_coinbase_rejects_malformed_catalogue_envelope(self):
         with patch.object(api, "_coinbase_request_json", return_value={"products": []}):
-            with self.assertRaisesRegex(api._MalformedProviderResponse, "catalogue response was not a list"):
+            with self.assertRaisesRegex(api._MalformedProviderResponse, "successful response envelope was not a top-level array"):
                 api._fetch_coinbase("BTCUSD", "1h", 5)
 
 
