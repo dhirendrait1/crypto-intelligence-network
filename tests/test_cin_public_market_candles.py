@@ -2172,14 +2172,14 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         kraken.assert_not_called()
         coinbase.assert_not_called()
 
-    async def test_transient_primary_and_all_fallback_failures_return_safe_503(self):
+    async def test_unsupported_final_fallback_is_terminal_502(self):
         with patch.object(api, "_fetch_binance", side_effect=TimeoutError("primary timed out")), patch.object(
             api, "_fetch_kraken", side_effect=ValueError("pair unavailable")
         ), patch.object(api, "_fetch_coinbase", side_effect=ValueError("unsupported quote")):
             with self.assertRaises(HTTPException) as ctx:
                 await api._load("BTCUSD", "1h", 5)
-        self.assertEqual(ctx.exception.status_code, 503)
-        self.assertIn("Binance transport failure", ctx.exception.detail)
+        self.assertEqual(ctx.exception.status_code, 502)
+        self.assertIn("invalid or unavailable data response", ctx.exception.detail)
 
 
 
