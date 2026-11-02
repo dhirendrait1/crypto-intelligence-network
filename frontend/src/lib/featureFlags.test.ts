@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isMarketsFeatureEnabled } from "./featureFlags";
+import { isMarketsFeatureEnabled, isCoinbaseResearchUiEnabled } from "./featureFlags";
 
 describe("Markets feature gate", () => {
   it("is disabled when the environment value is absent", () => {
@@ -9,5 +9,14 @@ describe("Markets feature gate", () => {
     expect(isMarketsFeatureEnabled("false")).toBe(false);
     expect(isMarketsFeatureEnabled("TRUE")).toBe(false);
     expect(isMarketsFeatureEnabled("true")).toBe(true);
+  });
+});
+
+describe("Coinbase research UI gate",()=>{
+  it("requires exact opt-in",()=>{
+    expect(isCoinbaseResearchUiEnabled(undefined)).toBe(false);
+    expect(isCoinbaseResearchUiEnabled("TRUE")).toBe(false);
+    expect(isCoinbaseResearchUiEnabled("1")).toBe(false);
+    expect(isCoinbaseResearchUiEnabled("true")).toBe(true);
   });
 });

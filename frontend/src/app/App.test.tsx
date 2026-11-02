@@ -16,6 +16,15 @@ describe("CIN dashboard shell", () => {
     expect(screen.getByRole("heading", { name: "Overview" })).toBeTruthy();
   });
 
+  it("opens the new Research view in a disabled, not-live state", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: /^Research$/i }));
+    expect(screen.getByRole("heading", { name: "Eligibility assessment" })).toBeTruthy();
+    expect(screen.getByText("DISABLED")).toBeTruthy();
+    expect(screen.getByText("NOT APPROVED")).toBeTruthy();
+    expect(screen.getByText("NOT LIVE")).toBeTruthy();
+  });
+
   it("navigates to a clearly unimplemented module without fabricating data", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: /^Screening$/i }));
