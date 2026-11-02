@@ -62,3 +62,7 @@ Financial magnitude inputs (market cap, volume, FDV, circulating supply, and tot
 ## Provider identity and deterministic row handling
 
 Before scoring, CIN requires each market row to have a non-empty string provider ID. Rows without an ID are discarded, and duplicate IDs are collapsed case-insensitively by keeping the first row in provider input order. The response `data_quality` object reports input rows, identity-less rows, duplicate IDs, and unique accepted identities. This prevents duplicate provider records from inflating result counts and makes identity cleanup visible. The policy is deterministic for a given provider response, but it does not prove that provider IDs are globally canonical or that two distinct IDs cannot refer to the same underlying asset.
+
+## Broad-universe provider policy
+
+CIN uses CoinPaprika public tickers for broad-universe screening; the retrieved universe is bounded and does not imply coverage of every cryptocurrency. No CoinGecko fallback is permitted. Coinbase public data remains preferred for exact USD-quoted exchange market candles and is not a substitute for global ranking data. Market data and provider timestamps are externally supplied, not independently verified. A bundled optional read-only smoke script validates only the response received at check time. Check provider free-use and commercial-use terms before deploying public services; no paid API or upgrade is authorized.
