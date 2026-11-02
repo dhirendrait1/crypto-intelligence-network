@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from cin_alert_rules import evaluate_alert_rule
+from cin_alert_rules import evaluate_durable_alert_rule as evaluate_alert_rule
 from cin_alert_state_store import evaluate_and_record
 from cin_alert_delivery_outbox import claim_due_alerts
 
