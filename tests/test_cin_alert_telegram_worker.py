@@ -39,8 +39,6 @@ def test_worker_reports_sanitized_telegram_configuration_error(capsys):
     output = json.loads(capsys.readouterr().err)
     assert output == {"status": "error", "error_code": "telegram_configuration_missing"}
 
-
-
 def test_importing_worker_never_processes_alerts():
     import importlib
     import cin_alert_telegram_delivery as delivery
@@ -62,6 +60,7 @@ def test_importing_worker_never_processes_alerts():
         ("--max-attempts", "0"),
     ],
 )
+
 def test_worker_rejects_nonpositive_bounds_before_processing(option, value):
     with patch.object(worker, "process_due_telegram_alerts") as process:
         with pytest.raises(SystemExit) as raised:
