@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
+from cin_market_candle_provenance import candle_observation_metadata, market_pair_metadata
 
 try:
     from app.cin_technical_analysis import analyze_ohlc
@@ -201,6 +202,33 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     return candles[-limit:]
 
 
+def _validate_candle_boundaries(rows: list[dict[str, Any]], interval: str, now_ms: int) -> None:
+    """Reject impossible interval boundaries and future-open candles without requiring gap-free data."""
+    if interval not in _INTERVAL_MS:
+        raise ValueError("Unsupported candle interval")
+    for row in rows:
+        open_time = row["open_time"]
+        close_time = row["close_time"]
+        if open_time > now_ms:
+            raise ValueError("Provider returned a candle with a future open timestamp")
+        if interval == "1M":
+            start = datetime.fromtimestamp(open_time / 1000, timezone.utc)
+            if start.day != 1 or start.hour or start.minute or start.second or start.microsecond:
+                raise ValueError("Monthly candle open timestamp is not aligned to a UTC month boundary")
+            expected_close = open_time + _interval_duration_ms(interval, open_time) - 1
+        else:
+            duration = _INTERVAL_MS[interval]
+            if interval == "1w":
+                # Weekly exchange candles are anchored to Monday 00:00 UTC.
+                dt = datetime.fromtimestamp(open_time / 1000, timezone.utc)
+                if dt.weekday() != 0 or dt.hour or dt.minute or dt.second or dt.microsecond:
+                    raise ValueError("Weekly candle open timestamp is not aligned to Monday UTC")
+            elif interval != "3d" and open_time % duration != 0:
+                raise ValueError(f"{interval} candle open timestamp is not interval-aligned")
+            expected_close = open_time + duration - 1
+        if close_time != expected_close:
+            raise ValueError("Candle close timestamp is inconsistent with its interval boundary")
+
 def _normalize_candle_sequence(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Return candles in chronological order and reject ambiguous duplicate timestamps."""
     ordered = sorted(rows, key=lambda row: row["open_time"])
@@ -223,9 +251,11 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
     if not pair:
         raise ValueError(f"Coinbase fallback cannot map symbol {symbol}")
     base, quote = pair.groups()
-    # Coinbase Exchange spot products are quoted with a hyphen; USDT requests
-    # are mapped to the equivalent USD spot market, and the actual product is reported.
-    product_id = f"{base}-USD"
+    # Never substitute a USD market for a USDT request: the quote assets and
+    # prices are not interchangeable. Coinbase fallback currently supports USD only.
+    if quote != "USD":
+        raise ValueError(f"Coinbase fallback does not support quote currency {quote}")
+    product_id = f"{base}-{quote}"
     duration = COINBASE_GRANULARITY[interval]
     now = int(datetime.now(timezone.utc).timestamp())
     start = now - limit * duration
@@ -257,11 +287,13 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
             start_ms = int(row[0]) * 1000
             duration_ms = duration * 1000
             # Coinbase rows are [time, low, high, open, close, volume].
-            candles.append({
+            candle = {
                 "open_time": start_ms, "open": float(row[3]), "high": float(row[2]),
                 "low": float(row[1]), "close": float(row[4]), "volume": float(row[5]),
                 "close_time": start_ms + duration_ms - 1,
-            })
+            }
+            if _is_valid_candle(candle):
+                candles.append(candle)
         except (TypeError, ValueError, OverflowError):
             continue
     if not candles:
@@ -302,6 +334,7 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
         raise HTTPException(status_code=502, detail="Binance public market-data provider returned an invalid response.") from None
     try:
         rows = _normalize_candle_sequence(rows)
+        _validate_candle_boundaries(rows, interval, int(datetime.now(timezone.utc).timestamp() * 1000))
     except (KeyError, TypeError, ValueError):
         raise HTTPException(status_code=502, detail="Public market-data provider returned an ambiguous candle sequence.") from None
     for row in rows:
@@ -334,10 +367,14 @@ async def get_market_candles(
     freshness = _freshness_metadata(rows, interval, now_ms)
     source = rows[0].get("_source", "Binance public market-data API")
     endpoint = rows[0].get("_source_endpoint", BINANCE_KLINES_URL)
+    retrieved_at = datetime.now(timezone.utc).isoformat()
+    source_id = ("coinbase_public" if source.startswith("Coinbase") else
+                 "kraken_public" if source.startswith("Kraken") else "binance_public")
+    pair_metadata = market_pair_metadata(normalized, source_id)
     return {
-        "service": "cin", "mode": "read_only", "source": source, "source_endpoint": endpoint,
-        "retrieved_at": datetime.now(timezone.utc).isoformat(), "symbol": normalized,
-        "timeframe": interval, "count": len(rows),
+        "service": "cin", "mode": "read_only", "source": source, "source_id": source_id,
+        "source_endpoint": endpoint, "retrieved_at": retrieved_at, "symbol": normalized,
+        **pair_metadata, "timeframe": interval, "count": len(rows),
         **freshness,
         "data": [
             {
@@ -345,6 +382,19 @@ async def get_market_candles(
                 "open_time_utc": datetime.fromtimestamp(row["open_time"] / 1000, timezone.utc).isoformat(),
                 "close_time_utc": datetime.fromtimestamp(row["close_time"] / 1000, timezone.utc).isoformat(),
                 "is_closed": row["close_time"] < now_ms,
+                "observation_metadata": candle_observation_metadata(
+                    source_id=source_id,
+                    observed_at=datetime.fromtimestamp(
+                        (row["close_time"] if row["close_time"] < now_ms else row["open_time"]) / 1000,
+                        timezone.utc,
+                    ).isoformat(),
+                    retrieved_at=retrieved_at,
+                    interval=interval,
+                    quote_currency=pair_metadata["quote_currency"],
+                    timestamp_semantics=(
+                        "candle_close_time" if row["close_time"] < now_ms else "candle_open_time"
+                    ),
+                ),
             }
             for row in rows
         ],
@@ -373,12 +423,16 @@ async def analyze_public_market(
     freshness = _freshness_metadata(rows, interval, now_ms)
     source = rows[0].get("_source", "Binance public market-data API")
     endpoint = rows[0].get("_source_endpoint", BINANCE_KLINES_URL)
+    source_id = ("coinbase_public" if source.startswith("Coinbase") else
+                 "kraken_public" if source.startswith("Kraken") else "binance_public")
+    pair_metadata = market_pair_metadata(normalized, source_id)
     try:
         analysis = analyze_ohlc([{key: row[key] for key in ("open", "high", "low", "close")} for row in closed_rows])
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=f"Fetched candles failed analysis validation: {exc}") from exc
     analysis["input"].update({
-        "symbol": normalized, "timeframe": interval, "source": source, "source_endpoint": endpoint,
+        "symbol": normalized, "timeframe": interval, "source": source, "source_id": source_id,
+        "source_endpoint": endpoint, **pair_metadata,
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
         "requested_candle_count": len(rows),
         "analysis_candle_count": len(closed_rows),
