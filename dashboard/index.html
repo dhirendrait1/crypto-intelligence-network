@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#111827">
+<title>CIN · Intelligence Console</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1020;--panel:#141c2e;--line:#26334a;--text:#edf2fb;--muted:#9baac2;--accent:#c5d8a4;--warn:#f4d28a}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#19243a 0,var(--bg) 55%);color:var(--text);font:15px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:1100px;margin:auto;padding:22px 16px 44px}.top{display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap}.brand{font-size:1.35rem;font-weight:750;letter-spacing:.02em}.sub,.muted{color:var(--muted)}.pill{border:1px solid var(--line);border-radius:999px;padding:5px 10px;font-size:.78rem;color:var(--warn)}
+h1{font-size:clamp(1.65rem,5vw,2.5rem);line-height:1.1;margin:30px 0 8px}.intro{max-width:680px;color:var(--muted);margin:0 0 22px}
+.grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:12px}.card{grid-column:span 4;background:linear-gradient(145deg,#182238,var(--panel));border:1px solid var(--line);border-radius:16px;padding:16px;min-width:0}.wide{grid-column:span 8}.full{grid-column:1/-1}.card h2{font-size:1rem;margin:0 0 8px}.state{font-size:1.15rem;font-weight:700;margin:12px 0 4px}.state:before{content:"";display:inline-block;width:8px;height:8px;background:var(--warn);border-radius:50%;margin:0 8px 2px 0}.foot{margin-top:20px;border-top:1px solid var(--line);padding-top:16px;color:var(--muted);font-size:.85rem}button{background:var(--accent);color:#172015;border:0;border-radius:10px;padding:10px 14px;font:inherit;font-weight:700;cursor:pointer}button:focus-visible{outline:3px solid white;outline-offset:3px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.notice{padding:12px;border:1px solid #66502a;background:#2a2418;border-radius:12px;color:#f6dfad;margin:18px 0}.small{font-size:.85rem}
+/* CIN visual direction: dense sci-fi research terminal inspired by the supplied reference */
+:root{--bg:#050914;--panel:#0a1120;--line:#1c3150;--text:#e7f3ff;--muted:#8097b7;--accent:#63f5d2;--warn:#f5c66d;--cyan:#51d9ff;--violet:#9a8cff}
+body{background:radial-gradient(ellipse at 50% 22%,#102747 0,#060b17 44%,#03060d 100%);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.01em}
+main{max-width:1600px;padding:16px 18px 36px}.top{padding:10px 12px;border:1px solid #203552;background:#07101de8;box-shadow:0 0 28px #123a6022}.brand{letter-spacing:.12em;text-transform:uppercase}.brand:before{content:"◈ ";color:var(--accent)}h1{font-size:clamp(1.45rem,3vw,2.1rem);letter-spacing:.07em;text-transform:uppercase;margin:20px 0 5px}.intro{font-family:system-ui,sans-serif;font-size:.9rem;margin-bottom:14px}
+.pill{border-radius:4px;text-transform:uppercase;letter-spacing:.08em;border-color:#36516e;color:var(--cyan);background:#0b1a2b}
+.notice{border-radius:4px;border-color:#284c66;background:#091b2a;color:#9deaff;margin:12px 0;padding:10px}
+.card{background:linear-gradient(145deg,#0c1728ee,#070d18f5);border:1px solid #1c3552;border-radius:5px;padding:13px;box-shadow:inset 0 1px #ffffff05,0 8px 22px #0003}
+.card h2{font-size:.82rem;text-transform:uppercase;letter-spacing:.12em;color:#a9c9e9;border-bottom:1px solid #203651;padding-bottom:8px}
+.state{font-size:1rem;color:var(--accent)}.state:before{background:var(--accent);box-shadow:0 0 9px #63f5d2}
+.grid{gap:9px}.foot{border-color:#203651;font-family:system-ui,sans-serif}
+button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:uppercase;letter-spacing:.04em;font-size:.78rem}button:focus-visible{outline-color:var(--cyan)}
+#api-results article{border-color:#203651!important}
+.terminal-layout{display:grid;grid-template-columns:minmax(220px,1fr) minmax(300px,1.5fr) minmax(220px,1fr);gap:9px;margin:12px 0}
+.terminal-panel{border:1px solid #1b3553;background:linear-gradient(160deg,#0b1727,#050a13);padding:12px;min-width:0;position:relative;overflow:hidden}
+.terminal-panel h2{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:#9ec7e8;margin:0 0 10px}
+.metric-big{font-size:1.35rem;font-weight:800;color:var(--accent);letter-spacing:-.04em}.metric-caption{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.terminal-row{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid #14273d;font-size:.75rem}.terminal-row:last-child{border-bottom:0}
+.signal{color:var(--accent)}.signal-warn{color:var(--warn)}.micro-chart{width:100%;height:66px;display:block;margin-top:8px}
+.particle-stage{min-height:290px;display:grid;place-items:center;background:radial-gradient(ellipse,#102a46 0,#07101d 45%,#050a12 78%);isolation:isolate}
+.particle-ring{width:min(72%,270px);aspect-ratio:1;border-radius:50%;position:relative;border:1px solid #4ddcff66;box-shadow:0 0 22px #20cfff22,inset 0 0 35px #1b8ca822;transform:perspective(550px) rotateX(58deg);background:repeating-radial-gradient(ellipse at center,transparent 0 10px,#51d9ff22 11px 12px,transparent 13px 21px)}
+.particle-ring:before,.particle-ring:after{content:"";position:absolute;inset:9%;border-radius:50%;border:1px dotted #63f5d2aa;box-shadow:0 0 15px #51d9ff22;transform:rotate(32deg) scaleY(.78)}
+.particle-ring:after{inset:20%;border-color:#f5c66d99;transform:rotate(-25deg) scaleY(.66)}
+.ring-core{position:absolute;inset:35%;border-radius:50%;background:radial-gradient(circle,#a5fff2aa,#16496d77 40%,transparent 72%);box-shadow:0 0 26px #4edfff55}
+.stage-caption{position:absolute;bottom:10px;left:12px;right:12px;text-align:center;font-size:.65rem;color:#829dbb;letter-spacing:.12em;text-transform:uppercase}
+.terminal-bottom{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:10px}
+@media(max-width:850px){.terminal-layout{grid-template-columns:1fr 1fr}.terminal-center{grid-column:1/-1;grid-row:1}.particle-stage{min-height:250px}.terminal-bottom{grid-template-columns:1fr}}
+@media(max-width:560px){main{padding:10px 8px 24px}.terminal-layout{grid-template-columns:1fr}.terminal-center{grid-column:auto;grid-row:auto}.particle-stage{min-height:225px}.particle-ring{width:210px}.metric-big{font-size:1.2rem}.terminal-panel{padding:10px}.top{gap:8px}.brand{font-size:1.1rem}}
+/* Reference-matched compact intelligence workstation */
+.ticker{display:flex;gap:18px;overflow:hidden;white-space:nowrap;padding:7px 10px;border:1px solid #263a54;background:#080e19;color:#93a9c6;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;margin:8px 0}
+.ticker b{color:#d5e7f8}.ticker .up{color:#5ff0bf}.ticker .down{color:#ff7b91}
+.reference-board{display:grid;grid-template-columns:1.02fr 1.2fr 1.55fr .72fr;gap:5px;margin:6px 0}
+.ref-panel{min-width:0;overflow:hidden;border:1px solid #243650;background:linear-gradient(155deg,#0b1422,#060a12);padding:8px;font-size:.65rem}
+.ref-head{display:flex;align-items:center;justify-content:space-between;gap:6px;text-transform:uppercase;letter-spacing:.12em;font-size:.61rem;color:#a4bdd9;border-bottom:1px solid #1c2d43;padding-bottom:7px;margin-bottom:8px}
+.ref-tag{color:#5de6cc;border:1px solid #23574f;padding:2px 4px;font-size:.56rem}
+.ref-metric{font-size:clamp(1.25rem,2.5vw,2.2rem);font-weight:800;letter-spacing:-.06em;color:#73efbf;line-height:1.2;margin:14px 0 5px}
+.ref-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:10px 0}.ref-kpi{border:1px solid #1c2c42;padding:6px}.ref-kpi strong{display:block;color:#d7e7f6;font-size:.83rem}.ref-kpi span{font-size:.55rem;color:#8299b7;text-transform:uppercase}
+.ref-line{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid #142238;padding:6px 0;color:#91a5bf}.ref-line strong{color:#d4e4f5;font-weight:600}.ref-chart{display:block;width:100%;height:115px}.ref-smallchart{display:block;width:100%;height:74px}
+.network-row{display:grid;grid-template-columns:minmax(0,1fr) 104px;gap:5px;margin:5px 0}
+.network-visual{position:relative;min-width:0;min-height:350px;border:1px solid #263852;background:radial-gradient(ellipse at 48% 54%,#10213a 0,#080e19 48%,#050912 100%);overflow:hidden}
+.network-visual svg{position:absolute;width:100%;height:100%;inset:0}
+.network-caption{position:absolute;left:10px;top:9px;font-size:.6rem;letter-spacing:.13em;color:#a7bfd8;text-transform:uppercase}
+.network-legend{position:absolute;bottom:8px;left:10px;right:10px;display:flex;gap:10px;flex-wrap:wrap;font-size:.56rem;color:#849bb9;text-transform:uppercase}
+.asset-rail{border:1px solid #263852;background:#080e19;padding:7px;min-width:0}
+.asset-rail h3{font-size:.58rem;letter-spacing:.1em;color:#9eb8d5;text-transform:uppercase;margin:2px 0 8px}
+.asset-item{padding:8px 0;border-bottom:1px solid #18263a;font-size:.62rem}.asset-item:last-child{border-bottom:0}.asset-item strong{display:block;color:#e1edf8}.asset-item span{color:#8299b7}.asset-item em{display:block;color:#5ce7bb;font-style:normal;margin-top:3px}
+.ref-bottom{display:grid;grid-template-columns:1.1fr 1fr;gap:5px;margin:5px 0}
+.ref-table{width:100%;border-collapse:collapse;font-size:.58rem}.ref-table th,.ref-table td{text-align:left;padding:6px 4px;border-bottom:1px solid #17263a;white-space:nowrap}.ref-table th{color:#6f89a9;font-weight:500;text-transform:uppercase}.ref-table td{color:#a9bed5}
+.ref-bottom-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:8px}.ref-bottom-kpis div{border:1px solid #243650;padding:6px;color:#7f9ab9;font-size:.55rem;text-transform:uppercase}.ref-bottom-kpis b{display:block;color:#d8e9f9;font-size:.78rem;margin-top:3px}
+@media(max-width:950px){.reference-board{grid-template-columns:1fr 1fr}.network-row{grid-template-columns:minmax(0,1fr) 110px}.network-visual{min-height:300px}}
+@media(max-width:560px){.reference-board{grid-template-columns:1fr 1fr}.ref-panel{padding:6px}.reference-board .latency-panel{grid-column:1/-1}.network-row{grid-template-columns:1fr}.network-visual{min-height:265px}.asset-rail{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 10px}.asset-rail h3{grid-column:1/-1}.asset-item{min-width:0}.ref-bottom{grid-template-columns:1fr}.ticker{font-size:.56rem}.ref-chart{height:90px}}
+
+@media(max-width:720px){main{padding:18px 12px 32px}.card,.wide{grid-column:1/-1}.card{padding:14px}.top{align-items:flex-start}}
+</style>
+</head>
+<body>
+<main>
+<header class="top">
+<div><div class="brand">CIN <span class="muted">/ Intelligence Network</span></div><div class="sub small">Read-only research · monitoring · evidence</div></div>
+<span class="pill">UI PREVIEW · API NOT CONNECTED</span>
+</header>
+<h1>Intelligence console</h1>
+<p class="intro">A mobile-first control panel for market analysis, screening, source evidence and monitoring. Live values are intentionally withheld until a verified API response is connected.</p>
+<div class="notice" role="status"><strong>Connection state: not connected.</strong> This preview does not fetch live data. No live data is shown in this preview, and it does not represent current market conditions.</div>
+<div class="ticker" aria-label="Market status ribbon"><span>◈ CIN INTELLIGENCE TERMINAL</span><span>MARKET FEED <b>—</b></span><span>BTC / USDT <b>—</b></span><span>ETH / USD <b>—</b></span><span>VOLATILITY <b>UNKNOWN</b></span><span>NETWORK <b>READ-ONLY</b></span><span>UTC <b>—</b></span></div>
+<section class="reference-board" aria-label="Top intelligence panels">
+ <article class="ref-panel"><div class="ref-head"><span>◈ Asset balance / overview</span><span class="ref-tag">RESEARCH</span></div><div class="metric-caption">Verified portfolio data</div><div class="ref-metric">— — —</div><div class="metric-caption">No wallet connected · no portfolio value inferred</div><div class="ref-kpis"><div class="ref-kpi"><strong>—</strong><span>24H change</span></div><div class="ref-kpi"><strong>—</strong><span>Volume</span></div><div class="ref-kpi"><strong>—</strong><span>Assets</span></div></div><div class="ref-line"><span>Evidence coverage</span><strong>UNKNOWN</strong></div><div class="ref-line"><span>Feed status</span><strong>NOT CONNECTED</strong></div><div class="ref-line"><span>Last update</span><strong>—</strong></div></article>
+ <article class="ref-panel"><div class="ref-head"><span>▥ BTC market structure</span><span class="ref-tag">1H</span></div><div class="ref-line"><span>Instrument</span><strong>BTCUSDT</strong></div><div class="ref-line"><span>Candle status</span><strong>UNAVAILABLE</strong></div><svg class="ref-chart" viewBox="0 0 300 115" preserveAspectRatio="none" role="img" aria-label="Illustrative candlestick chart, not market data"><g stroke="#17283d" stroke-width="1"><path d="M0 20H300M0 45H300M0 70H300M0 95H300"/></g><g stroke="#5ce8ba" fill="#5ce8ba"><path d="M18 63V34M14 43H22V56H14Z M46 70V42M42 48H50V61H42Z M74 56V24M70 30H78V43H70Z M102 64V39M98 43H106V57H98Z M130 48V19M126 24H134V39H126Z"/></g><g stroke="#ff718a" fill="#ff718a"><path d="M158 54V30M154 35H162V48H154Z M186 68V40M182 44H190V60H182Z M214 58V25M210 31H218V49H210Z"/></g><g stroke="#5ce8ba" fill="#5ce8ba"><path d="M242 46V15M238 20H246V36H238Z M270 38V8M266 13H274V28H266Z"/></g><path d="M0 83L30 76L60 81L90 55L120 61L150 44L180 68L210 37L240 42L270 18L300 25" fill="none" stroke="#f0c46c" stroke-width="1.4" opacity=".8"/></svg><div class="ref-kpis"><div class="ref-kpi"><strong>—</strong><span>RSI</span></div><div class="ref-kpi"><strong>—</strong><span>Trend</span></div><div class="ref-kpi"><strong>—</strong><span>Structure</span></div></div><div class="metric-caption">Chart is a visual placeholder until connected.</div></article>
+ <article class="ref-panel latency-panel"><div class="ref-head"><span>⌁ Feed latency & data quality</span><span class="ref-tag">UNVERIFIED</span></div><svg class="ref-smallchart" viewBox="0 0 420 74" preserveAspectRatio="none" role="img" aria-label="Illustrative telemetry lines, not live measurements"><g stroke="#17283d"><path d="M0 15H420M0 37H420M0 59H420"/></g><path d="M0 60L25 51L50 54L75 35L100 43L125 31L150 36L175 26L200 33L225 20L250 26L275 15L300 21L325 12L350 19L375 8L420 12" fill="none" stroke="#5ddfc4" stroke-width="1.6"/><path d="M0 66L25 61L50 63L75 51L100 55L125 45L150 49L175 40L200 46L225 35L250 41L275 29L300 34L325 27L350 30L375 22L420 24" fill="none" stroke="#78baff" stroke-width="1" opacity=".8"/></svg><div class="ref-kpis"><div class="ref-kpi"><strong>UNKNOWN</strong><span>Freshness</span></div><div class="ref-kpi"><strong>UNKNOWN</strong><span>Latency</span></div><div class="ref-kpi"><strong>UNKNOWN</strong><span>Completeness</span></div></div><div class="ref-line"><span>Policy registry</span><strong>EXPLICIT POLICY REQUIRED</strong></div><div class="ref-line"><span>Data provenance</span><strong>WAITING FOR API</strong></div></article>
+ <article class="ref-panel"><div class="ref-head"><span>◉ System</span></div><div class="ref-line"><span>API</span><strong>OFFLINE</strong></div><div class="ref-line"><span>Screening</span><strong>—</strong></div><div class="ref-line"><span>News</span><strong>—</strong></div><div class="ref-line"><span>Derivatives</span><strong>—</strong></div><div class="ref-line"><span>Alerts</span><strong>—</strong></div><div class="ref-line"><span>Mode</span><strong>READ ONLY</strong></div></article>
+</section>
+<div class="network-row">
+ <section class="network-visual" aria-label="Central intelligence network visualization"><div class="network-caption">✳ Neural shell / evidence relationship map</div><svg viewBox="0 0 900 430" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Decorative 3D particle-ring concept; no live network relationships represented"><defs><radialGradient id="shellGlow"><stop offset="0" stop-color="#17385b" stop-opacity=".1"/><stop offset=".7" stop-color="#2a6480" stop-opacity=".12"/><stop offset="1" stop-color="#050a12" stop-opacity="0"/></radialGradient><linearGradient id="nodeGold"><stop stop-color="#e5cf8a"/><stop offset="1" stop-color="#5edbc8"/></linearGradient></defs><ellipse cx="445" cy="220" rx="310" ry="155" fill="url(#shellGlow)"/><g fill="none" stroke-width=".7" opacity=".55"><ellipse cx="445" cy="220" rx="300" ry="105" stroke="#5a9dc4"/><ellipse cx="445" cy="220" rx="280" ry="80" stroke="#5a9dc4" transform="rotate(-19 445 220)"/><ellipse cx="445" cy="220" rx="280" ry="80" stroke="#5a9dc4" transform="rotate(19 445 220)"/><ellipse cx="445" cy="220" rx="230" ry="65" stroke="#c5b778" transform="rotate(52 445 220)"/><ellipse cx="445" cy="220" rx="230" ry="65" stroke="#c5b778" transform="rotate(-52 445 220)"/></g><g id="network-dots"></g><g fill="none" stroke="#6b9fbd" stroke-width=".8" opacity=".5"><path d="M35 110Q170 150 240 220T420 220T670 200T860 80"/><path d="M25 300Q175 275 260 235T455 230T700 285T875 340"/><path d="M90 40Q210 130 300 195T450 220T610 170T820 100"/><path d="M55 360Q200 300 330 250T520 210T780 250T860 390"/></g><g fill="#5fe7d0"><circle cx="240" cy="220" r="3"/><circle cx="670" cy="200" r="3"/><circle cx="330" cy="250" r="3"/><circle cx="610" cy="170" r="3"/></g><g fill="#e4c978"><circle cx="95" cy="40" r="3"/><circle cx="820" cy="100" r="3"/><circle cx="780" cy="250" r="3"/></g></svg><div class="network-legend"><span>○ Source identity: pending</span><span>○ Evidence links: pending</span><span>○ Nodes are illustrative</span></div></section>
+ <aside class="asset-rail" aria-label="Watchlist sidebar"><h3>◈ Watchlist / screening</h3><div class="asset-item"><strong>BTC · Bitcoin</strong><span>Score / trend</span><em>— / UNKNOWN</em></div><div class="asset-item"><strong>ETH · Ethereum</strong><span>Score / trend</span><em>— / UNKNOWN</em></div><div class="asset-item"><strong>SOL · Solana</strong><span>Score / trend</span><em>— / UNKNOWN</em></div><div class="asset-item"><strong>BNB · BNB</strong><span>Score / trend</span><em>— / UNKNOWN</em></div><div class="asset-item"><strong>LINK · Chainlink</strong><span>Score / trend</span><em>— / UNKNOWN</em></div><div class="asset-item"><strong>AVAX · Avalanche</strong><span>Score / trend</span><em>— / UNKNOWN</em></div></aside>
+</div>
+<section class="ref-bottom" aria-label="Bottom intelligence tables">
+ <article class="ref-panel"><div class="ref-head"><span>▤ Execution tape / event stream</span><span class="ref-tag">READ ONLY</span></div><table class="ref-table"><thead><tr><th>UTC time</th><th>Source</th><th>Event</th><th>Status</th></tr></thead><tbody><tr><td>—</td><td>—</td><td>No event feed connected</td><td>UNKNOWN</td></tr><tr><td>—</td><td>—</td><td>Evidence validation</td><td>WAITING</td></tr><tr><td>—</td><td>—</td><td>Freshness assessment</td><td>WAITING</td></tr><tr><td>—</td><td>—</td><td>Alert evaluation</td><td>WAITING</td></tr></tbody></table><div class="ref-bottom-kpis"><div>Evidence<b>—</b></div><div>Completeness<b>—</b></div><div>Alerts<b>—</b></div><div>Mode<b>Read-only</b></div></div></article>
+ <article class="ref-panel"><div class="ref-head"><span>⌁ Resolution funnel / analysis trace</span><span class="ref-tag">PREVIEW</span></div><svg class="ref-chart" viewBox="0 0 400 115" preserveAspectRatio="none" role="img" aria-label="Illustrative resolution trace, not live analysis"><g stroke="#182940"><path d="M0 20H400M0 45H400M0 70H400M0 95H400"/></g><path d="M0 33C45 20 54 75 94 53S155 28 180 59S232 70 260 57S322 65 350 82S378 89 400 93" fill="none" stroke="#5bdac4" stroke-width="1.6"/><path d="M0 75C45 65 54 90 94 70S155 66 180 75S232 30 260 42S322 47 350 34S378 38 400 28" fill="none" stroke="#729fe0" stroke-width="1.2"/></svg><div class="ref-line"><span>Input → validation → analysis</span><strong>WAITING</strong></div><div class="ref-line"><span>Output confidence</span><strong>NOT CALCULATED</strong></div><div class="ref-line"><span>Interpretation</span><strong>NO LIVE DATA</strong></div></article>
+</section>
+<section class="card full" aria-labelledby="api-connect-title">
+<h2 id="api-connect-title">Read-only API connection</h2>
+<p class="muted small">Optional and user-initiated. Enter the API origin you control. CIN makes no request until you press Connect. Cross-origin access requires the API to permit browser CORS.</p>
+<label for="api-origin" class="small">API origin (for example, your CIN API base URL)</label>
+<div class="actions"><input id="api-origin" type="url" inputmode="url" autocomplete="url" placeholder="https://your-cin-api.example" aria-describedby="api-origin-help" style="flex:1;min-width:220px;background:#0b1020;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit"></div>
+<p id="api-origin-help" class="muted small">Use the origin only; do not include a path, credentials, API keys, or secrets.</p>
+<div class="actions"><button id="connect-api" type="button">Connect read-only API</button><button id="disconnect-api" type="button">Disconnect</button></div>
+<p id="api-status" class="muted small" role="status" aria-live="polite">Disconnected. No API request has been made.</p>
+<div id="api-results" class="small" aria-live="polite"></div>
+</section>
+<section class="grid" aria-label="CIN modules">
+<article class="card" data-cin-panel="market"><h2>Market data</h2><div class="state">Awaiting API</div><p class="muted small">Provider, instrument, candle interval and observation timestamp will appear here.</p></article>
+<article class="card" data-cin-panel="technical"><h2>Technical analysis</h2><div class="state">Awaiting API</div><p class="muted small">Trend structure and indicators must include timeframe and closed-candle status.</p></article>
+<article class="card" data-cin-panel="screening"><h2>Coin screening</h2><div class="state">Awaiting API</div><p class="muted small">Scores should expose methodology, inputs and data limitations.</p></article>
+<article class="card" data-cin-panel="evidence"><h2>Evidence & provenance</h2><div class="state">Not verified</div><p class="muted small">Source identity, retrieval time, observed time and evidence completeness.</p></article>
+<article class="card" data-cin-panel="news"><h2>News & derivatives</h2><div class="state">Awaiting API</div><p class="muted small">Sentiment and derivatives metrics remain unavailable until returned by the service.</p></article>
+<article class="card" data-cin-panel="monitoring"><h2>Monitoring</h2><div class="state">Policy not configured</div><p class="muted small">Unknown freshness stays unknown; no universal thresholds are assumed.</p></article>
+<article class="card full"><h2>Data quality rules</h2><ul><li>Show unavailable and unknown states explicitly; never substitute fabricated values.</li><li>Display source and timestamps beside each dataset.</li><li>Separate heuristic research outputs from verified facts.</li><li>All controls are informational only: no orders, wallets or fund movement.</li></ul><div class="actions"><button id="refresh" type="button">Recheck preview state</button><span id="refresh-state" class="muted small" role="status" aria-live="polite">No API request has been made.</span></div></article>
+</section>
+<footer class="foot">Crypto Intelligence Network (CIN) · Preview only · No trading or order execution · No wallet access</footer>
+</main>
+<script>
+(function(){
+  "use strict";
+  const originInput=document.getElementById("api-origin");
+  const connectButton=document.getElementById("connect-api");
+  const disconnectButton=document.getElementById("disconnect-api");
+  const status=document.getElementById("api-status");
+  const results=document.getElementById("api-results");
+  let activeController=null;
+  const endpoints=[
+    {name:"Market candles",path:"/market-candles?symbol=BTCUSDT&interval=1h&limit=50",summary:data=>`Symbol: ${safeText(data.symbol)} · timeframe: ${safeText(data.timeframe)} · candles: ${safeText(data.count)} · source: ${safeText(data.source)} · retrieved: ${safeText(data.retrieved_at)}`},
+    {name:"Technical analysis",path:"/technical-analysis/market?symbol=BTCUSDT&interval=1h&limit=100",summary:data=>`Symbol: ${safeText(data.input&&data.input.symbol)} · timeframe: ${safeText(data.input&&data.input.timeframe)} · source: ${safeText(data.input&&data.input.source)} · retrieved: ${safeText(data.input&&data.input.retrieved_at)}`},
+    {name:"Coin screening",path:"/coin-screening?vs_currency=usd&per_page=5&min_score=0&asset_type=growth",summary:data=>"Assets returned: "+safeText(data.count)+" · source: "+safeText(data.source)+" · data mode: "+safeText(data.data_mode)+" · retrieved: "+safeText(data.retrieved_at)+" · methodology: "+safeText(data.methodology)},
+    {name:"Public news sentiment",path:"/news-sentiment?query=cryptocurrency&max_records=5",summary:data=>"Articles: "+safeText(data.count)+" · label: "+safeText(data.sentiment_summary&&data.sentiment_summary.label)+" · confidence: "+safeText(data.sentiment_summary&&data.sentiment_summary.confidence)+" · source: "+safeText(data.source)+" · retrieved: "+safeText(data.retrieved_at)},
+    {name:"Derivatives snapshot",path:"/derivatives/market-snapshot?symbol=BTCUSDT",summary:data=>`Symbol: ${safeText(data.symbol)} · source: ${safeText(data.source)} · retrieved: ${safeText(data.retrieved_at)} · freshness: ${safeText(data.data_quality&&data.data_quality.freshness_status)}`}
+  ];
+  const dotGroup=document.getElementById("network-dots");
+  if(dotGroup){
+    const ns="http://www.w3.org/2000/svg";
+    for(let i=0;i<560;i++){
+      const angle=i*2.3999632297;
+      const radius=Math.sqrt((i+.5)/560);
+      const x=445+Math.cos(angle)*290*radius;
+      const y=220+Math.sin(angle)*105*radius;
+      const depth=(Math.sin(angle*2.7)+1)/2;
+      const circle=document.createElementNS(ns,"circle");
+      circle.setAttribute("cx",x.toFixed(1));circle.setAttribute("cy",y.toFixed(1));
+      circle.setAttribute("r",(0.55+depth*1.05).toFixed(2));
+      circle.setAttribute("fill",depth>.72?"#e5cf8a":depth>.4?"#71dcca":"#75a9d4");
+      circle.setAttribute("opacity",(0.2+depth*.65).toFixed(2));dotGroup.appendChild(circle);
+    }
+  }
+  function safeText(value){return value===null||value===undefined||value===""?"unknown":String(value);}
+  function validOrigin(value){
+    try{const url=new URL(value);return (url.protocol==="https:"||url.protocol==="http:")&&url.origin===value.replace(/\/$/,"")&&!url.username&&!url.password&&url.search===""&&url.hash===""&&url.pathname==="/";}
+    catch(_){return false;}
+  }
+  const panelForEndpoint={
+    "Market candles":"market",
+    "Technical analysis":"technical",
+    "Coin screening":"screening",
+    "Public news sentiment":"news",
+    "Derivatives snapshot":"news"
+  };
+  function metricLine(container,label,value){
+    const line=document.createElement("div");
+    line.className="ref-line";
+    const left=document.createElement("span");left.textContent=label;
+    const right=document.createElement("strong");right.textContent=safeText(value);
+    line.append(left,right);container.appendChild(line);
+  }
+  function renderEndpointMetrics(name,data){
+    const key=panelForEndpoint[name];
+    const panel=key?document.querySelector('[data-cin-panel="'+key+'"]'):null;
+    if(panel){
+      let metrics=panel.querySelector('[data-api-metrics="'+name+'"]');
+      if(!metrics){metrics=document.createElement("div");metrics.className="api-metrics";metrics.setAttribute("data-api-metrics",name);panel.appendChild(metrics);}
+      metrics.replaceChildren();
+      if(name==="Market candles"){
+        const candles=Array.isArray(data.data)?data.data:[];
+        const latest=candles.length?candles[candles.length-1]:null;
+        metricLine(metrics,"Latest close",latest&&latest.close);
+        metricLine(metrics,"Latest candle closed",latest?String(latest.is_closed):"unknown");
+        metricLine(metrics,"Latest closed candle age (seconds)",data.latest_closed_candle_age_seconds);
+        metricLine(metrics,"Freshness warning",data.stale_data_warning||"none reported");
+        metricLine(metrics,"Provider",data.source);
+        const ribbon=document.querySelector(".ticker");
+        if(ribbon){
+          const btcValue=Array.from(ribbon.children).find(node=>node.textContent.includes("BTC / USDT"));
+          if(btcValue){
+            const value=btcValue.querySelector("b");
+            if(value) value.textContent=latest&&latest.close!=null?safeText(latest.close):"UNKNOWN";
+          }
+        }
+      }else if(name==="Technical analysis"){
+        const summary=data.market_structure||data.summary||data.analysis||{};
+        const indicators=data.indicators||{};
+        const input=data.input||{};
+        const levels=data.liquidity_reference_levels||{};
+        const scenarios=data.scenario_targets||{};
+        metricLine(metrics,"Analysis candles",input.analysis_candle_count??input.candle_count);
+        metricLine(metrics,"Forming candles excluded",input.forming_candle_excluded_count);
+        metricLine(metrics,"Last closed candle",input.last_candle_close_time_utc);
+        metricLine(metrics,"Provider",input.source);
+        metricLine(metrics,"Directional bias",summary.directional_bias||summary.trend||summary.bias);
+        metricLine(metrics,"Structure event",summary.structure_event);
+        metricLine(metrics,"Swing high pattern",summary.swing_high_pattern);
+        metricLine(metrics,"Swing low pattern",summary.swing_low_pattern);
+        metricLine(metrics,"RSI (14)",indicators.rsi_14??summary.rsi_14??summary.rsi);
+        metricLine(metrics,"MACD line",indicators.macd_line);
+        metricLine(metrics,"MACD signal",indicators.macd_signal);
+        metricLine(metrics,"MACD histogram",indicators.macd_histogram);
+        metricLine(metrics,"ATR (14)",indicators.atr_14);
+        metricLine(metrics,"Latest close",input.last_close);
+        metricLine(metrics,"Buy-side swing reference",levels.buy_side_reference);
+        metricLine(metrics,"Sell-side swing reference",levels.sell_side_reference);
+        metricLine(metrics,"Scenario targets status",scenarios.status);
+        if(scenarios.targets&&typeof scenarios.targets==="object"){
+          for(const [label,value] of Object.entries(scenarios.targets)) metricLine(metrics,"Illustrative "+label,value);
+        }
+        if(Array.isArray(data.limitations)) metricLine(metrics,"Analysis limitations",data.limitations.join(" "));
+      }else if(name==="Coin screening"){
+        const rows=Array.isArray(data.data)?data.data:[];
+        metricLine(metrics,"Assets returned",data.count);
+        metricLine(metrics,"Data mode",data.data_mode);
+        metricLine(metrics,"Cache age (seconds)",data.cache_age_seconds);
+        rows.slice(0,5).forEach((asset,i)=>metricLine(metrics,safeText(asset.name||asset.symbol||asset.id||("Asset "+(i+1))),asset.screen_score));
+        if(data.stale_data_warning) metricLine(metrics,"Data warning",data.stale_data_warning);
+      }else if(name==="Public news sentiment"){
+        const summary=data.sentiment_summary||{};
+        metricLine(metrics,"Headline sentiment",summary.label);
+        metricLine(metrics,"Confidence",summary.confidence);
+        metricLine(metrics,"Articles returned",data.count);
+        metricLine(metrics,"Provider timestamp quality",JSON.stringify(data.data_quality&&data.data_quality.provider_timestamp_quality_counts||{}));
+        metricLine(metrics,"Sentiment method warning",summary.warning);
+        metricLine(metrics,"Coverage limitation","Headline-only public news; no X, Reddit, or Telegram ingestion.");
+        (Array.isArray(data.articles)?data.articles:[]).slice(0,3).forEach((article,i)=>metricLine(metrics,safeText(article.title||("Headline "+(i+1))),article.provider_seen_at||article.published_at||"time unknown"));
+      }else if(name==="Derivatives snapshot"){
+        const d=data.data||{},q=data.data_quality||{},book=data.order_book||{};
+        metricLine(metrics,"Funding (% / interval)",d.funding_rate_percent_per_interval);
+        metricLine(metrics,"Open interest (contracts)",d.open_interest_contracts);
+        metricLine(metrics,"Mark price",d.mark_price);
+        metricLine(metrics,"Order-book spread (%)",book.spread_percent);
+        metricLine(metrics,"Bid/ask notional imbalance",book.bid_ask_notional_imbalance);
+        metricLine(metrics,"Open-interest value change (4h %)",d.open_interest_value_change_4h_percent);
+        metricLine(metrics,"Freshness",q.freshness_status);
+        metricLine(metrics,"Analysis eligibility",q.analysis_eligibility);
+        metricLine(metrics,"Timestamp checks",JSON.stringify(data.timestamp_quality||{}));
+        metricLine(metrics,"Liquidations",data.liquidations&&data.liquidations.status||"unknown");
+      }
+    }
+    if(name==="Coin screening"&&Array.isArray(data.data)){
+      const items=document.querySelectorAll(".asset-rail .asset-item");
+      data.data.slice(0,items.length).forEach((asset,i)=>{
+        const item=items[i];const em=item.querySelector("em");
+        if(em) em.textContent=safeText(asset.screen_score)+" / "+safeText(asset.analysis_eligibility||asset.score_band||"screened");
+        const label=item.querySelector("strong");
+        if(label) label.textContent=safeText(asset.symbol||asset.name||asset.id);
+      });
+    }
+    if(name==="Technical analysis"){
+      const summary=data.market_structure||data.summary||data.analysis||{};
+      const indicators=data.indicators||{};
+      const panel=document.querySelector(".reference-board article:nth-child(2)");
+      if(panel){
+        const lines=panel.querySelectorAll(".ref-line strong");
+        if(lines[1]) lines[1].textContent="CLOSED-CANDLE ANALYSIS";
+        const kpis=panel.querySelectorAll(".ref-kpi strong");
+        if(kpis[0]) kpis[0].textContent=safeText(indicators.rsi_14??summary.rsi_14??summary.rsi);
+        if(kpis[1]) kpis[1].textContent=safeText(summary.directional_bias||summary.trend||summary.bias||summary.direction);
+        if(kpis[2]) kpis[2].textContent=safeText(summary.structure_event||summary.market_structure||summary.structure);
+        const caption=panel.querySelector(".metric-caption:last-child");
+        if(caption) caption.textContent="API metrics only; chart geometry remains illustrative.";
+      }
+    }
+  }
+  function updateDashboardPanel(name,state,detail,data,meta){
+    const key=panelForEndpoint[name];
+    if(!key) return;
+    const panel=document.querySelector('[data-cin-panel="'+key+'"]');
+    if(!panel) return;
+    const stateNode=panel.querySelector(".state");
+    const description=panel.querySelector("p");
+    if(stateNode) stateNode.textContent=state==="available"?"API response received":state==="unavailable"?"Unavailable":"Awaiting API";
+    if(description) description.textContent=detail;
+    panel.setAttribute("data-api-state",state);
+    if(state==="available"&&data) renderEndpointMetrics(name,data);
+    const quality=document.querySelector(".latency-panel");
+    if(quality){
+      const kpis=quality.querySelectorAll(".ref-kpi strong");
+      if(kpis[0]){
+        let freshness="UNKNOWN";
+        if(name==="Market candles"&&data){
+          freshness=data.stale_data_warning?safeText(data.stale_data_warning):data.latest_closed_candle_age_seconds!=null?safeText(data.latest_closed_candle_age_seconds)+" s age":"UNKNOWN";
+        }else if(name==="Derivatives snapshot"&&data&&data.data_quality&&data.data_quality.freshness_status){
+          freshness=safeText(data.data_quality.freshness_status);
+        }
+        if(name==="Market candles"||name==="Derivatives snapshot") kpis[0].textContent=freshness;
+      }
+      if(kpis[1]&&meta&&Number.isFinite(meta.latencyMs)) kpis[1].textContent=meta.latencyMs+" ms";
+      if(state!=="available"){
+        if(kpis[0]) kpis[0].textContent="UNKNOWN";
+        if(kpis[1]) kpis[1].textContent="UNKNOWN";
+        if(kpis[2]) kpis[2].textContent="UNKNOWN";
+      }
+      if(kpis[2]&&state==="available"&&data){
+        let completeness="UNKNOWN";
+        if(name==="Market candles"&&Array.isArray(data.data)&&Number.isInteger(data.count)) completeness=data.data.length+"/"+data.count+" candles";
+        else if(name==="Coin screening"&&Array.isArray(data.data)&&Number.isInteger(data.count)) completeness=data.data.length+"/"+data.count+" assets";
+        else if(name==="Public news sentiment"&&Array.isArray(data.articles)&&Number.isInteger(data.count)) completeness=data.articles.length+"/"+data.count+" headlines";
+        if(completeness!=="UNKNOWN") kpis[2].textContent=completeness;
+      }
+      const tag=quality.querySelector(".ref-tag");
+      if(tag) tag.textContent=state==="available"?"API-REPORTED / MEASURED":"UNVERIFIED";
+    }
+    if(state!=="available"){
+      const metrics=panel.querySelector('[data-api-metrics="'+name+'"]');if(metrics)metrics.replaceChildren();
+      if(name==="Market candles"){
+        const ribbon=document.querySelector(".ticker");
+        if(ribbon){
+          const btcValue=Array.from(ribbon.children).find(node=>node.textContent.includes("BTC / USDT"));
+          const value=btcValue&&btcValue.querySelector("b");
+          if(value) value.textContent="UNKNOWN";
+        }
+      }
+      if(name==="Coin screening"){
+        document.querySelectorAll(".asset-rail .asset-item").forEach((item)=>{
+          const label=item.querySelector("strong"),value=item.querySelector("em");
+          if(label) label.textContent="Awaiting API";
+          if(value) value.textContent="unknown / not verified";
+        });
+      }
+      if(name==="Technical analysis"){
+        const analysisPanel=document.querySelector(".reference-board article:nth-child(2)");
+        if(analysisPanel){
+          analysisPanel.querySelectorAll(".ref-kpi strong").forEach(node=>node.textContent="unknown");
+          const caption=analysisPanel.querySelector(".metric-caption:last-child");
+          if(caption) caption.textContent="Waiting for verified API response; chart geometry remains illustrative.";
+        }
+      }
+    }
+  }
+  function renderRow(name,state,detail,data,meta){
+    updateDashboardPanel(name,state,detail,data,meta);
+    const row=document.createElement("article");
+    row.style.cssText="border-top:1px solid var(--line);padding:10px 0";
+    const heading=document.createElement("strong");heading.textContent=name+" — "+state;row.appendChild(heading);
+    const paragraph=document.createElement("p");paragraph.className="muted small";paragraph.textContent=detail;row.appendChild(paragraph);
+    results.appendChild(row);
+  }
+  document.getElementById("refresh").addEventListener("click",function(){
+    document.getElementById("refresh-state").textContent=activeController?"Connection attempt in progress.":"Preview rechecked. No request was made by this button.";
+  });
+  connectButton.addEventListener("click",async function(){
+    if(activeController) activeController.abort();
+    const base=originInput.value.trim().replace(/\/$/,"");
+    if(!validOrigin(base)){status.textContent="Not connected. Enter a valid HTTP(S) origin without a path or credentials.";return;}
+    activeController=new AbortController();
+    const controller=activeController;
+    connectButton.disabled=true;results.replaceChildren();
+    status.textContent="Connecting. Each endpoint is read-only; results may be partial.";
+    document.querySelector(".notice").textContent="Connection state: checking read-only endpoints. HTTP/JSON availability does not establish data correctness or freshness.";
+    let success=0;
+    for(const endpoint of endpoints){
+      if(controller.signal.aborted) return;
+      let requestStarted=Date.now();
+      try{
+        const response=await fetch(base+endpoint.path,{method:"GET",headers:{Accept:"application/json"},signal:controller.signal,cache:"no-store",credentials:"omit",redirect:"error"});
+        if(!response.ok) throw new Error("HTTP "+response.status);
+        const data=await response.json();
+        const latencyMs=Date.now()-requestStarted;
+        if(!data||typeof data!=="object"||Array.isArray(data)) throw new Error("Unexpected JSON response shape");
+        const schemaValid=endpoint.name==="Market candles"?typeof data.symbol==="string"&&typeof data.timeframe==="string"&&Number.isInteger(data.count)&&Array.isArray(data.data)&&typeof data.source==="string"&&typeof data.retrieved_at==="string":endpoint.name==="Technical analysis"?!!data.input&&typeof data.input.symbol==="string"&&typeof data.input.timeframe==="string"&&typeof data.input.source==="string"&&typeof data.input.retrieved_at==="string"&&Array.isArray(data.limitations):endpoint.name==="Coin screening"?Number.isInteger(data.count)&&Array.isArray(data.data)&&typeof data.source==="string"&&typeof data.data_mode==="string"&&typeof data.retrieved_at==="string"&&typeof data.methodology==="string":endpoint.name==="Public news sentiment"?Array.isArray(data.articles)&&Number.isInteger(data.count)&&!!data.sentiment_summary&&typeof data.source==="string"&&typeof data.retrieved_at==="string":endpoint.name==="Derivatives snapshot"?typeof data.symbol==="string"&&typeof data.source==="string"&&typeof data.retrieved_at==="string"&&!!data.data_quality:false;
+        if(!schemaValid) throw new Error("Invalid CIN response schema; expected fields are missing or have wrong types");
+        success++;
+        renderRow(endpoint.name,"available",endpoint.summary(data),data,{latencyMs});
+      }catch(error){
+        if(controller.signal.aborted) return;
+        renderRow(endpoint.name,"unavailable",error&&error.name==="TypeError"?"Request blocked or network/CORS error. Check API origin and browser CORS policy.":safeText(error&&error.message),null,{latencyMs:Date.now()-requestStarted});
+      }
+    }
+    if(controller.signal.aborted) return;
+    status.textContent=success===endpoints.length?"Connected: all "+success+" read-only endpoints responded.":"Partial connection: "+success+" of "+endpoints.length+" endpoints responded. Failed endpoints remain unavailable.";
+    document.querySelector(".notice").textContent=success===endpoints.length?"Connection state: endpoints responded. This confirms HTTP/JSON availability only, not data correctness, freshness, or source authenticity.":"Connection state: partial. "+success+" of "+endpoints.length+" endpoints responded; unavailable endpoints remain unverified.";
+    connectButton.disabled=false;
+    activeController=null;
+  });
+  disconnectButton.addEventListener("click",function(){
+    if(activeController) activeController.abort();
+    activeController=null;connectButton.disabled=false;results.replaceChildren();
+    // Clear API-derived values as well as the result log so disconnected panels cannot display stale readings.
+    for(const endpoint of endpoints) updateDashboardPanel(endpoint.name,"unavailable","Disconnected; reconnect to refresh this read-only endpoint.",null,null);
+    status.textContent="Disconnected. Existing displayed endpoint results cleared.";
+    document.querySelectorAll("[data-cin-panel]").forEach(panel=>{panel.removeAttribute("data-api-state");const stateNode=panel.querySelector(".state");if(stateNode)stateNode.textContent=panel.dataset.cinPanel==="evidence"?"Not verified":panel.dataset.cinPanel==="monitoring"?"Policy not configured":"Awaiting API";});
+    const quality=document.querySelector(".latency-panel");if(quality){quality.querySelectorAll(".ref-kpi strong").forEach(node=>node.textContent="UNKNOWN");const tag=quality.querySelector(".ref-tag");if(tag)tag.textContent="UNVERIFIED";}
+    document.querySelector(".notice").textContent="Connection state: not connected. No live values are shown until you explicitly connect to an API.";
+  });
+})();
+</script>
+</body>
+</html>
