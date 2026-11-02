@@ -6,3 +6,5 @@ The endpoint and status fields follow the [Mastodon hashtag timeline documentati
 
 Before integration into the shortlist: verify the instance's terms and public access from the Render environment; define caching, request budgets and candidate identity mapping; add safe provider failure handling and a independent evaluation of the limited sentiment methodology; then validate end-to-end. This code is not registered in the application, is not a social sentiment model, and does not satisfy the mandatory shortlist social evidence gate.
 
+
+The application includes an experimental preview route that returns HTTP 404 unless `CIN_SOCIAL_PREVIEW_ENABLED` is exactly `1`. Keep it disabled until the instance's terms and Render access have been reviewed. When enabled, it has a five-minute per-process cache and a 60-second per-asset failure backoff. These are not distributed rate limits and do not bound traffic across multiple instances. It does not authenticate users or establish sentiment accuracy; do not use this preview as a shortlist evidence source without further validation.

@@ -26,6 +26,8 @@ MODULES = (
     "cin_monitoring_status_api.py",
     "cin_source_observation_contract.py",
     "cin_source_freshness_policy.py",
+    "cin_public_social_mastodon.py",
+    "cin_public_social_preview_api.py",
 )
 
 
@@ -83,6 +85,7 @@ class DeploymentPatchTests(unittest.TestCase):
             "cin_derivatives_market_data_router",
             "cin_public_news_sentiment_router",
             "cin_monitoring_status_router",
+            "cin_social_preview_router",
         ):
             with self.subTest(router=router):
                 self.assertEqual(second_text.count(f"app.include_router({router})"), 1)
@@ -234,3 +237,4 @@ class DeploymentPatchTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

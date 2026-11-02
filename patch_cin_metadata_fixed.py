@@ -29,6 +29,8 @@ MODULES = (
     "cin_monitoring_status_api.py",
     "cin_source_observation_contract.py",
     "cin_source_freshness_policy.py",
+    "cin_public_social_mastodon.py",
+    "cin_public_social_preview_api.py",
 )
 main_path = APP_DIR / "main.py"
 if not main_path.is_file():
@@ -103,6 +105,12 @@ registrations = [
         "\n# CIN: caller-supplied monitoring status summary; no polling or alert delivery\n"
         "from app.cin_monitoring_status_api import router as cin_monitoring_status_router\n"
         "app.include_router(cin_monitoring_status_router)\n",
+    ),
+    (
+        "cin_social_preview_router",
+        "\n# CIN: opt-in social research preview; disabled by default\n"
+        "from app.cin_public_social_preview_api import router as cin_social_preview_router\n"
+        "app.include_router(cin_social_preview_router)\n",
     ),
 ]
 # Insert registrations before a direct-execution guard so routes are ready
@@ -186,3 +194,4 @@ for module_name in MODULES:
 
 
 print(f"CIN metadata verified; read-only market data, screening, assessment, evidence, and technical-analysis and public market-candle routers installed; files updated: {changed}")
+
