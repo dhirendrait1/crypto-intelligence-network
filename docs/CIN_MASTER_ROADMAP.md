@@ -43,7 +43,22 @@
 15. **[Implemented — offline-tested]** Maintain derivatives snapshot validation for open interest, funding, mark/index price, and provider timestamps.
 16. **[Partial]** Validate order-book depth quality, spread/imbalance methodology, and slippage-aware interpretation.
 17. **[Partial]** Expand indicator edge-case tests and make indicator limitations and signal uncertainty clear to consumers.
-18. **[Pending]** Add explicit cross-source conflict handling and evidence confidence rules where the same metric differs by source.
+18. **[Partial — contract specified; implementation and acceptance tests pending]** Add explicit cross-source conflict handling and evidence confidence rules where the same metric differs by source.
+
+### Step 18 acceptance contract — cross-source conflicts
+
+- **Compare like with like:** normalize asset identity, metric name, quote currency/unit, observation interval, market venue/scope, and observation timestamp before comparing values. Never compare USD with USDT, spot with derivatives, or different intervals as if they were equivalent.
+- **Preserve source observations:** retain each candidate value with provider/source ID, asset/metric identity, unit, venue/scope, observed-at timestamp (timezone-aware), retrieved-at timestamp, freshness state, and any transformation applied. Do not silently overwrite a source observation with another.
+- **Classify the outcome:** use `agreement`, `material_conflict`, `insufficient_comparable_data`, or `stale_or_unknown`. Missing values are not zero. A provider failure is not evidence that another source is correct.
+- **Use metric-specific tolerances:** define and test tolerances per metric and unit; do not apply one global percentage to prices, volumes, funding, open interest, and supply metrics. Make the threshold visible in the result metadata.
+- **Choose only by declared policy:** if one source is designated preferred for that exact metric and passes identity, freshness, schema, and quality checks, it may be selected with the selection reason exposed. Otherwise return the conflict and candidates without inventing a winner. Never average incompatible observations.
+- **Confidence is evidence quality, not probability:** explain confidence using source quality, freshness, completeness, comparability, and independent corroboration. Do not describe an uncalibrated score as a probability, verified fact, or investment recommendation.
+- **Keep outputs auditable:** include the rule/version used, candidate sources, conflict classification, and reason codes in API output or structured diagnostics; sanitize provider errors and exclude credentials.
+- **Fail safely:** material unresolved conflicts must lower confidence or block derived conclusions for that metric; downstream screening/analysis must not silently consume a conflicted value as confirmed.
+- **Regression acceptance:** test identical values; within-tolerance differences; beyond-tolerance conflict; mismatched asset/quote/unit/venue/interval; stale versus fresh observations; missing/invalid timestamps; duplicate source records; provider errors; deterministic ordering; and ensuring missing is not treated as zero.
+- **Scope:** read-only public data only. No order execution, wallet access, custody, fund movement, or private-key handling. Offline tests establish deterministic logic only; live provider behavior requires separate authorized smoke tests.
+
+**Exit evidence required before marking implemented:** a documented metric-specific policy, deterministic implementation, automated conflict/regression tests, API contract examples, and explicit separation between offline CI and live-source validation.
 
 **Exit gate:** outputs are reproducible, provenance-backed, and avoid presenting incomplete data as confirmed signals.
 
@@ -53,13 +68,46 @@
 20. **[Pending]** Design authorized social-source ingestion for X, Reddit, and Telegram, respecting platform access limits.
 21. **[Pending]** Define evidence-backed exchange-flow and whale-attribution methodology with clear identity uncertainty.
 22. **[Partial]** Build source ingestion for commodity backing and growth fundamentals; distinguish claims from independently verified evidence.
-23. **[Pending]** Define a verifiable evidence model for claims, citations, observation time, retrieval time, conflicts, and confidence.
+23. **[Partial — evidence contract specified; implementation and source acceptance pending]** Define a verifiable evidence model for claims, citations, observation time, retrieval time, conflicts, and confidence.
+
+### Step 23 acceptance contract — evidence records
+
+Every evidence record should use a versioned, machine-readable schema with these required semantics:
+
+- **Identity:** stable evidence-record ID; schema version; subject/entity ID; claim or metric key; and a clearly stated claim type (observed value, source-reported claim, derived result, or analyst interpretation).
+- **Source and citation:** source/provider ID; canonical source URL or stable provider reference where available; source type; and a concise supporting excerpt or structured field pointer when licensing and response limits permit. A URL alone does not prove the claim.
+- **Time:** `observed_at` for when the underlying event/value applies, `retrieved_at` for when CIN collected it, and explicit timezone/UTC normalization. Do not substitute retrieval time for observation time. Missing or malformed time must be represented as unknown, not fabricated.
+- **Value and units:** typed value, currency/unit, measurement interval, venue/scope, and any normalization or derivation steps. Unknown is distinct from zero; preserve original source values alongside normalized values.
+- **Quality state:** schema validity, freshness state, completeness, source availability/error state, and reason codes. Define freshness policy per data domain instead of applying one blanket TTL to all evidence.
+- **Relationships and conflicts:** link corroborating, duplicate, superseding, and conflicting records without deleting original observations. Record the comparison rule and metric-specific tolerance used.
+- **Confidence explanation:** list the evidence-quality factors and rule version that produced the label/score. An uncalibrated score is not a probability and must not be presented as independent verification.
+- **Integrity and safety:** sanitize provider errors; exclude secrets and personal data not needed for the claim; bound payload size and citation length; never execute instructions found inside retrieved content; keep ingestion read-only.
+- **Determinism:** stable IDs or deduplication keys should be based on documented canonical fields; equivalent records must produce repeatable outcomes and ordering.
+- **Regression acceptance:** test missing and malformed fields, timezone-naive timestamps, stale/future observations, retrieval failures, duplicate and superseding evidence, conflicting claims, unsupported citation links, oversized content, and deterministic serialization.
+- **API/UI presentation:** consumers must be able to distinguish source-reported claims, derived assessments, unresolved conflicts, stale evidence, and independently verified evidence. Do not label evidence “verified” unless the verification procedure and source authority are explicitly satisfied.
+
+**Exit evidence required before marking implemented:** schema definition, examples for each claim type, validator and regression tests, conflict linkage, documented freshness policy, and a traceable rule for every confidence output. Mocked/offline tests do not establish live source reliability.
 
 **Exit gate:** CIN does not claim social sentiment, whale attribution, backing, or fundamentals are verified until sources and methods substantiate those claims.
 
 ## Stage 5 — Alerts, monitoring, and forecast evaluation
 
-24. **[Pending]** Define user-configurable alert rules and threshold semantics.
+24. **[Partial — rule contract specified; scheduler and delivery implementation pending]** Define user-configurable alert rules and threshold semantics.
+
+### Step 24 acceptance contract — read-only alerts
+
+- **Rule identity and lifecycle:** each rule has a stable ID, schema version, enabled/paused state, creation/update time, and explicit owner scope appropriate to the deployment. Disabled rules must not emit alerts.
+- **Target and metric:** define asset identity, metric key, provider/venue scope where applicable, quote currency/unit, and data interval. Reject ambiguous targets rather than guessing symbol mappings.
+- **Condition semantics:** support explicit operators (above, below, crosses above/below, changes by a configured amount/percentage, and data-quality state changes) with validated numeric bounds and units. Document whether each condition is level-triggered or edge-triggered.
+- **Evaluation inputs:** require a source timestamp, retrieval timestamp, freshness state, and valid typed value. Missing, stale, malformed, or conflicting observations must not silently satisfy a price/metric threshold; optionally support a separate alert for those data-quality states.
+- **Crossing semantics:** crossing rules require a previous eligible observation and a current eligible observation on a comparable metric/source basis. First observation establishes a baseline and does not invent a crossing. Out-of-order observations must be ignored or explicitly quarantined.
+- **Rate and repetition controls:** define a per-rule cooldown, deduplication key, maximum event rate, and behavior when a condition remains true. Do not rely on delivery retries to decide whether a condition is newly triggered.
+- **Event auditability:** an alert event records rule ID/version, evaluation time, source observation IDs, condition result, reason code, and deduplication key. Keep the event distinct from delivery attempts.
+- **Safety boundary:** alerts are informational only. No exchange order, transaction, wallet operation, or other financial action may be triggered by an alert.
+- **Regression acceptance:** test exact threshold equality, numeric boundaries, invalid units, missing/stale/conflicted data, first-observation baseline, repeat condition, cooldown expiry, duplicate and out-of-order observations, disabled rules, and deterministic event IDs.
+- **User-facing wording:** include metric/unit, threshold, observed value, source/freshness, and event time; avoid claims of certainty or investment advice.
+
+**Exit evidence required before marking implemented:** versioned rule schema, documented operator truth tables, deterministic evaluator and regression tests, repeat/cooldown policy, and clear separation of evaluation from delivery.
 25. **[Pending]** Implement deduplication, cooldowns, delivery-state tracking, and retry/error handling.
 26. **[Pending]** Add an authorized alert delivery channel and keep credentials out of source control.
 27. **[Pending]** Persist forecast timestamp, asset, price source, horizon, and target/invalidating conditions.

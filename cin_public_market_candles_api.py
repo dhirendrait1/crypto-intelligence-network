@@ -1,4 +1,4 @@
-"""Read-only public OHLC candles with quote-safe, Coinbase-first provider selection."""
+"""Read-only public OHLC candles with Binance and Kraken public-provider fallback."""
 from __future__ import annotations
 
 import asyncio
@@ -12,7 +12,6 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
-
 from cin_market_candle_provenance import candle_observation_metadata, market_pair_metadata
 
 try:
@@ -161,33 +160,14 @@ def _fetch_kraken(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
     payload = _request_json(f"{KRAKEN_OHLC_URL}?{query}")
     if not isinstance(payload, dict):
         raise ValueError("Kraken response was not an object")
-    errors = payload.get("error")
-    # Kraken's response envelope must contain a well-formed error list.
-    if not isinstance(errors, list) or any(not isinstance(error, str) or not error.strip() for error in errors):
-        raise ValueError("Kraken response error field was malformed")
+    errors = payload.get("error") or []
     if errors:
-        raise ValueError("Kraken rejected pair/timeframe: " + "; ".join(errors))
+        raise ValueError("Kraken rejected pair/timeframe: " + "; ".join(str(e) for e in errors))
     result = payload.get("result")
     if not isinstance(result, dict):
         raise ValueError("Kraken response had no result")
-    # The response key is the only provider-returned market identity. Accept
-    # explicit aliases for this exact base/quote; never take an arbitrary key.
-    result_keys = [key for key in result if key != "last"]
-    base_alias = "XBT" if base == "XBT" else base
-    quote_alias = "ZUSD" if quote == "USD" else quote
-    accepted_pair_keys = {
-        f"{base_alias}{quote}",
-        f"X{base_alias}{quote_alias}",
-    }
-    if base_alias == "XBT":
-        accepted_pair_keys.add(f"XXBT{quote_alias}")
-    matching_keys = [key for key in result_keys if key in accepted_pair_keys]
-    if len(matching_keys) != 1:
-        if not matching_keys:
-            raise ValueError("Kraken response market key did not match requested pair")
-        raise ValueError("Kraken response contained ambiguous market keys for requested pair")
-    pair_key = matching_keys[0]
-    rows = result.get(pair_key)
+    pair_key = next((key for key in result if key != "last"), None)
+    rows = result.get(pair_key) if pair_key else None
     if not isinstance(rows, list):
         raise ValueError("Kraken returned no candle rows")
     candles = []
@@ -271,11 +251,11 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
     if not pair:
         raise ValueError(f"Coinbase fallback cannot map symbol {symbol}")
     base, quote = pair.groups()
-    # Never substitute a USD market for a USDT request: the quote asset is part
-    # of the market identity and must not be silently changed.
+    # Never substitute a USD market for a USDT request: the quote assets and
+    # prices are not interchangeable. Coinbase fallback currently supports USD only.
     if quote != "USD":
-        raise ValueError("Coinbase fallback requires an exact USD-quoted symbol")
-    product_id = f"{base}-USD"
+        raise ValueError(f"Coinbase fallback does not support quote currency {quote}")
+    product_id = f"{base}-{quote}"
     duration = COINBASE_GRANULARITY[interval]
     now = int(datetime.now(timezone.utc).timestamp())
     start = now - limit * duration
@@ -297,17 +277,7 @@ def _fetch_coinbase(symbol: str, interval: str, limit: int) -> list[dict[str, An
             if not isinstance(row, list) or len(row) < 6:
                 continue
             try:
-                # Coinbase timestamps are integer Unix seconds. Reject booleans,
-                # fractional values, non-finite numbers, and out-of-range times.
-                if isinstance(row[0], bool):
-                    continue
-                timestamp_seconds = float(row[0])
-                if (not math.isfinite(timestamp_seconds)
-                        or not timestamp_seconds.is_integer()
-                        or timestamp_seconds < 0
-                        or timestamp_seconds * 1000 > MAX_TIMESTAMP_MS):
-                    continue
-                rows_by_time[int(timestamp_seconds)] = row
+                rows_by_time[int(row[0])] = row
             except (TypeError, ValueError, OverflowError):
                 continue
         cursor = chunk_end
@@ -337,45 +307,31 @@ def _fetch_klines(symbol: str, interval: str, limit: int) -> list[dict[str, Any]
 
 
 async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
-    """Load public candles with Coinbase first where its quote matches exactly.
-
-    USD requests prefer Coinbase Exchange. USDT requests prefer Kraken because
-    Coinbase's spot candle endpoint here is USD-quoted only. Binance is the
-    final public fallback; no fallback is allowed to relabel a USD market as USDT.
-    """
-    match = re.fullmatch(r"([A-Z0-9]+)(USDT|USD)", symbol)
-    if not match:
-        raise HTTPException(status_code=400, detail="Symbol must be a supported USD or USDT trading pair.")
-    _, quote = match.groups()
-    if quote == "USD":
-        providers = [
-            (_fetch_coinbase, "Coinbase Exchange public candles API", COINBASE_CANDLES_URL),
-            (_fetch_kraken, "Kraken public OHLC API (fallback)", KRAKEN_OHLC_URL),
-            (_fetch_binance, "Binance public market-data API (fallback)", BINANCE_KLINES_URL),
-        ]
-    else:
-        providers = [
-            (_fetch_kraken, "Kraken public OHLC API", KRAKEN_OHLC_URL),
-            (_fetch_binance, "Binance public market-data API (fallback)", BINANCE_KLINES_URL),
-        ]
-
-    failures: list[tuple[str, Exception]] = []
-    rows = None
-    source = endpoint = None
-    for fetcher, provider_name, provider_endpoint in providers:
+    try:
+        rows = await asyncio.to_thread(_fetch_binance, symbol, interval, limit)
+        source, endpoint = "Binance public market-data API", BINANCE_KLINES_URL
+    except urllib.error.HTTPError as exc:
+        if exc.code != 451:
+            if exc.code in (418, 429):
+                raise HTTPException(status_code=503, detail="Public market-data rate limit reached; retry later.") from exc
+            raise HTTPException(status_code=502, detail=f"Binance public market-data provider returned HTTP {exc.code}.") from exc
         try:
-            rows = await asyncio.to_thread(fetcher, symbol, interval, limit)
-            source, endpoint = provider_name, provider_endpoint
-            break
-        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
-            failures.append((provider_name, exc))
-
-    if rows is None:
-        # Rate-limit responses should be retried later, not mistaken for valid data.
-        if any(isinstance(exc, urllib.error.HTTPError) and exc.code in (418, 429) for _, exc in failures):
-            raise HTTPException(status_code=503, detail="Public market-data rate limit reached; retry later.") from None
-        raise HTTPException(status_code=503, detail="No quote-compatible public market-data provider returned valid candles.") from None
-
+            rows = await asyncio.to_thread(_fetch_kraken, symbol, interval, limit)
+            source, endpoint = "Kraken public OHLC API (fallback after Binance HTTP 451)", KRAKEN_OHLC_URL
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
+            try:
+                rows = await asyncio.to_thread(_fetch_coinbase, symbol, interval, limit)
+                source, endpoint = "Coinbase Exchange public candles API (fallback after Binance HTTP 451)", COINBASE_CANDLES_URL
+            except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as coinbase_exc:
+                # Do not disguise provider failure or return stale/empty data as live.
+                reason = "Kraken and Coinbase fallbacks unavailable or pair/timeframe unsupported"
+                if isinstance(coinbase_exc, urllib.error.HTTPError):
+                    reason += f" (Coinbase HTTP {coinbase_exc.code})"
+                raise HTTPException(status_code=503, detail=reason + "; Binance returned HTTP 451.") from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise HTTPException(status_code=503, detail="Binance public market-data provider is temporarily unavailable.") from None
+    except (ValueError, json.JSONDecodeError):
+        raise HTTPException(status_code=502, detail="Binance public market-data provider returned an invalid response.") from None
     try:
         rows = _normalize_candle_sequence(rows)
         _validate_candle_boundaries(rows, interval, int(datetime.now(timezone.utc).timestamp() * 1000))
@@ -384,8 +340,6 @@ async def _load(symbol: str, interval: str, limit: int) -> list[dict[str, Any]]:
     for row in rows:
         row["_source"] = source
         row["_source_endpoint"] = endpoint
-        row["_requested_quote_currency"] = quote
-        row["_actual_quote_currency"] = quote
     return rows
 
 
@@ -417,13 +371,10 @@ async def get_market_candles(
     source_id = ("coinbase_public" if source.startswith("Coinbase") else
                  "kraken_public" if source.startswith("Kraken") else "binance_public")
     pair_metadata = market_pair_metadata(normalized, source_id)
-    requested_quote = pair_metadata["requested_quote_currency"]
-    actual_quote = pair_metadata["quote_currency"]
     return {
         "service": "cin", "mode": "read_only", "source": source, "source_id": source_id,
         "source_endpoint": endpoint, "retrieved_at": retrieved_at, "symbol": normalized,
-        **pair_metadata, "actual_quote_currency": actual_quote,
-        "timeframe": interval, "count": len(rows),
+        **pair_metadata, "timeframe": interval, "count": len(rows),
         **freshness,
         "data": [
             {
@@ -439,8 +390,10 @@ async def get_market_candles(
                     ).isoformat(),
                     retrieved_at=retrieved_at,
                     interval=interval,
-                    quote_currency=actual_quote,
-                    timestamp_semantics=("candle_close_time" if row["close_time"] < now_ms else "candle_open_time"),
+                    quote_currency=pair_metadata["quote_currency"],
+                    timestamp_semantics=(
+                        "candle_close_time" if row["close_time"] < now_ms else "candle_open_time"
+                    ),
                 ),
             }
             for row in rows
@@ -473,15 +426,13 @@ async def analyze_public_market(
     source_id = ("coinbase_public" if source.startswith("Coinbase") else
                  "kraken_public" if source.startswith("Kraken") else "binance_public")
     pair_metadata = market_pair_metadata(normalized, source_id)
-    requested_quote = pair_metadata["requested_quote_currency"]
-    actual_quote = pair_metadata["quote_currency"]
     try:
         analysis = analyze_ohlc([{key: row[key] for key in ("open", "high", "low", "close")} for row in closed_rows])
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=f"Fetched candles failed analysis validation: {exc}") from exc
     analysis["input"].update({
-        "symbol": normalized, "timeframe": interval, "source": source, "source_endpoint": endpoint,
-        "source_id": source_id, **pair_metadata, "actual_quote_currency": actual_quote,
+        "symbol": normalized, "timeframe": interval, "source": source, "source_id": source_id,
+        "source_endpoint": endpoint, **pair_metadata,
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
         "requested_candle_count": len(rows),
         "analysis_candle_count": len(closed_rows),
