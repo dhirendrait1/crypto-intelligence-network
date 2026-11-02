@@ -38,3 +38,8 @@ The fallback is best-effort. Pair availability, provider policies, regional acce
 ## Verification
 
 Offline tests cover response shape and provenance, invalid input, rate-limit handling, Binance HTTP-451 fallback selection, and explicit fallback failure. These tests do not prove that a live provider currently serves a particular pair or that the deployed Render instance has received the latest commit. Confirm live behavior separately after deployment.
+
+
+## Interval boundary validation
+
+Read-only provider rows must have interval-aligned UTC candle open times and consistent close times. Weekly candles use Monday UTC; monthly candles use calendar-month boundaries. Missing intervals are not fabricated. Future-open candles fail closed. These are deterministic checks, not evidence of live provider availability.
