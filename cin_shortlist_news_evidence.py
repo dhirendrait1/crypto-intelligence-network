@@ -7,6 +7,11 @@ from typing import Any
 from urllib.parse import urlsplit
 
 _ASSETS = {"bitcoin", "ethereum"}
+_RSS_SOURCES = {
+    "CoinDesk public RSS (public RSS fallback; query-filtered)",
+    "Cointelegraph public RSS (public RSS fallback; query-filtered)",
+    "CoinDesk public RSS + Cointelegraph public RSS (public RSS fallback; query-filtered)",
+}
 
 
 def news_evidence(payload: Any, *, asset_id: str, now: datetime) -> dict[str, Any]:
@@ -21,7 +26,7 @@ def news_evidence(payload: Any, *, asset_id: str, now: datetime) -> dict[str, An
         raise ValueError("News query does not match asset")
     source = payload.get("source")
     rows = payload.get("articles")
-    if source != "GDELT DOC 2.0 public article search":
+    if source != "GDELT DOC 2.0 public article search" and source not in _RSS_SOURCES:
         raise ValueError("News source unavailable")
     if not isinstance(rows, list) or len(rows) > 50 or type(payload.get("count")) is not int or payload["count"] != len(rows):
         raise ValueError("Invalid news response")
@@ -56,10 +61,12 @@ def news_evidence(payload: Any, *, asset_id: str, now: datetime) -> dict[str, An
     return {
         "status": "preliminary", "asset_id": asset_id, "source": source,
         "source_url": link, "observed_at": stamp.isoformat(), "headline": title,
-        "timestamp_semantics": "provider_seen_at_not_verified_publication_time",
+        "timestamp_semantics": ("rss_feed_reported_date_not_independently_verified" if source in _RSS_SOURCES
+                                else "provider_seen_at_not_verified_publication_time"),
         "limitations": [
             "A title match does not establish article truth or causal relevance.",
-            "Provider seen time is not an independently verified publication time.",
+            "Provider or feed timestamp is not an independently verified publication time.",
+            "The source names the queried feed or feed group, not necessarily the article publisher.",
             "Headline keyword sentiment is not treated as market sentiment or a forecast.",
         ],
     }

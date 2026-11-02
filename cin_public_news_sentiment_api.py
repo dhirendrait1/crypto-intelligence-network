@@ -118,8 +118,6 @@ def _get_rss_articles(query: str, max_records: int) -> tuple[list[dict[str, Any]
                             parsed_date = parsedate_to_datetime(date_raw)
                             if parsed_date.tzinfo is not None:
                                 seen_at = parsed_date.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-                            else:
-                                seen_at = parsed_date.replace(tzinfo=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
                         except (TypeError, ValueError, OverflowError):
                             seen_at = None
                     rows.append({"title": title, "url": link, "seendate": seen_at, "domain": urlsplit(link).hostname})
@@ -176,8 +174,6 @@ def _get_rss_articles(query: str, max_records: int) -> tuple[list[dict[str, Any]
                             parsed_date = parsedate_to_datetime(date_raw)
                             if parsed_date.tzinfo is not None:
                                 seen_at = parsed_date.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-                            else:
-                                seen_at = parsed_date.replace(tzinfo=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
                         except (TypeError, ValueError, OverflowError):
                             seen_at = None
                     rows.append({"title": title, "url": link, "seendate": seen_at, "domain": urlsplit(link).hostname})
@@ -430,3 +426,4 @@ async def news_sentiment(
             "provider": "GDELT DOC 2.0",
             "error": "invalid_response",
         }) from exc
+

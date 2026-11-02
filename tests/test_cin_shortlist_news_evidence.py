@@ -33,7 +33,11 @@ class NewsEvidenceTests(unittest.TestCase):
         self.assertNotIn("sentiment", value)
         self.assertNotIn("probability", value)
 
-    def test_rss_timestamp_provenance_is_not_assumed(self):
+    def test_unknown_rss_source_is_not_assumed(self):
         value = payload(); value["source"] = "Public RSS"
         with self.assertRaises(ValueError): self.call(value)
+
+    def test_known_rss_timestamp_is_labeled_as_feed_reported(self):
+        value = payload(); value["source"] = "CoinDesk public RSS (public RSS fallback; query-filtered)"
+        self.assertEqual(self.call(value)["timestamp_semantics"], "rss_feed_reported_date_not_independently_verified")
 

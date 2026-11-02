@@ -119,7 +119,7 @@ async def shortlist_chart_preview(asset_id: str, horizon: str = "24h", quote: st
                 market = None
         news = None
         try:
-            news_payload = await asyncio.wait_for(news_sentiment(query=asset_id, max_records=10), timeout=20)
+            news_payload = await asyncio.wait_for(news_sentiment(query=asset_id, max_records=10), timeout=40)
             news = news_evidence(news_payload, asset_id=asset_id, now=datetime.now(timezone.utc))
         except Exception:
             # An unavailable or unverified source is never treated as evidence.
