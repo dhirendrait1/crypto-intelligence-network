@@ -121,6 +121,27 @@ def test_stale_worker_cannot_mark_reclaimed_attempt_sent_or_failed(tmp_path):
     assert current["status"] == "sent"
 
 
+def test_concurrent_claimers_only_claim_each_due_item_once(tmp_path):
+    path = tmp_path / "alerts.sqlite3"
+    item = enqueue_alert_delivery(
+        path, rule_id="r1", observation_id="concurrent-claim",
+        payload={"value": 1}, now=NOW,
+    )
+
+    def claim(_):
+        return claim_due_alerts(path, now=NOW, limit=10)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        batches = list(pool.map(claim, range(8)))
+
+    claimed_keys = [
+        row["idempotency_key"]
+        for batch in batches
+        for row in batch
+    ]
+    assert claimed_keys == [item["idempotency_key"]]
+    assert sum(len(batch) for batch in batches) == 1
+
 def test_concurrent_workers_claim_each_due_item_at_most_once(tmp_path):
     path = tmp_path / "alerts.sqlite3"
     for index in range(12):
@@ -146,7 +167,6 @@ def test_concurrent_workers_claim_each_due_item_at_most_once(tmp_path):
     assert len(set(keys)) == 12
     assert all(item["status"] == "sending" for batch in batches for item in batch)
 
-
 def test_active_lease_is_not_reclaimed_before_expiry(tmp_path):
     path = tmp_path / "alerts.sqlite3"
     enqueue_alert_delivery(
@@ -163,8 +183,6 @@ def test_active_lease_is_not_reclaimed_before_expiry(tmp_path):
     assert len(recovered) == 1
     assert recovered[0]["idempotency_key"] == first["idempotency_key"]
     assert recovered[0]["attempts"] == first["attempts"] + 1
-
-
 
 def test_dead_letter_stays_terminal_when_later_claim_uses_higher_attempt_limit(tmp_path):
     path = tmp_path / "alerts.sqlite3"
