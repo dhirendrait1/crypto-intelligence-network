@@ -329,9 +329,9 @@ class PublicMarketCandleTests(unittest.IsolatedAsyncioTestCase):
         rows = [[1700000000, "100", "102", "99", "101", "100.5", "10", 4]]
         payload = {
             "error": [],
-            "result": {"XBTUSDT": rows, "ETHUSDT": rows, "last": 1700000000},
+            "result": {"XXBTUSDT": rows, "ETHUSDT": rows, "last": 1700000000},
         }
-        with patch.object(api, "_request_json", side_effect=[{"error":[],"result":{"XBTUSDT":{"altname":"XBTUSDT","wsname":"XBT/USDT","aclass_base":"currency","aclass_quote":"currency","base":"XXBT","quote":"USDT"}}}, payload]):
+        with patch.object(api, "_request_json", side_effect=[{"error":[],"result":{"XXBTUSDT":{"altname":"XBTUSDT","wsname":"XBT/USDT","aclass_base":"currency","aclass_quote":"currency","status":"online","base":"XXBT","quote":"USDT"}}}, payload]):
             with self.assertRaisesRegex(ValueError, "did not match the resolved requested market"):
                 api._fetch_kraken("BTCUSDT", "1h", 5)
 
