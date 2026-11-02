@@ -2,8 +2,8 @@
 
 **Scope:** Crypto Intelligence Network (CIN), read-only research, analysis, forecasting, monitoring, and alerts. This tracker records what is supported by repository evidence; it is not a claim that CIN is production-complete.
 
-**Branch:** `feat/cin-architecture-audit`  
-**Release controls (updated 2026-10-26):** PR #6 is merged and its deployment-aligned CI passes on main. PR #11 integrates additional read-only research modules and must pass all current-head workflows before merge. PR #7 and PR #8 remain unmerged audit branches; do not merge them wholesale because PR #8 predates the Coinbase fallback and conflicts with the current candle-provider module. `render.yaml` enables automatic deployment on main updates, so a merge may trigger Render deployment; confirm the deployed revision and live health/readiness/routes before calling the release complete. No order execution, wallet control, private keys, or fund movement.
+**Branch:** `docs/update-cin-release-tracker-after-pr11`  
+**Release controls (updated 2026-10-27):** PR #6 and PR #11 are merged; PR #11's current-head automated tests, technical-analysis tests, screening checks, and evidence-ingestion API checks were all successful when last verified. PR #7 and PR #8 remain separate unmerged audit branches; do not merge them wholesale because PR #8 predates the Coinbase fallback and conflicts with the current candle-provider module. PRs #28 and #29 are open Draft test-only pull requests and remain unmerged; their current-head four-workflow suites passed as of 2026-10-27. `render.yaml` enables automatic deployment on main updates, so a merge may trigger Render deployment; confirm the deployed revision and live health/readiness/routes before calling the release complete. No Render changes or deployment are performed as part of this repository audit. No order execution, wallet control, private keys, or fund movement.
 
 ## Status definitions
 
