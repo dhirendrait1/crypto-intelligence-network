@@ -124,7 +124,7 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
     {name:"Technical analysis",path:"/technical-analysis/market?symbol=BTCUSDT&interval=1h&limit=100",summary:data=>`Symbol: ${safeText(data.input&&data.input.symbol)} · timeframe: ${safeText(data.input&&data.input.timeframe)} · source: ${safeText(data.input&&data.input.source)} · retrieved: ${safeText(data.input&&data.input.retrieved_at)}`},
     {name:"Coin screening",path:"/coin-screening?vs_currency=usd&per_page=5&min_score=0&asset_type=growth",summary:data=>"Assets returned: "+safeText(data.count)+" · source: "+safeText(data.source)+" · data mode: "+safeText(data.data_mode)+" · retrieved: "+safeText(data.retrieved_at)+" · methodology: "+safeText(data.methodology)},
     {name:"Public news sentiment",path:"/news-sentiment?query=cryptocurrency&max_records=5",summary:data=>"Articles: "+safeText(data.count)+" · label: "+safeText(data.sentiment_summary&&data.sentiment_summary.label)+" · confidence: "+safeText(data.sentiment_summary&&data.sentiment_summary.confidence)+" · source: "+safeText(data.source)+" · retrieved: "+safeText(data.retrieved_at)},
-    {name:"Derivatives snapshot",path:"/derivatives/market-snapshot?symbol=BTCUSDT",summary:data=>`Symbol: ${safeText(data.symbol)} · source: ${safeText(data.source)} · retrieved: ${safeText(data.retrieved_at)} · freshness: ${safeText(data.data_quality&&data.data_quality.freshness_status)}`}
+    {name:"BTC/USD perpetual derivatives",path:"/derivatives/kraken-market-snapshot",summary:data=>`Symbol: ${safeText(data.symbol)} · source: ${safeText(data.source)} · retrieved: ${safeText(data.retrieved_at)} · freshness: ${safeText(data.data_quality&&data.data_quality.freshness_status)}`}
   ];
   const dotGroup=document.getElementById("network-dots");
   if(dotGroup){
@@ -152,7 +152,7 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
     "Technical analysis":"technical",
     "Coin screening":"screening",
     "Public news sentiment":"news",
-    "Derivatives snapshot":"news"
+    "BTC/USD perpetual derivatives":"news"
   };
   function metricLine(container,label,value){
     const line=document.createElement("div");
@@ -227,7 +227,7 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
         metricLine(metrics,"Sentiment method warning",summary.warning);
         metricLine(metrics,"Coverage limitation","Headline-only public news; no X, Reddit, or Telegram ingestion.");
         (Array.isArray(data.articles)?data.articles:[]).slice(0,3).forEach((article,i)=>metricLine(metrics,safeText(article.title||("Headline "+(i+1))),article.provider_seen_at||article.published_at||"time unknown"));
-      }else if(name==="Derivatives snapshot"){
+      }else if(name==="BTC/USD perpetual derivatives"){
         const d=data.data||{},q=data.data_quality||{},book=data.order_book||{};
         metricLine(metrics,"Funding (% / interval)",d.funding_rate_percent_per_interval);
         metricLine(metrics,"Open interest (contracts)",d.open_interest_contracts);
@@ -284,10 +284,10 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
         let freshness="UNKNOWN";
         if(name==="Market candles"&&data){
           freshness=data.stale_data_warning?safeText(data.stale_data_warning):data.latest_closed_candle_age_seconds!=null?safeText(data.latest_closed_candle_age_seconds)+" s age":"UNKNOWN";
-        }else if(name==="Derivatives snapshot"&&data&&data.data_quality&&data.data_quality.freshness_status){
+        }else if(name==="BTC/USD perpetual derivatives"&&data&&data.data_quality&&data.data_quality.freshness_status){
           freshness=safeText(data.data_quality.freshness_status);
         }
-        if(name==="Market candles"||name==="Derivatives snapshot") kpis[0].textContent=freshness;
+        if(name==="Market candles"||name==="BTC/USD perpetual derivatives") kpis[0].textContent=freshness;
       }
       if(kpis[1]&&meta&&Number.isFinite(meta.latencyMs)) kpis[1].textContent=meta.latencyMs+" ms";
       if(state!=="available"){
@@ -362,7 +362,7 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
         const data=await response.json();
         const latencyMs=Date.now()-requestStarted;
         if(!data||typeof data!=="object"||Array.isArray(data)) throw new Error("Unexpected JSON response shape");
-        const schemaValid=endpoint.name==="Market candles"?typeof data.symbol==="string"&&typeof data.timeframe==="string"&&Number.isInteger(data.count)&&Array.isArray(data.data)&&typeof data.source==="string"&&typeof data.retrieved_at==="string":endpoint.name==="Technical analysis"?!!data.input&&typeof data.input.symbol==="string"&&typeof data.input.timeframe==="string"&&typeof data.input.source==="string"&&typeof data.input.retrieved_at==="string"&&Array.isArray(data.limitations):endpoint.name==="Coin screening"?Number.isInteger(data.count)&&Array.isArray(data.data)&&typeof data.source==="string"&&typeof data.data_mode==="string"&&typeof data.retrieved_at==="string"&&typeof data.methodology==="string":endpoint.name==="Public news sentiment"?Array.isArray(data.articles)&&Number.isInteger(data.count)&&!!data.sentiment_summary&&typeof data.source==="string"&&typeof data.retrieved_at==="string":endpoint.name==="Derivatives snapshot"?typeof data.symbol==="string"&&typeof data.source==="string"&&typeof data.retrieved_at==="string"&&!!data.data_quality:false;
+        const schemaValid=endpoint.name==="Market candles"?typeof data.symbol==="string"&&typeof data.timeframe==="string"&&Number.isInteger(data.count)&&Array.isArray(data.data)&&typeof data.source==="string"&&typeof data.retrieved_at==="string":endpoint.name==="Technical analysis"?!!data.input&&typeof data.input.symbol==="string"&&typeof data.input.timeframe==="string"&&typeof data.input.source==="string"&&typeof data.input.retrieved_at==="string"&&Array.isArray(data.limitations):endpoint.name==="Coin screening"?Number.isInteger(data.count)&&Array.isArray(data.data)&&typeof data.source==="string"&&typeof data.data_mode==="string"&&typeof data.retrieved_at==="string"&&typeof data.methodology==="string":endpoint.name==="Public news sentiment"?Array.isArray(data.articles)&&Number.isInteger(data.count)&&!!data.sentiment_summary&&typeof data.source==="string"&&typeof data.retrieved_at==="string":endpoint.name==="BTC/USD perpetual derivatives"?typeof data.symbol==="string"&&typeof data.source==="string"&&typeof data.retrieved_at==="string"&&!!data.data_quality:false;
         if(!schemaValid) throw new Error("Invalid CIN response schema; expected fields are missing or have wrong types");
         success++;
         renderRow(endpoint.name,"available",endpoint.summary(data),data,{latencyMs});
@@ -391,3 +391,4 @@ button{border-radius:4px;background:#7bf4dc;color:#031119;text-transform:upperca
 </script>
 </body>
 </html>
+

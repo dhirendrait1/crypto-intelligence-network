@@ -328,3 +328,75 @@ async def derivatives_market_snapshot(
             "provider": "Binance USDⓈ-M Futures",
             "error": "invalid_response",
         }) from exc
+
+
+_KRAKEN_FUTURES_TICKER_URL = "https://futures.kraken.com/derivatives/api/v3/tickers/PF_XBTUSD"
+
+
+def _kraken_futures_snapshot() -> dict[str, Any]:
+    """Fetch the explicitly identified BTC/USD perpetual; never substitute USDT."""
+    request = urllib.request.Request(
+        _KRAKEN_FUTURES_TICKER_URL,
+        headers={"accept": "application/json", "user-agent": _USER_AGENT},
+        method="GET",
+    )
+    with urllib.request.urlopen(request, timeout=10) as response:
+        raw = response.read(_MAX_PROVIDER_RESPONSE_BYTES + 1)
+    if len(raw) > _MAX_PROVIDER_RESPONSE_BYTES:
+        raise ValueError("Kraken Futures response exceeded size limit")
+    payload = json.loads(raw.decode("utf-8"))
+    if not isinstance(payload, dict) or payload.get("result") != "success":
+        raise ValueError("Invalid Kraken Futures envelope")
+    ticker = payload.get("ticker")
+    if not isinstance(ticker, dict) or ticker.get("symbol") != "PF_XBTUSD" or ticker.get("pair") != "XBT:USD" or ticker.get("tag") != "perpetual":
+        raise ValueError("Unexpected Kraken Futures market identity")
+    if ticker.get("suspended") is not False:
+        raise ValueError("Kraken Futures market is suspended or status unknown")
+    mark = _finite_number(ticker.get("markPrice"))
+    index = _finite_number(ticker.get("indexPrice"))
+    if mark is None or mark <= 0 or index is None or index <= 0:
+        raise ValueError("Invalid Kraken Futures price")
+    return {
+        "service": "cin",
+        "mode": "read_only",
+        "source": "Kraken Futures public ticker API",
+        "source_endpoint": _KRAKEN_FUTURES_TICKER_URL,
+        "symbol": "BTCUSD",
+        "provider_symbol": "PF_XBTUSD",
+        "market_type": "BTC/USD perpetual",
+        "retrieved_at": datetime.now(timezone.utc).isoformat(),
+        "provider_server_time": payload.get("serverTime") if isinstance(payload.get("serverTime"), str) and len(payload["serverTime"]) <= 64 else None,
+        "data": {
+            "mark_price": mark,
+            "index_price": index,
+            "open_interest_contracts": None,
+            "open_interest_value_quote_approx": None,
+            "open_interest_value_change_4h_percent": None,
+            "funding_rate": None,
+            "funding_rate_percent_per_interval": None,
+        },
+        "order_book": None,
+        "liquidations": {"status": "not_available"},
+        "data_quality": {
+            "freshness_status": "unknown",
+            "analysis_eligibility": "not_recommended",
+            "limitations": [
+                "BTC/USD perpetual is not BTC/USDT and is not a substitute for a USDT-quoted contract.",
+                "Provider server time is not independently validated as the timestamp of each metric.",
+                "Funding, open interest units, order-book depth and liquidation totals are not established.",
+            ],
+        },
+    }
+
+
+@router.get("/derivatives/kraken-market-snapshot")
+async def kraken_derivatives_market_snapshot():
+    """Read-only BTC/USD perpetual ticker. No account or order access."""
+    import asyncio
+    try:
+        return await asyncio.to_thread(_kraken_futures_snapshot)
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as exc:
+        raise HTTPException(status_code=503, detail="Kraken Futures public data is unavailable.") from exc
+    except (ValueError, TypeError, KeyError, UnicodeDecodeError, OverflowError) as exc:
+        raise HTTPException(status_code=502, detail="Kraken Futures response was invalid or incomplete.") from exc
+

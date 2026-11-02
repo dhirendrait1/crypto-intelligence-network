@@ -68,7 +68,7 @@ class DashboardPreviewTests(unittest.TestCase):
             "/technical-analysis/market?symbol=BTCUSDT",
             "/coin-screening?vs_currency=usd",
             "/news-sentiment?query=cryptocurrency",
-            "/derivatives/market-snapshot?symbol=BTCUSDT",
+            "/derivatives/kraken-market-snapshot",
         ):
             with self.subTest(endpoint=endpoint):
                 self.assertIn(endpoint, self.html)
@@ -134,7 +134,7 @@ class DashboardPreviewTests(unittest.TestCase):
         self.assertIn('tag.textContent=state==="available"?"API-REPORTED / MEASURED":"UNVERIFIED"', self.html)
         self.assertIn('tag.textContent="UNVERIFIED"', self.html)
         self.assertIn('if(state!=="available")', self.html)
-        self.assertIn('if(name==="Market candles"||name==="Derivatives snapshot") kpis[0].textContent=freshness', self.html)
+        self.assertIn('if(name==="Market candles"||name==="BTC/USD perpetual derivatives") kpis[0].textContent=freshness', self.html)
         self.assertIn('if(kpis[2]) kpis[2].textContent="UNKNOWN"', self.html)
         self.assertIn('tag.textContent=state==="available"?"API-REPORTED / MEASURED":"UNVERIFIED"', self.html)
         self.assertIn('const metrics=panel.querySelector(\'[data-api-metrics="\'+name+\'"]\');if(metrics)metrics.replaceChildren();', self.html)
@@ -185,7 +185,7 @@ class DashboardPreviewTests(unittest.TestCase):
             "/technical-analysis/market?symbol=BTCUSDT",
             "/coin-screening?vs_currency=usd",
             "/news-sentiment?query=cryptocurrency",
-            "/derivatives/market-snapshot?symbol=BTCUSDT",
+            "/derivatives/kraken-market-snapshot",
         ):
             with self.subTest(path=path):
                 self.assertIn(path, contract)
@@ -195,3 +195,4 @@ class DashboardPreviewTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
