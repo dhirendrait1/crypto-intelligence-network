@@ -25,6 +25,14 @@ class PublicDataUnavailable(Exception):
         self.attempts = attempts
 
 
+class _DataQualityError(ValueError):
+    """Internally generated, safe-to-report data-quality category."""
+
+    def __init__(self, reason: str):
+        super().__init__(reason)
+        self.reason = reason
+
+
 def _number(value: Any, *, positive: bool = False) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError("Invalid numeric value")
@@ -41,6 +49,8 @@ def _timestamp(value: Any) -> int:
 
 
 def _error_category(exc: Exception) -> str:
+    if isinstance(exc, _DataQualityError):
+        return exc.reason
     name = type(exc).__name__
     if name in {"RateLimitExceeded", "DDoSProtection"}:
         return "rate_limited"
@@ -139,11 +149,21 @@ class PublicSpotAdapter:
     @staticmethod
     def __ticker(raw: Any, symbol: str, now: int) -> dict:
         if not isinstance(raw, dict) or raw.get("symbol") != symbol:
-            raise ValueError("Ticker market mismatch")
-        price = _number(raw.get("last"), positive=True)
-        observed = _timestamp(raw.get("timestamp"))
-        if observed > now or now - observed > 900_000:
-            raise ValueError("Ticker timestamp unavailable, future or stale")
+            raise _DataQualityError("ticker_market_mismatch")
+        try:
+            price = _number(raw.get("last"), positive=True)
+        except ValueError as exc:
+            raise _DataQualityError("invalid_ticker_price") from exc
+        if raw.get("timestamp") is None:
+            raise _DataQualityError("provider_timestamp_missing")
+        try:
+            observed = _timestamp(raw.get("timestamp"))
+        except ValueError as exc:
+            raise _DataQualityError("provider_timestamp_invalid") from exc
+        if observed > now:
+            raise _DataQualityError("provider_timestamp_future")
+        if now - observed > 900_000:
+            raise _DataQualityError("provider_timestamp_stale")
         return {"kind": "ticker", "last": price, "observed_at_ms": observed,
                 "limitations": ["Provider timestamp and identity are not independently verified."]}
 

@@ -62,6 +62,24 @@ class Tests(unittest.TestCase):
             with self.subTest(key=key,value=value):
                 for ex in self.exchanges.values(): ex.ticker={'symbol':'BTC/USD','last':100.,'timestamp':NOW-1000};ex.ticker[key]=value
                 with self.assertRaises(PublicDataUnavailable): self.adapter.ticker('BTC/USD')
+    def test_timestamp_missing_is_reported_without_relaxing_freshness(self):
+        self.exchanges['kraken'].ticker['timestamp'] = None
+        result = self.adapter.ticker('BTC/USD')
+        self.assertEqual(result['provider'], 'coinbase')
+        self.assertEqual(result['attempts'], [{'provider':'kraken','reason':'provider_timestamp_missing'}])
+        self.assertEqual(result['observed_at_ms'], NOW-1000)
+    def test_ticker_data_quality_reasons_are_safe_and_precise(self):
+        for key, value, expected in [('timestamp', None, 'provider_timestamp_missing'),
+                                     ('timestamp', True, 'provider_timestamp_invalid'),
+                                     ('timestamp', NOW+1, 'provider_timestamp_future'),
+                                     ('timestamp', NOW-900001, 'provider_timestamp_stale'),
+                                     ('last', float('nan'), 'invalid_ticker_price'),
+                                     ('symbol', 'BTC/USDT', 'ticker_market_mismatch')]:
+            with self.subTest(expected=expected):
+                self.exchanges['kraken'].ticker = {'symbol':'BTC/USD','last':100.,'timestamp':NOW-1000}
+                self.exchanges['kraken'].ticker[key] = value
+                result = self.adapter.ticker('BTC/USD')
+                self.assertEqual(result['attempts'][0]['reason'], expected)
     def test_closed_continuous_candles(self):
         result=self.adapter.candles('BTC/USD','1h',3)
         self.assertEqual(result['count'],3)
