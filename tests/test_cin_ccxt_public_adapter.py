@@ -130,6 +130,10 @@ class Tests(unittest.TestCase):
         book = self.adapter.order_book('BTC/USD')
         self.assertEqual(book['freshness_status'], 'unknown')
         self.assertFalse(book['analysis_eligible'])
+    def test_provider_level_metadata_is_not_misidentified(self):
+        self.exchanges['kraken'].book['bids'] = [[99, 2, 1234567890], [98, 3, 1234567890]]
+        book = self.adapter.order_book('BTC/USD')
+        self.assertEqual(book['bids'], [[99.0, 2.0], [98.0, 3.0]])
     def test_invalid_order_books_fail_closed(self):
         cases = [({'bids':[]}, 'invalid_order_book_depth'),
                  ({'bids':[[99,0]]}, 'invalid_order_book_level'),

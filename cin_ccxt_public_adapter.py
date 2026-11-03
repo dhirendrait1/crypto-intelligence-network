@@ -209,7 +209,9 @@ class PublicSpotAdapter:
                 raise _DataQualityError("invalid_order_book_depth")
             pairs = []
             for level in levels:
-                if not isinstance(level, (tuple, list)) or len(level) != 2:
+                # CCXT can include a third provider-specific count or timestamp;
+                # discard it without assigning cross-provider meaning.
+                if not isinstance(level, (tuple, list)) or len(level) not in (2, 3):
                     raise _DataQualityError("invalid_order_book_level")
                 try:
                     price = _number(level[0], positive=True)
@@ -243,7 +245,7 @@ class PublicSpotAdapter:
                 "quantity_unit": symbol.split("/")[0], "levels_per_side_limit": 10,
                 "bids": parsed["bids"], "asks": parsed["asks"],
                 "best_bid": bid, "best_ask": ask, "spread": ask - bid,
-                "spread_percent_midpoint": (ask - bid) / ((ask + bid) / 2) * 100,
+                "spread_percent_midpoint": (ask - bid) / (bid + (ask - bid) / 2) * 100,
                 "limitations": ["Snapshot is venue-specific and not a market-wide liquidity measurement.",
                                 "Order-book imbalance is not verified buy/sell pressure.",
                                 "Preview is not eligible for automated liquidity conclusions.",
