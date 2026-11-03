@@ -1,0 +1,49 @@
+name: Temporary public dashboard diagnostics
+on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/cin-public-diagnostic.yml']
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Inspect public dashboard and read-only endpoints
+        run: |
+          python - <<'PY'
+          import concurrent.futures, json, urllib.error, urllib.request
+          origin = 'https://crypto-net.pages.dev'
+          targets = {
+              'dashboard': origin + '/',
+              'news': 'https://cin-api-oohr.onrender.com/news-sentiment?query=cryptocurrency&max_records=5',
+              'test_stream': 'https://cin-api-milestone2-test.onrender.com/research/ccxt/public-trades-stream?symbol=BTC%2FUSD',
+          }
+          def check(item):
+              name, url = item
+              try:
+                  headers = {'Origin':origin, 'Accept':'text/event-stream' if name == 'test_stream' else 'application/json'}
+                  request = urllib.request.Request(url, headers=headers)
+                  with urllib.request.urlopen(request, timeout=35) as response:
+                      out = {'endpoint':name,'http':response.status,'cors':response.headers.get('Access-Control-Allow-Origin'),'content_type':response.headers.get('Content-Type')}
+                      if name == 'dashboard':
+                          raw=response.read(300000).decode('utf-8','replace')
+                          out['auto_stream_v12'] = 'stream.js?v=12' in raw
+                          out['old_auto_connect_label'] = 'Connect live stream' in raw
+                      elif name == 'news':
+                          body=json.loads(response.read(500000))
+                          out['count']=body.get('count')
+                          out['source']=str(body.get('source',''))[:150]
+                      else:
+                          first=response.readline(1000).decode('utf-8','replace').strip()
+                          out['first_event']=first
+                      return out
+              except urllib.error.HTTPError as exc:
+                  return {'endpoint':name,'http':exc.code,'cors':exc.headers.get('Access-Control-Allow-Origin')}
+              except Exception as exc:
+                  return {'endpoint':name,'error':type(exc).__name__}
+          with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+              for result in pool.map(check, targets.items()):
+                  print('CIN_DIAG',json.dumps(result))
+          PY
