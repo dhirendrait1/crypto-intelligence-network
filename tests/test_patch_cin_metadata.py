@@ -32,6 +32,8 @@ MODULES = (
     "cin_shortlist_market_evidence.py",
     "cin_shortlist_news_evidence.py",
     "cin_shortlist_chart_preview_api.py",
+    "cin_ccxt_public_adapter.py",
+    "cin_ccxt_public_preview_api.py",
 )
 
 
@@ -91,6 +93,7 @@ class DeploymentPatchTests(unittest.TestCase):
             "cin_monitoring_status_router",
             "cin_social_preview_router",
             "cin_shortlist_chart_preview_router",
+            "cin_ccxt_public_preview_router",
         ):
             with self.subTest(router=router):
                 self.assertEqual(second_text.count(f"app.include_router({router})"), 1)
@@ -266,6 +269,7 @@ class DeploymentPatchTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
 
 
 
