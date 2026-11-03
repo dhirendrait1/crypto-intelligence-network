@@ -67,4 +67,36 @@ class StreamTests(unittest.TestCase):
         rows=asyncio.run(run())
         self.assertEqual(len(rows),1);self.assertIn('market_identity_unverified',rows[0]);self.assertTrue(exchange.closed)
 
+    def test_slot_released_if_close_is_cancelled(self):
+        exchange=Exchange()
+        async def cancelled_close(): raise asyncio.CancelledError()
+        exchange.close=cancelled_close
+        async def run():
+            gate=asyncio.Semaphore(0)
+            with patch.object(api,'_slot',gate),patch.object(api,'_make_exchange',return_value=exchange),patch.object(api.time,'time',return_value=NOW):
+                with self.assertRaises(asyncio.CancelledError):
+                    _ = [row async for row in api._events(Request(),'BTC/USD')]
+                self.assertFalse(gate.locked())
+                await gate.acquire()
+                self.assertTrue(gate.locked())  # Exactly one release.
+        asyncio.run(run())
+
+    def test_response_releases_slot_when_generator_never_starts(self):
+        async def run():
+            gate=asyncio.Semaphore(0)
+            lease=api._StreamLease()
+            async def never_started():
+                yield 'unused'
+            async def disconnected(response, scope, receive, send):
+                raise asyncio.CancelledError()
+            with patch.object(api,'_slot',gate),patch.object(api.StreamingResponse,'__call__',disconnected):
+                response=api._LeasedStreamingResponse(never_started(),lease=lease)
+                with self.assertRaises(asyncio.CancelledError):
+                    await response({},None,None)
+                self.assertFalse(gate.locked())
+                lease.release()
+                await gate.acquire()
+                self.assertTrue(gate.locked())
+        asyncio.run(run())
+
 if __name__ == '__main__': unittest.main()

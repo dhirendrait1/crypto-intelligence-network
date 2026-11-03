@@ -21,6 +21,32 @@ _next_start = 0.0
 _COOLDOWN_SECONDS = 30
 
 
+class _StreamLease:
+    """Release the single slot exactly once, even if streaming never starts."""
+    def __init__(self):
+        self.released = False
+
+    def release(self):
+        global _next_start
+        if not self.released:
+            self.released = True
+            _next_start = time.monotonic() + _COOLDOWN_SECONDS
+            _slot.release()
+
+
+class _LeasedStreamingResponse(StreamingResponse):
+    def __init__(self, *args, lease: _StreamLease, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._lease = lease
+
+    async def __call__(self, scope, receive, send):
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            # Also covers disconnect before the generator starts.
+            self._lease.release()
+
+
 def _make_exchange():
     # This code path is lazy and receives no API credentials or account details.
     import ccxt.pro as pro
@@ -46,8 +72,8 @@ def _trade(raw: Any, symbol: str, now_ms: int) -> dict | None:
     return {"id": trade_id, "observed_at_ms": timestamp, "price": float(price), "quantity": float(amount)}
 
 
-async def _events(request: Request, symbol: str):
-    global _next_start
+async def _events(request: Request, symbol: str, lease: _StreamLease | None = None):
+    lease = lease or _StreamLease()
     exchange = None
     seen: set[str] = set()
     order: deque[str] = deque()
@@ -116,13 +142,15 @@ async def _events(request: Request, symbol: str):
     except Exception:
         yield _event('unavailable', {'reason':'public_stream_unavailable'})
     finally:
-        if exchange is not None:
-            try:
-                await asyncio.wait_for(exchange.close(), timeout=5)
-            except Exception:
-                pass
-        _next_start = time.monotonic() + _COOLDOWN_SECONDS
-        _slot.release()
+        try:
+            if exchange is not None:
+                try:
+                    await asyncio.wait_for(exchange.close(), timeout=5)
+                except Exception:
+                    pass
+        finally:
+            # CancelledError during close must not strand the process-local slot.
+            lease.release()
 
 
 @router.get('/research/ccxt/public-trades-stream')
@@ -138,8 +166,10 @@ async def public_trades_stream(request: Request, symbol: str = 'BTC/USD'):
     except TimeoutError as exc:
         raise HTTPException(status_code=503, detail='Public stream preview is busy', headers={'Retry-After':'15'}) from exc
     try:
-        return StreamingResponse(_events(request, symbol), media_type='text/event-stream',
-                                 headers={'Cache-Control':'no-store', 'X-Accel-Buffering':'no'})
+        lease = _StreamLease()
+        return _LeasedStreamingResponse(_events(request, symbol, lease), lease=lease,
+                                        media_type='text/event-stream',
+                                        headers={'Cache-Control':'no-store', 'X-Accel-Buffering':'no'})
     except BaseException:
         _slot.release()
         raise
