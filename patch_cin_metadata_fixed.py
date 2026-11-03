@@ -35,6 +35,9 @@ MODULES = (
     "cin_shortlist_market_evidence.py",
     "cin_shortlist_news_evidence.py",
     "cin_shortlist_chart_preview_api.py",
+    "cin_ccxt_public_adapter.py",
+    "cin_ccxt_public_preview_api.py",
+    "cin_ccxt_public_stream_api.py",
 )
 main_path = APP_DIR / "main.py"
 if not main_path.is_file():
@@ -121,6 +124,18 @@ registrations = [
         "\n# CIN: opt-in chart evidence preview; disabled by default\n"
         "from app.cin_shortlist_chart_preview_api import router as cin_shortlist_chart_preview_router\n"
         "app.include_router(cin_shortlist_chart_preview_router)\n",
+    ),
+    (
+        "cin_ccxt_public_preview_router",
+        "\n# CIN: opt-in public-only CCXT preview; disabled by default\n"
+        "from app.cin_ccxt_public_preview_api import router as cin_ccxt_public_preview_router\n"
+        "app.include_router(cin_ccxt_public_preview_router)\n",
+    ),
+    (
+        "cin_ccxt_public_stream_router",
+        "\n# CIN: separately gated public CCXT trade stream\n"
+        "from app.cin_ccxt_public_stream_api import router as cin_ccxt_public_stream_router\n"
+        "app.include_router(cin_ccxt_public_stream_router)\n",
     ),
 ]
 # Insert registrations before a direct-execution guard so routes are ready
@@ -219,6 +234,7 @@ for module_name in MODULES:
 
 
 print(f"CIN metadata verified; read-only market data, screening, assessment, evidence, and technical-analysis and public market-candle routers installed; files updated: {changed}")
+
 
 
 
