@@ -15,6 +15,8 @@ class FakeAdapter:
         return {'provider':'kraken','symbol':symbol,'kind':'order_book'}
     def compare_closed_candles(self, symbol):
         return {'symbol':symbol,'kind':'closed_candle_comparison','comparison_status':'partial'}
+    def provider_observations(self):
+        return {'scope':'current_process_only','providers':[],'limitations':['test']}
 
 class PreviewTests(unittest.TestCase):
     def setUp(self):
@@ -26,6 +28,15 @@ class PreviewTests(unittest.TestCase):
         with patch.dict(os.environ,{},clear=True), patch.object(api,'_get_adapter') as get:
             with self.assertRaises(HTTPException) as error: asyncio.run(api.ticker())
         self.assertEqual(error.exception.status_code,404); get.assert_not_called()
+    def test_provider_observations_do_not_construct_adapter(self):
+        with patch.dict(os.environ,{'CIN_CCXT_PREVIEW_ENABLED':'1'},clear=True), patch.object(api, '_adapter', None), patch.object(api, '_get_adapter') as get:
+            result=asyncio.run(api.provider_observations())
+        self.assertEqual(result['providers'], [])
+        get.assert_not_called()
+    def test_provider_observations_are_disabled_by_default(self):
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaises(HTTPException) as error: asyncio.run(api.provider_observations())
+        self.assertEqual(error.exception.status_code, 404)
     def test_only_public_preview_shape(self):
         with patch.dict(os.environ,{'CIN_CCXT_PREVIEW_ENABLED':'1'},clear=True),patch.object(api,'_get_adapter',return_value=FakeAdapter()):
             result=asyncio.run(api.ticker('BTC/USD'))

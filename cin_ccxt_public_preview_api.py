@@ -109,3 +109,15 @@ async def order_book(symbol: str = "BTC/USD"):
 @router.get("/research/ccxt/closed-candle-comparison")
 async def closed_candle_comparison(symbol: str = "BTC/USD"):
     return await _execute("comparison", symbol)
+
+
+@router.get("/research/ccxt/provider-observations")
+async def provider_observations():
+    if os.getenv("CIN_CCXT_PREVIEW_ENABLED") != "1":
+        raise HTTPException(status_code=404, detail="Not found")
+    # Do not initialize CCXT, contact providers or expose configured secrets.
+    if _adapter is None:
+        return {"service":"cin", "mode":"read_only", "status":"experimental",
+                "scope":"current_process_only", "providers":[],
+                "limitations":["No adapter activity has been observed in this process."]}
+    return {"service":"cin", "mode":"read_only", "status":"experimental", **_adapter.provider_observations()}

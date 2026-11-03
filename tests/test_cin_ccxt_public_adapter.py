@@ -184,5 +184,24 @@ class Tests(unittest.TestCase):
         self.assertEqual(result['comparison_status'], 'unavailable')
         self.assertEqual(result['sources'], [])
         self.assertIsNone(result['comparison'])
+    def test_provider_observations_record_failure_and_success_without_polling(self):
+        self.exchanges['kraken'].ticker['timestamp'] = None
+        self.adapter.ticker('BTC/USD')
+        before = {name: list(exchange.calls) for name, exchange in self.exchanges.items()}
+        snapshot = self.adapter.provider_observations()
+        records = {row['provider']: row for row in snapshot['providers']}
+        self.assertEqual(records['kraken']['rejected'], 1)
+        self.assertEqual(records['kraken']['last_attempt']['reason'], 'provider_timestamp_missing')
+        self.assertEqual(records['coinbase']['accepted'], 1)
+        self.assertEqual(records['coinbase']['last_accepted']['provider_observed_at_ms'], NOW - 1000)
+        self.assertEqual(before, {name: list(exchange.calls) for name, exchange in self.exchanges.items()})
+        records['coinbase']['last_attempt']['reason'] = 'tampered'
+        self.assertIsNone(self.adapter.provider_observations()['providers'][1]['last_attempt']['reason'])
+
+    def test_order_book_without_provider_time_is_recorded_as_unknown(self):
+        self.exchanges['kraken'].book['timestamp'] = None
+        self.adapter.order_book('BTC/USD')
+        record = self.adapter.provider_observations()['providers'][0]['last_accepted']
+        self.assertIsNone(record['provider_observed_at_ms'])
 
 if __name__=='__main__': unittest.main()

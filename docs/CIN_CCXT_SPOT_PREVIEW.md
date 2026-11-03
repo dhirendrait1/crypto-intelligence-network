@@ -13,3 +13,7 @@ Only public methods are invoked: market metadata, ticker, OHLCV and order-book o
 The optional `GET /research/ccxt/closed-candle-comparison?symbol=BTC%2FUSD` compares independently validated 1h spot candle closes from Kraken and Coinbase only when both report the same close window. Partial responses and mismatched windows contain no calculated difference. This is historical research, not a live ticker or executable opportunity; analysis eligibility remains false.
 
 WebSockets, derivatives, history pagination, live cross-exchange comparison, shared request budgets, monitoring, comprehensive caching, production fallback and dashboard integration are not implemented by this preview. A provider response is not evidence of a reliable prediction or a qualifying shortlist.
+
+## Process-local provider observations
+
+The optional `GET /research/ccxt/provider-observations` reports the last accepted and rejected public operations and their local elapsed time. It reads memory only: it neither contacts exchanges nor initializes CCXT. Counts and observations reset on restart and are not shared between workers. A rejection may be a data-quality rejection rather than a provider outage. An accepted order-book observation does not mean its provider timestamp is known or that it is eligible for automated analysis. This is not uptime monitoring or an independent health probe.

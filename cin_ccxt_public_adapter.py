@@ -88,12 +88,51 @@ class PublicSpotAdapter:
         self.__providers = {}
         self.__locks = {}
         self.__budgets = {}
+        self.__observation_lock = threading.Lock()
+        self.__observations = {name: {"configured": name in factories, "accepted": 0, "rejected": 0,
+                                      "last_attempt": None, "last_accepted": None}
+                               for name in _ALLOWED_PROVIDERS}
         for name in _ALLOWED_PROVIDERS:
             if name in factories:
                 # Public-only construction: no API key, secret, wallet or account.
                 self.__providers[name] = factories[name]({"enableRateLimit": True, "timeout": 10000})
                 self.__locks[name] = threading.Lock()
                 self.__budgets[name] = []
+
+    def __record(self, provider: str, operation: str, result: str, reason: str | None,
+                 started: float, observed_at_ms: int | None = None) -> None:
+        """Record bounded local outcomes, not an independently probed health state."""
+        try:
+            completed = _timestamp(self.__clock_ms())
+            duration = max(0, round((self.__monotonic() - started) * 1000))
+            entry = {"operation": operation, "result": result, "reason": reason,
+                     "completed_at_ms": completed, "duration_ms": duration,
+                     "provider_observed_at_ms": observed_at_ms}
+            with self.__observation_lock:
+                record = self.__observations[provider]
+                key = "accepted" if result == "accepted" else "rejected"
+                record[key] = min(record[key] + 1, 1_000_000)
+                record["last_attempt"] = entry
+                if result == "accepted":
+                    record["last_accepted"] = dict(entry)
+        except Exception:
+            # Diagnostics must not make a valid response fail.
+            return
+
+    def provider_observations(self) -> dict:
+        """Read a local snapshot; no requests or exchange objects are exposed."""
+        with self.__observation_lock:
+            observations = []
+            for provider, value in self.__observations.items():
+                observations.append({"provider": provider, "configured": value["configured"],
+                                     "accepted": value["accepted"], "rejected": value["rejected"],
+                                     "last_attempt": dict(value["last_attempt"]) if value["last_attempt"] else None,
+                                     "last_accepted": dict(value["last_accepted"]) if value["last_accepted"] else None})
+        return {"scope": "current_process_only", "providers": observations,
+                "limitations": ["Historical request outcomes, not current provider health or uptime.",
+                                "Counts reset on process restart and are not shared across workers.",
+                                "Rejected data may reflect validation, not a provider outage.",
+                                "Duration includes market loading, requests and local validation."]}
 
     def __market(self, exchange: Any, symbol: str) -> dict:
         markets = exchange.load_markets()
@@ -126,6 +165,7 @@ class PublicSpotAdapter:
                 self.__budgets[provider] = recent
                 if len(recent) >= 20:
                     attempts.append({"provider": provider, "reason": "local_budget_exhausted"})
+                    self.__record(provider, operation, "rejected", "local_budget_exhausted", tick)
                     continue
                 recent.append(tick)
                 try:
@@ -144,12 +184,16 @@ class PublicSpotAdapter:
                         result = self.__order_book(raw, symbol, now)
                     else:
                         raise ValueError("Unsupported public operation")
+                    retrieved_at = datetime.fromtimestamp(now / 1000, tz=timezone.utc).isoformat()
+                    self.__record(provider, operation, "accepted", None, tick, result.get("observed_at_ms"))
                     return {"provider": provider, "market_id": market.get("id"), "symbol": symbol,
                             "market_type": "spot", "quote_currency": symbol.split("/")[1],
-                            "retrieved_at": datetime.fromtimestamp(now / 1000, tz=timezone.utc).isoformat(),
+                            "retrieved_at": retrieved_at,
                             "attempts": attempts, **result}
                 except Exception as exc:
-                    attempts.append({"provider": provider, "reason": _error_category(exc)})
+                    reason = _error_category(exc)
+                    self.__record(provider, operation, "rejected", reason, tick)
+                    attempts.append({"provider": provider, "reason": reason})
         raise PublicDataUnavailable(attempts)
 
     @staticmethod
