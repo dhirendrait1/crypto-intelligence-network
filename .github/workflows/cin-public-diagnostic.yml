@@ -40,7 +40,14 @@ jobs:
                           out['first_event']=first
                       return out
               except urllib.error.HTTPError as exc:
-                  return {'endpoint':name,'http':exc.code,'cors':exc.headers.get('Access-Control-Allow-Origin')}
+                  detail = None
+                  try:
+                      parsed = json.loads(exc.read(4000))
+                      if isinstance(parsed, dict) and isinstance(parsed.get('detail'), str):
+                          detail = parsed['detail'][:150]
+                  except (ValueError, UnicodeError):
+                      pass
+                  return {'endpoint':name,'http':exc.code,'cors':exc.headers.get('Access-Control-Allow-Origin'),'detail':detail}
               except Exception as exc:
                   return {'endpoint':name,'error':type(exc).__name__}
           with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
