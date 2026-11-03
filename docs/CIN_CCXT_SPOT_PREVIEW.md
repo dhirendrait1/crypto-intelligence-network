@@ -17,3 +17,11 @@ WebSockets, derivatives, history pagination, live cross-exchange comparison, sha
 ## Process-local provider observations
 
 The optional `GET /research/ccxt/provider-observations` reports the last accepted and rejected public operations and their local elapsed time. It reads memory only: it neither contacts exchanges nor initializes CCXT. Counts and observations reset on restart and are not shared between workers. A rejection may be a data-quality rejection rather than a provider outage. An accepted order-book observation does not mean its provider timestamp is known or that it is eligible for automated analysis. This is not uptime monitoring or an independent health probe.
+
+## Bounded public trade-stream experiment
+
+`GET /research/ccxt/public-trades-stream?symbol=BTC%2FUSD` is an experimental server-sent event (SSE) preview backed by a public Kraken CCXT WebSocket. It is separately disabled unless both `CIN_CCXT_PREVIEW_ENABLED=1` and `CIN_CCXT_STREAM_ENABLED=1`. It accepts only BTC/USD and ETH/USD spot markets with verified matching active metadata and makes no authenticated calls. It does not submit or manage orders.
+
+A `connected` event means only that the stream is set up; no trade is implied. A `trade` event is emitted only for a public trade received after the connection, with a nonempty ID, the exact symbol, finite positive price and quantity, and a nonfuture provider timestamp no more than 30 seconds old. Duplicate IDs are suppressed. Provider time and identity are not independently verified. Invalid, stale or missing data is omitted; unavailable connections and timeouts do not generate synthetic trades. This is an experimental observation stream, not a forecast or an eligible shortlist input.
+
+The preview allows one stream per process, at most 120 events or 120 seconds after connection, a 30-second per-process cooldown, bounded caches, a connection timeout, and close on completion or disconnect. These limits are not distributed across workers or a substitute for provider-specific usage limits. The browser dashboard is not wired to this route. Stage on the test service and validate that the host permits public WebSocket egress, that close/disconnect works, and that free-tier resource use is acceptable before considering integration.
