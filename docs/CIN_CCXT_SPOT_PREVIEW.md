@@ -20,7 +20,7 @@ The optional `GET /research/ccxt/provider-observations` reports the last accepte
 
 ## Bounded public trade-stream experiment
 
-`GET /research/ccxt/public-trades-stream?symbol=BTC%2FUSD` is an experimental server-sent event (SSE) preview backed by a public Kraken CCXT WebSocket. It is separately disabled unless both `CIN_CCXT_PREVIEW_ENABLED=1` and `CIN_CCXT_STREAM_ENABLED=1`. It accepts only BTC/USD and ETH/USD spot markets with verified matching active metadata and makes no authenticated calls. It does not submit or manage orders.
+`GET /research/ccxt/public-trades-stream?symbol=BTC%2FUSD` is an experimental server-sent event (SSE) preview backed by a public Kraken CCXT WebSocket. It is separately disabled unless both `CIN_CCXT_PREVIEW_ENABLED=1` and `CIN_CCXT_STREAM_ENABLED=1`. It accepts bounded alphanumeric USD spot symbols only when Kraken returns matching active spot metadata. Availability is provider-dependent; a symbol does not independently establish token identity. It makes no authenticated calls. It does not submit or manage orders.
 
 A `connected` event means only that the stream is set up; no trade is implied. A `trade` event is emitted only for a public trade received after the connection, with a nonempty ID, the exact symbol, finite positive price and quantity, and a nonfuture provider timestamp no more than 30 seconds old. Duplicate IDs are suppressed. Provider time and identity are not independently verified. Invalid, stale or missing data is omitted; unavailable connections and timeouts do not generate synthetic trades. This is an experimental observation stream, not a forecast or an eligible shortlist input.
 

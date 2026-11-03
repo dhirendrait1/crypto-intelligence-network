@@ -5,6 +5,7 @@ import asyncio
 import json
 import math
 import os
+import re
 import time
 from collections import deque
 from typing import Any
@@ -12,7 +13,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 router = APIRouter(tags=["experimental-ccxt-public-stream"])
-_ALLOWED = {"BTC/USD", "ETH/USD"}
+_SPOT_SYMBOL = re.compile(r"[A-Z0-9]{1,10}/USD\Z")
 _MAX_SECONDS = 120
 _MAX_EVENTS = 120
 _MAX_TRADE_AGE_MS = 30_000
@@ -157,8 +158,8 @@ async def _events(request: Request, symbol: str, lease: _StreamLease | None = No
 async def public_trades_stream(request: Request, symbol: str = 'BTC/USD'):
     if os.getenv('CIN_CCXT_PREVIEW_ENABLED') != '1' or os.getenv('CIN_CCXT_STREAM_ENABLED') != '1':
         raise HTTPException(status_code=404, detail='Not found')
-    if symbol not in _ALLOWED:
-        raise HTTPException(status_code=400, detail='Unsupported spot market')
+    if not _SPOT_SYMBOL.fullmatch(symbol):
+        raise HTTPException(status_code=400, detail='Use a USD spot pair such as BTC/USD')
     if time.monotonic() < _next_start:
         raise HTTPException(status_code=503, detail='Public stream preview is cooling down', headers={'Retry-After':'30'})
     try:

@@ -34,9 +34,11 @@ class StreamTests(unittest.TestCase):
         self.assertEqual(error.exception.status_code,404);make.assert_not_called()
     def test_invalid_inputs_fail_before_provider_access(self):
         with patch.dict(os.environ,{'CIN_CCXT_PREVIEW_ENABLED':'1','CIN_CCXT_STREAM_ENABLED':'1'},clear=True),patch.object(api,'_make_exchange') as make:
-            with self.assertRaises(HTTPException) as error:
-                asyncio.run(api.public_trades_stream(Request(), 'BTC/USDT'))
-        self.assertEqual(error.exception.status_code,400);make.assert_not_called()
+            for symbol in ('BTC/USDT', '../BTC/USD', 'btC/USD', 'BTC/ETH', 'ABCDEFGHIJK/USD'):
+                with self.subTest(symbol=symbol),self.assertRaises(HTTPException) as error:
+                    asyncio.run(api.public_trades_stream(Request(), symbol))
+                self.assertEqual(error.exception.status_code,400)
+        make.assert_not_called()
     def test_live_event_is_validated_deduplicated_and_closed(self):
         exchange=Exchange()
         async def run():
@@ -66,6 +68,20 @@ class StreamTests(unittest.TestCase):
                 return [row async for row in api._events(Request(),'BTC/USD')]
         rows=asyncio.run(run())
         self.assertEqual(len(rows),1);self.assertIn('market_identity_unverified',rows[0]);self.assertTrue(exchange.closed)
+
+    def test_other_usd_spot_symbols_require_and_use_exact_identity(self):
+        self.assertIsNotNone(api._SPOT_SYMBOL.fullmatch('SOL/USD'))
+        exchange=Exchange()
+        async def markets(): return {'SOL/USD':{'symbol':'SOL/USD','base':'SOL','quote':'USD','spot':True,'active':True,'id':'SOLUSD'}}
+        async def trades(symbol, limit):
+            return [{'id':'one','symbol':symbol,'timestamp':int(NOW*1000),'price':100,'amount':1}]
+        exchange.load_markets=markets;exchange.watch_trades=trades
+        async def run():
+            with patch.object(api,'_slot',asyncio.Semaphore(0)),patch.object(api,'_make_exchange',return_value=exchange),patch.object(api.time,'time',return_value=NOW):
+                return [row async for row in api._events(Request(),'SOL/USD')]
+        rows=asyncio.run(run())
+        trade=json.loads(next(row for row in rows if row.startswith('event: trade')).split('data: ',1)[1])
+        self.assertEqual((trade['symbol'],trade['quantity_currency']),('SOL/USD','SOL'))
 
     def test_slot_released_if_close_is_cancelled(self):
         exchange=Exchange()
