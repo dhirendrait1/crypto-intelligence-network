@@ -18,6 +18,9 @@ router = APIRouter(tags=["experimental-ccxt-public-preview"])
 _adapter: PublicSpotAdapter | None = None
 _adapter_lock = threading.Lock()
 _gate = asyncio.Semaphore(1)
+_pending = 0
+_MAX_PENDING = 4
+_QUEUE_TIMEOUT_SECONDS = 20
 
 
 def _get_adapter() -> PublicSpotAdapter:
@@ -29,21 +32,41 @@ def _get_adapter() -> PublicSpotAdapter:
 
 
 async def _execute(kind: str, symbol: str, *, interval: str = "1h", limit: int = 24) -> dict[str, Any]:
+    global _pending
     if os.getenv("CIN_CCXT_PREVIEW_ENABLED") != "1":
         raise HTTPException(status_code=404, detail="Not found")
     if symbol not in {"BTC/USD", "ETH/USD", "BTC/USDT", "ETH/USDT"}:
         raise HTTPException(status_code=400, detail="Unsupported spot market")
+    # Admission and decrement run on the event loop without an intervening await.
+    # This cap is per process; a multi-worker deployment needs shared controls.
+    if _pending >= _MAX_PENDING:
+        raise HTTPException(status_code=503, detail="Public market preview queue is full", headers={"Retry-After": "5"})
+    _pending += 1
+    acquired = False
+    release_on_completion = False
     try:
-        await asyncio.wait_for(_gate.acquire(), timeout=0.25)
-    except TimeoutError as exc:
-        raise HTTPException(status_code=503, detail="Public market preview is busy") from exc
-    try:
+        try:
+            await asyncio.wait_for(_gate.acquire(), timeout=_QUEUE_TIMEOUT_SECONDS)
+            acquired = True
+        except TimeoutError as exc:
+            raise HTTPException(status_code=503, detail="Public market preview is busy; retry shortly", headers={"Retry-After": "5"}) from exc
         adapter = _get_adapter()
         if kind == "ticker":
-            result = await asyncio.wait_for(asyncio.to_thread(adapter.ticker, symbol), timeout=45)
+            task = asyncio.create_task(asyncio.to_thread(adapter.ticker, symbol))
         else:
-            result = await asyncio.wait_for(asyncio.to_thread(adapter.candles, symbol, interval, limit), timeout=45)
+            task = asyncio.create_task(asyncio.to_thread(adapter.candles, symbol, interval, limit))
+        # A timed-out thread cannot be cancelled. Retain the gate until it
+        # actually finishes so another worker cannot overlap it in this process.
+        def release_gate(completed: asyncio.Task) -> None:
+            _gate.release()
+            if not completed.cancelled():
+                completed.exception()  # Consume late exceptions after timeout/cancellation.
+        task.add_done_callback(release_gate)
+        release_on_completion = True
+        result = await asyncio.wait_for(asyncio.shield(task), timeout=45)
         return {"service": "cin", "mode": "read_only", "status": "experimental", **result}
+    except HTTPException:
+        raise
     except PublicDataUnavailable as exc:
         raise HTTPException(status_code=503, detail={"message":"Public market data unavailable", "attempts":exc.attempts}) from exc
     except ValueError as exc:
@@ -53,7 +76,9 @@ async def _execute(kind: str, symbol: str, *, interval: str = "1h", limit: int =
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Public market preview unavailable") from exc
     finally:
-        _gate.release()
+        if acquired and not release_on_completion:
+            _gate.release()
+        _pending -= 1
 
 
 @router.get("/research/ccxt/ticker")
