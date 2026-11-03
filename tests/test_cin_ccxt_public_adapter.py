@@ -12,6 +12,7 @@ class FakeExchange:
         self.market = {'id':'XBTUSD','symbol':self.symbol,'base':'BTC','quote':'USD','spot':True,'active':True}
         self.ticker = {'symbol':self.symbol,'last':100.0,'timestamp':NOW-1000}
         self.rows = [[END-(3-i)*DURATION,100,103,99,102,20] for i in range(3)]
+        self.book = {'symbol':'BTC/USD','timestamp':NOW-1000,'bids':[[99,2],[98,3]],'asks':[[101,4],[102,5]]}
         self.calls = []
         self.failure = None
     def load_markets(self):
@@ -22,6 +23,8 @@ class FakeExchange:
         self.calls.append('fetch_ticker'); return self.ticker
     def fetch_ohlcv(self, symbol, timeframe, limit):
         self.calls.append('fetch_ohlcv'); return self.rows
+    def fetch_order_book(self, symbol, limit):
+        self.calls.append('fetch_order_book'); return self.book
 
 class Tests(unittest.TestCase):
     def setUp(self):
@@ -40,6 +43,17 @@ class Tests(unittest.TestCase):
         result=self.adapter.ticker('BTC/USD')
         self.assertEqual((result['provider'],result['symbol'],result['quote_currency'],result['last']),('kraken','BTC/USD','USD',100.0))
         self.assertEqual(self.exchanges['kraken'].calls,['load_markets','fetch_ticker'])
+    def test_retrieval_clock_is_read_after_provider_response(self):
+        clock = [NOW]
+        ex = self.exchanges['kraken']
+        def fetch(symbol):
+            clock[0] += 500
+            return {'symbol':symbol,'last':100.0,'timestamp':NOW+200}
+        ex.fetch_ticker = fetch
+        adapter = PublicSpotAdapter(factories={'kraken':lambda options: ex},clock_ms=lambda:clock[0])
+        result = adapter.ticker('BTC/USD', providers=('kraken',))
+        self.assertEqual(result['observed_at_ms'], NOW+200)
+        self.assertTrue(result['retrieved_at'].endswith('.500000+00:00'))
     def test_fallback_stays_same_market_and_explains_failure(self):
         self.exchanges['kraken'].failure=TimeoutError('not exposed')
         result=self.adapter.ticker('BTC/USD')
@@ -104,5 +118,33 @@ class Tests(unittest.TestCase):
         for _ in range(20):self.adapter.ticker('BTC/USD',providers=('kraken',))
         with self.assertRaises(PublicDataUnavailable) as exc:self.adapter.ticker('BTC/USD',providers=('kraken',))
         self.assertEqual(exc.exception.attempts[0]['reason'],'local_budget_exhausted')
+    def test_public_order_book_has_explicit_units_and_spread(self):
+        book = self.adapter.order_book('BTC/USD')
+        self.assertEqual((book['provider'], book['kind'], book['quantity_unit'], book['price_currency']), ('kraken', 'order_book', 'BTC', 'USD'))
+        self.assertEqual((book['best_bid'], book['best_ask'], book['spread']), (99,101,2))
+        self.assertAlmostEqual(book['spread_percent_midpoint'], 2)
+        self.assertFalse(book['analysis_eligible'])
+        self.assertEqual(book['freshness_status'], 'fresh_by_provider_timestamp')
+    def test_missing_book_time_is_unknown_and_ineligible(self):
+        self.exchanges['kraken'].book['timestamp'] = None
+        book = self.adapter.order_book('BTC/USD')
+        self.assertEqual(book['freshness_status'], 'unknown')
+        self.assertFalse(book['analysis_eligible'])
+    def test_invalid_order_books_fail_closed(self):
+        cases = [({'bids':[]}, 'invalid_order_book_depth'),
+                 ({'bids':[[99,0]]}, 'invalid_order_book_level'),
+                 ({'bids':[[99,1],[100,1]]}, 'order_book_out_of_order'),
+                 ({'asks':[[98,1]]}, 'crossed_or_locked_order_book'),
+                 ({'timestamp':NOW+1}, 'provider_timestamp_future'),
+                 ({'timestamp':NOW-60001}, 'provider_timestamp_stale'),
+                 ({'symbol':'BTC/USDT'}, 'order_book_market_mismatch')]
+        for changes, reason in cases:
+            with self.subTest(reason=reason):
+                for ex in self.exchanges.values():
+                    ex.book = {'symbol':'BTC/USD','timestamp':NOW-1000,'bids':[[99,2],[98,3]],'asks':[[101,4],[102,5]]}
+                    ex.book.update(changes)
+                with self.assertRaises(PublicDataUnavailable) as error:
+                    self.adapter.order_book('BTC/USD')
+                self.assertEqual(error.exception.attempts[0]['reason'], reason)
 
 if __name__=='__main__': unittest.main()

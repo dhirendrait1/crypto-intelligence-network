@@ -53,8 +53,12 @@ async def _execute(kind: str, symbol: str, *, interval: str = "1h", limit: int =
         adapter = _get_adapter()
         if kind == "ticker":
             task = asyncio.create_task(asyncio.to_thread(adapter.ticker, symbol))
-        else:
+        elif kind == "candles":
             task = asyncio.create_task(asyncio.to_thread(adapter.candles, symbol, interval, limit))
+        elif kind == "order_book":
+            task = asyncio.create_task(asyncio.to_thread(adapter.order_book, symbol))
+        else:
+            raise ValueError("Unsupported request")
         # A timed-out thread cannot be cancelled. Retain the gate until it
         # actually finishes so another worker cannot overlap it in this process.
         def release_gate(completed: asyncio.Task) -> None:
@@ -93,3 +97,8 @@ async def candles(symbol: str = "BTC/USD", interval: str = "1h", limit: int = Qu
     if interval not in {"5m", "15m", "1h", "4h", "1d"}:
         raise HTTPException(status_code=400, detail="Unsupported candle interval")
     return await _execute("candles", symbol, interval=interval, limit=limit)
+
+
+@router.get("/research/ccxt/order-book")
+async def order_book(symbol: str = "BTC/USD"):
+    return await _execute("order_book", symbol)

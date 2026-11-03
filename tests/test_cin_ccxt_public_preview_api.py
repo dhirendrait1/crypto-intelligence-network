@@ -11,6 +11,8 @@ class FakeAdapter:
         return {'provider':'kraken','symbol':symbol,'kind':'ticker','last':100}
     def candles(self, symbol, interval, limit):
         return {'provider':'kraken','symbol':symbol,'kind':'ohlcv','interval':interval,'count':limit}
+    def order_book(self, symbol):
+        return {'provider':'kraken','symbol':symbol,'kind':'order_book'}
 
 class PreviewTests(unittest.TestCase):
     def setUp(self):
@@ -26,8 +28,10 @@ class PreviewTests(unittest.TestCase):
         with patch.dict(os.environ,{'CIN_CCXT_PREVIEW_ENABLED':'1'},clear=True),patch.object(api,'_get_adapter',return_value=FakeAdapter()):
             result=asyncio.run(api.ticker('BTC/USD'))
             candles=asyncio.run(api.candles('BTC/USD','1h',24))
+            book=asyncio.run(api.order_book('BTC/USD'))
         self.assertEqual((result['mode'],result['status'],result['provider']),('read_only','experimental','kraken'))
         self.assertEqual(candles['count'],24)
+        self.assertEqual(book['kind'],'order_book')
     def test_rejects_unknown_inputs_before_provider_access(self):
         with patch.dict(os.environ,{'CIN_CCXT_PREVIEW_ENABLED':'1'},clear=True),patch.object(api,'_get_adapter') as get:
             with self.assertRaises(HTTPException) as error:asyncio.run(api.ticker('BTC/EUR'))

@@ -129,13 +129,18 @@ class PublicSpotAdapter:
                 recent.append(tick)
                 try:
                     market = self.__market(exchange, symbol)
-                    now = _timestamp(self.__clock_ms())
                     if operation == "ticker":
                         raw = exchange.fetch_ticker(symbol)
+                        now = _timestamp(self.__clock_ms())
                         result = self.__ticker(raw, symbol, now)
                     elif operation == "candles":
                         raw = exchange.fetch_ohlcv(symbol, timeframe=kwargs["interval"], limit=kwargs["limit"] + 1)
+                        now = _timestamp(self.__clock_ms())
                         result = self.__candles(raw, now, kwargs["interval"], kwargs["limit"])
+                    elif operation == "order_book":
+                        raw = exchange.fetch_order_book(symbol, limit=10)
+                        now = _timestamp(self.__clock_ms())
+                        result = self.__order_book(raw, symbol, now)
                     else:
                         raise ValueError("Unsupported public operation")
                     return {"provider": provider, "market_id": market.get("id"), "symbol": symbol,
@@ -193,6 +198,57 @@ class PublicSpotAdapter:
                 "observed_at_ms": rows[-1][0] + duration, "count": len(rows), "data": rows,
                 "limitations": ["Provider identity and source authenticity are not independently verified."]}
 
+    @staticmethod
+    def __order_book(raw: Any, symbol: str, now: int) -> dict:
+        if not isinstance(raw, dict) or raw.get("symbol") != symbol:
+            raise _DataQualityError("order_book_market_mismatch")
+        parsed = {}
+        for side in ("bids", "asks"):
+            levels = raw.get(side)
+            if not isinstance(levels, list) or not 1 <= len(levels) <= 10:
+                raise _DataQualityError("invalid_order_book_depth")
+            pairs = []
+            for level in levels:
+                if not isinstance(level, (tuple, list)) or len(level) != 2:
+                    raise _DataQualityError("invalid_order_book_level")
+                try:
+                    price = _number(level[0], positive=True)
+                    quantity = _number(level[1], positive=True)
+                except ValueError as exc:
+                    raise _DataQualityError("invalid_order_book_level") from exc
+                pairs.append([price, quantity])
+            for first, second in zip(pairs, pairs[1:]):
+                if (side == "bids" and first[0] <= second[0]) or (side == "asks" and first[0] >= second[0]):
+                    raise _DataQualityError("order_book_out_of_order")
+            parsed[side] = pairs
+        bid, ask = parsed["bids"][0][0], parsed["asks"][0][0]
+        if bid >= ask:
+            raise _DataQualityError("crossed_or_locked_order_book")
+        observed = raw.get("timestamp")
+        if observed is None:
+            freshness = "unknown"
+        else:
+            try:
+                observed = _timestamp(observed)
+            except ValueError as exc:
+                raise _DataQualityError("provider_timestamp_invalid") from exc
+            if observed > now:
+                raise _DataQualityError("provider_timestamp_future")
+            if now - observed > 60_000:
+                raise _DataQualityError("provider_timestamp_stale")
+            freshness = "fresh_by_provider_timestamp"
+        return {"kind": "order_book", "observed_at_ms": observed,
+                "freshness_status": freshness, "analysis_eligible": False,
+                "base_currency": symbol.split("/")[0], "price_currency": symbol.split("/")[1],
+                "quantity_unit": symbol.split("/")[0], "levels_per_side_limit": 10,
+                "bids": parsed["bids"], "asks": parsed["asks"],
+                "best_bid": bid, "best_ask": ask, "spread": ask - bid,
+                "spread_percent_midpoint": (ask - bid) / ((ask + bid) / 2) * 100,
+                "limitations": ["Snapshot is venue-specific and not a market-wide liquidity measurement.",
+                                "Order-book imbalance is not verified buy/sell pressure.",
+                                "Preview is not eligible for automated liquidity conclusions.",
+                                "Provider time and identity are not independently verified."]}
+
     def ticker(self, symbol: str, *, providers: tuple[str, ...] = _ALLOWED_PROVIDERS) -> dict:
         return self.__call(symbol, "ticker", providers)
 
@@ -200,3 +256,6 @@ class PublicSpotAdapter:
         if interval not in _INTERVALS_MS or type(limit) is not int or not 2 <= limit <= _MAX_ROWS:
             raise ValueError("Unsupported candle interval or limit")
         return self.__call(symbol, "candles", providers, interval=interval, limit=limit)
+
+    def order_book(self, symbol: str, *, providers: tuple[str, ...] = _ALLOWED_PROVIDERS) -> dict:
+        return self.__call(symbol, "order_book", providers)
