@@ -9,6 +9,7 @@ import math
 import threading
 import time
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Any, Callable
 
 _ALLOWED_PROVIDERS = ("kraken", "coinbase")
@@ -190,8 +191,11 @@ class PublicSpotAdapter:
                 rows.append([ts, op, high, low, close, volume])
             elif ts > now:
                 raise ValueError("Future candle")
-        if len(rows) != limit or any(b[0] - a[0] != duration for a, b in zip(rows, rows[1:])):
+        if len(rows) < limit or any(b[0] - a[0] != duration for a, b in zip(rows, rows[1:])):
             raise ValueError("Incomplete, duplicate or discontinuous candle window")
+        # Providers may return only closed candles; retain the newest requested
+        # window after validating the entire returned sequence.
+        rows = rows[-limit:]
         if now - (rows[-1][0] + duration) > duration * 2:
             raise ValueError("Stale candle window")
         return {"kind": "ohlcv", "interval": interval, "closed_candles": True,
@@ -239,13 +243,14 @@ class PublicSpotAdapter:
             if now - observed > 60_000:
                 raise _DataQualityError("provider_timestamp_stale")
             freshness = "fresh_by_provider_timestamp"
+        spread = float(Decimal(str(ask)) - Decimal(str(bid)))
         return {"kind": "order_book", "observed_at_ms": observed,
                 "freshness_status": freshness, "analysis_eligible": False,
                 "base_currency": symbol.split("/")[0], "price_currency": symbol.split("/")[1],
                 "quantity_unit": symbol.split("/")[0], "levels_per_side_limit": 10,
                 "bids": parsed["bids"], "asks": parsed["asks"],
-                "best_bid": bid, "best_ask": ask, "spread": ask - bid,
-                "spread_percent_midpoint": (ask - bid) / (bid + (ask - bid) / 2) * 100,
+                "best_bid": bid, "best_ask": ask, "spread": spread,
+                "spread_percent_midpoint": spread / (bid + spread / 2) * 100,
                 "limitations": ["Snapshot is venue-specific and not a market-wide liquidity measurement.",
                                 "Order-book imbalance is not verified buy/sell pressure.",
                                 "Preview is not eligible for automated liquidity conclusions.",
@@ -261,3 +266,40 @@ class PublicSpotAdapter:
 
     def order_book(self, symbol: str, *, providers: tuple[str, ...] = _ALLOWED_PROVIDERS) -> dict:
         return self.__call(symbol, "order_book", providers)
+
+    def compare_closed_candles(self, symbol: str) -> dict:
+        """Compare same-symbol 1h closes independently; never mix timestamp windows."""
+        if symbol not in _ALLOWED_MARKETS:
+            raise ValueError("Unsupported spot market")
+        sources, failures = [], []
+        for provider in _ALLOWED_PROVIDERS:
+            try:
+                result = self.candles(symbol, '1h', 2, providers=(provider,))
+            except PublicDataUnavailable as exc:
+                failures.extend(exc.attempts)
+                continue
+            sources.append({"provider": provider, "market_id": result["market_id"],
+                            "observed_at_ms": result["observed_at_ms"],
+                            "retrieved_at": result["retrieved_at"],
+                            "close": result["data"][-1][4]})
+        comparison = None
+        status = "unavailable" if not sources else "partial" if len(sources) == 1 else "window_mismatch"
+        if len(sources) == 2 and sources[0]["observed_at_ms"] == sources[1]["observed_at_ms"]:
+            a, b = (Decimal(str(item['close'])) for item in sources)
+            difference = b - a
+            percentage = difference / a * Decimal(100)
+            if math.isfinite(float(difference)) and math.isfinite(float(percentage)):
+                comparison = {"reference_provider": sources[0]["provider"],
+                              "comparison_provider": sources[1]["provider"],
+                              "difference_quote": float(difference),
+                              "difference_percent_of_reference": float(percentage)}
+                status = "comparable_closed_window"
+            else:
+                status = "invalid_comparison"
+        return {"kind": "closed_candle_comparison", "symbol": symbol, "interval": "1h",
+                "quote_currency": symbol.split('/')[1], "comparison_status": status,
+                "sources": sources, "failures": failures, "comparison": comparison,
+                "analysis_eligible": False,
+                "limitations": ["Last closed candles are historical, not live tickers.",
+                                "Exchange snapshots are not atomic; source identity is not independently verified.",
+                                "Differences do not imply an executable opportunity."]}

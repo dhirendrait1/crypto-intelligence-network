@@ -57,6 +57,8 @@ async def _execute(kind: str, symbol: str, *, interval: str = "1h", limit: int =
             task = asyncio.create_task(asyncio.to_thread(adapter.candles, symbol, interval, limit))
         elif kind == "order_book":
             task = asyncio.create_task(asyncio.to_thread(adapter.order_book, symbol))
+        elif kind == "comparison":
+            task = asyncio.create_task(asyncio.to_thread(adapter.compare_closed_candles, symbol))
         else:
             raise ValueError("Unsupported request")
         # A timed-out thread cannot be cancelled. Retain the gate until it
@@ -102,3 +104,8 @@ async def candles(symbol: str = "BTC/USD", interval: str = "1h", limit: int = Qu
 @router.get("/research/ccxt/order-book")
 async def order_book(symbol: str = "BTC/USD"):
     return await _execute("order_book", symbol)
+
+
+@router.get("/research/ccxt/closed-candle-comparison")
+async def closed_candle_comparison(symbol: str = "BTC/USD"):
+    return await _execute("comparison", symbol)

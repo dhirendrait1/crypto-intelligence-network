@@ -99,6 +99,10 @@ class Tests(unittest.TestCase):
         self.assertEqual(result['count'],3)
         self.assertTrue(result['closed_candles'])
         self.assertEqual(result['data'][-1][0],END-DURATION)
+    def test_extra_closed_candle_keeps_latest_requested_window(self):
+        result = self.adapter.candles('BTC/USD', '1h', 2)
+        self.assertEqual(result['count'], 2)
+        self.assertEqual(result['data'][0][0], END - 2 * DURATION)
     def test_gaps_duplicates_invalid_and_stale_candles_fail_closed(self):
         cases=[lambda rows: rows.__setitem__(1,rows[0]),lambda rows: rows[1].__setitem__(1,-1),lambda rows: rows[1].__setitem__(2,1),lambda rows: rows[1].__setitem__(5,float('nan')),lambda rows: rows[1].__setitem__(0,rows[1][0]+1),lambda rows: rows.pop(),lambda rows: [r.__setitem__(0,r[0]-20*DURATION) for r in rows]]
         for mutate in cases:
@@ -125,6 +129,10 @@ class Tests(unittest.TestCase):
         self.assertAlmostEqual(book['spread_percent_midpoint'], 2)
         self.assertFalse(book['analysis_eligible'])
         self.assertEqual(book['freshness_status'], 'fresh_by_provider_timestamp')
+    def test_decimal_spread_does_not_show_binary_float_artifact(self):
+        self.exchanges['kraken'].book['bids'] = [[76763.7, 1]]
+        self.exchanges['kraken'].book['asks'] = [[76763.8, 1]]
+        self.assertEqual(self.adapter.order_book('BTC/USD')['spread'], 0.1)
     def test_missing_book_time_is_unknown_and_ineligible(self):
         self.exchanges['kraken'].book['timestamp'] = None
         book = self.adapter.order_book('BTC/USD')
@@ -150,5 +158,31 @@ class Tests(unittest.TestCase):
                 with self.assertRaises(PublicDataUnavailable) as error:
                     self.adapter.order_book('BTC/USD')
                 self.assertEqual(error.exception.attempts[0]['reason'], reason)
+    def test_comparison_requires_exact_same_closed_candle(self):
+        for ex in self.exchanges.values(): ex.rows = ex.rows[-2:]
+        self.exchanges['coinbase'].market['id'] = 'BTC-USD'
+        self.exchanges['coinbase'].rows[-1][4] = 102.5
+        result = self.adapter.compare_closed_candles('BTC/USD')
+        self.assertEqual(result['comparison_status'], 'comparable_closed_window')
+        self.assertEqual(result['comparison']['difference_quote'], 0.5)
+        self.assertFalse(result['analysis_eligible'])
+        for row in self.exchanges['coinbase'].rows: row[0] -= DURATION
+        result = self.adapter.compare_closed_candles('BTC/USD')
+        self.assertEqual(result['comparison_status'], 'window_mismatch')
+        self.assertIsNone(result['comparison'])
+    def test_comparison_remains_partial_when_provider_fails(self):
+        self.exchanges['kraken'].rows = self.exchanges['kraken'].rows[-2:]
+        self.exchanges['coinbase'].failure = TimeoutError('secret ignored')
+        result = self.adapter.compare_closed_candles('BTC/USD')
+        self.assertEqual(result['comparison_status'], 'partial')
+        self.assertEqual(len(result['sources']), 1)
+        self.assertIsNone(result['comparison'])
+        self.assertEqual(result['failures'][0]['reason'], 'timeout')
+    def test_comparison_reports_unavailable_when_both_providers_fail(self):
+        for ex in self.exchanges.values(): ex.failure = TimeoutError()
+        result = self.adapter.compare_closed_candles('BTC/USD')
+        self.assertEqual(result['comparison_status'], 'unavailable')
+        self.assertEqual(result['sources'], [])
+        self.assertIsNone(result['comparison'])
 
 if __name__=='__main__': unittest.main()

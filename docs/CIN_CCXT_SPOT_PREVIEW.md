@@ -10,4 +10,6 @@ Use `CIN_CCXT_PREVIEW_ENABLED=1` only on an isolated test service after the pinn
 
 Only public methods are invoked: market metadata, ticker, OHLCV and order-book observation. No public HTTP route exposes a raw exchange object, arbitrary CCXT method, private account, order or wallet operation. Tests use injected fake public exchanges and never transmit data.
 
-WebSockets, derivatives, history pagination, cross-exchange comparison, shared request budgets, monitoring, comprehensive caching, production fallback and dashboard integration are not implemented by this preview. A provider response is not evidence of a reliable prediction or a qualifying shortlist.
+The optional `GET /research/ccxt/closed-candle-comparison?symbol=BTC%2FUSD` compares independently validated 1h spot candle closes from Kraken and Coinbase only when both report the same close window. Partial responses and mismatched windows contain no calculated difference. This is historical research, not a live ticker or executable opportunity; analysis eligibility remains false.
+
+WebSockets, derivatives, history pagination, live cross-exchange comparison, shared request budgets, monitoring, comprehensive caching, production fallback and dashboard integration are not implemented by this preview. A provider response is not evidence of a reliable prediction or a qualifying shortlist.
