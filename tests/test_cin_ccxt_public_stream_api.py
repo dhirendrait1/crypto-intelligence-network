@@ -53,6 +53,18 @@ class StreamTests(unittest.TestCase):
         self.assertEqual((trade['provider'],trade['symbol'],trade['price'],trade['quantity_currency']),('kraken','BTC/USD',100.0,'BTC'))
         self.assertNotIn('id',trade)
         self.assertTrue(exchange.closed)
+    def test_session_stops_at_event_limit(self):
+        exchange=Exchange()
+        async def trades(symbol, limit):
+            return [{'id':str(i),'symbol':symbol,'timestamp':int(NOW*1000),'price':100+i,'amount':1} for i in range(3)]
+        exchange.watch_trades=trades
+        async def run():
+            with patch.object(api,'_slot',asyncio.Semaphore(0)),patch.object(api,'_make_exchange',return_value=exchange),patch.object(api.time,'time',return_value=NOW),patch.object(api,'_MAX_EVENTS',2):
+                return [row async for row in api._events(Request(),'BTC/USD')]
+        rows=asyncio.run(run())
+        self.assertEqual(sum(row.startswith('event: trade') for row in rows),2)
+        self.assertTrue(rows[-1].startswith('event: closed'))
+        self.assertTrue(exchange.closed)
     def test_trade_validation_rejects_stale_future_and_bad_values(self):
         good={'id':'x','symbol':'BTC/USD','timestamp':int(NOW*1000),'price':100,'amount':1}
         for changes in ({'id':None},{'timestamp':int(NOW*1000)-30001},{'timestamp':int(NOW*1000)+1},

@@ -14,8 +14,8 @@ from fastapi.responses import StreamingResponse
 
 router = APIRouter(tags=["experimental-ccxt-public-stream"])
 _SPOT_SYMBOL = re.compile(r"[A-Z0-9]{1,10}/USD\Z")
-_MAX_SECONDS = 120
-_MAX_EVENTS = 120
+_MAX_SECONDS = 300
+_MAX_EVENTS = 1200
 _MAX_TRADE_AGE_MS = 30_000
 _slot = asyncio.Semaphore(1)
 _next_start = 0.0
@@ -92,6 +92,7 @@ async def _events(request: Request, symbol: str, lease: _StreamLease | None = No
             return
         yield _event('connected', {'provider':'kraken','symbol':symbol,'market_id':market['id'],
                                   'market_type':'spot','mode':'read_only',
+                                  'max_session_seconds': _MAX_SECONDS, 'max_events': _MAX_EVENTS,
                                   'message':'Public stream connected; no trade received yet.'})
         connected_at_ms = int(time.time() * 1000)
         start = time.monotonic()
